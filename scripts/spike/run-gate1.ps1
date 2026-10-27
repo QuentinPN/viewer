@@ -88,7 +88,7 @@ while (-not $proc.HasExited -and (Get-Date) -lt $deadline) {
       [Win]::SetForegroundWindow($hwnd) | Out-Null
       Start-Sleep -Milliseconds 300
       [System.Windows.Forms.SendKeys]::SendWait(' ')
-    } elseif ($captures -contains $cp -and -not $seen[$cp]) {
+    } elseif (($captures -contains $cp -or $cp -match '^(audio|subtitle)-') -and -not $seen[$cp]) {
       Start-Sleep -Milliseconds 1200  # let the frame settle after the step
       Save-WindowCapture $hwnd $cp
       $seen[$cp] = $true

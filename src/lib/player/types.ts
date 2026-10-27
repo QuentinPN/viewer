@@ -53,6 +53,7 @@ export interface PlayerDiagnostics {
   videoWidth: number | null;
   videoHeight: number | null;
   audioCodec: string | null;
+  audioOutput: string | null;
   container: string | null;
   osdWidth: number | null;
   osdHeight: number | null;

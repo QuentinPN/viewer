@@ -326,6 +326,7 @@ impl PlayerEngine for MpvEngine {
             video_width: i("width"),
             video_height: i("height"),
             audio_codec: s("audio-codec-name"),
+            audio_output: s("current-ao"),
             container: s("file-format"),
             osd_width: i("osd-width"),
             osd_height: i("osd-height"),

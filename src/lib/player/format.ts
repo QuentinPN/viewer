@@ -30,11 +30,15 @@ const LANGUAGES: Record<string, string> = {
   kor: "Coréen",
 };
 
+/** French name for an ISO 639 or BCP 47 code (`fr-FR` → `fr`), else the code itself. */
+function languageName(code: string): string {
+  const lower = code.toLowerCase();
+  return LANGUAGES[lower] ?? LANGUAGES[lower.split(/[-_]/)[0] ?? ""] ?? code;
+}
+
 /** Human label for a track selector, in French. */
 export function trackLabel(track: Track): string {
-  const lang = track.lang
-    ? (LANGUAGES[track.lang.toLowerCase()] ?? track.lang)
-    : null;
+  const lang = track.lang ? languageName(track.lang) : null;
   const parts = [track.title, lang, track.codec?.toUpperCase()].filter(
     (p): p is string => typeof p === "string" && p.length > 0,
   );

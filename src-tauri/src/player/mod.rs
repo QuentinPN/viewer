@@ -162,6 +162,8 @@ pub struct PlayerDiagnostics {
     pub video_width: Option<i64>,
     pub video_height: Option<i64>,
     pub audio_codec: Option<String>,
+    /// Active audio output driver (`current-ao`); `None` means no device is open.
+    pub audio_output: Option<String>,
     pub container: Option<String>,
     pub osd_width: Option<i64>,
     pub osd_height: Option<i64>,

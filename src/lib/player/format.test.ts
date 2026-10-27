@@ -35,6 +35,13 @@ describe("trackLabel", () => {
     ).toBe("Complets · Français · ASS");
   });
 
+  it("translates BCP 47 tags through their primary language", () => {
+    expect(
+      trackLabel(track({ lang: "fr-FR", codec: "ass", title: "CC" })),
+    ).toBe("CC · Français · ASS");
+    expect(trackLabel(track({ lang: "pt-BR" }))).toBe("pt-BR");
+  });
+
   it("falls back to the track number and marks external tracks", () => {
     expect(trackLabel(track({ id: 3 }))).toBe("Piste 3");
     expect(trackLabel(track({ lang: "xyz", external: true }))).toBe(

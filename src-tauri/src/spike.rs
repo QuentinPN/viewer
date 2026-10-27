@@ -162,34 +162,110 @@ fn run(app: &AppHandle, media: &str, out: &Path) -> Report {
         .filter(|t| t.kind == TrackKind::Sub)
         .map(|t| t.id)
         .collect();
+    // `aid`/`sid` only reflect the request; `current-tracks/*` is the track mpv
+    // actually decodes, and playback must keep advancing after the switch.
     for id in &audio {
-        let ok = engine
+        let requested = engine
             .command(&PlayerCommand::SetAudioTrack { id: Some(*id) })
-            .is_ok()
+            .is_ok();
+        let active = requested
             && wait_until(Duration::from_secs(3), || {
-                engine.property("aid") == Some(id.to_string())
+                engine.property("current-tracks/audio/id") == Some(id.to_string())
             });
+        let before = time_pos(&engine);
+        let advancing =
+            active && wait_until(Duration::from_secs(3), || time_pos(&engine) > before + 0.5);
         push(
             &format!("audio_track_{id}"),
-            ok,
-            format!("aid={:?}", engine.property("aid")),
+            advancing,
+            format!(
+                "active={:?} lang={:?} codec={:?} ao={:?} advancing={advancing}",
+                engine.property("current-tracks/audio/id"),
+                engine.property("current-tracks/audio/lang"),
+                engine.property("audio-codec-name"),
+                engine.property("current-ao"),
+            ),
         );
+        hold(out, &format!("audio-{id}"), 2);
     }
+    // For text subtitles, `sub-text` proves each track yields its own cues; only
+    // a hash is recorded so reports never contain the subtitle content.
+    let mut sub_hashes = Vec::new();
+    // Every track starts from the same point so a sparse track cannot move the
+    // playhead into a part of the file without dialogue.
+    let anchor = time_pos(&engine).max(0.0);
     for id in &subs {
-        let ok = engine
+        let requested = engine
             .command(&PlayerCommand::SetSubtitleTrack { id: Some(*id) })
-            .is_ok()
+            .is_ok();
+        let active = requested
             && wait_until(Duration::from_secs(3), || {
-                engine.property("sid") == Some(id.to_string())
+                engine.property("current-tracks/sub/id") == Some(id.to_string())
             });
         push(
             &format!("subtitle_track_{id}"),
-            ok,
+            active,
+            format!(
+                "active={:?} lang={:?} codec={:?}",
+                engine.property("current-tracks/sub/id"),
+                engine.property("current-tracks/sub/lang"),
+                engine.property("current-tracks/sub/codec"),
+            ),
+        );
+        let _ = engine.command(&PlayerCommand::SeekAbsolute { seconds: anchor });
+        let mut text = None;
+        let found = active
+            && wait_until(Duration::from_secs(20), || {
+                text = engine.property("sub-text").filter(|t| !t.trim().is_empty());
+                text.is_some()
+            });
+        let hash = text.as_deref().map(text_hash);
+        sub_hashes.extend(hash);
+        // Forced/signs tracks can legitimately have no cue in the window.
+        push(
+            &format!("subtitle_cue_{id}"),
+            found,
+            format!(
+                "window={anchor:.0}-{:.0}s cue_chars={:?} cue_hash={hash:?}",
+                anchor + 20.0,
+                text.as_deref().map(|t| t.chars().count()),
+            ),
+        );
+        hold(out, &format!("subtitle-{id}"), 3);
+    }
+    if sub_hashes.len() > 1 {
+        let mut distinct = sub_hashes.clone();
+        distinct.sort_unstable();
+        distinct.dedup();
+        push(
+            "subtitle_cues_distinct",
+            distinct.len() == sub_hashes.len(),
+            format!(
+                "{} distinct cues for {} tracks with a cue",
+                distinct.len(),
+                sub_hashes.len()
+            ),
+        );
+    }
+    if !subs.is_empty() {
+        let off = engine
+            .command(&PlayerCommand::SetSubtitleTrack { id: None })
+            .is_ok()
+            && wait_until(Duration::from_secs(3), || {
+                engine.property("current-tracks/sub/id").is_none()
+            });
+        push(
+            "subtitle_disable",
+            off,
             format!("sid={:?}", engine.property("sid")),
         );
+        hold(out, "subtitle-off", 3);
     }
     if let Some(first) = subs.first() {
         let _ = engine.command(&PlayerCommand::SetSubtitleTrack { id: Some(*first) });
+    }
+    if let Some(first) = audio.first() {
+        let _ = engine.command(&PlayerCommand::SetAudioTrack { id: Some(*first) });
     }
     let report_tracks = tracks;
 
@@ -341,4 +417,11 @@ fn finish(
         tracks,
         teardown_ms,
     }
+}
+
+fn text_hash(text: &str) -> u64 {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+    let mut h = DefaultHasher::new();
+    text.hash(&mut h);
+    h.finish()
 }

@@ -14,20 +14,21 @@ Prove local MKV, authorized HTTP stream, audio, subtitle switching, seek, fullsc
   - local H.264 MKV and local HTTP stream with header token;
   - d3d11va hardware decoding;
   - ASS subtitles rendered;
+  - switching between 3 audio and 3 ASS subtitle tracks, checked on the decoded track (`current-tracks/*`), distinct cues per track, subtitles disabled, UI selectors in sync; audio output `wasapi` opened;
   - seek, fullscreen and resize following;
   - real Space key → pause through the WebView;
   - teardown ≈100–145 ms, 3 open/close cycles, process exits cleanly.
 - NOT VERIFIED:
-  - switching between multiple audio/subtitle tracks (test file has one of each);
+  - rendering of a "Forced" subtitle track (no cue observed in the test window);
   - SRT embedded, PGS;
   - HEVC, AV1, 4K, HDR;
-  - audible audio output;
+  - audible audio output (device opened, not listened to);
   - mouse clicks on overlay, Escape and focus after fullscreen;
   - 125/150 % DPI, multi-monitor;
   - window close during playback;
   - network loss, unsupported codec;
   - release build on a clean machine.
-- Next: a multi-track sample (several audio + SRT/ASS/PGS) and a HEVC sample, then rerun `scripts/spike/run-gate1.ps1`.
+- Next: a HEVC sample and a sample with SRT/PGS subtitles, then rerun `scripts/spike/run-gate1.ps1`; manual checks (mouse on overlay, Escape, close during playback, 125/150 % DPI).
 
 ## Gate 2 — Emby integration [TODO · needs user authorization]
 Connection/auth, typed API client, libraries, item details, PlaybackInfo, secure tokens, session reporting, fake-server contract tests.
@@ -57,3 +58,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - no GitHub remote, so CI has not run;
   - Emby access not yet authorized.
 - **Next**: multi-track/HEVC samples for the remaining Gate 1 items; then Gate 2 after ADR 0004 and server access approval.
+
+### 2026-10-27 — Gate 1 multi-track switching
+- **Changed**: the Gate 1 scenario checks the decoded track (`current-tracks/*`) instead of the requested one, checks playback keeps advancing after an audio switch, captures a hashed subtitle cue per track, disables subtitles, and takes one screenshot per track. `PlayerDiagnostics` exposes `audioOutput` (`current-ao`). Track labels translate BCP 47 tags (`fr-FR` → Français).
+- **Tests**:
+  - `scripts/spike/run-gate1.ps1` (parent, multi-track MKV: 3 AAC, 3 ASS): all checks pass except `subtitle_cue_1` (Forced track, no cue in the window);
+  - `npm run verify`: all green (Vitest 9/9, cargo test 10/10).
+- **Bug found and fixed** (scenario): scanning a sparse track moved the playhead to the end credits.
+- **Next**: HEVC and SRT/PGS samples; manual overlay/DPI/close checks.
