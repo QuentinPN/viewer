@@ -18,7 +18,7 @@ Relecture de CLAUDE.md, PRODUCT.md, ARCHITECTURE.md, DESIGN.md, ROADMAP.md, TEST
 
 1. **Où vit `EmbyClient` : TypeScript ou Rust ?** ARCHITECTURE.md liste `EmbyClient` parmi les « services applicatifs » sans préciser la couche, tout en exigeant un stockage OS des jetons et l'interdiction pour l'UI de construire des URLs média.
    - **Proposition** : `EmbyClient` en Rust (reqwest + rustls, validation TLS). Le jeton ne quitte jamais Rust (Windows Credential Manager via la crate `keyring`), il n'y a pas de CORS à gérer, et l'en-tête d'auth est passé directement à mpv. L'UI reçoit des modèles typés.
-   - À valider par ADR 0004 au début de la Gate 2.
+   - **Tranché par l'ADR 0004** (Gate 2) : `EmbyClient` en Rust, mais TLS via native-tls (SChannel) plutôt que rustls, dont le backend aws-lc exige CMake et NASM absents du poste.
 2. **Images (affiches)** : la CSP actuelle n'autorise que `'self'`. Deux options :
    - autoriser l'origine du serveur Emby ;
    - servir les images via le `CacheRepository` Rust (protocole personnalisé), ce qui donne le cache disque borné demandé et évite d'élargir la CSP.

@@ -29,9 +29,17 @@ Prove local MKV, authorized HTTP stream, audio, subtitle switching, seek, fullsc
   - release build on a clean machine.
 - Next: a HEVC sample and a sample with SRT/PGS subtitles, then rerun `scripts/spike/run-gate1.ps1`; manual 125/150 % DPI check.
 
-## Gate 2 — Emby integration [TODO · needs user authorization]
+## Gate 2 — Emby integration [IN PROGRESS · sign-in and secure token VERIFIED]
 Connection/auth, typed API client, libraries, item details, PlaybackInfo, secure tokens, session reporting, fake-server contract tests.
-- Prerequisite: ADR 0004 (EmbyClient in Rust vs TS, proposal in `docs/analyse-initiale.md`); server URL/version; a non-admin test account; explicit permission before any request to the NAS.
+- Access authorized by the user (2026-10-27): Emby 4.10.1.0 on the QNAP, LAN HTTP only, non-admin test account. Decision: ADR 0004 (`EmbyClient` in Rust, token in the Windows Credential Manager).
+- VERIFIED (2026-10-27), evidence in `docs/evidence/gate2-2026-10-27.md`:
+  - server address normalization, connection test, plain HTTP accepted only to a local address;
+  - sign-in, token stored in the Windows Credential Manager only, auth in the `X-Emby-Authorization` header;
+  - restore after restart, revoked token detected and forgotten, sign-out revoking the token on the server;
+  - typed French errors with a hint (wrong password, unreachable, not Emby, expired session);
+  - fake-server contract tests, `#[ignore]` real-server test, UI E2E on the real server.
+- NOT VERIFIED: HTTPS with TLS validation against a real server (none available); retries, cancellation, offline state; 125/150 % DPI.
+- TODO: libraries (`/Users/{id}/Views`, paged items), item details, PlaybackInfo / MediaSources, session reporting.
 
 ## Gate 3 — Core experience [TODO]
 Home, film/series browsing, details, search, accessible player UI, responsive layouts and artwork cache.
@@ -76,3 +84,13 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Changed**: after mpv teardown the main window is destroyed and Tauri exits normally (window close path and Gate 1 scenario); `scripts/spike/close-probe.ps1` added to measure Windows close idle or during playback.
 - **Tests**: close-probe during playback 4/4 without the error (154–189 ms, exit 0, no leftover process); idle close 38 ms without the error; full Gate 1 scenario without the error, same check results; `npm run verify` all green.
 - **Next**: HEVC and SRT/PGS samples; 125/150 % DPI.
+
+### 2026-10-27 — Gate 2 sign-in and secure token
+- **Changed**: ADR 0004; Rust `emby` module (`ServerUrl`, `EmbyClient`, `CredentialStore` on the Windows Credential Manager, `EmbyService` with `session.json` holding no secret); five Tauri commands (`emby_probe`, `emby_sign_in`, `emby_restore`, `emby_sign_out`, `emby_last_server`); French two-step sign-in screen; session restored at startup; the Gate 1 prototype stays reachable from the signed-in screen.
+- **Tests**:
+  - `npm run verify`: all green (Vitest 12/12, cargo test 22 passed / 2 ignored);
+  - ignored tests run on demand: Windows Credential Manager round trip, real server sign-in/restore/sign-out: OK;
+  - `scripts/gate2/e2e-signin.ps1` on the real server: wrong password, sign-in, restore after restart, sign-out, prefilled address; screenshots reviewed.
+- **Bugs found and fixed**: focus sent to a still-disabled input; spike detection too early at startup.
+- **Server side effects**: test devices left in the Emby dashboard, one with an unrevoked session ("PC test bureau"); no configuration changed.
+- **Next**: libraries and paged items, then PlaybackInfo.

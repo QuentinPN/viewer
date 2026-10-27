@@ -1,4 +1,5 @@
 mod commands;
+pub mod emby;
 pub mod player;
 #[cfg(debug_assertions)]
 mod spike;
@@ -81,6 +82,27 @@ fn resolve_libmpv() -> PathBuf {
     beside_exe.unwrap_or(fallback)
 }
 
+/// Emby session service: token in the OS credential store, metadata in the app
+/// config directory (ADR 0004).
+fn emby_service(
+    app: &tauri::App,
+) -> Result<emby::session::EmbyService, Box<dyn std::error::Error>> {
+    let path = app.path().app_config_dir()?.join("session.json");
+    #[cfg(windows)]
+    let store: Box<dyn emby::credentials::CredentialStore> =
+        Box::new(emby::credentials::WindowsCredentialStore);
+    #[cfg(not(windows))]
+    let store: Box<dyn emby::credentials::CredentialStore> =
+        Box::new(emby::credentials::MemoryCredentialStore::default());
+    let device_name = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC Windows".into());
+    Ok(emby::session::EmbyService::new(
+        store,
+        path,
+        device_name,
+        env!("CARGO_PKG_VERSION").to_owned(),
+    ))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
@@ -106,6 +128,8 @@ pub fn run() {
             };
             #[cfg(not(windows))]
             let wid = None;
+
+            app.manage(emby_service(app)?);
 
             app.manage(AppState {
                 player: Mutex::new(None),
@@ -161,6 +185,11 @@ pub fn run() {
             commands::player_close,
             commands::window_set_fullscreen,
             commands::app_info,
+            commands::emby_probe,
+            commands::emby_sign_in,
+            commands::emby_restore,
+            commands::emby_sign_out,
+            commands::emby_last_server,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Viewer");

@@ -24,6 +24,12 @@ Cases: H.264 MP4, HEVC MKV, AV1 if supported, 4K sample, multiple audio tracks, 
 
 Mock Emby API for auth failures, pagination, permissions, missing fields, playback selection and session lifecycle. With user approval, verify progress and watched state on a real test account and test media.
 
+- `src-tauri/src/emby/tests.rs` runs `EmbyService` against a local fake Emby server (one request per connection) and an in-memory credential store. Fake responses mirror real server responses recorded in `docs/evidence/`.
+- Real server, opt-in: credentials only through environment variables, never as arguments or in files: `VIEWER_EMBY_URL`, `VIEWER_EMBY_USER`, `VIEWER_EMBY_PASSWORD`.
+  - `./scripts/with-msvc.ps1 cargo test --manifest-path src-tauri/Cargo.toml real_server_sign_in_restore_sign_out '--' --ignored`: sign-in, restore, sign-out, revoked token refused. It reuses the fixed device id `viewer-real-server-test`.
+  - `./scripts/gate2/e2e-signin.ps1` (after a debug `cargo build`, starting signed out): drives the app UI with key presses over three launches and writes screenshots to `artifacts/gate2/<run>/`. Review them.
+- Windows Credential Manager, opt-in: `cargo test … windows_store_round_trip '--' --ignored`, then check `cmdkey /list` shows no `Viewer` entry.
+
 ## Release gate
 
 No release claims without: reproducible build, successful tests, Windows player smoke test, clean-machine installer test, dependency/license audit and documented known limitations.

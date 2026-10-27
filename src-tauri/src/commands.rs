@@ -5,6 +5,9 @@ use serde::Serialize;
 use tauri::{State, WebviewWindow};
 
 use crate::AppState;
+use crate::emby::EmbyError;
+use crate::emby::models::{ServerSummary, SignedInUser};
+use crate::emby::session::EmbyService;
 use crate::player::{
     MediaSource, PlaybackRequest, PlayerCommand, PlayerDiagnostics, PlayerEngine, PlayerError,
     Track,
@@ -81,6 +84,8 @@ pub struct AppInfo {
     pub version: &'static str,
     pub surface_mode: SurfaceMode,
     pub libmpv_found: bool,
+    /// Debug builds only: the Gate 1 scenario drives the player (src/spike.rs).
+    pub spike: bool,
 }
 
 #[tauri::command]
@@ -89,5 +94,41 @@ pub async fn app_info(state: State<'_, AppState>) -> Result<AppInfo, ()> {
         version: env!("CARGO_PKG_VERSION"),
         surface_mode: state.mode,
         libmpv_found: state.library.is_file(),
+        spike: cfg!(debug_assertions) && std::env::var_os("VIEWER_SPIKE_MEDIA").is_some(),
     })
+}
+
+// Emby (ADR 0004). Results carry user and server summaries, never the token.
+
+#[tauri::command]
+pub async fn emby_probe(
+    emby: State<'_, EmbyService>,
+    url: String,
+) -> Result<ServerSummary, EmbyError> {
+    emby.probe(&url).await
+}
+
+#[tauri::command]
+pub async fn emby_sign_in(
+    emby: State<'_, EmbyService>,
+    url: String,
+    username: String,
+    password: String,
+) -> Result<SignedInUser, EmbyError> {
+    emby.sign_in(&url, &username, &password).await
+}
+
+#[tauri::command]
+pub async fn emby_restore(emby: State<'_, EmbyService>) -> Result<Option<SignedInUser>, EmbyError> {
+    emby.restore().await
+}
+
+#[tauri::command]
+pub async fn emby_sign_out(emby: State<'_, EmbyService>) -> Result<(), EmbyError> {
+    emby.sign_out().await
+}
+
+#[tauri::command]
+pub async fn emby_last_server(emby: State<'_, EmbyService>) -> Result<Option<String>, ()> {
+    Ok(emby.last_server_url())
 }

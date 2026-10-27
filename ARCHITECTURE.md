@@ -9,7 +9,7 @@ Services: `EmbyClient`, `LibraryService`, `PlaybackCoordinator`, `PlayerEngine`,
 
 - Frontend: Svelte 5 runes, TypeScript strict, Vite, route/state organization proportional to project size.
 - Native: Tauri 2 commands/events, Rust adapters, libmpv integration after a verified Windows feasibility spike.
-- Server: existing Emby API over HTTP(S); no proxy/backend by default.
+- Server: existing Emby API over HTTP(S); no proxy/backend by default. `EmbyClient` lives in Rust (`src-tauri/src/emby/`, ADR 0004): the token stays in Rust and in the Windows Credential Manager (`SecureCredentialStore`); the UI only sees typed models and `{kind, message}` errors. Plain HTTP is accepted only to a local-network address.
 - Cache: SQLite metadata + files for resized artwork; server/user namespacing, TTL, quotas, invalidation and schema migrations. Never store auth tokens there.
 
 ## Playback flow

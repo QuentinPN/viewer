@@ -68,4 +68,6 @@ export interface AppInfo {
   version: string;
   surfaceMode: "child" | "parent" | "separate";
   libmpvFound: boolean;
+  /** Debug builds only: the Gate 1 scenario drives the player. */
+  spike: boolean;
 }
