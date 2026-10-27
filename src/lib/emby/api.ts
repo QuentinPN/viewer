@@ -1,5 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { EmbyError, ServerSummary, SignedInUser } from "./types";
+import type {
+  EmbyError,
+  ItemPage,
+  Library,
+  ServerSummary,
+  SignedInUser,
+} from "./types";
 
 // Thin typed wrapper over the Emby commands of src-tauri/src/commands.rs.
 
@@ -10,6 +16,9 @@ export const embyApi = {
   restore: () => invoke<SignedInUser | null>("emby_restore"),
   signOut: () => invoke<void>("emby_sign_out"),
   lastServer: () => invoke<string | null>("emby_last_server"),
+  libraries: () => invoke<Library[]>("emby_libraries"),
+  items: (libraryId: string, startIndex: number, limit: number) =>
+    invoke<ItemPage>("emby_items", { libraryId, startIndex, limit }),
 };
 
 /** Normalizes a rejected command into an `EmbyError`, whatever was thrown. */
@@ -43,6 +52,8 @@ export function errorHint(error: EmbyError): string | null {
       return "Votre session a été fermée sur le serveur. Reconnectez-vous.";
     case "invalidResponse":
       return "L'adresse répond, mais ce n'est peut-être pas un serveur Emby.";
+    case "notFound":
+      return "Elle a peut-être été supprimée ou masquée. Actualisez la liste.";
     case "credentialStore":
       return "Le Gestionnaire d'identification Windows n'a pas pu enregistrer la session.";
     default:

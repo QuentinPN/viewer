@@ -7,9 +7,12 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 
 use super::EmbyError;
-use super::client::{AccessToken, DeviceIdentity, EmbyClient};
+use super::client::{AccessToken, DeviceIdentity, EmbyClient, ItemsQuery};
 use super::credentials::{self, CredentialStore};
-use super::models::{ServerSummary, SignedInUser};
+use super::images::{self, ImageRequest, ImageType};
+use super::models::{
+    BaseItemDto, ItemPage, Library, LibraryKind, MediaItem, ServerSummary, SignedInUser,
+};
 use super::server_url::ServerUrl;
 
 /// Contents of `session.json`. Contains no secret.
@@ -60,9 +63,16 @@ impl SessionFile {
     }
 }
 
+/// Largest page the UI may ask for.
+pub const MAX_PAGE: u32 = 200;
+const TICKS_PER_MINUTE: i64 = 600_000_000;
+const IMAGE_CONCURRENCY: usize = 6;
+
 struct Current {
     client: EmbyClient,
     user: SignedInUser,
+    /// Last `/Views` answer: item queries only accept these ids as parent.
+    libraries: Vec<Library>,
 }
 
 pub struct EmbyService {
@@ -72,6 +82,8 @@ pub struct EmbyService {
     device_name: String,
     version: String,
     current: Mutex<Option<Current>>,
+    /// Bounds concurrent artwork downloads to spare the NAS (ADR 0005).
+    image_permits: tokio::sync::Semaphore,
 }
 
 impl EmbyService {
@@ -89,6 +101,7 @@ impl EmbyService {
             device_name,
             version,
             current: Mutex::new(None),
+            image_permits: tokio::sync::Semaphore::new(IMAGE_CONCURRENCY),
         }
     }
 
@@ -130,6 +143,126 @@ impl EmbyService {
             .as_ref()
             .map(|c| c.client.clone())
             .ok_or(EmbyError::NotSignedIn)
+    }
+
+    fn session(&self) -> Result<(EmbyClient, String), EmbyError> {
+        self.current
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .as_ref()
+            .map(|c| (c.client.clone(), c.user.user_id.clone()))
+            .ok_or(EmbyError::NotSignedIn)
+    }
+
+    /// A token rejected while browsing is forgotten like at startup, so the next
+    /// launch does not retry it.
+    fn expire_on_401<T>(&self, result: Result<T, EmbyError>) -> Result<T, EmbyError> {
+        if let Err(EmbyError::SessionExpired) = &result {
+            let current = self
+                .current
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .take();
+            if let Some(c) = current {
+                let account = credentials::account(&c.user.server.id, &c.user.user_id);
+                if let Err(e) = self.store.delete(&account) {
+                    log::warn!("expired token not deleted: {}", e.kind());
+                }
+                if let Err(e) = self.update_file(|f| f.session = None) {
+                    log::warn!("session.json not updated: {}", e.kind());
+                }
+            }
+        }
+        result
+    }
+
+    /// Film and series libraries of the user, in server order. Other collection
+    /// types (music, photos, live TV…) are not browsable yet and are left out.
+    pub async fn libraries(&self) -> Result<Vec<Library>, EmbyError> {
+        let (client, user_id) = self.session()?;
+        let views = self.expire_on_401(client.views(&user_id).await)?;
+        let libraries: Vec<Library> = views
+            .items
+            .into_iter()
+            .filter_map(|v| {
+                let kind = LibraryKind::from_collection_type(v.collection_type.as_deref())?;
+                let image = images::image_ref(
+                    &v.id,
+                    ImageType::Primary,
+                    v.image_tags.get("Primary").map(String::as_str),
+                    images::LIBRARY_WIDTHS,
+                );
+                Some(Library {
+                    id: v.id,
+                    name: v.name,
+                    kind,
+                    image,
+                })
+            })
+            .collect();
+        if let Some(c) = self
+            .current
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .as_mut()
+        {
+            c.libraries = libraries.clone();
+        }
+        Ok(libraries)
+    }
+
+    fn library_kind(&self, library_id: &str) -> Option<LibraryKind> {
+        self.current
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .as_ref()?
+            .libraries
+            .iter()
+            .find(|l| l.id == library_id)
+            .map(|l| l.kind)
+    }
+
+    /// One page of films or series of a library, sorted by name. `limit` is
+    /// clamped to `1..=MAX_PAGE`.
+    pub async fn items(
+        &self,
+        library_id: &str,
+        start_index: u32,
+        limit: u32,
+    ) -> Result<ItemPage, EmbyError> {
+        let kind = match self.library_kind(library_id) {
+            Some(k) => k,
+            None => {
+                self.libraries().await?;
+                self.library_kind(library_id).ok_or(EmbyError::NotFound)?
+            }
+        };
+        let (client, user_id) = self.session()?;
+        let query = ItemsQuery {
+            parent_id: library_id,
+            item_types: kind.item_types(),
+            start_index,
+            limit: limit.clamp(1, MAX_PAGE),
+        };
+        let page = self.expire_on_401(client.items(&user_id, &query).await)?;
+        let returned = u32::try_from(page.items.len()).unwrap_or(u32::MAX);
+        Ok(ItemPage {
+            next_index: start_index.saturating_add(returned),
+            items: page.items.into_iter().filter_map(media_item).collect(),
+            start_index,
+            total: page.total_record_count,
+        })
+    }
+
+    /// Artwork for the `emby-img` protocol, fetched with the open session.
+    pub async fn image(&self, req: &ImageRequest) -> Result<(String, Vec<u8>), EmbyError> {
+        let _permit = self
+            .image_permits
+            .acquire()
+            .await
+            .map_err(|_| EmbyError::NotSignedIn)?;
+        let (client, _) = self.session()?;
+        self.expire_on_401(client.image(req).await)
     }
 
     pub fn last_server_url(&self) -> Option<String> {
@@ -184,6 +317,7 @@ impl EmbyService {
         self.set_current(Some(Current {
             client: client.with_token(token),
             user: user.clone(),
+            libraries: Vec::new(),
         }));
         Ok(user)
     }
@@ -225,6 +359,7 @@ impl EmbyService {
         self.set_current(Some(Current {
             client,
             user: user.clone(),
+            libraries: Vec::new(),
         }));
         Ok(Some(user))
     }
@@ -259,5 +394,41 @@ async fn summary(client: &EmbyClient) -> Result<ServerSummary, EmbyError> {
         version: info.version,
         id: info.id,
         encrypted: client.server().is_https(),
+    })
+}
+
+/// Grid card for a film or series; items with an unusable id are dropped.
+fn media_item(dto: BaseItemDto) -> Option<MediaItem> {
+    let poster = images::image_ref(
+        &dto.id,
+        ImageType::Primary,
+        dto.image_tags.get("Primary").map(String::as_str),
+        images::POSTER_WIDTHS,
+    );
+    if !dto
+        .id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-')
+        || dto.id.is_empty()
+    {
+        return None;
+    }
+    let user_data = dto.user_data.unwrap_or_default();
+    Some(MediaItem {
+        runtime_minutes: dto
+            .run_time_ticks
+            .filter(|_| dto.item_type == "Movie")
+            .and_then(|t| u32::try_from(t / TICKS_PER_MINUTE).ok())
+            .filter(|&m| m > 0),
+        id: dto.id,
+        name: dto.name,
+        item_type: dto.item_type,
+        year: dto.production_year,
+        poster,
+        aspect_ratio: dto
+            .primary_image_aspect_ratio
+            .filter(|r| r.is_finite() && *r > 0.0),
+        played: user_data.played,
+        unplayed_count: user_data.unplayed_item_count,
     })
 }

@@ -26,6 +26,7 @@ export type EmbyErrorKind =
   | "forbidden"
   | "server"
   | "invalidResponse"
+  | "notFound"
   | "notSignedIn"
   | "sessionExpired"
   | "credentialStore";
@@ -33,4 +34,40 @@ export type EmbyErrorKind =
 export interface EmbyError {
   kind: EmbyErrorKind;
   message: string;
+}
+
+/** Artwork on the local `emby-img` protocol (ADR 0005), ready for `<img>`. */
+export interface ImageRef {
+  src: string;
+  srcset: string;
+}
+
+export type LibraryKind = "movies" | "tvShows";
+
+export interface Library {
+  id: string;
+  name: string;
+  kind: LibraryKind;
+  image: ImageRef | null;
+}
+
+export interface MediaItem {
+  id: string;
+  name: string;
+  itemType: string;
+  year: number | null;
+  runtimeMinutes: number | null;
+  poster: ImageRef | null;
+  aspectRatio: number | null;
+  played: boolean;
+  /** Series only: episodes not yet watched. */
+  unplayedCount: number | null;
+}
+
+export interface ItemPage {
+  items: MediaItem[];
+  startIndex: number;
+  /** Start of the next page, counting items Rust dropped as unusable. */
+  nextIndex: number;
+  total: number;
 }

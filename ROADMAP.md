@@ -29,7 +29,7 @@ Prove local MKV, authorized HTTP stream, audio, subtitle switching, seek, fullsc
   - release build on a clean machine.
 - Next: a HEVC sample and a sample with SRT/PGS subtitles, then rerun `scripts/spike/run-gate1.ps1`; manual 125/150 % DPI check.
 
-## Gate 2 — Emby integration [IN PROGRESS · sign-in and secure token VERIFIED]
+## Gate 2 — Emby integration [IN PROGRESS · sign-in, libraries and paged grid VERIFIED]
 Connection/auth, typed API client, libraries, item details, PlaybackInfo, secure tokens, session reporting, fake-server contract tests.
 - Access authorized by the user (2026-10-27): Emby 4.10.1.0 on the QNAP, LAN HTTP only, non-admin test account. Decision: ADR 0004 (`EmbyClient` in Rust, token in the Windows Credential Manager).
 - VERIFIED (2026-10-27), evidence in `docs/evidence/gate2-2026-10-27.md`:
@@ -38,8 +38,10 @@ Connection/auth, typed API client, libraries, item details, PlaybackInfo, secure
   - restore after restart, revoked token detected and forgotten, sign-out revoking the token on the server;
   - typed French errors with a hint (wrong password, unreachable, not Emby, expired session);
   - fake-server contract tests, `#[ignore]` real-server test, UI E2E on the real server.
+- VERIFIED (2026-10-27): film and series libraries, poster grid paged by 60 and sorted by name, watched and unwatched-episode badges, artwork through the local `emby-img` protocol (ADR 0005), narrow layout; real server: 4 libraries, 15 to 707 items, every last page reached.
 - NOT VERIFIED: HTTPS with TLS validation against a real server (none available); retries, cancellation, offline state; 125/150 % DPI.
-- TODO: libraries (`/Users/{id}/Views`, paged items), item details, PlaybackInfo / MediaSources, session reporting.
+- Measured limitation: a cold poster costs ~170–230 ms on the NAS (server-side resize), so a fast scroll leaves posters blank for a few seconds; no virtualization yet (707 cards stay in the DOM).
+- TODO: item details, PlaybackInfo / MediaSources, session reporting. Search, sorting and filters come with Gate 3.
 
 ## Gate 3 — Core experience [TODO]
 Home, film/series browsing, details, search, accessible player UI, responsive layouts and artwork cache.
@@ -94,3 +96,13 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Bugs found and fixed**: focus sent to a still-disabled input; spike detection too early at startup.
 - **Server side effects**: test devices left in the Emby dashboard, one with an unrevoked session ("PC test bureau"); no configuration changed.
 - **Next**: libraries and paged items, then PlaybackInfo.
+
+### 2026-10-27 — Gate 2 libraries and paged grid
+- **Changed**: ADR 0005 (artwork through a local `emby-img` protocol served by Rust); `EmbyClient::views/items/image`; `EmbyService::libraries/items/image` (only library ids received from `/Views` are sent as `ParentId`, page size clamped to 200, a token rejected while browsing ends the session); commands `emby_libraries`, `emby_items`; CSP allows `http://emby-img.localhost`; signed-in home with a library sidebar and an infinite poster grid (skeletons, empty and error states, retry, "Afficher la suite" fallback).
+- **Server findings** (Emby 4.10.1.0): an unknown `ParentId` is ignored and returns the whole server (16 829 items); paging past the end returns `TotalRecordCount: 0`; images answer without auth, and a missing image type answers 200 with a generic picture; ids are numeric strings.
+- **Tests**:
+  - `npm run verify`: all green (Vitest 19/19, cargo test 29 passed / 3 ignored);
+  - `real_server_libraries_and_pages` (ignored test): OK on the 4 libraries, last page sizes match the totals, one poster fetched;
+  - `scripts/gate2/e2e-browse.ps1`: sign-in, library switch by keyboard, scroll loading further pages, narrow window, sign-out; screenshots reviewed; credential store empty at the end.
+- **Bug found and fixed**: `Url::parse_with_params` appended a bare `?` to every request, breaking all existing calls; caught by the contract tests.
+- **Next**: item details (film; series with seasons and episodes), then PlaybackInfo.

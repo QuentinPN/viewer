@@ -7,7 +7,11 @@ use reqwest::{Method, RequestBuilder, Response, StatusCode};
 use serde::de::DeserializeOwned;
 
 use super::EmbyError;
-use super::models::{AuthenticateUserByName, AuthenticationResult, PublicSystemInfo, UserDto};
+use super::images::{self, ImageRequest};
+use super::models::{
+    AuthenticateUserByName, AuthenticationResult, BaseItemDto, PublicSystemInfo, QueryResult,
+    UserDto,
+};
 use super::server_url::ServerUrl;
 
 pub const CLIENT_NAME: &str = "Viewer";
@@ -95,8 +99,18 @@ impl EmbyClient {
     }
 
     fn request(&self, method: Method, path: &str) -> RequestBuilder {
+        self.request_url(method, &self.server.api(path), &[])
+    }
+
+    /// Query values are encoded by `url`; they never carry secrets.
+    fn request_url(&self, method: Method, url: &str, query: &[(&str, &str)]) -> RequestBuilder {
+        // `parse_with_params` appends `?` even with no parameter.
+        let url = match url::Url::parse_with_params(url, query) {
+            Ok(u) if !query.is_empty() => u.to_string(),
+            _ => url.to_owned(),
+        };
         self.http
-            .request(method, self.server.api(path))
+            .request(method, url)
             .header("X-Emby-Authorization", self.authorization_header())
             .header("Accept", "application/json")
     }
@@ -150,12 +164,93 @@ impl EmbyClient {
         check(res, true).map(|_| ())
     }
 
+    /// Libraries visible to the user (`/Users/{Id}/Views`).
+    pub async fn views(&self, user_id: &str) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let path = format!("/Users/{}/Views", path_segment(user_id)?);
+        let res = self.request(Method::GET, &path).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// One page of a library, sorted by name. The server ignores an unknown
+    /// `ParentId` and returns the whole server: callers pass known library ids only.
+    pub async fn items(
+        &self,
+        user_id: &str,
+        query: &ItemsQuery<'_>,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Users/{}/Items", path_segment(user_id)?));
+        let (start, limit) = (query.start_index.to_string(), query.limit.to_string());
+        let params = [
+            ("ParentId", path_segment(query.parent_id)?),
+            ("Recursive", "true"),
+            ("IncludeItemTypes", query.item_types),
+            ("SortBy", "SortName"),
+            ("SortOrder", "Ascending"),
+            ("StartIndex", &start),
+            ("Limit", &limit),
+            ("Fields", "PrimaryImageAspectRatio,ProductionYear"),
+            ("EnableImageTypes", "Primary"),
+            ("ImageTypeLimit", "1"),
+            ("EnableUserData", "true"),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// Artwork bytes and content type for the `emby-img` protocol (ADR 0005).
+    pub async fn image(&self, req: &ImageRequest) -> Result<(String, Vec<u8>), EmbyError> {
+        let url = self.server.api(&req.api_path());
+        let width = req.max_width.to_string();
+        let params = [
+            ("tag", req.tag.as_str()),
+            ("maxWidth", &width),
+            ("quality", "90"),
+        ];
+        let res = check(
+            self.request_url(Method::GET, &url, &params).send().await?,
+            true,
+        )?;
+        let content_type = res
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_owned();
+        if !content_type.starts_with("image/") {
+            return Err(EmbyError::InvalidResponse("ce n'est pas une image".into()));
+        }
+        if res
+            .content_length()
+            .is_some_and(|n| n > images::MAX_BYTES as u64)
+        {
+            return Err(EmbyError::InvalidResponse("image trop lourde".into()));
+        }
+        let bytes = res.bytes().await?;
+        if bytes.len() > images::MAX_BYTES {
+            return Err(EmbyError::InvalidResponse("image trop lourde".into()));
+        }
+        Ok((content_type, bytes.to_vec()))
+    }
+
     fn require_token(&self) -> Result<(), EmbyError> {
         self.token
             .as_ref()
             .map(|_| ())
             .ok_or(EmbyError::NotSignedIn)
     }
+}
+
+/// Parameters of one library page.
+#[derive(Debug, Clone)]
+pub struct ItemsQuery<'a> {
+    pub parent_id: &'a str,
+    pub item_types: &'a str,
+    pub start_index: u32,
+    pub limit: u32,
 }
 
 /// Maps HTTP status to error categories. `authenticated` distinguishes an expired
@@ -172,6 +267,7 @@ fn check(res: Response, authenticated: bool) -> Result<Response, EmbyError> {
         s if s.is_redirection() => {
             EmbyError::InvalidResponse(format!("redirection HTTP {} non suivie", s.as_u16()))
         }
+        StatusCode::NOT_FOUND => EmbyError::NotFound,
         s => EmbyError::Server(s.as_u16()),
     })
 }

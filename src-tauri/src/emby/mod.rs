@@ -3,6 +3,7 @@
 
 pub mod client;
 pub mod credentials;
+pub mod images;
 pub mod models;
 pub mod server_url;
 pub mod session;
@@ -33,6 +34,8 @@ pub enum EmbyError {
     Server(u16),
     #[error("réponse inattendue du serveur : {0}")]
     InvalidResponse(String),
+    #[error("élément introuvable sur le serveur")]
+    NotFound,
     #[error("aucune session ouverte")]
     NotSignedIn,
     #[error("session expirée ou révoquée : reconnectez-vous")]
@@ -52,6 +55,7 @@ impl EmbyError {
             Self::Forbidden => "forbidden",
             Self::Server(_) => "server",
             Self::InvalidResponse(_) => "invalidResponse",
+            Self::NotFound => "notFound",
             Self::NotSignedIn => "notSignedIn",
             Self::SessionExpired => "sessionExpired",
             Self::CredentialStore(_) => "credentialStore",

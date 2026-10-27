@@ -6,7 +6,7 @@ use tauri::{State, WebviewWindow};
 
 use crate::AppState;
 use crate::emby::EmbyError;
-use crate::emby::models::{ServerSummary, SignedInUser};
+use crate::emby::models::{ItemPage, Library, ServerSummary, SignedInUser};
 use crate::emby::session::EmbyService;
 use crate::player::{
     MediaSource, PlaybackRequest, PlayerCommand, PlayerDiagnostics, PlayerEngine, PlayerError,
@@ -131,4 +131,19 @@ pub async fn emby_sign_out(emby: State<'_, EmbyService>) -> Result<(), EmbyError
 #[tauri::command]
 pub async fn emby_last_server(emby: State<'_, EmbyService>) -> Result<Option<String>, ()> {
     Ok(emby.last_server_url())
+}
+
+#[tauri::command]
+pub async fn emby_libraries(emby: State<'_, EmbyService>) -> Result<Vec<Library>, EmbyError> {
+    emby.libraries().await
+}
+
+#[tauri::command]
+pub async fn emby_items(
+    emby: State<'_, EmbyService>,
+    library_id: String,
+    start_index: u32,
+    limit: u32,
+) -> Result<ItemPage, EmbyError> {
+    emby.items(&library_id, start_index, limit).await
 }

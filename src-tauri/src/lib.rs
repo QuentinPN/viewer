@@ -103,9 +103,55 @@ fn emby_service(
     ))
 }
 
+/// Serves `emby-img` requests (ADR 0005): only validated artwork paths, fetched
+/// with the session's auth header so the token never reaches the WebView.
+async fn emby_image(
+    app: &tauri::AppHandle,
+    request: &tauri::http::Request<Vec<u8>>,
+) -> tauri::http::Response<Vec<u8>> {
+    use tauri::http::{Response, StatusCode, header};
+    let reply = |status: StatusCode| {
+        Response::builder()
+            .status(status)
+            .body(Vec::new())
+            .unwrap_or_default()
+    };
+    let uri = request.uri();
+    let Some(req) = emby::images::ImageRequest::parse(uri.path(), uri.query()) else {
+        return reply(StatusCode::BAD_REQUEST);
+    };
+    match app.state::<emby::session::EmbyService>().image(&req).await {
+        Ok((content_type, bytes)) => Response::builder()
+            .header(header::CONTENT_TYPE, content_type)
+            // The URL carries the image tag, so a given URL never changes content.
+            .header(header::CACHE_CONTROL, "max-age=31536000, immutable")
+            .body(bytes)
+            .unwrap_or_default(),
+        Err(e) => {
+            log::debug!("artwork {} not served: {}", req.item_id, e.kind());
+            reply(match e {
+                emby::EmbyError::NotSignedIn | emby::EmbyError::SessionExpired => {
+                    StatusCode::UNAUTHORIZED
+                }
+                emby::EmbyError::NotFound => StatusCode::NOT_FOUND,
+                _ => StatusCode::BAD_GATEWAY,
+            })
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        .register_asynchronous_uri_scheme_protocol(
+            emby::images::SCHEME,
+            |ctx, request, responder| {
+                let app = ctx.app_handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    responder.respond(emby_image(&app, &request).await);
+                });
+            },
+        )
         .setup(|app| {
             let window = app
                 .get_webview_window("main")
@@ -190,6 +236,8 @@ pub fn run() {
             commands::emby_restore,
             commands::emby_sign_out,
             commands::emby_last_server,
+            commands::emby_libraries,
+            commands::emby_items,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Viewer");
