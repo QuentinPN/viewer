@@ -1,0 +1,26 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+vite.config.ts.timestamp-*
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Native third-party binaries are fetched by scripts/fetch-libmpv.ps1, never committed
+vendor/
+
+# Local evidence produced by spike runs (may contain local paths); curated copies go to docs/evidence/
+artifacts/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/

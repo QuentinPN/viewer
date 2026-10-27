@@ -1,0 +1,32 @@
+import { describe, expect, it } from "vitest";
+import { mapPlayerKey } from "./keyboard";
+
+describe("mapPlayerKey", () => {
+  it("toggles pause with Space and k", () => {
+    const expected = { kind: "command", command: { type: "togglePause" } };
+    expect(mapPlayerKey(" ", { inTextField: false })).toEqual(expected);
+    expect(mapPlayerKey("k", { inTextField: false })).toEqual(expected);
+  });
+
+  it("seeks 10 s, or 30 s with Shift", () => {
+    expect(mapPlayerKey("ArrowLeft", { inTextField: false })).toEqual({
+      kind: "command",
+      command: { type: "seekRelative", seconds: -10 },
+    });
+    expect(
+      mapPlayerKey("ArrowRight", { inTextField: false, shift: true }),
+    ).toEqual({
+      kind: "command",
+      command: { type: "seekRelative", seconds: 30 },
+    });
+  });
+
+  it("never hijacks typing in text fields", () => {
+    expect(mapPlayerKey(" ", { inTextField: true })).toBeNull();
+    expect(mapPlayerKey("f", { inTextField: true })).toBeNull();
+  });
+
+  it("ignores unrelated keys", () => {
+    expect(mapPlayerKey("a", { inTextField: false })).toBeNull();
+  });
+});
