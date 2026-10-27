@@ -129,8 +129,10 @@ pub fn run() {
                 }
             }
             WindowEvent::CloseRequested { api, .. } => {
-                // Tear mpv down off the UI thread, then exit, so the embedded video
-                // window can be destroyed while the UI thread keeps pumping messages.
+                // Tear mpv down off the UI thread, so the embedded video window can be
+                // destroyed while the UI thread keeps pumping messages. Then destroy the
+                // window rather than calling `exit`: exiting with the WebView2 still
+                // alive logs "Failed to unregister class Chrome_WidgetWin_0" (1412).
                 let state = window.state::<AppState>();
                 if state
                     .player
@@ -139,10 +141,13 @@ pub fn run() {
                     .is_some()
                 {
                     api.prevent_close();
-                    let app = window.app_handle().clone();
+                    let window = window.clone();
                     std::thread::spawn(move || {
-                        app.state::<AppState>().close_player();
-                        app.exit(0);
+                        window.state::<AppState>().close_player();
+                        if let Err(e) = window.destroy() {
+                            log::warn!("window destroy failed: {e}");
+                            window.app_handle().exit(0);
+                        }
                     });
                 }
             }

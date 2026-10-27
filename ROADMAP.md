@@ -18,12 +18,12 @@ Prove local MKV, authorized HTTP stream, audio, subtitle switching, seek, fullsc
   - seek, fullscreen and resize following;
   - real Space key → pause through the WebView;
   - teardown ≈100–145 ms, 3 open/close cycles, process exits cleanly;
-  - manual, by the user: audible audio, mouse clicks on overlay controls, Escape leaves fullscreen and Space still works after it, Windows ✕ during playback closes at once with no leftover process.
+  - manual, by the user: audible audio, mouse clicks on overlay controls, Escape leaves fullscreen and Space still works after it, Windows ✕ during playback closes at once with no leftover process;
+  - window close during playback measured by `scripts/spike/close-probe.ps1`: 154–189 ms, exit code 0, no WebView2 error at exit.
 - NOT VERIFIED:
   - rendering of a "Forced" subtitle track (no cue observed in the test window);
   - SRT embedded, PGS;
   - HEVC, AV1, 4K, HDR;
-  - timed teardown on window close, and the WebView2 `Chrome_WidgetWin_0` (1412) error logged at exit;
   - 125/150 % DPI, multi-monitor;
   - network loss, unsupported codec;
   - release build on a clean machine.
@@ -70,3 +70,9 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests** (by the user, debug build, multi-track MKV): audio audible; mouse clicks on play/pause, seek bar and track menus; Escape exits fullscreen and Space works right after; Escape closes an open track menu; Windows ✕ during playback closes at once, no leftover process (measured).
 - **Not measured**: close latency; WebView2 `Chrome_WidgetWin_0` error 1412 at exit not analysed.
 - **Next**: HEVC and SRT/PGS samples (public test files, download needs approval); 125/150 % DPI.
+
+### 2026-10-27 — WebView2 error at exit
+- **Bug**: every exit with an active player logged `Failed to unregister class Chrome_WidgetWin_0. Error = 1412`, because the process exited through `app.exit(0)` while the WebView2 host window still existed.
+- **Changed**: after mpv teardown the main window is destroyed and Tauri exits normally (window close path and Gate 1 scenario); `scripts/spike/close-probe.ps1` added to measure Windows close idle or during playback.
+- **Tests**: close-probe during playback 4/4 without the error (154–189 ms, exit 0, no leftover process); idle close 38 ms without the error; full Gate 1 scenario without the error, same check results; `npm run verify` all green.
+- **Next**: HEVC and SRT/PGS samples; 125/150 % DPI.

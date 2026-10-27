@@ -51,7 +51,11 @@ pub fn maybe_start(app: AppHandle) {
         let _ = std::fs::write(out.join("report.json"), json);
         checkpoint(&out, "done");
         std::thread::sleep(Duration::from_millis(500));
-        app.exit(0);
+        // Same exit path as the user closing the window (see lib.rs).
+        match app.get_webview_window("main") {
+            Some(w) if w.destroy().is_ok() => {}
+            _ => app.exit(0),
+        }
     });
 }
 

@@ -10,6 +10,8 @@
 
 ## Gate 1 playback scenario
 
+`scripts/spike/close-probe.ps1 [-Media <file>]` posts WM_CLOSE (Windows close button) idle or during playback and reports close latency, exit code, leftover processes and the WebView2 exit error.
+
 `scripts/spike/run-gate1.ps1 -Media <file|http URL> [-Mode parent|child|separate] [-HttpToken <test token>]` drives the debug build: playback, tracks, seek, fullscreen, resize, real Space key, teardown, open/close cycles. It writes `report.json`, `driver.json` and screenshots to `artifacts/gate1/<run>/`. For HTTP, `scripts/spike/serve-file.mjs` serves one file on 127.0.0.1 with Range support and can require an `X-Emby-Token` header. **Review the screenshots**: property checks alone passed for a mode whose video was invisible.
 
 ## Playback matrix
