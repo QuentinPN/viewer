@@ -17,18 +17,17 @@ Prove local MKV, authorized HTTP stream, audio, subtitle switching, seek, fullsc
   - switching between 3 audio and 3 ASS subtitle tracks, checked on the decoded track (`current-tracks/*`), distinct cues per track, subtitles disabled, UI selectors in sync; audio output `wasapi` opened;
   - seek, fullscreen and resize following;
   - real Space key → pause through the WebView;
-  - teardown ≈100–145 ms, 3 open/close cycles, process exits cleanly.
+  - teardown ≈100–145 ms, 3 open/close cycles, process exits cleanly;
+  - manual, by the user: audible audio, mouse clicks on overlay controls, Escape leaves fullscreen and Space still works after it, Windows ✕ during playback closes at once with no leftover process.
 - NOT VERIFIED:
   - rendering of a "Forced" subtitle track (no cue observed in the test window);
   - SRT embedded, PGS;
   - HEVC, AV1, 4K, HDR;
-  - audible audio output (device opened, not listened to);
-  - mouse clicks on overlay, Escape and focus after fullscreen;
+  - timed teardown on window close, and the WebView2 `Chrome_WidgetWin_0` (1412) error logged at exit;
   - 125/150 % DPI, multi-monitor;
-  - window close during playback;
   - network loss, unsupported codec;
   - release build on a clean machine.
-- Next: a HEVC sample and a sample with SRT/PGS subtitles, then rerun `scripts/spike/run-gate1.ps1`; manual checks (mouse on overlay, Escape, close during playback, 125/150 % DPI).
+- Next: a HEVC sample and a sample with SRT/PGS subtitles, then rerun `scripts/spike/run-gate1.ps1`; manual 125/150 % DPI check.
 
 ## Gate 2 — Emby integration [TODO · needs user authorization]
 Connection/auth, typed API client, libraries, item details, PlaybackInfo, secure tokens, session reporting, fake-server contract tests.
@@ -66,3 +65,8 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - `npm run verify`: all green (Vitest 9/9, cargo test 10/10).
 - **Bug found and fixed** (scenario): scanning a sparse track moved the playhead to the end credits.
 - **Next**: HEVC and SRT/PGS samples; manual overlay/DPI/close checks.
+
+### 2026-10-27 — Gate 1 manual checks
+- **Tests** (by the user, debug build, multi-track MKV): audio audible; mouse clicks on play/pause, seek bar and track menus; Escape exits fullscreen and Space works right after; Escape closes an open track menu; Windows ✕ during playback closes at once, no leftover process (measured).
+- **Not measured**: close latency; WebView2 `Chrome_WidgetWin_0` error 1412 at exit not analysed.
+- **Next**: HEVC and SRT/PGS samples (public test files, download needs approval); 125/150 % DPI.
