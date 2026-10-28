@@ -179,7 +179,12 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
         let items = format!("/emby/Users/{USER_ID}/Items");
         let views_path = format!("/emby/Users/{USER_ID}/Views");
         match path {
-            p if (p == views_path || p == items || p.starts_with("/emby/Items/")) && !token_ok => {
+            p if (p == views_path
+                || p.starts_with(&items)
+                || p.starts_with("/emby/Items/")
+                || p.starts_with("/emby/Shows/"))
+                && !token_ok =>
+            {
                 (401, String::new())
             }
             p if p == views_path => (200, views()),
@@ -187,9 +192,101 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
             p if p == items => (200, r#"{"Items":[],"TotalRecordCount":0}"#.into()),
             "/emby/Items/101/Images/Primary" => (200, "JPEG:fake-jpeg-bytes".into()),
             "/emby/Items/102/Images/Primary" => (200, "<html>pas une image</html>".into()),
+            p if p == format!("{items}/30207") => (200, movie_detail()),
+            p if p == format!("{items}/80473") => (200, series_detail()),
+            p if p == format!("{items}/80475") => (200, episode_detail()),
+            p if p.starts_with(&format!("{items}/")) => (404, NOT_FOUND_TEXT.into()),
+            "/emby/Shows/80473/Seasons" => (200, seasons()),
+            "/emby/Shows/80473/Episodes" if query.contains("SeasonId=80474") => {
+                (200, episodes_page())
+            }
+            // Emby trusts SeasonId: a season of another series returns its episodes.
+            "/emby/Shows/80473/Episodes" if query.contains("SeasonId=67639") => {
+                (200, foreign_episodes())
+            }
+            p if p.starts_with("/emby/Shows/") => (404, NOT_FOUND_TEXT.into()),
             _ => base(r),
         }
     })
+}
+
+/// 404 body of Emby 4.10.1.0 for an unknown item: French text, not JSON.
+const NOT_FOUND_TEXT: &str =
+    "L'objet demandé ne peut pas être trouvé. Il a peut-être été récemment supprimé du serveur.";
+
+/// Trimmed `/Users/{Id}/Items/30207` answer: real field names and value shapes,
+/// including the NAS path, which must never reach the UI.
+fn movie_detail() -> String {
+    r#"{"Name":"2 Coeurs","OriginalTitle":"2 Hearts","Id":"30207","Type":"Movie",
+        "Path":"/share/Films/2 Coeurs (2020)/2 Coeurs.mkv","FileName":"2 Coeurs.mkv",
+        "PremiereDate":"2020-10-15T22:00:00.0000000Z","CriticRating":17,"OfficialRating":"PG-13",
+        "Overview":"Lorsque la maladie frappe deux personnes opposées…",
+        "Taglines":["Découvrez le mystère qui les relie tous."],
+        "Genres":["Romance","Drame"],"CommunityRating":6.234,"RunTimeTicks":61033890000,"ProductionYear":2020,
+        "People":[{"Name":"Jacob Elordi","Id":"30209","Role":"Chris","Type":"Actor","PrimaryImageTag":"4b8a"},
+                  {"Name":"Lance Hool","Id":"30300","Type":"Director"},
+                  {"Name":"Scénariste","Id":"30301","Type":"Writer"}],
+        "Studios":[{"Name":"Silver Lion Films","Id":30218}],
+        "UserData":{"PlaybackPositionTicks":18310167000,"PlayCount":0,"IsFavorite":false,"Played":false},
+        "ImageTags":{"Primary":"7b213eb5_6379","Logo":"028272e6_6379"},
+        "BackdropImageTags":["2edd4b0e_6379"],
+        "MediaSources":[{"Protocol":"File","Id":"mediasource_30207",
+          "Path":"/share/Films/2 Coeurs (2020)/2 Coeurs.mkv",
+          "Container":"mkv","Size":3760231036,"Name":"2 Hearts (2020)","Bitrate":4928712,"SupportsDirectPlay":true,
+          "MediaStreams":[
+            {"Codec":"hevc","Type":"Video","Height":1038,"Width":1920,"BitDepth":10,"VideoRange":"HDR 10",
+             "ExtendedVideoSubTypeDescription":"HDR 10","Title":"release.name.x265","IsDefault":true},
+            {"Codec":"ac3","Language":"fre","Type":"Audio","Channels":6,"IsDefault":true,"DisplayTitle":"French AC3 5.1"},
+            {"Codec":"eac3","Language":"eng","Type":"Audio","Channels":6},
+            {"Codec":"subrip","Language":"fre","Type":"Subtitle","IsDefault":true,"IsForced":true,"Title":"Forcés"},
+            {"Codec":"PGSSUB","Language":"eng","Type":"Subtitle","IsExternal":false},
+            {"Codec":"mjpeg","Type":"EmbeddedImage"}]}]}"#
+        .into()
+}
+
+fn series_detail() -> String {
+    r#"{"Name":"2.5 Dimensional Seduction","OriginalTitle":"2.5次元の誘惑","Id":"80473","Type":"Series",
+        "Path":"/share/Anime/2.5 Dimensional Seduction","Status":"Ended","EndDate":"2024-12-13T00:00:00.0000000Z",
+        "ProductionYear":2024,"RunTimeTicks":14400000000,"Overview":"Masamune Okumura…","Taglines":[],
+        "Genres":["Animation"],"CommunityRating":6.9,"OfficialRating":"FR-16",
+        "UserData":{"UnplayedItemCount":24,"PlaybackPositionTicks":0,"PlayCount":0,"Played":false},
+        "ImageTags":{"Primary":"4b62464b_6385"},"BackdropImageTags":[]}"#
+        .into()
+}
+
+fn episode_detail() -> String {
+    r#"{"Name":"La Nouvelle Recrue","Id":"80475","Type":"Episode","SeriesId":"80473"}"#.into()
+}
+
+fn seasons() -> String {
+    r#"{"Items":[
+        {"Name":"Épisodes spéciaux","Id":"80480","IndexNumber":0,"Type":"Season","SeriesId":"80473",
+         "UserData":{"UnplayedItemCount":2,"Played":false}},
+        {"Name":"Saison 1","Id":"80474","IndexNumber":1,"Type":"Season","SeriesId":"80473",
+         "UserData":{"UnplayedItemCount":0,"Played":true},"ImageTags":{"Primary":"1cc83503_6385"}},
+        {"Name":"Saison d'un autre","Id":"67639","IndexNumber":1,"Type":"Season","SeriesId":"67638"}
+    ],"TotalRecordCount":3}"#
+        .into()
+}
+
+fn episodes_page() -> String {
+    r#"{"Items":[
+        {"Name":"La Nouvelle Recrue","Id":"80475","IndexNumber":1,"ParentIndexNumber":1,"Type":"Episode",
+         "SeriesId":"80473","SeasonId":"80474","RunTimeTicks":14400640000,"Overview":"Seul membre du club…",
+         "PremiereDate":"2024-07-04T22:00:00.0000000Z","ImageTags":{"Primary":"9e617fa1_6385"},
+         "UserData":{"PlaybackPositionTicks":7200320000,"Played":false}},
+        {"Name":"Double","Id":"80476","IndexNumber":2,"IndexNumberEnd":3,"ParentIndexNumber":1,"Type":"Episode",
+         "SeriesId":"80473","SeasonId":"80474","ImageTags":{},"UserData":{"Played":true}},
+        {"Name":"Date to Date","Id":"80490","IndexNumber":1,"ParentIndexNumber":0,"Type":"Episode",
+         "SeriesId":"80473","SeasonId":"80480","SeasonName":"Épisodes spéciaux"}
+    ],"TotalRecordCount":24}"#
+        .into()
+}
+
+fn foreign_episodes() -> String {
+    r#"{"Items":[{"Name":"Autre","Id":"67640","Type":"Episode","SeriesId":"67638","SeasonId":"67639"}],
+        "TotalRecordCount":13}"#
+        .into()
 }
 
 fn signed_in_browser() -> (FakeEmby, Fixture, Arc<AtomicBool>) {
@@ -531,6 +628,152 @@ fn artwork_is_fetched_with_auth_and_checked() {
     assert!(matches!(err, EmbyError::NotSignedIn), "{err:?}");
 }
 
+#[test]
+fn movie_detail_maps_metadata_and_tech_info_without_the_nas_path() {
+    let (server, fx, _) = signed_in_browser();
+    let d = run(fx.service.item_detail("30207")).unwrap();
+
+    let req = server.requests().into_iter().last().unwrap();
+    assert_eq!(req.path, format!("/emby/Users/{USER_ID}/Items/30207"));
+    let json = serde_json::to_string(&d).unwrap();
+    assert!(!json.contains("/share"), "NAS path leaked: {json}");
+    assert!(!json.contains(&server.url), "server address leaked: {json}");
+
+    assert_eq!(d.kind, super::models::DetailKind::Movie);
+    assert_eq!(d.original_title.as_deref(), Some("2 Hearts"));
+    assert_eq!(
+        d.tagline.as_deref(),
+        Some("Découvrez le mystère qui les relie tous.")
+    );
+    assert_eq!(d.community_rating, Some(6.2));
+    assert_eq!(d.critic_rating, Some(17));
+    assert_eq!(d.runtime_minutes, Some(101));
+    assert_eq!(d.directors, ["Lance Hool"]);
+    assert_eq!(d.cast.len(), 1);
+    assert_eq!(d.cast[0].role.as_deref(), Some("Chris"));
+    assert_eq!(d.studios, ["Silver Lion Films"]);
+    let resume = d.resume.unwrap();
+    assert_eq!(resume.position_seconds, 1831);
+    assert!((resume.fraction.unwrap() - 0.3).abs() < 0.001);
+    assert!(
+        d.backdrop
+            .unwrap()
+            .src
+            .contains("/30207/Backdrop?tag=2edd4b0e_6379")
+    );
+    assert!(d.logo.unwrap().src.contains("/30207/Logo?"));
+    assert_eq!(
+        (d.end_year, d.continuing, d.unplayed_count),
+        (None, None, None)
+    );
+
+    let media = &d.media[0];
+    assert_eq!(media.container.as_deref(), Some("mkv"));
+    let video = media.video.as_ref().unwrap();
+    assert_eq!((video.height, video.bit_depth), (Some(1038), Some(10)));
+    assert_eq!(video.range.as_deref(), Some("HDR 10"));
+    assert_eq!(media.audio.len(), 2);
+    assert_eq!(media.audio[0].language.as_deref(), Some("fre"));
+    assert_eq!(media.audio[0].channels, Some(6));
+    assert_eq!(
+        media.subtitles.len(),
+        2,
+        "embedded images are not subtitles"
+    );
+    assert!(media.subtitles[0].is_forced);
+}
+
+#[test]
+fn series_detail_seasons_and_episodes() {
+    let (server, fx, _) = signed_in_browser();
+    let d = run(fx.service.item_detail("80473")).unwrap();
+    assert_eq!(d.kind, super::models::DetailKind::Series);
+    assert_eq!(
+        (d.year, d.end_year, d.continuing),
+        (Some(2024), Some(2024), Some(false))
+    );
+    assert_eq!(d.unplayed_count, Some(24));
+    assert_eq!(d.runtime_minutes, None, "a series has no single runtime");
+    assert!(d.media.is_empty() && d.backdrop.is_none() && d.tagline.is_none());
+
+    let seasons = run(fx.service.seasons("80473")).unwrap();
+    let names: Vec<_> = seasons.iter().map(|s| (s.index, s.name.as_str())).collect();
+    assert_eq!(
+        names,
+        [(Some(0), "Épisodes spéciaux"), (Some(1), "Saison 1")],
+        "a season of another series is dropped"
+    );
+    assert!(seasons[1].played);
+    let req = server.requests().into_iter().last().unwrap();
+    assert!(
+        req.path.starts_with("/emby/Shows/80473/Seasons?"),
+        "{}",
+        req.path
+    );
+    assert!(req.path.contains(&format!("UserId={USER_ID}")));
+
+    let page = run(fx.service.episodes("80473", "80474", 0, 500)).unwrap();
+    let req = server.requests().into_iter().last().unwrap();
+    let (path, query) = req.path.split_once('?').unwrap();
+    assert_eq!(path, "/emby/Shows/80473/Episodes");
+    for expected in [
+        "SeasonId=80474",
+        "StartIndex=0",
+        "Limit=200",
+        "Fields=Overview",
+    ] {
+        assert!(
+            query.split('&').any(|p| p == expected),
+            "{expected} in {query}"
+        );
+    }
+    assert!(!req.path.contains(TOKEN));
+    assert_eq!((page.total, page.next_index), (24, 3));
+    let first = &page.items[0];
+    assert_eq!((first.season_index, first.index), (Some(1), Some(1)));
+    assert_eq!(first.runtime_minutes, Some(24));
+    assert_eq!(first.resume.as_ref().unwrap().position_seconds, 720);
+    assert!(first.thumb.as_ref().unwrap().srcset.contains(" 640w"));
+    let double = &page.items[1];
+    assert_eq!((double.index, double.index_end), (Some(2), Some(3)));
+    assert!(double.played && double.resume.is_none() && double.thumb.is_none());
+    assert_eq!(
+        page.items[2].season_index,
+        Some(0),
+        "a special aired during the season is kept"
+    );
+}
+
+#[test]
+fn detail_refuses_foreign_seasons_unknown_ids_and_other_types() {
+    let (server, fx, revoked) = signed_in_browser();
+    let err = run(fx.service.episodes("80473", "67639", 0, 50)).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
+
+    let err = run(fx.service.item_detail("999")).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
+    let err = run(fx.service.seasons("999")).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
+    let err = run(fx.service.item_detail("80475")).unwrap_err();
+    assert!(matches!(err, EmbyError::InvalidResponse(_)), "{err:?}");
+
+    let before = server.requests().len();
+    for bad in ["../Users", "1?x=2", ""] {
+        assert!(run(fx.service.item_detail(bad)).is_err());
+        assert!(run(fx.service.episodes("80473", bad, 0, 10)).is_err());
+    }
+    assert_eq!(
+        server.requests().len(),
+        before,
+        "unsafe ids never reach the server"
+    );
+
+    revoked.store(true, Ordering::SeqCst);
+    let err = run(fx.service.seasons("80473")).unwrap_err();
+    assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
+    assert!(stored_token(&fx).is_none());
+}
+
 /// Real server check, run on demand only:
 /// `VIEWER_EMBY_URL=… VIEWER_EMBY_USER=… VIEWER_EMBY_PASSWORD=… cargo test -- --ignored real_server`
 /// Signs in, restores from the credential store, then signs out (revokes the token).
@@ -672,6 +915,89 @@ fn real_server_libraries_and_pages() {
         let req = ImageRequest::parse(path, Some(query)).unwrap();
         let (content_type, bytes) = run(fx.service.image(&req)).unwrap();
         println!("poster: {content_type}, {} bytes", bytes.len());
+        assert!(content_type.starts_with("image/"));
+    }));
+    run(fx.service.sign_out()).unwrap();
+    if let Err(e) = result {
+        std::panic::resume_unwind(e);
+    }
+}
+
+/// Real server details, on demand only (same variables as above): detail pages of
+/// the first `VIEWER_DETAIL_SAMPLE` (default 40) items of each library, then seasons
+/// and the first page of episodes of every sampled series, and one backdrop.
+#[test]
+#[ignore = "needs a real Emby server and credentials in environment variables"]
+fn real_server_details_seasons_episodes() {
+    use super::images::ImageRequest;
+    use super::models::DetailKind;
+    let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} manquant"));
+    let sample: u32 = std::env::var("VIEWER_DETAIL_SAMPLE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(40);
+    let path = std::env::temp_dir()
+        .join(format!("viewer-emby-real-{}", uuid::Uuid::new_v4()))
+        .join("session.json");
+    SessionFile {
+        device_id: REAL_DEVICE_ID.into(),
+        ..SessionFile::default()
+    }
+    .save(&path)
+    .unwrap();
+    let fx = reopen(Arc::new(MemoryCredentialStore::default()), path);
+    run(fx.service.sign_in(
+        &var("VIEWER_EMBY_URL"),
+        &var("VIEWER_EMBY_USER"),
+        &var("VIEWER_EMBY_PASSWORD"),
+    ))
+    .unwrap();
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut backdrop = None;
+        let (mut details, mut seasons_seen, mut episodes_seen) = (0, 0, 0);
+        let mut slowest = std::time::Duration::ZERO;
+        for lib in run(fx.service.libraries()).unwrap() {
+            let page = run(fx.service.items(&lib.id, 0, sample)).unwrap();
+            for item in page.items {
+                let started = std::time::Instant::now();
+                let d = run(fx.service.item_detail(&item.id))
+                    .unwrap_or_else(|e| panic!("detail {} ({}): {e:?}", item.id, item.name));
+                slowest = slowest.max(started.elapsed());
+                details += 1;
+                let json = serde_json::to_string(&d).unwrap();
+                assert!(!json.contains("\"Path\"") && !json.contains("/share/"));
+                if backdrop.is_none() {
+                    backdrop = d.backdrop.clone();
+                }
+                match d.kind {
+                    DetailKind::Movie => assert!(!d.media.is_empty(), "{}: no media", d.name),
+                    DetailKind::Series => {
+                        let seasons = run(fx.service.seasons(&d.id)).unwrap();
+                        seasons_seen += seasons.len();
+                        for s in &seasons {
+                            let eps = run(fx.service.episodes(&d.id, &s.id, 0, 100))
+                                .unwrap_or_else(|e| panic!("episodes {}/{}: {e:?}", d.id, s.id));
+                            assert!(eps.items.len() as u32 <= eps.total.max(1));
+                            episodes_seen += eps.items.len();
+                        }
+                    }
+                }
+            }
+        }
+        println!(
+            "details={details} seasons={seasons_seen} episodes={episodes_seen} slowest detail={} ms",
+            slowest.as_millis()
+        );
+        let backdrop = backdrop.expect("at least one backdrop");
+        let url = backdrop
+            .src
+            .strip_prefix("http://emby-img.localhost")
+            .unwrap();
+        let (path, query) = url.split_once('?').unwrap();
+        let req = ImageRequest::parse(path, Some(query)).unwrap();
+        let (content_type, bytes) = run(fx.service.image(&req)).unwrap();
+        println!("backdrop: {content_type}, {} bytes", bytes.len());
         assert!(content_type.starts_with("image/"));
     }));
     run(fx.service.sign_out()).unwrap();

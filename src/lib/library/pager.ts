@@ -1,11 +1,20 @@
-import type { ItemPage, LibraryKind, MediaItem } from "../emby/types";
+import type { LibraryKind, MediaItem } from "../emby/types";
+import { formatMinutes } from "../format/duration";
 
 /** Items per request: a few rows on a large window, about 0.2–0.5 s on the NAS. */
 export const PAGE_SIZE = 60;
 
-/** Pages of one library, loaded in order. Pure so it can be unit tested. */
-export interface PagerState {
-  items: MediaItem[];
+/** A page as Rust returns it (`ItemPage`, `EpisodePage`). */
+export interface Page<T> {
+  items: T[];
+  startIndex: number;
+  nextIndex: number;
+  total: number;
+}
+
+/** Pages of one list, loaded in order. Pure so it can be unit tested. */
+export interface PagerState<T extends { id: string } = MediaItem> {
+  items: T[];
   /** Server index of the next page. */
   next: number;
   /** Total announced by the server, `null` before the first page. */
@@ -13,7 +22,9 @@ export interface PagerState {
   done: boolean;
 }
 
-export const emptyPager = (): PagerState => ({
+export const emptyPager = <
+  T extends { id: string } = MediaItem,
+>(): PagerState<T> => ({
   items: [],
   next: 0,
   total: null,
@@ -25,7 +36,10 @@ export const emptyPager = (): PagerState => ({
  * first total is kept; an empty page also ends the list. A page that does not
  * start where the list ends (stale or duplicate answer) is ignored.
  */
-export function appendPage(state: PagerState, page: ItemPage): PagerState {
+export function appendPage<T extends { id: string }>(
+  state: PagerState<T>,
+  page: Page<T>,
+): PagerState<T> {
   if (state.done || page.startIndex !== state.next) return state;
   const seen = new Set(state.items.map((i) => i.id));
   const items = state.items.concat(page.items.filter((i) => !seen.has(i.id)));
@@ -40,11 +54,8 @@ export function appendPage(state: PagerState, page: ItemPage): PagerState {
 export function itemSubtitle(item: MediaItem): string {
   const parts: string[] = [];
   if (item.year) parts.push(String(item.year));
-  if (item.runtimeMinutes) {
-    const h = Math.floor(item.runtimeMinutes / 60);
-    const m = item.runtimeMinutes % 60;
-    parts.push(h > 0 ? `${h} h ${String(m).padStart(2, "0")}` : `${m} min`);
-  }
+  const runtime = formatMinutes(item.runtimeMinutes);
+  if (runtime) parts.push(runtime);
   return parts.join(" · ");
 }
 

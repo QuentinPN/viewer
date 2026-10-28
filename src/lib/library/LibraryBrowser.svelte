@@ -1,8 +1,15 @@
 <script lang="ts">
-// Signed-in home: library list and a paged poster grid (DESIGN.md, Films/Series).
+// Signed-in home: library list, a paged poster grid (DESIGN.md, Films/Series) and
+// the detail page of the opened item, shown over the grid.
 import { onMount, tick } from "svelte";
+import ItemDetail from "../detail/ItemDetail.svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
-import type { EmbyError, Library, SignedInUser } from "../emby/types";
+import type {
+  EmbyError,
+  Library,
+  MediaItem,
+  SignedInUser,
+} from "../emby/types";
 import PosterCard from "./PosterCard.svelte";
 import { appendPage, countLabel, emptyPager, PAGE_SIZE } from "./pager";
 
@@ -29,6 +36,7 @@ let sentinel = $state<HTMLElement | null>(null);
 // Bumped on every library switch: answers for a previous library are dropped.
 let generation = 0;
 let observer: IntersectionObserver | null = null;
+let opened = $state<MediaItem | null>(null);
 
 function fail(e: unknown): EmbyError {
   const error = toEmbyError(e);
@@ -48,7 +56,22 @@ async function loadLibraries() {
   }
 }
 
+function open(item: MediaItem) {
+  opened = item;
+}
+
+/** Back to the grid, focus on the card that opened the detail. */
+async function closeDetail() {
+  const id = opened?.id;
+  opened = null;
+  await tick();
+  scroller
+    ?.querySelector<HTMLElement>(`[data-item-id="${CSS.escape(id ?? "")}"]`)
+    ?.focus({ preventScroll: true });
+}
+
 function select(library: Library) {
+  opened = null;
   if (selected?.id === library.id && pager.total !== null) return;
   generation += 1;
   selected = library;
@@ -142,7 +165,14 @@ $effect(() => {
     </div>
   </nav>
 
-  <main class="content" bind:this={scroller} aria-busy={loading}>
+  <div class="pane">
+  <main
+    class="content"
+    bind:this={scroller}
+    aria-busy={loading}
+    inert={opened !== null}
+    aria-hidden={opened !== null ? "true" : undefined}
+  >
     {#if librariesError}
       <div class="state" role="alert">
         <p class="state-title">Impossible de charger vos bibliothèques</p>
@@ -170,7 +200,7 @@ $effect(() => {
       {:else}
         <ul class="grid" aria-label={selected.name}>
           {#each pager.items as item (item.id)}
-            <li><PosterCard {item} /></li>
+            <li><PosterCard {item} onOpen={open} /></li>
           {/each}
           {#if loading}
             {#each { length: pager.items.length === 0 ? 18 : 6 } as _, i (i)}
@@ -197,6 +227,12 @@ $effect(() => {
     {/if}
     <div class="sentinel" bind:this={sentinel} aria-hidden="true"></div>
   </main>
+  {#if opened}
+    {#key opened.id}
+      <ItemDetail item={opened} onClose={closeDetail} onError={fail} />
+    {/key}
+  {/if}
+  </div>
 </div>
 
 <style>
@@ -297,7 +333,13 @@ $effect(() => {
     opacity: 0.55;
     cursor: default;
   }
+  .pane {
+    position: relative;
+    min-height: 0;
+    min-width: 0;
+  }
   .content {
+    height: 100%;
     min-height: 0;
     overflow-y: auto;
     padding: var(--space-6) clamp(var(--space-4), 3vw, 48px) 48px;

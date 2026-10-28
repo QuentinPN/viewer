@@ -1,13 +1,15 @@
 <script lang="ts">
-// One film or series in a library grid. Artwork comes ready from Rust (ADR 0005).
+// One film or series in a library grid, opening its detail page. Artwork comes
+// ready from Rust (ADR 0005).
 import type { MediaItem } from "../emby/types";
 import { itemSubtitle } from "./pager";
 
 interface Props {
   item: MediaItem;
+  onOpen: (item: MediaItem) => void;
 }
 
-let { item }: Props = $props();
+let { item, onOpen }: Props = $props();
 
 let failed = $state(false);
 const subtitle = $derived(itemSubtitle(item));
@@ -21,7 +23,7 @@ const initials = $derived(
 );
 </script>
 
-<article class="card">
+<button type="button" class="card" data-item-id={item.id} onclick={() => onOpen(item)}>
   <div class="poster">
     {#if item.poster && !failed}
       <img
@@ -49,13 +51,32 @@ const initials = $derived(
       </span>
     {/if}
   </div>
-  <h3 class="title">{item.name}</h3>
-  {#if subtitle}<p class="meta">{subtitle}</p>{/if}
-</article>
+  <span class="title">{item.name}</span>
+  {#if subtitle}<span class="meta">{subtitle}</span>{/if}
+</button>
 
 <style>
   .card {
     min-width: 0;
+    width: 100%;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    border-radius: var(--radius-md);
+  }
+  .card:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 4px;
+  }
+  .card:hover .poster,
+  .card:focus-visible .poster {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 32px rgb(0 0 0 / 45%);
   }
   .poster {
     position: relative;
@@ -64,6 +85,9 @@ const initials = $derived(
     overflow: hidden;
     background: linear-gradient(160deg, var(--color-elevated), var(--color-surface));
     box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+    transition:
+      transform var(--motion-base) ease-out,
+      box-shadow var(--motion-base) ease-out;
   }
   img {
     width: 100%;
@@ -120,6 +144,7 @@ const initials = $derived(
     overflow: hidden;
   }
   .meta {
+    display: block;
     margin: 2px 0 0;
     font-size: 12px;
     color: var(--color-text-muted);

@@ -110,6 +110,49 @@ pub struct BaseItemDto {
     pub run_time_ticks: Option<i64>,
     #[serde(default)]
     pub user_data: Option<UserItemData>,
+    // Detail fields: `/Users/{Id}/Items/{Id}` returns them without `Fields`; list
+    // endpoints only when asked. `Path` is never read: it is the file path on the NAS.
+    #[serde(default)]
+    pub original_title: Option<String>,
+    #[serde(default)]
+    pub overview: Option<String>,
+    #[serde(default)]
+    pub taglines: Vec<String>,
+    #[serde(default)]
+    pub genres: Vec<String>,
+    /// `Studios[].Id` is a number on Emby 4.10.1.0, unlike other ids: only names are read.
+    #[serde(default)]
+    pub studios: Vec<NameDto>,
+    #[serde(default)]
+    pub people: Vec<PersonDto>,
+    #[serde(default)]
+    pub official_rating: Option<String>,
+    #[serde(default)]
+    pub community_rating: Option<f64>,
+    #[serde(default)]
+    pub critic_rating: Option<f64>,
+    /// ISO 8601 in UTC, e.g. `2024-07-04T22:00:00.0000000Z` for a 5 July premiere.
+    #[serde(default)]
+    pub premiere_date: Option<String>,
+    #[serde(default)]
+    pub end_date: Option<String>,
+    /// Series only: `Ended` or `Continuing`.
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub backdrop_image_tags: Vec<String>,
+    #[serde(default)]
+    pub index_number: Option<u32>,
+    #[serde(default)]
+    pub index_number_end: Option<u32>,
+    #[serde(default)]
+    pub parent_index_number: Option<u32>,
+    #[serde(default)]
+    pub series_id: Option<String>,
+    #[serde(default)]
+    pub season_id: Option<String>,
+    #[serde(default)]
+    pub media_sources: Vec<MediaSourceDto>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -119,6 +162,78 @@ pub struct UserItemData {
     pub played: bool,
     #[serde(default)]
     pub unplayed_item_count: Option<u32>,
+    #[serde(default)]
+    pub playback_position_ticks: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct NameDto {
+    #[serde(default)]
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PersonDto {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub role: Option<String>,
+    /// `Actor`, `Director`, `Writer`, `Producer`, `GuestStar`…
+    #[serde(rename = "Type", default)]
+    pub person_type: String,
+}
+
+/// One file (version) of an item. `Path` is left out on purpose.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct MediaSourceDto {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub container: Option<String>,
+    #[serde(default)]
+    pub size: Option<u64>,
+    #[serde(default)]
+    pub bitrate: Option<u64>,
+    #[serde(default)]
+    pub media_streams: Vec<MediaStreamDto>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct MediaStreamDto {
+    /// `Video`, `Audio`, `Subtitle`, `EmbeddedImage`, `Attachment`…
+    #[serde(rename = "Type", default)]
+    pub stream_type: String,
+    #[serde(default)]
+    pub codec: Option<String>,
+    /// ISO 639 as stored in the file: `fre`, `fra`, `fr`, `und`… all seen on one server.
+    #[serde(default)]
+    pub language: Option<String>,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub is_default: bool,
+    #[serde(default)]
+    pub is_forced: bool,
+    #[serde(default)]
+    pub is_external: bool,
+    #[serde(default)]
+    pub channels: Option<u32>,
+    #[serde(default)]
+    pub width: Option<u32>,
+    #[serde(default)]
+    pub height: Option<u32>,
+    #[serde(default)]
+    pub bit_depth: Option<u32>,
+    /// `SDR`, `HDR 10`, `DolbyVision`.
+    #[serde(default)]
+    pub video_range: Option<String>,
+    /// `HDR 10`, `Profile 8.1 (HDR10 compatible)`, `None`.
+    #[serde(default)]
+    pub extended_video_sub_type_description: Option<String>,
 }
 
 /// Library kinds this client browses. Other collection types are not listed yet.
@@ -188,6 +303,145 @@ pub struct ItemPage {
     pub start_index: u32,
     /// Where the next page starts: `start_index` plus what the server returned,
     /// even if some unusable items were dropped from `items`.
+    pub next_index: u32,
+    pub total: u32,
+}
+
+/// Kinds of item a detail page shows. Episodes open from their series for now.
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum DetailKind {
+    Movie,
+    Series,
+}
+
+/// Where playback stopped, for an item started but not finished.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ResumePoint {
+    pub position_seconds: u32,
+    /// `0.0..=1.0` of the runtime, when the runtime is known.
+    pub fraction: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CastMember {
+    pub name: String,
+    pub role: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoInfo {
+    pub codec: Option<String>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub bit_depth: Option<u32>,
+    /// `SDR`, `HDR 10`, `Dolby Vision Profile 8.1 (HDR10 compatible)`…
+    pub range: Option<String>,
+}
+
+/// Audio or subtitle track as described by the server, before any playback decision.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamInfo {
+    pub language: Option<String>,
+    pub codec: Option<String>,
+    pub title: Option<String>,
+    /// Audio only.
+    pub channels: Option<u32>,
+    pub is_default: bool,
+    pub is_forced: bool,
+    pub is_external: bool,
+}
+
+/// One version of the item: technical information only. Whether it plays directly
+/// is decided later from PlaybackInfo, never from these fields.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaInfo {
+    pub name: Option<String>,
+    pub container: Option<String>,
+    pub size_bytes: Option<u64>,
+    pub bitrate: Option<u64>,
+    pub video: Option<VideoInfo>,
+    pub audio: Vec<StreamInfo>,
+    pub subtitles: Vec<StreamInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemDetail {
+    pub id: String,
+    pub kind: DetailKind,
+    pub name: String,
+    /// Only when it differs from `name`.
+    pub original_title: Option<String>,
+    pub year: Option<i32>,
+    /// Series only, from `EndDate`.
+    pub end_year: Option<i32>,
+    /// Series only: `Some(true)` while new episodes are expected.
+    pub continuing: Option<bool>,
+    pub overview: Option<String>,
+    pub tagline: Option<String>,
+    pub genres: Vec<String>,
+    pub studios: Vec<String>,
+    pub directors: Vec<String>,
+    pub cast: Vec<CastMember>,
+    pub official_rating: Option<String>,
+    /// Out of 10, one decimal.
+    pub community_rating: Option<f64>,
+    /// Out of 100.
+    pub critic_rating: Option<u32>,
+    /// Movie only.
+    pub runtime_minutes: Option<u32>,
+    pub premiere_date: Option<String>,
+    pub poster: Option<ImageRef>,
+    pub backdrop: Option<ImageRef>,
+    pub logo: Option<ImageRef>,
+    pub played: bool,
+    pub resume: Option<ResumePoint>,
+    /// Series only.
+    pub unplayed_count: Option<u32>,
+    /// Movie only; empty for a series.
+    pub media: Vec<MediaInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Season {
+    pub id: String,
+    pub name: String,
+    /// `0` is the specials season on Emby.
+    pub index: Option<u32>,
+    pub unplayed_count: Option<u32>,
+    pub played: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Episode {
+    pub id: String,
+    pub name: String,
+    pub index: Option<u32>,
+    /// Last number of a double episode (`IndexNumberEnd`).
+    pub index_end: Option<u32>,
+    pub season_index: Option<u32>,
+    pub overview: Option<String>,
+    pub runtime_minutes: Option<u32>,
+    pub premiere_date: Option<String>,
+    /// 16:9 still, when the server has one.
+    pub thumb: Option<ImageRef>,
+    pub played: bool,
+    pub resume: Option<ResumePoint>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct EpisodePage {
+    pub items: Vec<Episode>,
+    pub start_index: u32,
     pub next_index: u32,
     pub total: u32,
 }

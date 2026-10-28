@@ -238,6 +238,9 @@ pub fn run() {
             commands::emby_last_server,
             commands::emby_libraries,
             commands::emby_items,
+            commands::emby_item_detail,
+            commands::emby_seasons,
+            commands::emby_episodes,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Viewer");

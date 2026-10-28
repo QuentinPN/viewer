@@ -1,8 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   EmbyError,
+  EpisodePage,
+  ItemDetail,
   ItemPage,
   Library,
+  Season,
   ServerSummary,
   SignedInUser,
 } from "./types";
@@ -19,6 +22,21 @@ export const embyApi = {
   libraries: () => invoke<Library[]>("emby_libraries"),
   items: (libraryId: string, startIndex: number, limit: number) =>
     invoke<ItemPage>("emby_items", { libraryId, startIndex, limit }),
+  itemDetail: (itemId: string) =>
+    invoke<ItemDetail>("emby_item_detail", { itemId }),
+  seasons: (seriesId: string) => invoke<Season[]>("emby_seasons", { seriesId }),
+  episodes: (
+    seriesId: string,
+    seasonId: string,
+    startIndex: number,
+    limit: number,
+  ) =>
+    invoke<EpisodePage>("emby_episodes", {
+      seriesId,
+      seasonId,
+      startIndex,
+      limit,
+    }),
 };
 
 /** Normalizes a rejected command into an `EmbyError`, whatever was thrown. */

@@ -6,7 +6,9 @@ use tauri::{State, WebviewWindow};
 
 use crate::AppState;
 use crate::emby::EmbyError;
-use crate::emby::models::{ItemPage, Library, ServerSummary, SignedInUser};
+use crate::emby::models::{
+    EpisodePage, ItemDetail, ItemPage, Library, Season, ServerSummary, SignedInUser,
+};
 use crate::emby::session::EmbyService;
 use crate::player::{
     MediaSource, PlaybackRequest, PlayerCommand, PlayerDiagnostics, PlayerEngine, PlayerError,
@@ -146,4 +148,32 @@ pub async fn emby_items(
     limit: u32,
 ) -> Result<ItemPage, EmbyError> {
     emby.items(&library_id, start_index, limit).await
+}
+
+#[tauri::command]
+pub async fn emby_item_detail(
+    emby: State<'_, EmbyService>,
+    item_id: String,
+) -> Result<ItemDetail, EmbyError> {
+    emby.item_detail(&item_id).await
+}
+
+#[tauri::command]
+pub async fn emby_seasons(
+    emby: State<'_, EmbyService>,
+    series_id: String,
+) -> Result<Vec<Season>, EmbyError> {
+    emby.seasons(&series_id).await
+}
+
+#[tauri::command]
+pub async fn emby_episodes(
+    emby: State<'_, EmbyService>,
+    series_id: String,
+    season_id: String,
+    start_index: u32,
+    limit: u32,
+) -> Result<EpisodePage, EmbyError> {
+    emby.episodes(&series_id, &season_id, start_index, limit)
+        .await
 }

@@ -30,6 +30,8 @@ Mock Emby API for auth failures, pagination, permissions, missing fields, playba
   - `./scripts/gate2/e2e-signin.ps1` (after a debug `cargo build`, starting signed out): drives the app UI with key presses over three launches and writes screenshots to `artifacts/gate2/<run>/`. Review them.
   - `… cargo test … real_server_libraries_and_pages '--' --ignored --nocapture`: lists libraries, reads the first and last page of each, fetches one poster, signs out.
   - `./scripts/gate2/e2e-browse.ps1` (same prerequisites, Vite dev server running): sign-in, library switch, mouse-wheel scroll through several pages, narrow window, sign-out.
+  - `… cargo test … real_server_details_seasons_episodes '--' --ignored --nocapture` (optional `VIEWER_DETAIL_SAMPLE`, default 40 items per library): detail of each sampled item, seasons and first page of episodes of each series, one backdrop.
+  - `./scripts/gate2/e2e-detail.ps1` (same prerequisites): series and film detail pages, season switch, Escape back with focus and scroll kept, narrow window, sign-out. It sends no key unless Viewer is the foreground window.
 - Windows Credential Manager, opt-in: `cargo test … windows_store_round_trip '--' --ignored`, then check `cmdkey /list` shows no `Viewer` entry.
 
 ## Release gate

@@ -201,6 +201,68 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
+    /// Full item as the user sees it (`/Users/{Id}/Items/{Id}`): overview, people,
+    /// media sources and user data come without `Fields`. Unknown id: 404.
+    pub async fn item(&self, user_id: &str, item_id: &str) -> Result<BaseItemDto, EmbyError> {
+        self.require_token()?;
+        let path = format!(
+            "/Users/{}/Items/{}",
+            path_segment(user_id)?,
+            path_segment(item_id)?
+        );
+        let res = self.request(Method::GET, &path).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// Seasons of a series, in order (`0` = specials). Unknown series: 404.
+    pub async fn seasons(
+        &self,
+        user_id: &str,
+        series_id: &str,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Shows/{}/Seasons", path_segment(series_id)?));
+        let params = [
+            ("UserId", path_segment(user_id)?),
+            ("EnableUserData", "true"),
+            ("EnableImageTypes", "Primary"),
+            ("ImageTypeLimit", "1"),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// One page of episodes of a season. Emby 4.10.1.0 trusts `SeasonId` over the
+    /// series id: a season of another series returns that series' episodes, so
+    /// callers must check `SeriesId` on the answer.
+    pub async fn episodes(
+        &self,
+        user_id: &str,
+        query: &EpisodesQuery<'_>,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self.server.api(&format!(
+            "/Shows/{}/Episodes",
+            path_segment(query.series_id)?
+        ));
+        let (start, limit) = (query.start_index.to_string(), query.limit.to_string());
+        let params = [
+            ("UserId", path_segment(user_id)?),
+            ("SeasonId", path_segment(query.season_id)?),
+            ("StartIndex", &start),
+            ("Limit", &limit),
+            // Without it episodes come without their overview.
+            ("Fields", "Overview"),
+            ("EnableUserData", "true"),
+            ("EnableImageTypes", "Primary"),
+            ("ImageTypeLimit", "1"),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
     /// Artwork bytes and content type for the `emby-img` protocol (ADR 0005).
     pub async fn image(&self, req: &ImageRequest) -> Result<(String, Vec<u8>), EmbyError> {
         let url = self.server.api(&req.api_path());
@@ -249,6 +311,15 @@ impl EmbyClient {
 pub struct ItemsQuery<'a> {
     pub parent_id: &'a str,
     pub item_types: &'a str,
+    pub start_index: u32,
+    pub limit: u32,
+}
+
+/// Parameters of one page of episodes.
+#[derive(Debug, Clone)]
+pub struct EpisodesQuery<'a> {
+    pub series_id: &'a str,
+    pub season_id: &'a str,
     pub start_index: u32,
     pub limit: u32,
 }

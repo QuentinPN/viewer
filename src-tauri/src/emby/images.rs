@@ -14,6 +14,11 @@ pub const MAX_BYTES: usize = 10 * 1024 * 1024;
 /// Poster widths offered in `srcset`; the WebView picks one for the density.
 pub const POSTER_WIDTHS: &[u32] = &[240, 360, 480];
 pub const LIBRARY_WIDTHS: &[u32] = &[400, 640, 800];
+/// Detail page: the backdrop spans the window, the logo replaces the title.
+pub const BACKDROP_WIDTHS: &[u32] = &[960, 1440, 1920];
+pub const LOGO_WIDTHS: &[u32] = &[320, 640];
+/// 16:9 episode stills.
+pub const THUMB_WIDTHS: &[u32] = &[320, 480, 640];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageType {

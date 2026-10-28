@@ -7,11 +7,13 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 
 use super::EmbyError;
-use super::client::{AccessToken, DeviceIdentity, EmbyClient, ItemsQuery};
+use super::client::{AccessToken, DeviceIdentity, EmbyClient, EpisodesQuery, ItemsQuery};
 use super::credentials::{self, CredentialStore};
 use super::images::{self, ImageRequest, ImageType};
 use super::models::{
-    BaseItemDto, ItemPage, Library, LibraryKind, MediaItem, ServerSummary, SignedInUser,
+    BaseItemDto, CastMember, DetailKind, Episode, EpisodePage, ItemDetail, ItemPage, Library,
+    LibraryKind, MediaInfo, MediaItem, MediaSourceDto, MediaStreamDto, ResumePoint, Season,
+    ServerSummary, SignedInUser, StreamInfo, UserItemData, VideoInfo,
 };
 use super::server_url::ServerUrl;
 
@@ -254,6 +256,74 @@ impl EmbyService {
         })
     }
 
+    /// Detail page of a film or series. Other item types are refused.
+    pub async fn item_detail(&self, item_id: &str) -> Result<ItemDetail, EmbyError> {
+        let (client, user_id) = self.session()?;
+        let dto = self.expire_on_401(client.item(&user_id, item_id).await)?;
+        if dto.id != item_id {
+            return Err(EmbyError::InvalidResponse(
+                "le serveur a renvoyé un autre élément".into(),
+            ));
+        }
+        item_detail(dto)
+    }
+
+    /// Seasons of a series, in server order; unusable entries are dropped.
+    pub async fn seasons(&self, series_id: &str) -> Result<Vec<Season>, EmbyError> {
+        let (client, user_id) = self.session()?;
+        let res = self.expire_on_401(client.seasons(&user_id, series_id).await)?;
+        Ok(res
+            .items
+            .into_iter()
+            .filter(|s| is_id(&s.id) && s.series_id.as_deref().is_none_or(|id| id == series_id))
+            .map(|s| {
+                let user_data = s.user_data.unwrap_or_default();
+                Season {
+                    id: s.id,
+                    name: s.name,
+                    index: s.index_number,
+                    unplayed_count: user_data.unplayed_item_count,
+                    played: user_data.played,
+                }
+            })
+            .collect())
+    }
+
+    /// One page of episodes of a season, `limit` clamped to `1..=MAX_PAGE`. A season
+    /// that belongs to another series is reported as not found (see `episodes`).
+    /// Specials aired during the season come within it, with their own `SeasonId`
+    /// and `season_index` 0 (Emby 4.10.1.0): they are kept.
+    pub async fn episodes(
+        &self,
+        series_id: &str,
+        season_id: &str,
+        start_index: u32,
+        limit: u32,
+    ) -> Result<EpisodePage, EmbyError> {
+        let (client, user_id) = self.session()?;
+        let query = EpisodesQuery {
+            series_id,
+            season_id,
+            start_index,
+            limit: limit.clamp(1, MAX_PAGE),
+        };
+        let page = self.expire_on_401(client.episodes(&user_id, &query).await)?;
+        let foreign = page
+            .items
+            .iter()
+            .any(|e| e.series_id.as_deref() != Some(series_id));
+        if foreign {
+            return Err(EmbyError::NotFound);
+        }
+        let returned = u32::try_from(page.items.len()).unwrap_or(u32::MAX);
+        Ok(EpisodePage {
+            next_index: start_index.saturating_add(returned),
+            items: page.items.into_iter().filter_map(episode).collect(),
+            start_index,
+            total: page.total_record_count,
+        })
+    }
+
     /// Artwork for the `emby-img` protocol, fetched with the open session.
     pub async fn image(&self, req: &ImageRequest) -> Result<(String, Vec<u8>), EmbyError> {
         let _permit = self
@@ -405,21 +475,12 @@ fn media_item(dto: BaseItemDto) -> Option<MediaItem> {
         dto.image_tags.get("Primary").map(String::as_str),
         images::POSTER_WIDTHS,
     );
-    if !dto
-        .id
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '-')
-        || dto.id.is_empty()
-    {
+    if !is_id(&dto.id) {
         return None;
     }
     let user_data = dto.user_data.unwrap_or_default();
     Some(MediaItem {
-        runtime_minutes: dto
-            .run_time_ticks
-            .filter(|_| dto.item_type == "Movie")
-            .and_then(|t| u32::try_from(t / TICKS_PER_MINUTE).ok())
-            .filter(|&m| m > 0),
+        runtime_minutes: minutes(dto.run_time_ticks.filter(|_| dto.item_type == "Movie")),
         id: dto.id,
         name: dto.name,
         item_type: dto.item_type,
@@ -430,5 +491,211 @@ fn media_item(dto: BaseItemDto) -> Option<MediaItem> {
             .filter(|r| r.is_finite() && *r > 0.0),
         played: user_data.played,
         unplayed_count: user_data.unplayed_item_count,
+    })
+}
+
+fn is_id(id: &str) -> bool {
+    !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
+const TICKS_PER_SECOND: i64 = 10_000_000;
+/// Enough names for one line of credits; the full cast is not shown.
+const MAX_CAST: usize = 12;
+
+fn minutes(ticks: Option<i64>) -> Option<u32> {
+    ticks
+        .and_then(|t| u32::try_from(t / TICKS_PER_MINUTE).ok())
+        .filter(|&m| m > 0)
+}
+
+/// Resume point of a started, unfinished item.
+fn resume(user_data: &UserItemData, runtime_ticks: Option<i64>) -> Option<ResumePoint> {
+    let position = user_data.playback_position_ticks;
+    if user_data.played || position <= 0 {
+        return None;
+    }
+    Some(ResumePoint {
+        position_seconds: u32::try_from(position / TICKS_PER_SECOND).ok()?,
+        fraction: runtime_ticks
+            .filter(|&r| r > 0)
+            .map(|r| (position as f64 / r as f64).clamp(0.0, 1.0)),
+    })
+}
+
+/// Trimmed, non-empty text.
+fn text(value: Option<String>) -> Option<String> {
+    value.map(|v| v.trim().to_owned()).filter(|v| !v.is_empty())
+}
+
+fn year_of(date: Option<&str>) -> Option<i32> {
+    date?.get(..4)?.parse().ok()
+}
+
+/// Display range of a video stream: `HDR 10` or `Dolby Vision Profile 8.1 (…)`.
+fn video_range(s: &MediaStreamDto) -> Option<String> {
+    let range = text(s.video_range.clone())?;
+    let detail =
+        text(s.extended_video_sub_type_description.clone()).filter(|d| d != "None" && *d != range);
+    Some(match (range.as_str(), detail) {
+        ("DolbyVision", Some(d)) => format!("Dolby Vision {d}"),
+        ("DolbyVision", None) => "Dolby Vision".into(),
+        (_, _) => range,
+    })
+}
+
+fn media_info(source: MediaSourceDto) -> MediaInfo {
+    let stream = |s: &MediaStreamDto| StreamInfo {
+        language: text(s.language.clone()),
+        codec: text(s.codec.clone()),
+        title: text(s.title.clone()),
+        channels: s.channels,
+        is_default: s.is_default,
+        is_forced: s.is_forced,
+        is_external: s.is_external,
+    };
+    let of_type = |t: &str| {
+        source
+            .media_streams
+            .iter()
+            .filter(|s| s.stream_type == t)
+            .map(stream)
+            .collect::<Vec<_>>()
+    };
+    MediaInfo {
+        video: source
+            .media_streams
+            .iter()
+            .find(|s| s.stream_type == "Video")
+            .map(|s| VideoInfo {
+                codec: text(s.codec.clone()),
+                width: s.width,
+                height: s.height,
+                bit_depth: s.bit_depth,
+                range: video_range(s),
+            }),
+        audio: of_type("Audio"),
+        subtitles: of_type("Subtitle"),
+        name: text(source.name),
+        container: text(source.container),
+        size_bytes: source.size,
+        bitrate: source.bitrate,
+    }
+}
+
+fn item_detail(dto: BaseItemDto) -> Result<ItemDetail, EmbyError> {
+    let kind = match dto.item_type.as_str() {
+        "Movie" => DetailKind::Movie,
+        "Series" => DetailKind::Series,
+        other => {
+            return Err(EmbyError::InvalidResponse(format!(
+                "type d'élément non pris en charge : {other}"
+            )));
+        }
+    };
+    if !is_id(&dto.id) {
+        return Err(EmbyError::InvalidResponse("identifiant invalide".into()));
+    }
+    let image = |t: ImageType, widths| {
+        let tag = match t {
+            ImageType::Backdrop => dto.backdrop_image_tags.first(),
+            _ => dto.image_tags.get(t.as_str()),
+        };
+        images::image_ref(&dto.id, t, tag.map(String::as_str), widths)
+    };
+    let poster = image(ImageType::Primary, images::POSTER_WIDTHS);
+    let backdrop = image(ImageType::Backdrop, images::BACKDROP_WIDTHS);
+    let logo = image(ImageType::Logo, images::LOGO_WIDTHS);
+    let user_data = dto.user_data.unwrap_or_default();
+    let is_movie = kind == DetailKind::Movie;
+    let people_of = |t: &'static str| {
+        dto.people
+            .iter()
+            .filter(move |p| p.person_type == t && !p.name.trim().is_empty())
+    };
+    let name = dto.name.trim().to_owned();
+    Ok(ItemDetail {
+        directors: people_of("Director").map(|p| p.name.clone()).collect(),
+        cast: people_of("Actor")
+            .take(MAX_CAST)
+            .map(|p| CastMember {
+                name: p.name.clone(),
+                role: text(p.role.clone()),
+            })
+            .collect(),
+        original_title: text(dto.original_title).filter(|t| *t != name),
+        year: dto.production_year,
+        end_year: year_of(dto.end_date.as_deref()).filter(|_| !is_movie),
+        continuing: dto
+            .status
+            .as_deref()
+            .filter(|_| !is_movie)
+            .and_then(|s| match s {
+                "Continuing" => Some(true),
+                "Ended" => Some(false),
+                _ => None,
+            }),
+        overview: text(dto.overview),
+        tagline: dto.taglines.into_iter().find_map(|t| text(Some(t))),
+        genres: dto.genres,
+        studios: dto
+            .studios
+            .into_iter()
+            .filter_map(|s| text(Some(s.name)))
+            .collect(),
+        official_rating: text(dto.official_rating),
+        community_rating: dto
+            .community_rating
+            .filter(|r| r.is_finite() && *r > 0.0)
+            .map(|r| (r * 10.0).round() / 10.0),
+        critic_rating: dto
+            .critic_rating
+            .filter(|r| r.is_finite() && (0.0..=100.0).contains(r))
+            .map(|r| r.round() as u32),
+        runtime_minutes: minutes(dto.run_time_ticks).filter(|_| is_movie),
+        premiere_date: text(dto.premiere_date),
+        resume: if is_movie {
+            resume(&user_data, dto.run_time_ticks)
+        } else {
+            None
+        },
+        played: user_data.played,
+        unplayed_count: user_data.unplayed_item_count.filter(|_| !is_movie),
+        media: if is_movie {
+            dto.media_sources.into_iter().map(media_info).collect()
+        } else {
+            Vec::new()
+        },
+        id: dto.id,
+        kind,
+        name,
+        poster,
+        backdrop,
+        logo,
+    })
+}
+
+fn episode(dto: BaseItemDto) -> Option<Episode> {
+    if !is_id(&dto.id) {
+        return None;
+    }
+    let thumb = images::image_ref(
+        &dto.id,
+        ImageType::Primary,
+        dto.image_tags.get("Primary").map(String::as_str),
+        images::THUMB_WIDTHS,
+    );
+    let user_data = dto.user_data.unwrap_or_default();
+    Some(Episode {
+        resume: resume(&user_data, dto.run_time_ticks),
+        played: user_data.played,
+        runtime_minutes: minutes(dto.run_time_ticks),
+        id: dto.id,
+        name: dto.name.trim().to_owned(),
+        index: dto.index_number,
+        index_end: dto.index_number_end,
+        season_index: dto.parent_index_number,
+        overview: text(dto.overview),
+        premiere_date: text(dto.premiere_date),
+        thumb,
     })
 }

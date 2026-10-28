@@ -39,7 +39,7 @@ describe("trackLabel", () => {
     expect(
       trackLabel(track({ lang: "fr-FR", codec: "ass", title: "CC" })),
     ).toBe("CC · Français · ASS");
-    expect(trackLabel(track({ lang: "pt-BR" }))).toBe("pt-BR");
+    expect(trackLabel(track({ lang: "pt-BR" }))).toBe("Portugais");
   });
 
   it("falls back to the track number and marks external tracks", () => {

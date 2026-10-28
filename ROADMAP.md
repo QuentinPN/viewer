@@ -29,7 +29,7 @@ Prove local MKV, authorized HTTP stream, audio, subtitle switching, seek, fullsc
   - release build on a clean machine.
 - Next: a HEVC sample and a sample with SRT/PGS subtitles, then rerun `scripts/spike/run-gate1.ps1`; manual 125/150 % DPI check.
 
-## Gate 2 — Emby integration [IN PROGRESS · sign-in, libraries and paged grid VERIFIED]
+## Gate 2 — Emby integration [IN PROGRESS · sign-in, libraries, grid and detail pages VERIFIED]
 Connection/auth, typed API client, libraries, item details, PlaybackInfo, secure tokens, session reporting, fake-server contract tests.
 - Access authorized by the user (2026-10-27): Emby 4.10.1.0 on the QNAP, LAN HTTP only, non-admin test account. Decision: ADR 0004 (`EmbyClient` in Rust, token in the Windows Credential Manager).
 - VERIFIED (2026-10-27), evidence in `docs/evidence/gate2-2026-10-27.md`:
@@ -39,9 +39,10 @@ Connection/auth, typed API client, libraries, item details, PlaybackInfo, secure
   - typed French errors with a hint (wrong password, unreachable, not Emby, expired session);
   - fake-server contract tests, `#[ignore]` real-server test, UI E2E on the real server.
 - VERIFIED (2026-10-27): film and series libraries, poster grid paged by 60 and sorted by name, watched and unwatched-episode badges, artwork through the local `emby-img` protocol (ADR 0005), narrow layout; real server: 4 libraries, 15 to 707 items, every last page reached.
-- NOT VERIFIED: HTTPS with TLS validation against a real server (none available); retries, cancellation, offline state; 125/150 % DPI.
+- VERIFIED (2026-10-28), evidence in `docs/evidence/gate2-2026-10-28.md`: film and series detail pages (backdrop, logo, metadata, people, technical info without the NAS path), seasons and paged episodes, back to the grid with scroll and focus kept; real server: 195 details, 267 seasons, 3 454 episodes deserialized.
+- NOT VERIFIED: HTTPS with TLS validation against a real server (none available); retries, cancellation, offline state; 125/150 % DPI; resume and watched display against real data (test account has no history).
 - Measured limitation: a cold poster costs ~170–230 ms on the NAS (server-side resize), so a fast scroll leaves posters blank for a few seconds; no virtualization yet (707 cards stay in the DOM).
-- TODO: item details, PlaybackInfo / MediaSources, session reporting. Search, sorting and filters come with Gate 3.
+- TODO: PlaybackInfo / MediaSources and a play button on the detail page, then session reporting. Episode detail, search, sorting and filters come with Gate 3.
 
 ## Gate 3 — Core experience [TODO]
 Home, film/series browsing, details, search, accessible player UI, responsive layouts and artwork cache.
@@ -106,3 +107,13 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - `scripts/gate2/e2e-browse.ps1`: sign-in, library switch by keyboard, scroll loading further pages, narrow window, sign-out; screenshots reviewed; credential store empty at the end.
 - **Bug found and fixed**: `Url::parse_with_params` appended a bare `?` to every request, breaking all existing calls; caught by the contract tests.
 - **Next**: item details (film; series with seasons and episodes), then PlaybackInfo.
+
+### 2026-10-28 — Gate 2 detail pages
+- **Changed**: `EmbyClient::item/seasons/episodes`; `EmbyService::item_detail/seasons/episodes` (NAS paths never deserialized, episodes of another series rejected, in-season specials kept); commands `emby_item_detail`, `emby_seasons`, `emby_episodes`; poster cards are buttons; detail page over the grid (grid kept mounted and `inert`), season switcher, episodes paged by 50; shared `languageName` on `Intl.DisplayNames` (also used by the player prototype); generic pager.
+- **Server findings** (Emby 4.10.1.0): detail fields come without `Fields`; episodes need `Fields=Overview`; a `SeasonId` of another series is honoured; specials aired during a season come within it; `Studios[].Id` is a number; unknown id → 404 with French text.
+- **Tests**:
+  - `npm run verify`: all green (Vitest 31/31, cargo test 32 passed / 4 ignored);
+  - `real_server_details_seasons_episodes` (ignored test, 60 items per library): OK;
+  - `scripts/gate2/e2e-detail.ps1`: series and film pages, season switch by keyboard, Escape back with focus, scroll kept after a mouse open, narrow window, sign-out; screenshots reviewed.
+- **Bugs found and fixed**: in-season specials rejected by the first series/season check (real-server test); separators lost to Svelte whitespace trimming; focus outline around the logo; first E2E keys sent before the page was ready (script now checks the foreground window before every key).
+- **Next**: PlaybackInfo with a device profile, Direct Play / Direct Stream / Transcode decision, play button from the detail page.
