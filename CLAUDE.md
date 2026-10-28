@@ -67,3 +67,13 @@ Follow `TESTING.md`. Never deploy or package a release if core playback gates ar
 ## Communication
 
 Write explanations and user-facing UI copy in French. Keep code identifiers, technical contracts and commit messages consistent with existing repository conventions. Ask concise questions only when blocked by an essential unknown or permission requirement.
+
+## Compact instructions
+
+Auto-compaction is triggered at 20% context usage (`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=20` in `.claude/settings.local.json`). When compacting, keep everything needed to continue without re-explaining:
+
+- Where we are: current branch, uncommitted files, last commit.
+- Every decision taken and why.
+- What the user asked for or refused, in their own words.
+- What remains to do.
+- Key files, and pitfalls already encountered (failed commands, workarounds, environment quirks).
