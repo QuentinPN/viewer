@@ -5,13 +5,21 @@ import { formatMinutes } from "../format/duration";
 /** `S5 · É2`; `null` without numbers. */
 export function episodeCode(item: WatchItem): string | null {
   if (item.kind !== "episode") return null;
-  const season = item.seasonIndex === 0 ? "Spécial" : item.seasonIndex;
-  if (season == null && item.index == null) return null;
+  return seasonEpisodeCode(item.seasonIndex, item.index);
+}
+
+/** `S5 · É2`, `Spécial 3`; `null` without numbers. */
+export function seasonEpisodeCode(
+  seasonIndex: number | null,
+  index: number | null,
+): string | null {
+  const season = seasonIndex === 0 ? "Spécial" : seasonIndex;
+  if (season == null && index == null) return null;
   if (season === "Spécial")
-    return item.index == null ? "Spécial" : `Spécial ${item.index}`;
+    return index == null ? "Spécial" : `Spécial ${index}`;
   return [
     season != null ? `S${season}` : null,
-    item.index != null ? `É${item.index}` : null,
+    index != null ? `É${index}` : null,
   ]
     .filter(Boolean)
     .join(" · ");

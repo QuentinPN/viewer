@@ -11,6 +11,7 @@ Initially a single Windows 10/11 x64 user with Emby Premiere. Multiple users and
 ## MVP (P0)
 
 - Add server URL, validate connection, sign in/out securely, show recoverable connection errors.
+- Sign in once: later launches reopen the session automatically; a NAS outage shows a recovery screen (retry, change server) instead of the sign-in form; only a session rejected by the server asks for the password again; switching server keeps the previous session to return to (ADR 0012).
 - Browse authorized film and series libraries; posters, metadata, search and pagination.
 - Movie/episode details; play, pause, seek, fullscreen, select audio/subtitle tracks.
 - Select media source using server playback info; expose Direct Play/Direct Stream/Transcode diagnostic status.

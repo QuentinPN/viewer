@@ -9,6 +9,7 @@ import { formatTime, playMethodLabel, trackLabel } from "./format";
 import { mapPlayerKey } from "./keyboard";
 import type {
   AppInfo,
+  EndReason,
   PlayerCommand,
   PlayerDiagnostics,
   PlayerEvent,
@@ -19,9 +20,17 @@ interface Props {
   /** Playback started by `emby_play`; the open form is not shown then. */
   playback?: PlaybackStart | null;
   onExit?: () => void;
+  /**
+   * Emby playback that ended on an error or well before the end (the stream
+   * broke, ADR 0012): the player closes and the app offers to resume.
+   */
+  onInterrupted?: (itemId: string) => void;
 }
 
-let { playback = null, onExit }: Props = $props();
+let { playback = null, onExit, onInterrupted }: Props = $props();
+
+/** Same margin as Rust's early end of file (`EARLY_EOF_TICKS`). */
+const EARLY_EOF_SECONDS = 30;
 
 let info = $state<AppInfo | null>(null);
 let source = $state("");
@@ -66,7 +75,9 @@ function onEvent(ev: PlayerEvent) {
       tracks = ev.tracks;
       break;
     case "endFile":
-      if (ev.reason === "error")
+      if (playback && onInterrupted && interruptedBy(ev.reason)) {
+        void close(() => onInterrupted(playback.itemId));
+      } else if (ev.reason === "error")
         error = `Lecture impossible : ${ev.error ?? "erreur inconnue"}`;
       else if (ev.reason === "eof" && onExit) void close();
       break;
@@ -128,7 +139,16 @@ async function open(event: SubmitEvent) {
   }
 }
 
-async function close() {
+/** An error once the file played, or an end of file far from the duration. */
+function interruptedBy(reason: EndReason): boolean {
+  if (!active) return false;
+  if (reason === "error") return true;
+  return (
+    reason === "eof" && duration > 0 && duration - position > EARLY_EOF_SECONDS
+  );
+}
+
+async function close(then: (() => void) | undefined = onExit) {
   if (fullscreen) await toggleFullscreen(false).catch(() => {});
   await playerApi.close();
   active = false;
@@ -136,7 +156,7 @@ async function close() {
   diag = null;
   position = 0;
   duration = 0;
-  onExit?.();
+  then?.();
 }
 
 async function toggleFullscreen(force?: boolean) {
@@ -187,7 +207,7 @@ function trackId(value: string): number | null {
       {:else}
         <p class="subtitle">Ouverture du flux…</p>
       {/if}
-      <button type="button" onclick={close}>Retour</button>
+      <button type="button" onclick={() => close()}>Retour</button>
     </main>
   {:else if !active}
     <main class="open-panel">
@@ -269,7 +289,7 @@ function trackId(value: string): number | null {
       <button onclick={() => toggleFullscreen()} aria-label={fullscreen ? "Quitter le plein écran" : "Plein écran"}>
         {fullscreen ? "⤡" : "⤢"}
       </button>
-      <button onclick={close} aria-label={onExit ? "Arrêter et revenir à la fiche" : "Fermer la lecture"}>✕</button>
+      <button onclick={() => close()} aria-label={onExit ? "Arrêter et revenir à la fiche" : "Fermer la lecture"}>✕</button>
     </section>
   {/if}
 </div>

@@ -1,11 +1,14 @@
 <script lang="ts">
-// Home page (DESIGN.md, Home; ADR 0010): "Reprendre" and "À suivre" play at once,
-// then the latest additions of each library open their detail page. Rows load in
-// parallel; "Reprendre" and "À suivre" are read again after every playback.
-import { onMount } from "svelte";
+// Home page (DESIGN.md, Home; ADR 0010): the hero (ADR 0015), then "Reprendre"
+// and "À suivre" play at once, then favorites (ADR 0014) and the latest additions
+// of each library open their detail page. Rows load in parallel; the hero,
+// "Reprendre" and "À suivre" are read again after every playback, "Favoris" after
+// every favorite change.
+import { onMount, untrack } from "svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
 import type {
   EmbyError,
+  HeroItem,
   Library,
   MediaItem,
   PlaybackStart,
@@ -13,6 +16,7 @@ import type {
 } from "../emby/types";
 import PosterCard from "../library/PosterCard.svelte";
 import { watchTitle, withoutDuplicates } from "./format";
+import Hero from "./Hero.svelte";
 import Row from "./Row.svelte";
 import WatchCard from "./WatchCard.svelte";
 
@@ -22,12 +26,24 @@ interface Props {
   onOpen: (item: MediaItem) => void;
   onShowLibrary: (library: Library) => void;
   onPlay: (start: PlaybackStart) => void;
-  /** Reports the error upward (an expired session signs out) and returns it. */
+  /** Bumped when the connection comes back (ADR 0012). */
+  refresh: number;
+  /** Bumped when a favorite changed on a detail page: "Favoris" is read again. */
+  favoritesVersion: number;
+  /** Reports the error upward (a lost NAS or a 401 changes the screen) and returns it. */
   onError: (e: unknown) => EmbyError;
 }
 
-let { libraries, userName, onOpen, onShowLibrary, onPlay, onError }: Props =
-  $props();
+let {
+  libraries,
+  userName,
+  onOpen,
+  onShowLibrary,
+  onPlay,
+  refresh,
+  favoritesVersion,
+  onError,
+}: Props = $props();
 
 interface RowState<T> {
   items: T[] | null;
@@ -38,13 +54,16 @@ function loadingRow<T>(): RowState<T> {
   return { items: null, error: null };
 }
 
+let hero = $state<RowState<HeroItem>>(loadingRow());
 let inProgress = $state<RowState<WatchItem>>(loadingRow());
 let nextUp = $state<RowState<WatchItem>>(loadingRow());
+let favorites = $state<RowState<MediaItem>>(loadingRow());
 let latest = $state<Record<string, RowState<MediaItem>>>({});
 let starting = $state<string | null>(null);
 let playError = $state<{ title: string; error: EmbyError } | null>(null);
 // Bumped by every reload of the watch rows: older answers are dropped.
 let watchGeneration = 0;
+let favoritesGeneration = 0;
 
 const nextUpShown = $derived(
   nextUp.items ? withoutDuplicates(nextUp.items, inProgress.items ?? []) : null,
@@ -54,8 +73,10 @@ const watchLoading = $derived(
     (nextUp.items === null && !nextUp.error),
 );
 const everythingEmpty = $derived(
-  inProgress.items?.length === 0 &&
+  hero.items?.length === 0 &&
+    inProgress.items?.length === 0 &&
     nextUpShown?.length === 0 &&
+    favorites.items?.length === 0 &&
     libraries.every((l) => latest[l.id]?.items?.length === 0),
 );
 
@@ -72,11 +93,28 @@ async function loadRow<T>(
   }
 }
 
+/** Hero, "Reprendre" and "À suivre": read again in place after a playback. */
 function loadWatchRows() {
   const gen = ++watchGeneration;
   const current = () => gen === watchGeneration;
+  void loadRow(embyApi.hero, (r) => (hero = r), current);
   void loadRow(embyApi.continueWatching, (r) => (inProgress = r), current);
   void loadRow(embyApi.nextUp, (r) => (nextUp = r), current);
+}
+
+/** Read again in place: the cards shown stay until the answer comes. */
+function loadFavorites() {
+  const gen = ++favoritesGeneration;
+  void loadRow(
+    embyApi.favorites,
+    (r) => (favorites = r),
+    () => gen === favoritesGeneration,
+  );
+}
+
+function retryFavorites() {
+  favorites = loadingRow();
+  loadFavorites();
 }
 
 function loadLatest(library: Library) {
@@ -87,21 +125,57 @@ function loadLatest(library: Library) {
   );
 }
 
-async function play(item: WatchItem) {
+async function start(id: string, resume: boolean, title: string) {
   if (starting) return;
-  starting = item.id;
+  starting = id;
   playError = null;
   try {
-    onPlay(await embyApi.play(item.id, item.resume !== null));
+    onPlay(await embyApi.play(id, resume));
   } catch (e) {
-    playError = { title: watchTitle(item), error: onError(toEmbyError(e)) };
+    playError = { title, error: onError(toEmbyError(e)) };
   } finally {
     starting = null;
   }
 }
 
+function play(item: WatchItem) {
+  void start(item.id, item.resume !== null, watchTitle(item));
+}
+
+function playHero(item: HeroItem) {
+  if (item.playId)
+    void start(item.playId, item.resume !== null, item.detail.name);
+}
+
+function retryHero() {
+  hero = loadingRow();
+  void loadRow(embyApi.hero, (r) => (hero = r));
+}
+
+// Back online: the watch rows are read again in place, failed rows retried.
+let seenRefresh = untrack(() => refresh);
+$effect(() => {
+  if (refresh === seenRefresh) return;
+  seenRefresh = refresh;
+  untrack(() => {
+    loadWatchRows();
+    loadFavorites();
+    for (const library of libraries) {
+      if (latest[library.id]?.error) loadLatest(library);
+    }
+  });
+});
+
+let seenFavorites = untrack(() => favoritesVersion);
+$effect(() => {
+  if (favoritesVersion === seenFavorites) return;
+  seenFavorites = favoritesVersion;
+  untrack(loadFavorites);
+});
+
 onMount(() => {
   loadWatchRows();
+  loadFavorites();
   for (const library of libraries) loadLatest(library);
   const unlisten = embyApi.onPlaybackStopped(() => loadWatchRows());
   return () => {
@@ -140,6 +214,17 @@ onMount(() => {
       {#if errorHint(playError.error)}<p class="hint">{errorHint(playError.error)}</p>{/if}
       <button type="button" class="secondary" onclick={() => (playError = null)}>Fermer</button>
     </div>
+  {/if}
+
+  {#if hero.error}
+    <section class="row-failed" aria-labelledby="hero-failed">
+      <h2 id="hero-failed">À la une</h2>
+      {@render rowError(hero.error, retryHero)}
+    </section>
+  {:else if hero.items === null}
+    <div class="hero-skeleton" aria-hidden="true"></div>
+  {:else}
+    <Hero items={hero.items} {starting} onPlay={playHero} {onOpen} />
   {/if}
 
   {#if watchLoading}
@@ -186,6 +271,23 @@ onMount(() => {
         {/each}
       </Row>
     {/if}
+  {/if}
+
+  {#if favorites.error}
+    <section class="row-failed" aria-labelledby="row-favorites">
+      <h2 id="row-favorites">Favoris</h2>
+      {@render rowError(favorites.error, retryFavorites)}
+    </section>
+  {:else if !favorites.items || favorites.items.length > 0}
+    <Row title="Favoris" id="row-favorites">
+      {#if favorites.items}
+        {#each favorites.items as item (item.id)}
+          <li><PosterCard {item} onOpen={onOpen} /></li>
+        {/each}
+      {:else}
+        {@render skeleton(false, 8)}
+      {/if}
+    </Row>
   {/if}
 
   {#each libraries as library (library.id)}
@@ -298,6 +400,13 @@ onMount(() => {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
+  .hero-skeleton {
+    height: clamp(300px, 40vw, 540px);
+    margin-bottom: 32px;
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
   .skeleton .sk-image {
     aspect-ratio: 2 / 3;
     border-radius: var(--radius-md);
@@ -321,6 +430,7 @@ onMount(() => {
     }
   }
   @media (prefers-reduced-motion: reduce) {
+    .hero-skeleton,
     .skeleton .sk-image,
     .skeleton .sk-line {
       animation: none;

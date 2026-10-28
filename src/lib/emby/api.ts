@@ -3,15 +3,19 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   EmbyError,
   EpisodePage,
+  HeroItem,
   ItemDetail,
   ItemPage,
+  ItemsOptions,
   Library,
   MediaItem,
   PlaybackStart,
   PlaybackStopped,
+  SavedServer,
   SearchResults,
   Season,
   ServerSummary,
+  SessionStatus,
   SignedInUser,
   WatchItem,
 } from "./types";
@@ -24,16 +28,36 @@ export const embyApi = {
   probe: (url: string) => invoke<ServerSummary>("emby_probe", { url }),
   signIn: (url: string, username: string, password: string) =>
     invoke<SignedInUser>("emby_sign_in", { url, username, password }),
-  restore: () => invoke<SignedInUser | null>("emby_restore"),
+  /** Validates the saved session (ADR 0012); `cancelled` if superseded. */
+  restore: () => invoke<SessionStatus>("emby_restore"),
+  /** Sets the session aside without revoking it, to come back to it later. */
+  changeServer: () => invoke<void>("emby_change_server"),
+  savedSessions: () => invoke<SavedServer[]>("emby_saved_sessions"),
+  resumeSaved: (serverId: string, userId: string) =>
+    invoke<SessionStatus>("emby_resume_saved", { serverId, userId }),
   signOut: () => invoke<void>("emby_sign_out"),
   lastServer: () => invoke<string | null>("emby_last_server"),
   libraries: () => invoke<Library[]>("emby_libraries"),
-  items: (libraryId: string, startIndex: number, limit: number) =>
-    invoke<ItemPage>("emby_items", { libraryId, startIndex, limit }),
+  items: (
+    libraryId: string,
+    startIndex: number,
+    limit: number,
+    options?: ItemsOptions,
+  ) =>
+    invoke<ItemPage>("emby_items", { libraryId, startIndex, limit, options }),
+  /** Genre names of a library, usable as a filter (ADR 0013). */
+  genres: (libraryId: string) => invoke<string[]>("emby_genres", { libraryId }),
   continueWatching: () => invoke<WatchItem[]>("emby_continue_watching"),
   nextUp: () => invoke<WatchItem[]>("emby_next_up"),
   latest: (libraryId: string) =>
     invoke<MediaItem[]>("emby_latest", { libraryId }),
+  /** Home row "Favoris" (ADR 0014): favorite films and series, by title. */
+  favorites: () => invoke<MediaItem[]>("emby_favorites"),
+  /** Home hero (ADR 0015): up to five titles, the ones to resume first. */
+  hero: () => invoke<HeroItem[]>("emby_hero"),
+  /** Returns the favorite state the server reports after the change. */
+  setFavorite: (itemId: string, favorite: boolean) =>
+    invoke<boolean>("emby_set_favorite", { itemId, favorite }),
   search: (query: string) => invoke<SearchResults>("emby_search", { query }),
   itemDetail: (itemId: string) =>
     invoke<ItemDetail>("emby_item_detail", { itemId }),
@@ -92,6 +116,10 @@ export function errorHint(error: EmbyError): string | null {
       return "Le nom d'utilisateur et le mot de passe sont sensibles à la casse.";
     case "sessionExpired":
       return "Votre session a été fermée sur le serveur. Reconnectez-vous.";
+    case "accountUnavailable":
+      return "Demandez à l'administrateur du serveur de réactiver votre compte, ou utilisez-en un autre.";
+    case "serverMismatch":
+      return "Votre session n'a pas été envoyée à ce serveur. Vérifiez l'adresse ou changez de serveur.";
     case "invalidResponse":
       return "L'adresse répond, mais ce n'est peut-être pas un serveur Emby.";
     case "notFound":

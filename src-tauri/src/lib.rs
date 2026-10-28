@@ -152,6 +152,8 @@ async fn emby_image(
                     StatusCode::UNAUTHORIZED
                 }
                 emby::EmbyError::NotFound => StatusCode::NOT_FOUND,
+                // An image of another server than the open session's (ADR 0012).
+                emby::EmbyError::Forbidden => StatusCode::FORBIDDEN,
                 _ => StatusCode::BAD_GATEWAY,
             })
         }
@@ -275,13 +277,20 @@ pub fn run() {
             commands::emby_probe,
             commands::emby_sign_in,
             commands::emby_restore,
+            commands::emby_change_server,
+            commands::emby_saved_sessions,
+            commands::emby_resume_saved,
             commands::emby_sign_out,
             commands::emby_last_server,
             commands::emby_libraries,
             commands::emby_items,
+            commands::emby_genres,
             commands::emby_continue_watching,
             commands::emby_next_up,
             commands::emby_latest,
+            commands::emby_favorites,
+            commands::emby_hero,
+            commands::emby_set_favorite,
             commands::emby_search,
             commands::emby_item_detail,
             commands::emby_seasons,

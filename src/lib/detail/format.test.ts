@@ -39,6 +39,7 @@ const detail = (over: Partial<ItemDetail>): ItemDetail => ({
   backdrop: null,
   logo: null,
   played: false,
+  favorite: false,
   resume: null,
   unplayedCount: null,
   media: [],

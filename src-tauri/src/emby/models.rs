@@ -53,6 +53,8 @@ pub struct UserDto {
 pub struct UserPolicy {
     #[serde(default)]
     pub is_administrator: bool,
+    #[serde(default)]
+    pub is_disabled: bool,
 }
 
 /// What the UI learns about a server before signing in.
@@ -75,6 +77,43 @@ pub struct SignedInUser {
     pub user_id: String,
     pub user_name: String,
     pub is_administrator: bool,
+}
+
+/// A session known from `session.json`, shown on the recovery, reauthentication
+/// and server screens (ADR 0012). Contains no secret.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedServer {
+    pub url: String,
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub encrypted: bool,
+    pub user_id: String,
+    pub user_name: String,
+}
+
+/// Outcome of validating the saved session (ADR 0012). Network failures keep the
+/// session; only a rejection by the server asks for the password again.
+#[derive(Debug, Serialize)]
+#[serde(
+    tag = "state",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum SessionStatus {
+    SignedOut,
+    Authenticated {
+        user: SignedInUser,
+    },
+    ServerUnreachable {
+        server: SavedServer,
+        error: super::EmbyError,
+    },
+    AuthenticationRequired {
+        server: SavedServer,
+        error: super::EmbyError,
+    },
 }
 
 /// `QueryResult_BaseItemDto` from `/Users/{Id}/Views` and `/Users/{Id}/Items`.
@@ -175,6 +214,13 @@ pub struct BaseItemDto {
     pub parent_backdrop_item_id: Option<String>,
     #[serde(default)]
     pub parent_backdrop_image_tags: Vec<String>,
+    /// Episodes: the series' logo and poster, for the home hero.
+    #[serde(default)]
+    pub parent_logo_item_id: Option<String>,
+    #[serde(default)]
+    pub parent_logo_image_tag: Option<String>,
+    #[serde(default)]
+    pub series_primary_image_tag: Option<String>,
     #[serde(default)]
     pub media_sources: Vec<MediaSourceDto>,
 }
@@ -188,6 +234,8 @@ pub struct UserItemData {
     pub unplayed_item_count: Option<u32>,
     #[serde(default)]
     pub playback_position_ticks: i64,
+    #[serde(default)]
+    pub is_favorite: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -295,6 +343,86 @@ impl LibraryKind {
     }
 }
 
+/// Order of a library grid (ADR 0013).
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum SortKey {
+    #[default]
+    Name,
+    DateAdded,
+    Year,
+    Rating,
+}
+
+impl SortKey {
+    /// `SortBy`; the title breaks ties so pages stay stable.
+    pub fn sort_by(self) -> &'static str {
+        match self {
+            Self::Name => "SortName",
+            Self::DateAdded => "DateCreated,SortName",
+            Self::Year => "ProductionYear,SortName",
+            Self::Rating => "CommunityRating,SortName",
+        }
+    }
+}
+
+/// Watched state kept in a library grid (ADR 0013).
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum WatchFilter {
+    #[default]
+    All,
+    Unplayed,
+    Played,
+    InProgress,
+}
+
+/// Sort and filters of a library grid, as the UI chooses them (ADR 0013).
+#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ItemsOptions {
+    pub sort: SortKey,
+    pub descending: bool,
+    pub watch: WatchFilter,
+    pub favorites: bool,
+    pub genre: Option<String>,
+}
+
+/// Longest genre name sent to the server.
+pub const MAX_GENRE_CHARS: usize = 100;
+
+/// A genre the server can filter on: `Genres` is `|`-separated on Emby.
+pub fn is_usable_genre(name: &str) -> bool {
+    !name.trim().is_empty()
+        && name.chars().count() <= MAX_GENRE_CHARS
+        && !name.chars().any(|c| c == '|' || c.is_control())
+}
+
+impl ItemsOptions {
+    pub fn sort_order(&self) -> &'static str {
+        if self.descending {
+            "Descending"
+        } else {
+            "Ascending"
+        }
+    }
+
+    /// `Filters`, empty when nothing is filtered.
+    pub fn filters(&self) -> String {
+        let watch = match self.watch {
+            WatchFilter::All => None,
+            WatchFilter::Unplayed => Some("IsUnplayed"),
+            WatchFilter::Played => Some("IsPlayed"),
+            WatchFilter::InProgress => Some("IsResumable"),
+        };
+        watch
+            .into_iter()
+            .chain(self.favorites.then_some("IsFavorite"))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+}
+
 /// Image ready for `<img>`: URLs point at the local `emby-img` protocol (ADR 0005).
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -377,6 +505,41 @@ pub struct ItemPage {
     /// even if some unusable items were dropped from `items`.
     pub next_index: u32,
     pub total: u32,
+}
+
+/// One title of the home hero (ADR 0015): a wide backdrop, what the main button
+/// plays, and the film or series that "Plus d'infos" opens.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct HeroItem {
+    /// Film or series of the detail page; for a resumed episode, its series.
+    pub detail: MediaItem,
+    pub reason: HeroReason,
+    pub backdrop: ImageRef,
+    pub logo: Option<ImageRef>,
+    pub overview: Option<String>,
+    /// Film or episode the main button plays; `None` when nothing is left to watch.
+    pub play_id: Option<String>,
+    /// When the main button plays an episode.
+    pub episode: Option<HeroEpisode>,
+    pub resume: Option<ResumePoint>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum HeroReason {
+    /// Started but not finished ("Reprendre").
+    Resume,
+    /// Recently added, not watched.
+    Latest,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct HeroEpisode {
+    pub name: String,
+    pub season_index: Option<u32>,
+    pub index: Option<u32>,
 }
 
 /// Kinds of item a detail page shows. Episodes open from their series for now.
@@ -473,6 +636,8 @@ pub struct ItemDetail {
     pub backdrop: Option<ImageRef>,
     pub logo: Option<ImageRef>,
     pub played: bool,
+    /// In the user's favorites (ADR 0014).
+    pub favorite: bool,
     pub resume: Option<ResumePoint>,
     /// Series only.
     pub unplayed_count: Option<u32>,

@@ -10,8 +10,8 @@ use super::EmbyError;
 use super::images::{self, ImageRequest};
 use super::models::{
     AuthenticateUserByName, AuthenticationResult, BaseItemDto, DeviceProfile, HomeSectionDto,
-    PlaybackInfoRequest, PlaybackInfoResponse, PlaybackReportBody, PublicSystemInfo, QueryResult,
-    UserDto,
+    ItemsOptions, PlaybackInfoRequest, PlaybackInfoResponse, PlaybackReportBody, PublicSystemInfo,
+    QueryResult, UserDto, UserItemData,
 };
 use super::server_url::ServerUrl;
 
@@ -57,9 +57,19 @@ pub struct EmbyClient {
 
 impl EmbyClient {
     pub fn new(server: ServerUrl, device: DeviceIdentity) -> Result<Self, EmbyError> {
+        Self::with_timeouts(server, device, CONNECT_TIMEOUT, REQUEST_TIMEOUT)
+    }
+
+    /// Same as `new` with other bounds (tests use short ones to simulate a hung NAS).
+    pub fn with_timeouts(
+        server: ServerUrl,
+        device: DeviceIdentity,
+        connect: Duration,
+        request: Duration,
+    ) -> Result<Self, EmbyError> {
         let http = reqwest::Client::builder()
-            .connect_timeout(CONNECT_TIMEOUT)
-            .timeout(REQUEST_TIMEOUT)
+            .connect_timeout(connect)
+            .timeout(request)
             // An Emby server never needs redirects for API calls; following them
             // could forward the auth header to another host.
             .redirect(reqwest::redirect::Policy::none())
@@ -77,6 +87,15 @@ impl EmbyClient {
     pub fn with_token(mut self, token: AccessToken) -> Self {
         self.token = Some(token);
         self
+    }
+
+    /// True when both clients carry the same token: a 401 only ends the session
+    /// whose token was refused, not a newer one (ADR 0012).
+    pub fn same_token(&self, other: &EmbyClient) -> bool {
+        match (&self.token, &other.token) {
+            (Some(a), Some(b)) => a.expose() == b.expose(),
+            _ => false,
+        }
     }
 
     pub fn server(&self) -> &ServerUrl {
@@ -185,18 +204,49 @@ impl EmbyClient {
             .server
             .api(&format!("/Users/{}/Items", path_segment(user_id)?));
         let (start, limit) = (query.start_index.to_string(), query.limit.to_string());
-        let params = [
+        let options = query.options;
+        let filters = options.filters();
+        let mut params = vec![
             ("ParentId", path_segment(query.parent_id)?),
             ("Recursive", "true"),
             ("IncludeItemTypes", query.item_types),
-            ("SortBy", "SortName"),
-            ("SortOrder", "Ascending"),
+            ("SortBy", options.sort.sort_by()),
+            ("SortOrder", options.sort_order()),
             ("StartIndex", &start),
             ("Limit", &limit),
             ("Fields", "PrimaryImageAspectRatio,ProductionYear"),
             ("EnableImageTypes", "Primary"),
             ("ImageTypeLimit", "1"),
             ("EnableUserData", "true"),
+        ];
+        if !filters.is_empty() {
+            params.push(("Filters", &filters));
+        }
+        if let Some(genre) = &options.genre {
+            params.push(("Genres", genre));
+        }
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// Genres of the films or series of a library, by name (`/Genres`).
+    pub async fn genres(
+        &self,
+        user_id: &str,
+        parent_id: &str,
+        item_types: &str,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self.server.api("/Genres");
+        let params = [
+            ("UserId", path_segment(user_id)?),
+            ("ParentId", path_segment(parent_id)?),
+            ("IncludeItemTypes", item_types),
+            ("Recursive", "true"),
+            ("SortBy", "SortName"),
+            ("SortOrder", "Ascending"),
+            ("EnableImages", "false"),
+            ("EnableUserData", "false"),
         ];
         let res = self.request_url(Method::GET, &url, &params).send().await?;
         json(check(res, true)?).await
@@ -222,6 +272,83 @@ impl EmbyClient {
             ("EnableUserData", "true"),
             ("ImageTypeLimit", "1"),
             ("EnableImageTypes", WATCH_IMAGES),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// Home hero (ADR 0015): the items of `resume_items`, with the overview and
+    /// the wide artwork (episodes also get their series' backdrop and logo).
+    pub async fn hero_resume(
+        &self,
+        user_id: &str,
+        limit: u32,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Users/{}/Items/Resume", path_segment(user_id)?));
+        let limit = limit.to_string();
+        let params = [
+            ("Limit", limit.as_str()),
+            ("MediaTypes", "Video"),
+            ("IncludeItemTypes", "Movie,Episode"),
+            ("Fields", HERO_FIELDS),
+            ("EnableUserData", "true"),
+            ("ImageTypeLimit", "1"),
+            ("EnableImageTypes", HERO_IMAGES),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// Home hero (ADR 0015): films and series not watched yet that have a
+    /// backdrop, most recently added first.
+    pub async fn hero_latest(
+        &self,
+        user_id: &str,
+        limit: u32,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Users/{}/Items", path_segment(user_id)?));
+        let limit = limit.to_string();
+        let params = [
+            ("Recursive", "true"),
+            ("IncludeItemTypes", "Movie,Series"),
+            ("IsPlayed", "false"),
+            ("ImageTypes", "Backdrop"),
+            ("SortBy", "DateCreated"),
+            ("SortOrder", "Descending"),
+            ("Limit", limit.as_str()),
+            ("Fields", HERO_FIELDS),
+            ("EnableUserData", "true"),
+            ("ImageTypeLimit", "1"),
+            ("EnableImageTypes", HERO_IMAGES),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// First episode of a series not watched yet, in the series' order
+    /// (`/Shows/{Id}/Episodes?IsPlayed=false`). Unknown series: 404.
+    pub async fn first_unplayed_episode(
+        &self,
+        user_id: &str,
+        series_id: &str,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Shows/{}/Episodes", path_segment(series_id)?));
+        let params = [
+            ("UserId", path_segment(user_id)?),
+            ("IsPlayed", "false"),
+            ("Limit", "1"),
+            ("EnableUserData", "true"),
+            ("EnableImageTypes", "Primary"),
+            ("ImageTypeLimit", "1"),
         ];
         let res = self.request_url(Method::GET, &url, &params).send().await?;
         json(check(res, true)?).await
@@ -439,6 +566,56 @@ impl EmbyClient {
         check(res, true).map(drop)
     }
 
+    /// Adds or removes a favorite (`POST` / `DELETE /Users/{Id}/FavoriteItems/{Id}`);
+    /// the server answers with the item's new user data.
+    pub async fn set_favorite(
+        &self,
+        user_id: &str,
+        item_id: &str,
+        favorite: bool,
+    ) -> Result<UserItemData, EmbyError> {
+        self.require_token()?;
+        let url = self.server.api(&format!(
+            "/Users/{}/FavoriteItems/{}",
+            path_segment(user_id)?,
+            path_segment(item_id)?
+        ));
+        let method = if favorite {
+            Method::POST
+        } else {
+            Method::DELETE
+        };
+        let res = self.request_url(method, &url, &[]).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// Favorite films and series of the user, by title (`Filters=IsFavorite`).
+    pub async fn favorites(
+        &self,
+        user_id: &str,
+        limit: u32,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Users/{}/Items", path_segment(user_id)?));
+        let limit = limit.to_string();
+        let params = [
+            ("Filters", "IsFavorite"),
+            ("Recursive", "true"),
+            ("IncludeItemTypes", "Movie,Series"),
+            ("SortBy", "SortName"),
+            ("SortOrder", "Ascending"),
+            ("Limit", limit.as_str()),
+            ("Fields", "PrimaryImageAspectRatio,ProductionYear"),
+            ("EnableImageTypes", "Primary"),
+            ("ImageTypeLimit", "1"),
+            ("EnableUserData", "true"),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
     /// Marks an item played on `date_played` (`yyyyMMddHHmmss`, UTC), or unplayed
     /// with `None` (`POST` / `DELETE /Users/{Id}/PlayedItems/{Id}`).
     /// Real-server tests only: the app does not offer it yet.
@@ -516,6 +693,8 @@ impl EmbyClient {
 /// come by default; the images feed the 16:9 card.
 const WATCH_FIELDS: &str = "PrimaryImageAspectRatio";
 const WATCH_IMAGES: &str = "Primary,Backdrop,Thumb";
+const HERO_FIELDS: &str = "Overview,ProductionYear,PrimaryImageAspectRatio";
+const HERO_IMAGES: &str = "Primary,Backdrop,Logo";
 
 /// Parameters of one library page.
 #[derive(Debug, Clone)]
@@ -524,6 +703,8 @@ pub struct ItemsQuery<'a> {
     pub item_types: &'a str,
     pub start_index: u32,
     pub limit: u32,
+    /// Checked by the caller: the genre is a usable one (`is_usable_genre`).
+    pub options: &'a ItemsOptions,
 }
 
 /// Parameters of one page of episodes.

@@ -29,6 +29,9 @@ export type EmbyErrorKind =
   | "notFound"
   | "notSignedIn"
   | "sessionExpired"
+  | "accountUnavailable"
+  | "serverMismatch"
+  | "cancelled"
   | "credentialStore"
   | "playbackRefused"
   | "noCompatibleStream"
@@ -38,6 +41,24 @@ export interface EmbyError {
   kind: EmbyErrorKind;
   message: string;
 }
+
+/** A session known from `session.json` (ADR 0012). Never carries the token. */
+export interface SavedServer {
+  url: string;
+  id: string;
+  name: string;
+  version: string;
+  encrypted: boolean;
+  userId: string;
+  userName: string;
+}
+
+/** Outcome of `emby_restore`: only a rejection asks for the password again. */
+export type SessionStatus =
+  | { state: "signedOut" }
+  | { state: "authenticated"; user: SignedInUser }
+  | { state: "serverUnreachable"; server: SavedServer; error: EmbyError }
+  | { state: "authenticationRequired"; server: SavedServer; error: EmbyError };
 
 /** Artwork on the local `emby-img` protocol (ADR 0005), ready for `<img>`. */
 export interface ImageRef {
@@ -91,6 +112,41 @@ export interface WatchItem {
   image: ImageRef | null;
   runtimeMinutes: number | null;
   resume: ResumePoint | null;
+}
+
+/** One title of the home hero (ADR 0015). */
+export interface HeroItem {
+  /** Film or series the detail page opens; a resumed episode gives its series. */
+  detail: MediaItem;
+  reason: "resume" | "latest";
+  backdrop: ImageRef;
+  logo: ImageRef | null;
+  overview: string | null;
+  /** Film or episode the main button plays; `null` when nothing is left. */
+  playId: string | null;
+  episode: HeroEpisode | null;
+  resume: ResumePoint | null;
+}
+
+export interface HeroEpisode {
+  name: string;
+  seasonIndex: number | null;
+  index: number | null;
+}
+
+/** Sort of a library grid (ADR 0013); Rust maps it to `SortBy`. */
+export type SortKey = "name" | "dateAdded" | "year" | "rating";
+/** Watched-state filter; `inProgress` is offered for films only. */
+export type WatchFilter = "all" | "unplayed" | "played" | "inProgress";
+
+/** Sort and filters of a library grid, sent with `emby_items`. */
+export interface ItemsOptions {
+  sort: SortKey;
+  descending: boolean;
+  watch: WatchFilter;
+  favorites: boolean;
+  /** One genre among `emby_genres`, or none. */
+  genre: string | null;
 }
 
 export interface ItemPage {
@@ -170,6 +226,8 @@ export interface ItemDetail {
   backdrop: ImageRef | null;
   logo: ImageRef | null;
   played: boolean;
+  /** In the user's favorites (ADR 0014). */
+  favorite: boolean;
   resume: ResumePoint | null;
   unplayedCount: number | null;
   media: MediaInfo[];

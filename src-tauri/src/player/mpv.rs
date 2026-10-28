@@ -156,6 +156,7 @@ const OBS_DURATION: u64 = 2;
 const OBS_PAUSE: u64 = 3;
 const OBS_CACHE: u64 = 4;
 const OBS_TRACKS: u64 = 5;
+const OBS_EOF: u64 = 6;
 /// Reply id of the asynchronous `sub-add` commands.
 const REPLY_SUBTITLE: u64 = 1;
 
@@ -263,6 +264,10 @@ impl MpvEngine {
         inner.observe(OBS_PAUSE, "pause", ffi::MPV_FORMAT_FLAG)?;
         inner.observe(OBS_CACHE, "paused-for-cache", ffi::MPV_FORMAT_FLAG)?;
         inner.observe(OBS_TRACKS, "track-list", ffi::MPV_FORMAT_STRING)?;
+        // With `keep-open`, mpv stays on the last frame at the end of the file and
+        // sends no `end-file`: `eof-reached` is the end, including a stream cut
+        // short by the network once the cache is drained (ADR 0012).
+        inner.observe(OBS_EOF, "eof-reached", ffi::MPV_FORMAT_FLAG)?;
         Ok(())
     }
 
@@ -601,6 +606,12 @@ fn map_property(id: u64, prop: &ffi::MpvEventProperty) -> Option<PlayerEvent> {
             (OBS_CACHE, ffi::MPV_FORMAT_FLAG) => Some(PlayerEvent::Buffering {
                 active: *prop.data.cast::<c_int>() != 0,
             }),
+            (OBS_EOF, ffi::MPV_FORMAT_FLAG) => {
+                (*prop.data.cast::<c_int>() != 0).then_some(PlayerEvent::EndFile {
+                    reason: EndReason::Eof,
+                    error: None,
+                })
+            }
             (OBS_TRACKS, ffi::MPV_FORMAT_STRING) => {
                 let s = CStr::from_ptr(*prop.data.cast::<*const c_char>()).to_string_lossy();
                 parse_tracks(&s)
@@ -775,6 +786,24 @@ mod tests {
             wait_for(&rx, Duration::from_secs(5), |e| *e
                 == PlayerEvent::Paused { paused: true }),
             "paused"
+        );
+
+        // `keep-open` keeps the last frame: the end still comes as an `Eof`.
+        engine
+            .command(&PlayerCommand::SeekAbsolute { seconds: 29.0 })
+            .unwrap();
+        engine
+            .command(&PlayerCommand::SetPaused { paused: false })
+            .unwrap();
+        assert!(
+            wait_for(&rx, Duration::from_secs(10), |e| matches!(
+                e,
+                PlayerEvent::EndFile {
+                    reason: EndReason::Eof,
+                    ..
+                }
+            )),
+            "end of file reported with keep-open"
         );
 
         engine.command(&PlayerCommand::Stop).unwrap();

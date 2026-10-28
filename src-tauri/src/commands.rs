@@ -7,8 +7,8 @@ use tauri::{State, WebviewWindow};
 use crate::AppState;
 use crate::emby::EmbyError;
 use crate::emby::models::{
-    EpisodePage, ItemDetail, ItemPage, Library, MediaItem, PlaybackStart, SearchResults, Season,
-    ServerSummary, SignedInUser, WatchItem,
+    EpisodePage, HeroItem, ItemDetail, ItemPage, ItemsOptions, Library, MediaItem, PlaybackStart,
+    SavedServer, SearchResults, Season, ServerSummary, SessionStatus, SignedInUser, WatchItem,
 };
 use crate::emby::reporting::ActivePlayback;
 use crate::emby::session::EmbyService;
@@ -123,8 +123,30 @@ pub async fn emby_sign_in(
 }
 
 #[tauri::command]
-pub async fn emby_restore(emby: State<'_, EmbyService>) -> Result<Option<SignedInUser>, EmbyError> {
+pub async fn emby_restore(emby: State<'_, EmbyService>) -> Result<SessionStatus, EmbyError> {
     emby.restore().await
+}
+
+/// Sets the open session aside without revoking it (ADR 0012).
+#[tauri::command]
+pub async fn emby_change_server(emby: State<'_, EmbyService>) -> Result<(), EmbyError> {
+    emby.change_server()
+}
+
+#[tauri::command]
+pub async fn emby_saved_sessions(
+    emby: State<'_, EmbyService>,
+) -> Result<Vec<SavedServer>, EmbyError> {
+    Ok(emby.saved_sessions())
+}
+
+#[tauri::command]
+pub async fn emby_resume_saved(
+    emby: State<'_, EmbyService>,
+    server_id: String,
+    user_id: String,
+) -> Result<SessionStatus, EmbyError> {
+    emby.resume_saved(&server_id, &user_id).await
 }
 
 #[tauri::command]
@@ -148,8 +170,23 @@ pub async fn emby_items(
     library_id: String,
     start_index: u32,
     limit: u32,
+    options: Option<ItemsOptions>,
 ) -> Result<ItemPage, EmbyError> {
-    emby.items(&library_id, start_index, limit).await
+    emby.items(
+        &library_id,
+        start_index,
+        limit,
+        &options.unwrap_or_default(),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn emby_genres(
+    emby: State<'_, EmbyService>,
+    library_id: String,
+) -> Result<Vec<String>, EmbyError> {
+    emby.genres(&library_id).await
 }
 
 #[tauri::command]
@@ -178,6 +215,26 @@ pub async fn emby_latest(
     library_id: String,
 ) -> Result<Vec<MediaItem>, EmbyError> {
     emby.latest(&library_id).await
+}
+
+#[tauri::command]
+pub async fn emby_hero(emby: State<'_, EmbyService>) -> Result<Vec<HeroItem>, EmbyError> {
+    emby.hero().await
+}
+
+#[tauri::command]
+pub async fn emby_favorites(emby: State<'_, EmbyService>) -> Result<Vec<MediaItem>, EmbyError> {
+    emby.favorites().await
+}
+
+/// Returns the favorite state the server reports after the change.
+#[tauri::command]
+pub async fn emby_set_favorite(
+    emby: State<'_, EmbyService>,
+    item_id: String,
+    favorite: bool,
+) -> Result<bool, EmbyError> {
+    emby.set_favorite(&item_id, favorite).await
 }
 
 #[tauri::command]

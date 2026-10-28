@@ -1,6 +1,6 @@
 <script lang="ts">
 // Season switcher and paged episode list of a series (DESIGN.md, Series).
-import { onMount } from "svelte";
+import { onMount, untrack } from "svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
 import type {
   EmbyError,
@@ -14,6 +14,8 @@ import { defaultSeason, episodeNumber, formatDate } from "./format";
 
 interface Props {
   seriesId: string;
+  /** Bumped when the connection comes back (ADR 0012): failures are retried. */
+  refresh: number;
   onError: (error: EmbyError) => EmbyError;
   /** `resume`: start where the server says the episode was left. */
   onPlay: (episodeId: string, resume: boolean) => void;
@@ -21,7 +23,7 @@ interface Props {
   starting: string | null;
 }
 
-let { seriesId, onError, onPlay, starting }: Props = $props();
+let { seriesId, refresh, onError, onPlay, starting }: Props = $props();
 
 /** Long anime seasons exist; the rest comes with "Afficher plus d'épisodes". */
 const EPISODE_PAGE = 50;
@@ -34,6 +36,16 @@ let loading = $state(false);
 let pageError = $state<EmbyError | null>(null);
 // Bumped on every season switch: answers for a previous season are dropped.
 let generation = 0;
+
+let seenRefresh = untrack(() => refresh);
+$effect(() => {
+  if (refresh === seenRefresh) return;
+  seenRefresh = refresh;
+  untrack(() => {
+    if (seasonsError) void loadSeasons();
+    else if (pageError) void loadMore();
+  });
+});
 
 async function loadSeasons() {
   seasons = null;

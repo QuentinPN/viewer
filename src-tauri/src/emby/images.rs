@@ -48,6 +48,8 @@ impl ImageType {
 /// One validated artwork request coming from the WebView.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ImageRequest {
+    /// Emby server the URL was built for (ADR 0012): refused unless it is the current one.
+    pub server_id: String,
     pub item_id: String,
     pub image_type: ImageType,
     pub tag: String,
@@ -55,14 +57,16 @@ pub struct ImageRequest {
 }
 
 impl ImageRequest {
-    /// Parses `/{itemId}/{Type}?tag=…&maxWidth=…`. Anything else is refused, so the
-    /// protocol cannot be used to reach other server endpoints.
+    /// Parses `/{serverId}/{itemId}/{Type}?tag=…&maxWidth=…`. Anything else is refused,
+    /// so the protocol cannot be used to reach other server endpoints.
     pub fn parse(path: &str, query: Option<&str>) -> Option<Self> {
         let mut parts = path.trim_start_matches('/').split('/');
-        let (Some(item_id), Some(kind), None) = (parts.next(), parts.next(), parts.next()) else {
+        let (Some(server_id), Some(item_id), Some(kind), None) =
+            (parts.next(), parts.next(), parts.next(), parts.next())
+        else {
             return None;
         };
-        if !is_id(item_id) {
+        if !is_id(server_id) || !is_id(item_id) {
             return None;
         }
         let image_type = ImageType::parse(kind)?;
@@ -80,6 +84,7 @@ impl ImageRequest {
         }
         let max_width = max_width.filter(|w| (MIN_WIDTH..=MAX_WIDTH).contains(w))?;
         Some(Self {
+            server_id: server_id.to_owned(),
             item_id: item_id.to_owned(),
             image_type,
             tag: tag?,
@@ -99,19 +104,21 @@ impl ImageRequest {
 
 /// `src`/`srcset` for an item image, or `None` when the item has no such image: a
 /// missing image still answers 200 with a generic picture, so `ImageTags` decides.
+/// The server id scopes the WebView's HTTP cache to one server (ADR 0012).
 pub fn image_ref(
+    server_id: &str,
     item_id: &str,
     image_type: ImageType,
     tag: Option<&str>,
     widths: &[u32],
 ) -> Option<ImageRef> {
     let tag = tag.filter(|t| is_tag(t))?;
-    if !is_id(item_id) || widths.is_empty() {
+    if !is_id(server_id) || !is_id(item_id) || widths.is_empty() {
         return None;
     }
     let url = |w: u32| {
         format!(
-            "{ORIGIN}/{item_id}/{}?tag={tag}&maxWidth={w}",
+            "{ORIGIN}/{server_id}/{item_id}/{}?tag={tag}&maxWidth={w}",
             image_type.as_str()
         )
     };
@@ -142,39 +149,52 @@ mod tests {
 
     #[test]
     fn builds_srcset_from_image_tags() {
-        let r = image_ref("74668", ImageType::Primary, Some("ab12_6384"), &[240, 480]).unwrap();
+        let r = image_ref(
+            "srv1",
+            "74668",
+            ImageType::Primary,
+            Some("ab12_6384"),
+            &[240, 480],
+        )
+        .unwrap();
         assert_eq!(
             r.src,
-            "http://emby-img.localhost/74668/Primary?tag=ab12_6384&maxWidth=240"
+            "http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=240"
         );
         assert_eq!(
             r.srcset,
-            "http://emby-img.localhost/74668/Primary?tag=ab12_6384&maxWidth=240 240w, \
-             http://emby-img.localhost/74668/Primary?tag=ab12_6384&maxWidth=480 480w"
+            "http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=240 240w, \
+             http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=480 480w"
         );
-        assert_eq!(image_ref("1", ImageType::Primary, None, &[240]), None);
         assert_eq!(
-            image_ref("1", ImageType::Primary, Some("a\"b"), &[240]),
+            image_ref("srv1", "1", ImageType::Primary, None, &[240]),
+            None
+        );
+        assert_eq!(
+            image_ref("srv1", "1", ImageType::Primary, Some("a\"b"), &[240]),
             None
         );
     }
 
     #[test]
     fn parses_only_well_formed_requests() {
-        let ok = ImageRequest::parse("/74668/Primary", Some("tag=ab12_6384&maxWidth=360")).unwrap();
+        let ok =
+            ImageRequest::parse("/srv1/74668/Primary", Some("tag=ab12_6384&maxWidth=360")).unwrap();
         assert_eq!(ok.api_path(), "/Items/74668/Images/Primary");
+        assert_eq!(ok.server_id, "srv1");
         assert_eq!(ok.max_width, 360);
 
         for (path, query) in [
-            ("/74668/Primary", Some("tag=x")),               // no width
-            ("/74668/Primary", Some("maxWidth=360")),        // no tag
-            ("/74668/Primary", Some("tag=x&maxWidth=8000")), // too large
-            ("/74668/Primary", Some("tag=x&maxWidth=360&api_key=y")), // extra param
-            ("/74668/Chapter", Some("tag=x&maxWidth=360")),  // type not allowed
-            ("/../Users/Primary", Some("tag=x&maxWidth=360")), // traversal
-            ("/74668/Primary/0", Some("tag=x&maxWidth=360")), // extra segment
-            ("/74668/Primary", Some("tag=a%2Fb&maxWidth=360")), // encoded chars
-            ("/74668/Primary", None),
+            ("/srv1/74668/Primary", Some("tag=x")),        // no width
+            ("/srv1/74668/Primary", Some("maxWidth=360")), // no tag
+            ("/srv1/74668/Primary", Some("tag=x&maxWidth=8000")), // too large
+            ("/srv1/74668/Primary", Some("tag=x&maxWidth=360&api_key=y")), // extra param
+            ("/srv1/74668/Chapter", Some("tag=x&maxWidth=360")), // type not allowed
+            ("/srv1/../Users/Primary", Some("tag=x&maxWidth=360")), // traversal
+            ("/srv1/74668/Primary/0", Some("tag=x&maxWidth=360")), // extra segment
+            ("/srv1/74668/Primary", Some("tag=a%2Fb&maxWidth=360")), // encoded chars
+            ("/srv1/74668/Primary", None),
+            ("/74668/Primary", Some("tag=x&maxWidth=360")), // no server segment
         ] {
             assert_eq!(ImageRequest::parse(path, query), None, "{path}?{query:?}");
         }

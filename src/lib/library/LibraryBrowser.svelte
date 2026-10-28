@@ -2,16 +2,19 @@
 // Signed-in shell: the sidebar with the search field, then the home page
 // (ADR 0010), the paged poster grid of a library (DESIGN.md, Films/Series) or the
 // search results (ADR 0011), and the detail page of the opened item over them.
-import { onMount, tick } from "svelte";
+import { onMount, tick, untrack } from "svelte";
 import ItemDetail from "../detail/ItemDetail.svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
 import type {
   EmbyError,
   SearchResults as Found,
+  ItemsOptions,
   Library,
   MediaItem,
   PlaybackStart,
   SignedInUser,
+  SortKey,
+  WatchFilter,
 } from "../emby/types";
 import Home from "../home/Home.svelte";
 import {
@@ -21,26 +24,46 @@ import {
   SEARCH_MAX_CHARS,
 } from "../search/query";
 import SearchResults from "../search/SearchResults.svelte";
+import {
+  DEFAULT_OPTIONS,
+  directionLabels,
+  isDefault,
+  isFiltered,
+  loadOptions,
+  noMatchLabel,
+  SORTS,
+  sameOptions,
+  saveOptions,
+  storageKey,
+  watchChoices,
+  withSort,
+} from "./options";
 import PosterCard from "./PosterCard.svelte";
 import { appendPage, countLabel, emptyPager, PAGE_SIZE } from "./pager";
 
 interface Props {
   user: SignedInUser;
+  /** Bumped when the connection comes back (ADR 0012): failed areas reload. */
+  refresh: number;
   signingOut: boolean;
   onSignOut: () => void;
   onOpenPlayer: () => void;
-  /** The token was refused while browsing: back to sign-in. */
-  onSessionExpired: (error: EmbyError) => void;
+  /** Sets the session aside and shows the server form. */
+  onChangeServer: () => void;
+  /** Every error is reported: a 401 or a lost NAS changes the screen. */
+  onError: (error: EmbyError) => void;
   /** A film or episode started playing: show the player over this view. */
   onPlay: (start: PlaybackStart) => void;
 }
 
 let {
   user,
+  refresh,
   signingOut,
   onSignOut,
   onOpenPlayer,
-  onSessionExpired,
+  onChangeServer,
+  onError,
   onPlay,
 }: Props = $props();
 
@@ -53,8 +76,15 @@ let loading = $state(false);
 let pageError = $state<EmbyError | null>(null);
 let scroller = $state<HTMLElement | null>(null);
 let sentinel = $state<HTMLElement | null>(null);
-// Bumped on every library switch: answers for a previous library are dropped.
+// Bumped on every library or option switch: answers for older ones are dropped.
 let generation = 0;
+/** Sort and filters of the shown library (ADR 0013), remembered per library. */
+let options = $state<ItemsOptions>({ ...DEFAULT_OPTIONS });
+let genres = $state<string[] | null>(null);
+let genresError = $state<EmbyError | null>(null);
+let genresGeneration = 0;
+let sortSelect = $state<HTMLSelectElement | null>(null);
+const directions = $derived(directionLabels(options.sort));
 let observer: IntersectionObserver | null = null;
 let opened = $state<MediaItem | null>(null);
 
@@ -72,11 +102,29 @@ let debounce: ReturnType<typeof setTimeout> | undefined;
 /** Scroll of the view the search replaced, restored when leaving it. */
 let scrollBeforeSearch: number | null = null;
 
+/** Bumped after a favorite change on a detail page (ADR 0014). */
+let favoritesVersion = $state(0);
+
 function fail(e: unknown): EmbyError {
   const error = toEmbyError(e);
-  if (error.kind === "sessionExpired") onSessionExpired(error);
+  onError(error);
   return error;
 }
+
+/** Back online: retry what failed; what is shown, and its scroll, stay. */
+function retryFailed() {
+  if (librariesError) void loadLibraries();
+  if (pageError) void loadMore();
+  if (searchError) void runSearch(true);
+  if (genresError && selected) void loadGenres(selected);
+}
+
+let seenRefresh = untrack(() => refresh);
+$effect(() => {
+  if (refresh === seenRefresh) return;
+  seenRefresh = refresh;
+  untrack(retryFailed);
+});
 
 async function loadLibraries() {
   librariesError = null;
@@ -192,6 +240,7 @@ function showHome() {
   if (searching) void leaveSearch(false);
   if (selected === null) return;
   generation += 1;
+  genresGeneration += 1;
   selected = null;
   pager = emptyPager();
   pageError = null;
@@ -199,17 +248,78 @@ function showHome() {
   scroller?.scrollTo({ top: 0 });
 }
 
-function select(library: Library) {
-  opened = null;
-  if (searching) void leaveSearch(false);
-  if (selected?.id === library.id && pager.total !== null) return;
+/** `localStorage` may be missing or refused: choices are then not kept. */
+function storage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+const optionsKey = (library: Library) =>
+  storageKey(user.server.id, user.userId, library.id);
+
+/** Empties the grid and loads the first page for the current options. */
+function restartGrid() {
   generation += 1;
-  selected = library;
   pager = emptyPager();
   pageError = null;
   loading = false;
   scroller?.scrollTo({ top: 0 });
   void loadMore();
+}
+
+function select(library: Library) {
+  opened = null;
+  if (searching) void leaveSearch(false);
+  if (selected?.id === library.id && pager.total !== null) return;
+  selected = library;
+  options = loadOptions(storage(), optionsKey(library), library.kind);
+  void loadGenres(library);
+  restartGrid();
+}
+
+/** Applies new options: saved for this library, grid reloaded from the top. */
+function setOptions(next: ItemsOptions) {
+  const library = selected;
+  if (!library || sameOptions(next, options)) return;
+  options = next;
+  saveOptions(storage(), optionsKey(library), next);
+  restartGrid();
+}
+
+/** The reset button disappears with the change: focus goes to the sort. */
+async function resetOptions(keepSort: boolean) {
+  setOptions(
+    keepSort
+      ? {
+          ...DEFAULT_OPTIONS,
+          sort: options.sort,
+          descending: options.descending,
+        }
+      : { ...DEFAULT_OPTIONS },
+  );
+  await tick();
+  sortSelect?.focus();
+}
+
+async function loadGenres(library: Library) {
+  const gen = ++genresGeneration;
+  genres = null;
+  genresError = null;
+  try {
+    const names = await embyApi.genres(library.id);
+    if (gen !== genresGeneration) return;
+    genres = names;
+    // A remembered genre the library no longer has would show an empty grid.
+    if (options.genre !== null && !names.includes(options.genre)) {
+      setOptions({ ...options, genre: null });
+    }
+  } catch (e) {
+    if (gen !== genresGeneration) return;
+    genresError = fail(e);
+  }
 }
 
 async function loadMore() {
@@ -219,7 +329,12 @@ async function loadMore() {
   loading = true;
   pageError = null;
   try {
-    const page = await embyApi.items(library.id, pager.next, PAGE_SIZE);
+    const page = await embyApi.items(
+      library.id,
+      pager.next,
+      PAGE_SIZE,
+      $state.snapshot(options),
+    );
     if (gen !== generation) return;
     pager = appendPage(pager, page);
   } catch (e) {
@@ -328,6 +443,9 @@ $effect(() => {
         {user.userName}
         <span>{user.server.name}{user.server.encrypted ? "" : " · non chiffré"}</span>
       </p>
+      <button type="button" class="quiet" onclick={onChangeServer}>
+        Changer de serveur
+      </button>
       <button type="button" class="quiet" onclick={onOpenPlayer}>
         Prototype de lecture
       </button>
@@ -373,17 +491,108 @@ $effect(() => {
         onOpen={open}
         onShowLibrary={select}
         {onPlay}
+        {refresh}
+        {favoritesVersion}
         onError={fail}
       />
     {:else if selected}
       <header class="heading">
         <h1>{selected.name}</h1>
-        {#if pager.total !== null}
-          <p class="count">{countLabel(pager.total, selected.kind)}</p>
-        {/if}
+        <p class="count" aria-live="polite">
+          {pager.total !== null ? countLabel(pager.total, selected.kind) : ""}
+        </p>
       </header>
 
-      {#if pager.total === 0}
+      <div class="toolbar" role="group" aria-label="Tri et filtres">
+        <label class="field">
+          <span>Trier par</span>
+          <select
+            bind:this={sortSelect}
+            value={options.sort}
+            onchange={(e) =>
+              setOptions(withSort(options, e.currentTarget.value as SortKey))}
+          >
+            {#each SORTS as s (s.key)}
+              <option value={s.key}>{s.label}</option>
+            {/each}
+          </select>
+        </label>
+        <label class="field">
+          <span>Ordre</span>
+          <select
+            value={options.descending ? "desc" : "asc"}
+            onchange={(e) =>
+              setOptions({
+                ...options,
+                descending: e.currentTarget.value === "desc",
+              })}
+          >
+            <option value="asc">{directions.ascending}</option>
+            <option value="desc">{directions.descending}</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Visionnage</span>
+          <select
+            value={options.watch}
+            onchange={(e) =>
+              setOptions({
+                ...options,
+                watch: e.currentTarget.value as WatchFilter,
+              })}
+          >
+            {#each watchChoices(selected.kind) as w (w.key)}
+              <option value={w.key}>{w.label}</option>
+            {/each}
+          </select>
+        </label>
+        <label class="field">
+          <span>Genre</span>
+          <select
+            value={options.genre ?? ""}
+            aria-busy={genres === null && !genresError}
+            onchange={(e) =>
+              setOptions({ ...options, genre: e.currentTarget.value || null })}
+          >
+            <option value="">
+              {genresError ? "Genres indisponibles" : "Tous les genres"}
+            </option>
+            {#if options.genre !== null && !genres?.includes(options.genre)}
+              <option value={options.genre}>{options.genre}</option>
+            {/if}
+            {#each genres ?? [] as g (g)}
+              <option value={g}>{g}</option>
+            {/each}
+          </select>
+        </label>
+        <button
+          type="button"
+          class="toggle"
+          aria-pressed={options.favorites}
+          onclick={() => setOptions({ ...options, favorites: !options.favorites })}
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true"
+            ><path
+              d="m8 1.8 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"
+            /></svg
+          >
+          Favoris
+        </button>
+        {#if !isDefault(options)}
+          <button type="button" class="quiet reset" onclick={() => resetOptions(false)}>
+            Réinitialiser
+          </button>
+        {/if}
+      </div>
+
+      {#if pager.total === 0 && isFiltered(options)}
+        <div class="state">
+          <p class="state-title">{noMatchLabel(selected.kind)}</p>
+          <button type="button" onclick={() => resetOptions(true)}>
+            Réinitialiser les filtres
+          </button>
+        </div>
+      {:else if pager.total === 0}
         <div class="state">
           <p class="state-title">Cette bibliothèque est vide</p>
         </div>
@@ -419,7 +628,14 @@ $effect(() => {
   </main>
   {#if opened}
     {#key opened.id}
-      <ItemDetail item={opened} onClose={closeDetail} onError={fail} {onPlay} />
+      <ItemDetail
+        item={opened}
+        {refresh}
+        onClose={closeDetail}
+        onError={fail}
+        {onPlay}
+        onFavoriteChange={() => favoritesVersion++}
+      />
     {/key}
   {/if}
   </div>
@@ -596,6 +812,76 @@ $effect(() => {
   .count {
     margin: 0;
     color: var(--color-text-muted);
+  }
+  .heading {
+    margin-bottom: var(--space-4);
+  }
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+  .field {
+    display: grid;
+    gap: var(--space-1);
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+  .field select {
+    min-width: 140px;
+    max-width: 220px;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-elevated);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .field select:hover {
+    border-color: var(--color-text-muted);
+  }
+  .field select:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+  .toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-elevated);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .toggle svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+  }
+  .toggle[aria-pressed="true"] {
+    border-color: var(--color-accent);
+    color: var(--color-text);
+  }
+  .toggle[aria-pressed="true"] svg {
+    fill: var(--color-accent);
+    stroke: var(--color-accent);
+  }
+  .toggle:hover {
+    color: var(--color-text);
+  }
+  button.reset {
+    font-size: 14px;
   }
   .grid {
     list-style: none;

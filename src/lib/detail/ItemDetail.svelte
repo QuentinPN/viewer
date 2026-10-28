@@ -1,7 +1,7 @@
 <script lang="ts">
 // Detail page of a film or series (DESIGN.md, Film detail / Series). Shown over the
 // library grid, which stays mounted so its scroll position survives the return.
-import { onMount, tick } from "svelte";
+import { onMount, tick, untrack } from "svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
 import type {
   EmbyError,
@@ -11,6 +11,7 @@ import type {
   PlaybackStopped,
 } from "../emby/types";
 import EpisodeList from "./EpisodeList.svelte";
+import { changeFavorite } from "./favorite";
 import {
   audioLabel,
   formatBitrate,
@@ -26,14 +27,19 @@ import {
 interface Props {
   /** Grid card: title and poster are shown at once while the detail loads. */
   item: MediaItem;
+  /** Bumped when the connection comes back (ADR 0012). */
+  refresh: number;
   onClose: () => void;
   /** Returns the error; a rejected token also ends the session. */
   onError: (error: EmbyError) => EmbyError;
   /** Playback started by the server negotiation: show the player. */
   onPlay: (start: PlaybackStart) => void;
+  /** The server took a favorite change: the home row "Favoris" reloads (ADR 0014). */
+  onFavoriteChange?: (itemId: string, favorite: boolean) => void;
 }
 
-let { item, onClose, onError, onPlay }: Props = $props();
+let { item, refresh, onClose, onError, onPlay, onFavoriteChange }: Props =
+  $props();
 
 let detail = $state<ItemDetail | null>(null);
 let error = $state<EmbyError | null>(null);
@@ -48,11 +54,25 @@ let fromStart = $state(false);
 let playError = $state<EmbyError | null>(null);
 let playButton = $state<HTMLButtonElement | null>(null);
 let fromStartButton = $state<HTMLButtonElement | null>(null);
+/** A favorite change is waiting for the server: further clicks are ignored. */
+let savingFavorite = $state(false);
+let favoriteError = $state<EmbyError | null>(null);
 
 const poster = $derived(detail?.poster ?? item.poster);
 const meta = $derived(detail ? metaParts(detail) : []);
 const rating = $derived(ratingLabel(detail?.communityRating ?? null));
 const premiere = $derived(formatDate(detail?.premiereDate ?? null));
+
+// Back online: read the page again in place (watched state may have changed).
+let seenRefresh = untrack(() => refresh);
+$effect(() => {
+  if (refresh === seenRefresh) return;
+  seenRefresh = refresh;
+  untrack(() => {
+    playError = null;
+    void load();
+  });
+});
 
 async function load() {
   error = null;
@@ -75,6 +95,25 @@ async function play(id: string, resume: boolean) {
     playError = onError(toEmbyError(e));
   } finally {
     starting = null;
+  }
+}
+
+async function toggleFavorite() {
+  const d = detail;
+  if (!d || savingFavorite) return;
+  savingFavorite = true;
+  favoriteError = null;
+  try {
+    const favorite = await changeFavorite(
+      !d.favorite,
+      (f) => (d.favorite = f),
+      (f) => embyApi.setFavorite(d.id, f),
+    );
+    onFavoriteChange?.(d.id, favorite);
+  } catch (e) {
+    favoriteError = onError(toEmbyError(e));
+  } finally {
+    savingFavorite = false;
   }
 }
 
@@ -234,8 +273,8 @@ onMount(() => {
             {/if}
           </div>
 
-          {#if detail.kind === "movie"}
-            <div class="play-actions">
+          <div class="play-actions">
+            {#if detail.kind === "movie"}
               <button
                 type="button"
                 class="primary play"
@@ -259,8 +298,21 @@ onMount(() => {
                   {#if starting && fromStart}Ouverture…{:else}Lire depuis le début{/if}
                 </button>
               {/if}
-            </div>
-          {/if}
+            {/if}
+            <button
+              type="button"
+              class="secondary favorite"
+              aria-pressed={detail.favorite}
+              aria-disabled={savingFavorite}
+              title={detail.favorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+              onclick={toggleFavorite}
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true"
+                ><path d="m8 1.8 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z" /></svg
+              >
+              Favori
+            </button>
+          </div>
         {:else if !error}
           <div class="sk-meta" aria-hidden="true"></div>
           <p class="sr-only">Chargement de la fiche…</p>
@@ -326,7 +378,13 @@ onMount(() => {
       </div>
 
       {#if detail.kind === "series"}
-        <EpisodeList seriesId={detail.id} {onError} onPlay={play} {starting} />
+        <EpisodeList
+          seriesId={detail.id}
+          {refresh}
+          {onError}
+          onPlay={play}
+          {starting}
+        />
       {:else if detail.media.length > 0}
         <section class="tech" aria-labelledby="tech-title">
           <h2 id="tech-title">Informations techniques</h2>
@@ -399,6 +457,16 @@ onMount(() => {
       </div>
     {/if}
   </div>
+  {#if favoriteError}
+    <div class="play-error" role="alert">
+      <div>
+        <p class="state-title">Favori non modifié</p>
+        <p>{favoriteError.message}</p>
+        {#if errorHint(favoriteError)}<p class="hint">{errorHint(favoriteError)}</p>{/if}
+      </div>
+      <button type="button" class="secondary" onclick={() => (favoriteError = null)}>Fermer</button>
+    </div>
+  {/if}
   {#if playError}
     <div class="play-error" role="alert">
       <div>
@@ -728,6 +796,26 @@ onMount(() => {
   }
   .from-start {
     padding: var(--space-2) var(--space-4);
+  }
+  .favorite {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .favorite svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+  }
+  .favorite[aria-pressed="true"] svg {
+    fill: #f2c94c;
+    stroke: #f2c94c;
+  }
+  .favorite[aria-disabled="true"] {
+    cursor: progress;
   }
   .play[aria-disabled="true"],
   .from-start[aria-disabled="true"] {

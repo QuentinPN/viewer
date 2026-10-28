@@ -59,6 +59,9 @@ impl ReportKind {
     }
 }
 
+/// Margin before the end under which an EOF is a normal end (credits, rounding).
+const EARLY_EOF_TICKS: i64 = 30 * TICKS_PER_SECOND as i64;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Report {
     pub kind: ReportKind,
@@ -91,6 +94,14 @@ struct Playing {
 }
 
 impl Playing {
+    /// An end of file well before the known duration: mpv reports a stream cut
+    /// by the network as EOF once its cache drains (ADR 0012). Never "watched".
+    fn ended_early(&self) -> bool {
+        self.playback
+            .run_time_ticks
+            .is_some_and(|run| run - self.position_ticks > EARLY_EOF_TICKS)
+    }
+
     fn report(&mut self, kind: ReportKind, event: Option<&'static str>, now: Instant) -> Report {
         self.last_sent = now;
         let p = &self.playback;
@@ -122,10 +133,15 @@ impl Tracker {
     }
 
     pub fn on_event(&mut self, event: &PlayerEvent, now: Instant) -> Vec<Report> {
-        if matches!(self.phase, Phase::Playing(_)) {
+        if let Phase::Playing(p) = &self.phase {
             match event {
                 PlayerEvent::EndFile { reason, .. } => {
-                    return self.stop(*reason == EndReason::Error, now);
+                    let failed = match reason {
+                        EndReason::Error => true,
+                        EndReason::Eof => p.ended_early(),
+                        _ => false,
+                    };
+                    return self.stop(failed, now);
                 }
                 PlayerEvent::Shutdown => return self.stop(false, now),
                 _ => {}
@@ -431,6 +447,8 @@ mod tests {
             (PlayerEvent::Shutdown, false),
         ] {
             let mut t = loaded(t0);
+            // 10 s before the end of the 6000 s file: a normal end.
+            t.on_event(&PlayerEvent::Duration { seconds: 6000.0 }, t0);
             t.on_event(&PlayerEvent::TimePos { seconds: 5990.0 }, t0);
             let stop = t.on_event(&event, t0);
             assert_eq!(kinds(&stop), vec![(ReportKind::Stopped, None)], "{event:?}");
@@ -442,6 +460,24 @@ mod tests {
             assert!(t.on_event(&PlayerEvent::Shutdown, t0).is_empty());
             assert!(t.tick(t0 + PROGRESS_INTERVAL * 3).is_empty());
         }
+    }
+
+    #[test]
+    fn an_early_end_of_file_is_reported_as_failed_at_the_last_position() {
+        let t0 = Instant::now();
+        let mut t = loaded(t0);
+        t.on_event(&PlayerEvent::Duration { seconds: 6000.0 }, t0);
+        t.on_event(&PlayerEvent::TimePos { seconds: 1000.0 }, t0);
+        let stop = t.on_event(
+            &PlayerEvent::EndFile {
+                reason: EndReason::Eof,
+                error: None,
+            },
+            t0,
+        );
+        let body = serde_json::to_value(&stop[0].body).unwrap();
+        assert_eq!(body["Failed"], true);
+        assert_eq!(body["PositionTicks"], 10_000_000_000_i64);
     }
 
     #[test]

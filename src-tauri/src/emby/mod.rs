@@ -42,6 +42,15 @@ pub enum EmbyError {
     NotSignedIn,
     #[error("session expirée ou révoquée : reconnectez-vous")]
     SessionExpired,
+    /// The token is valid but the account is disabled or deleted (ADR 0012).
+    #[error("compte désactivé ou supprimé sur le serveur")]
+    AccountUnavailable,
+    /// Another Emby server answers at the session's address: the token is not sent.
+    #[error("un autre serveur Emby répond à cette adresse")]
+    ServerMismatch,
+    /// Superseded by a sign-in, sign-out or server change made meanwhile.
+    #[error("opération annulée")]
+    Cancelled,
     #[error("coffre d'identification Windows indisponible : {0}")]
     CredentialStore(String),
     #[error("lecture refusée : {0}")]
@@ -67,6 +76,9 @@ impl EmbyError {
             Self::NotFound => "notFound",
             Self::NotSignedIn => "notSignedIn",
             Self::SessionExpired => "sessionExpired",
+            Self::AccountUnavailable => "accountUnavailable",
+            Self::ServerMismatch => "serverMismatch",
+            Self::Cancelled => "cancelled",
             Self::CredentialStore(_) => "credentialStore",
             Self::PlaybackRefused(_) => "playbackRefused",
             Self::NoCompatibleStream => "noCompatibleStream",

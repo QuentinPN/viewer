@@ -1,29 +1,76 @@
 <script lang="ts">
-// Onboarding: server address, connection test, then sign-in (DESIGN.md).
-import { tick, untrack } from "svelte";
+// Onboarding: server address, connection test, then sign-in (DESIGN.md). With
+// `reauth`, the server answered but refused the saved token (ADR 0012): server
+// and user are prefilled and only the password is asked.
+import { onMount, tick, untrack } from "svelte";
 import { embyApi, errorHint, toEmbyError } from "./api";
-import type { EmbyError, ServerSummary, SignedInUser } from "./types";
+import type {
+  EmbyError,
+  SavedServer,
+  ServerSummary,
+  SignedInUser,
+} from "./types";
 
 interface Props {
-  initialUrl?: string | null;
-  /** Shown above the form, e.g. an expired session found at startup. */
+  /** Shown above the form, e.g. why the password is asked again. */
   notice?: EmbyError | null;
+  /** The session to sign in again; the server step is skipped. */
+  reauth?: SavedServer | null;
   onSignedIn: (user: SignedInUser) => void;
+  /** "Changer de serveur" in reauthentication mode leaves this account. */
+  onChangeServer?: () => void;
+  /** "Revenir à …": a set-aside session, back without a password. */
+  onResumeSaved?: (serverId: string, userId: string) => void;
 }
 
-let { initialUrl = null, notice = null, onSignedIn }: Props = $props();
+let {
+  notice = null,
+  reauth = null,
+  onSignedIn,
+  onChangeServer,
+  onResumeSaved,
+}: Props = $props();
 
 // Prefill only: later prop changes must not overwrite what the user typed.
-let url = $state(untrack(() => initialUrl) ?? "");
-let server = $state<ServerSummary | null>(null);
-let username = $state("");
+const initial = untrack(() => reauth);
+let url = $state(initial?.url ?? "");
+let server = $state<ServerSummary | null>(
+  initial
+    ? {
+        url: initial.url,
+        name: initial.name,
+        version: initial.version,
+        id: initial.id,
+        encrypted: initial.encrypted,
+      }
+    : null,
+);
+let username = $state(initial?.userName ?? "");
 let password = $state("");
 let busy = $state(false);
 let error = $state<EmbyError | null>(null);
+let saved = $state<SavedServer[]>([]);
 let usernameInput = $state<HTMLInputElement | null>(null);
 let passwordInput = $state<HTMLInputElement | null>(null);
 
 const shownError = $derived(error ?? notice);
+
+onMount(() => {
+  if (initial) {
+    passwordInput?.focus();
+    return;
+  }
+  void embyApi
+    .savedSessions()
+    .then((list) => (saved = list))
+    .catch(() => {});
+  void embyApi
+    .lastServer()
+    .then((last) => {
+      if (last && url === "") url = last;
+    })
+    .catch(() => {});
+});
 
 async function testServer(event: SubmitEvent) {
   event.preventDefault();
@@ -62,6 +109,10 @@ async function signIn(event: SubmitEvent) {
 }
 
 function changeServer() {
+  if (initial && onChangeServer) {
+    onChangeServer();
+    return;
+  }
   server = null;
   error = null;
   password = "";
@@ -72,7 +123,11 @@ function changeServer() {
   <section class="card" aria-labelledby="signin-title">
     <h1 id="signin-title">Viewer</h1>
     <p class="lead">
-      {server ? "Connectez-vous à votre compte Emby." : "Indiquez l'adresse de votre serveur Emby."}
+      {#if initial}
+        Votre session sur {initial.name} doit être confirmée : saisissez votre mot de passe.
+      {:else}
+        {server ? "Connectez-vous à votre compte Emby." : "Indiquez l'adresse de votre serveur Emby."}
+      {/if}
     </p>
 
     {#if shownError}
@@ -99,6 +154,26 @@ function changeServer() {
           {busy ? "Connexion au serveur…" : "Continuer"}
         </button>
       </form>
+      {#if saved.length > 0 && onResumeSaved}
+        <div class="saved">
+          <p class="saved-title">Sessions conservées</p>
+          <ul>
+            {#each saved as entry (`${entry.id}/${entry.userId}`)}
+              <li>
+                <button
+                  type="button"
+                  class="saved-entry"
+                  disabled={busy}
+                  onclick={() => onResumeSaved(entry.id, entry.userId)}
+                >
+                  <span>Revenir à {entry.name}</span>
+                  <span class="server-meta">{entry.userName} · {entry.url}</span>
+                </button>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
     {:else}
       <div class="server">
         <div>
@@ -106,7 +181,7 @@ function changeServer() {
           <p class="server-meta">{server.url} · Emby {server.version}</p>
         </div>
         <button type="button" class="link" onclick={changeServer} disabled={busy}>
-          Changer
+          {initial ? "Changer de serveur" : "Changer"}
         </button>
       </div>
       {#if !server.encrypted}
@@ -238,6 +313,31 @@ function changeServer() {
     color: var(--color-text-secondary);
     font-size: 13px;
     margin: var(--space-3) 0 0;
+  }
+  .saved {
+    margin-top: var(--space-6);
+  }
+  .saved-title {
+    margin: 0 0 var(--space-2);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+  }
+  .saved ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+  button.saved-entry {
+    width: 100%;
+    margin: 0;
+    display: grid;
+    justify-items: start;
+    gap: 2px;
+    text-align: left;
+    background: var(--color-elevated);
+    color: var(--color-text);
   }
   .error {
     border-left: 3px solid var(--color-danger);

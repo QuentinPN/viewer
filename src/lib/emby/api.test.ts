@@ -24,5 +24,11 @@ describe("errorHint", () => {
       "https://",
     );
     expect(errorHint({ kind: "server", message: "" })).toBeNull();
+    expect(errorHint({ kind: "accountUnavailable", message: "" })).toContain(
+      "administrateur",
+    );
+    expect(errorHint({ kind: "serverMismatch", message: "" })).toContain(
+      "n'a pas été envoyée",
+    );
   });
 });

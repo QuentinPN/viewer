@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 use super::EmbyError;
 use super::client::AccessToken;
 use super::credentials::{CredentialStore, MemoryCredentialStore, account};
+use super::models::{SessionStatus, SignedInUser};
 use super::session::{EmbyService, SessionFile};
 
 const SERVER_ID: &str = "d969e3d9465b49ec8f73a5f1eab2e86f";
@@ -76,6 +77,10 @@ impl FakeEmby {
                 };
                 let (status, body) = route(&req);
                 log.lock().unwrap().push(req);
+                // Status 0: the connection is dropped without an answer.
+                if status == 0 {
+                    continue;
+                }
                 // A body starting with `JPEG:` is served as an image.
                 let (content_type, body) = match body.strip_prefix("JPEG:") {
                     Some(b) => ("image/jpeg", b.to_owned()),
@@ -180,6 +185,7 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
         let views_path = format!("/emby/Users/{USER_ID}/Views");
         let sections = format!("/emby/Users/{USER_ID}/HomeSections");
         let section_items = format!("/emby/Users/{USER_ID}/Sections/resume/Items");
+        let favorite_items = format!("/emby/Users/{USER_ID}/FavoriteItems/");
         match path {
             p if (p == views_path
                 || p == sections
@@ -187,14 +193,28 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
                 || p.starts_with(&items)
                 || p.starts_with("/emby/Items/")
                 || p.starts_with("/emby/Shows/")
-                || p.starts_with("/emby/Sessions/"))
+                || p.starts_with("/emby/Sessions/")
+                || p == "/emby/Genres"
+                || p.starts_with(&favorite_items))
                 && !token_ok =>
             {
                 (401, String::new())
             }
             p if p == views_path => (200, views()),
+            "/emby/Genres" if query.contains("ParentId=5") => (200, genres()),
             p if p == items && query.contains("SearchTerm=") => (200, search_answer(query)),
             p if p == items && query.contains("ParentId=5") => (200, movies_page()),
+            p if p == items && query.contains("Filters=IsFavorite") => (200, favorites()),
+            p if p == items && query.contains("ImageTypes=Backdrop") => (200, hero_latest()),
+            p if p == format!("{favorite_items}30207") && r.method == "POST" => (
+                200,
+                r#"{"IsFavorite":true,"Played":false,"PlaybackPositionTicks":0}"#.into(),
+            ),
+            p if p == format!("{favorite_items}30207") && r.method == "DELETE" => (
+                200,
+                r#"{"IsFavorite":false,"Played":false,"PlaybackPositionTicks":0}"#.into(),
+            ),
+            p if p.starts_with(&favorite_items) => (404, NOT_FOUND_TEXT.into()),
             p if p == items => (200, r#"{"Items":[],"TotalRecordCount":0}"#.into()),
             "/emby/Items/101/Images/Primary" => (200, "JPEG:fake-jpeg-bytes".into()),
             "/emby/Items/102/Images/Primary" => (200, "<html>pas une image</html>".into()),
@@ -212,6 +232,12 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
             p if p == format!("{items}/80475") => (200, episode_detail()),
             p if p.starts_with(&format!("{items}/")) => (404, NOT_FOUND_TEXT.into()),
             "/emby/Shows/80473/Seasons" => (200, seasons()),
+            "/emby/Shows/80473/Episodes" if query.contains("IsPlayed=false") => {
+                (200, first_unplayed())
+            }
+            "/emby/Shows/80500/Episodes" if query.contains("IsPlayed=false") => {
+                (200, r#"{"Items":[],"TotalRecordCount":0}"#.into())
+            }
             "/emby/Shows/80473/Episodes" if query.contains("SeasonId=80474") => {
                 (200, episodes_page())
             }
@@ -285,7 +311,7 @@ fn movie_detail() -> String {
                   {"Name":"Lance Hool","Id":"30300","Type":"Director"},
                   {"Name":"Scénariste","Id":"30301","Type":"Writer"}],
         "Studios":[{"Name":"Silver Lion Films","Id":30218}],
-        "UserData":{"PlaybackPositionTicks":18310167000,"PlayCount":0,"IsFavorite":false,"Played":false},
+        "UserData":{"PlaybackPositionTicks":18310167000,"PlayCount":0,"IsFavorite":true,"Played":false},
         "ImageTags":{"Primary":"7b213eb5_6379","Logo":"028272e6_6379"},
         "BackdropImageTags":["2edd4b0e_6379"],
         "MediaSources":[{"Protocol":"File","Id":"mediasource_30207",
@@ -361,6 +387,8 @@ fn resume_items() -> String {
          "ImageTags":{"Primary":"b31c7276_6384"},"BackdropImageTags":[],
          "ParentThumbItemId":"70185","ParentThumbImageTag":"724ef532_6384",
          "ParentBackdropItemId":"70185","ParentBackdropImageTags":["6da1a59e_6384"],
+         "ParentLogoItemId":"70185","ParentLogoImageTag":"9c1f0e2a_6384",
+         "SeriesPrimaryImageTag":"51d2b7e0_6384","Overview":" Le casse continue. ",
          "UserData":{"PlaybackPositionTicks":6000000000,"Played":false}},
         {"Name":"Sans image","Id":"70228","Type":"Episode","IndexNumber":3,"ParentIndexNumber":5,
          "SeriesName":"La casa de papel","SeriesId":"70185","ImageTags":{},
@@ -369,6 +397,35 @@ fn resume_items() -> String {
         {"Name":"Chanson","Id":"5000","Type":"Audio","UserData":{"PlaybackPositionTicks":10}},
         {"Name":"Id douteux","Id":"../x","Type":"Movie"}
     ],"TotalRecordCount":5}"#
+        .into()
+}
+
+/// `/Users/{Id}/Items?ImageTypes=Backdrop&IsPlayed=false` for the home hero
+/// (trimmed): titles already resumed, one without backdrop tag, a series fully
+/// watched (no episode left), and more than the hero shows.
+fn hero_latest() -> String {
+    r#"{"Items":[
+        {"Name":"La casa de papel","Id":"70185","Type":"Series","BackdropImageTags":["6da1a59e_6384"]},
+        {"Name":"2 Coeurs","Id":"30207","Type":"Movie","BackdropImageTags":["2edd4b0e_6379"]},
+        {"Name":"Dark","Id":"80473","Type":"Series","ProductionYear":2017,"Overview":"Winden.",
+         "ImageTags":{"Primary":"aa11_1","Logo":"bb22_1"},"BackdropImageTags":["cc33_1"],
+         "UserData":{"UnplayedItemCount":18,"Played":false}},
+        {"Name":"Sans fond","Id":"30300","Type":"Movie","BackdropImageTags":[]},
+        {"Name":"Tout vu","Id":"80500","Type":"Series","BackdropImageTags":["dd44_1"]},
+        {"Name":"Nouveau film","Id":"30301","Type":"Movie","RunTimeTicks":60000000000,
+         "BackdropImageTags":["ee55_1"],"UserData":{"PlaybackPositionTicks":0,"Played":false}},
+        {"Name":"En trop","Id":"30302","Type":"Movie","BackdropImageTags":["ff66_1"]}
+    ],"TotalRecordCount":7}"#
+        .into()
+}
+
+/// `/Shows/80473/Episodes?IsPlayed=false&Limit=1` (trimmed), started a little.
+fn first_unplayed() -> String {
+    r#"{"Items":[
+        {"Name":"Secrets","Id":"80475","Type":"Episode","IndexNumber":1,"ParentIndexNumber":1,
+         "SeriesId":"80473","RunTimeTicks":30000000000,
+         "UserData":{"PlaybackPositionTicks":3000000000,"Played":false}}
+    ],"TotalRecordCount":18}"#
         .into()
 }
 
@@ -431,6 +488,31 @@ fn resume_section() -> String {
          "SeriesName":"La casa de papel","SeriesId":"70185","ImageTags":{},
          "UserData":{"PlaybackPositionTicks":0,"Played":false}}
     ],"TotalRecordCount":3}"#
+        .into()
+}
+
+/// `/Users/{Id}/Items?Filters=IsFavorite`: a film, a series, a collection (not
+/// shown) and an unusable id.
+fn favorites() -> String {
+    r#"{"Items":[
+        {"Name":"2 Coeurs","Id":"30207","Type":"Movie","ProductionYear":2020,
+         "ImageTags":{"Primary":"7b213eb5_6379"},"UserData":{"IsFavorite":true,"Played":false}},
+        {"Name":"Arcane","Id":"80473","Type":"Series","ProductionYear":2021,
+         "ImageTags":{},"UserData":{"IsFavorite":true,"UnplayedItemCount":18}},
+        {"Name":"Collection","Id":"555","Type":"BoxSet","UserData":{"IsFavorite":true}},
+        {"Name":"Id douteux","Id":"../x","Type":"Movie"}
+    ],"TotalRecordCount":4}"#
+        .into()
+}
+
+/// `/Genres?ParentId=5`: names as the server stores them, one unusable.
+fn genres() -> String {
+    r#"{"Items":[
+        {"Name":"Action","Id":"901","Type":"Genre"},
+        {"Name":"Science-Fiction","Id":"902","Type":"Genre"},
+        {"Name":"Drame|Romance","Id":"903","Type":"Genre"},
+        {"Name":"Science-Fiction","Id":"904","Type":"Genre"}
+    ],"TotalRecordCount":4}"#
         .into()
 }
 
@@ -504,6 +586,34 @@ fn stored_token(fx: &Fixture) -> Option<AccessToken> {
     fx.store.load(&account(SERVER_ID, USER_ID)).unwrap()
 }
 
+fn authenticated(status: SessionStatus) -> SignedInUser {
+    match status {
+        SessionStatus::Authenticated { user } => user,
+        other => panic!("expected authenticated, got {other:?}"),
+    }
+}
+
+/// `(error kind)` of an `AuthenticationRequired` status.
+fn reauth_kind(status: SessionStatus) -> &'static str {
+    match status {
+        SessionStatus::AuthenticationRequired { server, error } => {
+            assert_eq!(server.user_name, "testeur");
+            error.kind()
+        }
+        other => panic!("expected authenticationRequired, got {other:?}"),
+    }
+}
+
+fn unreachable_kind(status: SessionStatus) -> &'static str {
+    match status {
+        SessionStatus::ServerUnreachable { server, error } => {
+            assert_eq!(server.id, SERVER_ID);
+            error.kind()
+        }
+        other => panic!("expected serverUnreachable, got {other:?}"),
+    }
+}
+
 #[test]
 fn sign_in_stores_token_securely_and_sends_auth_in_header() {
     let server = FakeEmby::start(emby_like(204));
@@ -566,7 +676,7 @@ fn restore_after_restart_reuses_token_and_keeps_device_id() {
             .device_id;
 
     let fx = reopen(fx.store, fx.path);
-    let user = run(fx.service.restore()).unwrap().unwrap();
+    let user = authenticated(run(fx.service.restore()).unwrap());
     assert_eq!(user.user_id, USER_ID);
     let check = server.requests().into_iter().last().unwrap();
     let header = check.auth.unwrap();
@@ -588,20 +698,34 @@ fn restore_with_revoked_token_forgets_it() {
         .unwrap();
 
     let fx = reopen(fx.store, fx.path);
-    let err = run(fx.service.restore()).unwrap_err();
-    assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
+    let status = run(fx.service.restore()).unwrap();
+    assert_eq!(reauth_kind(status), "sessionExpired");
     assert!(stored_token(&fx).is_none());
+    assert!(fx.service.current_user().is_none());
     assert_eq!(
         fx.service.last_server_url().as_deref(),
         Some(server.url.as_str())
     );
-    assert!(run(fx.service.restore()).unwrap().is_none());
+    // After a restart the reauthentication screen is still prefilled.
+    let fx = reopen(fx.store, fx.path);
+    assert_eq!(
+        reauth_kind(run(fx.service.restore()).unwrap()),
+        "sessionExpired"
+    );
+    // Signing in again clears the hint.
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    let file: SessionFile =
+        serde_json::from_str(&std::fs::read_to_string(&fx.path).unwrap()).unwrap();
+    assert!(file.reauth.is_none());
 }
 
 #[test]
 fn restore_with_nothing_saved_is_signed_out() {
     let fx = fixture();
-    assert!(run(fx.service.restore()).unwrap().is_none());
+    assert!(matches!(
+        run(fx.service.restore()).unwrap(),
+        SessionStatus::SignedOut
+    ));
 }
 
 #[test]
@@ -619,7 +743,10 @@ fn sign_out_revokes_on_server_and_forgets_locally_even_if_logout_fails() {
         assert!(fx.service.current_user().is_none());
         assert!(matches!(fx.service.client(), Err(EmbyError::NotSignedIn)));
         let fx = reopen(fx.store, fx.path);
-        assert!(run(fx.service.restore()).unwrap().is_none());
+        assert!(matches!(
+            run(fx.service.restore()).unwrap(),
+            SessionStatus::SignedOut
+        ));
     }
 }
 
@@ -676,9 +803,9 @@ fn libraries_keep_films_and_series_with_local_image_urls() {
     assert_eq!(json[1]["kind"], "movies");
     let image = libs[0].image.as_ref().unwrap();
     assert!(
-        image
-            .src
-            .starts_with("http://emby-img.localhost/10/Primary?tag=56f6b8b2_6384&maxWidth="),
+        image.src.starts_with(&format!(
+            "http://emby-img.localhost/{SERVER_ID}/10/Primary?tag=56f6b8b2_6384&maxWidth="
+        )),
         "{}",
         image.src
     );
@@ -697,7 +824,7 @@ fn libraries_keep_films_and_series_with_local_image_urls() {
 #[test]
 fn items_page_queries_one_sorted_page_and_maps_cards() {
     let (server, fx, _) = signed_in_browser();
-    let page = run(fx.service.items("5", 50, 50)).unwrap();
+    let page = run(fx.service.items("5", 50, 50, &Default::default())).unwrap();
 
     let req = server.requests().into_iter().last().unwrap();
     let (path, query) = req.path.split_once('?').unwrap();
@@ -735,14 +862,307 @@ fn items_page_queries_one_sorted_page_and_maps_cards() {
 fn items_refuse_unknown_library_and_clamp_page_size() {
     let (server, fx, _) = signed_in_browser();
     // Emby would answer an unknown ParentId with the whole server: never send one.
-    let err = run(fx.service.items("999", 0, 50)).unwrap_err();
+    let err = run(fx.service.items("999", 0, 50, &Default::default())).unwrap_err();
     assert!(matches!(err, EmbyError::NotFound), "{err:?}");
     assert!(server.requests().iter().all(|r| !r.path.contains("/Items")));
 
-    run(fx.service.items("10", 0, 100_000)).unwrap();
+    run(fx.service.items("10", 0, 100_000, &Default::default())).unwrap();
     let req = server.requests().into_iter().last().unwrap();
     assert!(req.path.contains("Limit=200"), "{}", req.path);
     assert!(req.path.contains("IncludeItemTypes=Series"), "{}", req.path);
+}
+
+#[test]
+fn items_send_the_chosen_sort_and_filters() {
+    use super::models::{ItemsOptions, SortKey, WatchFilter};
+    let (server, fx, _) = signed_in_browser();
+    let query_of = |options: &ItemsOptions| {
+        run(fx.service.items("5", 0, 60, options)).unwrap();
+        let req = server.requests().into_iter().last().unwrap();
+        let query = req.path.split_once('?').unwrap().1.to_owned();
+        query.split('&').map(str::to_owned).collect::<Vec<_>>()
+    };
+
+    let plain = query_of(&ItemsOptions::default());
+    assert!(
+        plain
+            .iter()
+            .all(|p| !p.starts_with("Filters=") && !p.starts_with("Genres="))
+    );
+
+    let q = query_of(&ItemsOptions {
+        sort: SortKey::DateAdded,
+        descending: true,
+        watch: WatchFilter::Unplayed,
+        favorites: true,
+        genre: Some("Science-Fiction & Fantastique".into()),
+    });
+    for expected in [
+        "SortBy=DateCreated%2CSortName",
+        "SortOrder=Descending",
+        "Filters=IsUnplayed%2CIsFavorite",
+        "Genres=Science-Fiction+%26+Fantastique",
+        "ParentId=5",
+        "StartIndex=0",
+    ] {
+        assert!(q.iter().any(|p| p == expected), "{expected} in {q:?}");
+    }
+
+    for (sort, sort_by) in [
+        (SortKey::Name, "SortBy=SortName"),
+        (SortKey::Year, "SortBy=ProductionYear%2CSortName"),
+        (SortKey::Rating, "SortBy=CommunityRating%2CSortName"),
+    ] {
+        let q = query_of(&ItemsOptions {
+            sort,
+            ..Default::default()
+        });
+        assert!(q.iter().any(|p| p == sort_by), "{sort_by} in {q:?}");
+    }
+    for (watch, filters) in [
+        (WatchFilter::Played, "Filters=IsPlayed"),
+        (WatchFilter::InProgress, "Filters=IsResumable"),
+    ] {
+        let q = query_of(&ItemsOptions {
+            watch,
+            ..Default::default()
+        });
+        assert!(q.iter().any(|p| p == filters), "{filters} in {q:?}");
+    }
+}
+
+#[test]
+fn items_refuse_a_genre_the_server_cannot_filter_on() {
+    use super::models::ItemsOptions;
+    let (server, fx, _) = signed_in_browser();
+    let before = server.requests().len();
+    let long = "x".repeat(101);
+    for genre in ["", "  ", "Drame|Romance", "a\u{7}b", long.as_str()] {
+        let options = ItemsOptions {
+            genre: Some(genre.to_owned()),
+            ..Default::default()
+        };
+        let err = run(fx.service.items("5", 0, 60, &options)).unwrap_err();
+        assert!(
+            matches!(err, EmbyError::InvalidResponse(_)),
+            "{genre:?}: {err:?}"
+        );
+    }
+    assert_eq!(server.requests().len(), before, "nothing sent");
+}
+
+#[test]
+fn options_from_the_ui_default_and_parse() {
+    use super::models::{ItemsOptions, SortKey, WatchFilter};
+    let parsed: ItemsOptions =
+        serde_json::from_str(r#"{"sort":"rating","descending":true,"watch":"inProgress"}"#)
+            .unwrap();
+    assert_eq!(parsed.sort, SortKey::Rating);
+    assert!(parsed.descending && !parsed.favorites && parsed.genre.is_none());
+    assert_eq!(parsed.watch, WatchFilter::InProgress);
+    assert_eq!(
+        serde_json::from_str::<ItemsOptions>("{}").unwrap(),
+        ItemsOptions::default()
+    );
+    assert!(serde_json::from_str::<ItemsOptions>(r#"{"sort":"random"}"#).is_err());
+}
+
+#[test]
+fn genres_of_a_library_are_listed_without_unusable_names() {
+    let (server, fx, _) = signed_in_browser();
+    let genres = run(fx.service.genres("5")).unwrap();
+    assert_eq!(genres, ["Action", "Science-Fiction"]);
+
+    let req = server.requests().into_iter().last().unwrap();
+    let (path, query) = req.path.split_once('?').unwrap();
+    assert_eq!(path, "/emby/Genres");
+    for expected in [
+        format!("UserId={USER_ID}"),
+        "ParentId=5".into(),
+        "IncludeItemTypes=Movie".into(),
+        "Recursive=true".into(),
+    ] {
+        assert!(
+            query.split('&').any(|p| p == expected),
+            "{expected} in {query}"
+        );
+    }
+    assert!(!req.path.contains(TOKEN));
+
+    // Unknown library: nothing asked about it.
+    let err = run(fx.service.genres("999")).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
+}
+
+#[test]
+fn favorites_row_lists_films_and_series_by_title() {
+    let (server, fx, _) = signed_in_browser();
+    let items = run(fx.service.favorites()).unwrap();
+    let ids: Vec<_> = items.iter().map(|i| i.id.as_str()).collect();
+    assert_eq!(ids, ["30207", "80473"]);
+    assert_eq!(items[1].unplayed_count, Some(18));
+
+    let req = server.requests().into_iter().last().unwrap();
+    let (path, query) = req.path.split_once('?').unwrap();
+    assert_eq!(path, format!("/emby/Users/{USER_ID}/Items"));
+    for expected in [
+        "Filters=IsFavorite",
+        "Recursive=true",
+        "IncludeItemTypes=Movie%2CSeries",
+        "SortBy=SortName",
+        "Limit=16",
+    ] {
+        assert!(
+            query.split('&').any(|p| p == expected),
+            "{expected} in {query}"
+        );
+    }
+    assert!(!query.contains("ParentId"));
+    assert!(!req.path.contains(TOKEN));
+}
+
+#[test]
+fn hero_resumes_first_then_fills_with_latest() {
+    use super::models::HeroReason;
+    let (server, fx, _) = signed_in_browser();
+    let hero = run(fx.service.hero()).unwrap();
+    let ids: Vec<_> = hero.iter().map(|h| h.detail.id.as_str()).collect();
+    // Resumed film and series, then latest; duplicates, no backdrop and the sixth dropped.
+    assert_eq!(ids, ["30207", "70185", "80473", "80500", "30301"]);
+    let reasons: Vec<_> = hero.iter().map(|h| h.reason).collect();
+    assert_eq!(reasons[..2], [HeroReason::Resume; 2]);
+    assert_eq!(reasons[2..], [HeroReason::Latest; 3]);
+
+    let film = &hero[0];
+    assert_eq!(film.play_id.as_deref(), Some("30207"));
+    assert_eq!(film.resume.as_ref().unwrap().position_seconds, 1831);
+    assert!(film.backdrop.src.contains("/30207/Backdrop?"));
+    assert!(film.episode.is_none());
+
+    // A resumed episode stands for its series, with the series' artwork.
+    let series = &hero[1];
+    assert_eq!(series.detail.item_type, "Series");
+    assert_eq!(series.detail.name, "La casa de papel");
+    assert!(
+        series
+            .detail
+            .poster
+            .as_ref()
+            .unwrap()
+            .src
+            .contains("/70185/Primary?")
+    );
+    assert_eq!(series.play_id.as_deref(), Some("70227"));
+    assert_eq!(series.resume.as_ref().unwrap().position_seconds, 600);
+    let episode = series.episode.as_ref().unwrap();
+    assert_eq!(
+        (episode.name.as_str(), episode.season_index, episode.index),
+        ("Le Professeur", Some(5), Some(2))
+    );
+    assert_eq!(series.overview.as_deref(), Some("Le casse continue."));
+    assert!(series.backdrop.src.contains("/70185/Backdrop?"));
+    assert!(series.logo.as_ref().unwrap().src.contains("/70185/Logo?"));
+
+    // A latest series plays its first episode not watched, a fully watched one nothing.
+    let dark = &hero[2];
+    assert_eq!(dark.play_id.as_deref(), Some("80475"));
+    assert_eq!(dark.episode.as_ref().unwrap().name, "Secrets");
+    assert_eq!(dark.resume.as_ref().unwrap().position_seconds, 300);
+    assert_eq!(dark.detail.unplayed_count, Some(18));
+    assert_eq!(dark.overview.as_deref(), Some("Winden."));
+    assert!(dark.logo.is_some());
+    assert!(hero[3].play_id.is_none() && hero[3].episode.is_none());
+    assert_eq!(hero[4].play_id.as_deref(), Some("30301"));
+    assert!(hero[4].resume.is_none() && hero[4].logo.is_none());
+
+    let requests = server.requests();
+    let latest = requests
+        .iter()
+        .find(|r| r.path.contains("ImageTypes=Backdrop"))
+        .unwrap();
+    let (path, query) = latest.path.split_once('?').unwrap();
+    assert_eq!(path, format!("/emby/Users/{USER_ID}/Items"));
+    for expected in [
+        "Recursive=true",
+        "IncludeItemTypes=Movie%2CSeries",
+        "IsPlayed=false",
+        "SortBy=DateCreated",
+        "SortOrder=Descending",
+        "Limit=10",
+    ] {
+        assert!(
+            query.split('&').any(|p| p == expected),
+            "{expected} in {query}"
+        );
+    }
+    let episodes = requests
+        .iter()
+        .find(|r| r.path.starts_with("/emby/Shows/80473/Episodes"))
+        .unwrap();
+    for expected in ["IsPlayed=false", "Limit=1", &format!("UserId={USER_ID}")] {
+        assert!(
+            episodes.path.split(['?', '&']).any(|p| p == expected),
+            "{}",
+            episodes.path
+        );
+    }
+    // No lookup for films nor for the resumed series.
+    assert!(
+        !requests
+            .iter()
+            .any(|r| r.path.starts_with("/emby/Shows/70185"))
+    );
+    assert!(requests.iter().all(|r| !r.path.contains(TOKEN)));
+}
+
+#[test]
+fn hero_with_a_revoked_token_ends_the_session() {
+    let (_server, fx, revoked) = signed_in_browser();
+    revoked.store(true, Ordering::SeqCst);
+    let err = run(fx.service.hero()).unwrap_err();
+    assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
+}
+
+#[test]
+fn favorite_is_set_and_cleared_with_the_server_answer() {
+    let (server, fx, _) = signed_in_browser();
+    assert!(run(fx.service.set_favorite("30207", true)).unwrap());
+    let req = server.requests().into_iter().last().unwrap();
+    assert_eq!(req.method, "POST");
+    assert_eq!(
+        req.path,
+        format!("/emby/Users/{USER_ID}/FavoriteItems/30207")
+    );
+
+    assert!(!run(fx.service.set_favorite("30207", false)).unwrap());
+    let req = server.requests().into_iter().last().unwrap();
+    assert_eq!(req.method, "DELETE");
+    assert_eq!(
+        req.path,
+        format!("/emby/Users/{USER_ID}/FavoriteItems/30207")
+    );
+
+    let err = run(fx.service.set_favorite("99999", true)).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
+
+    // An id that is not one never reaches the server.
+    let before = server.requests().len();
+    for id in ["", "../30207", "30207?x=1"] {
+        let err = run(fx.service.set_favorite(id, true)).unwrap_err();
+        assert!(
+            matches!(err, EmbyError::InvalidResponse(_)),
+            "{id}: {err:?}"
+        );
+    }
+    assert_eq!(server.requests().len(), before);
+}
+
+#[test]
+fn favorite_with_a_revoked_token_ends_the_session() {
+    let (_server, fx, revoked) = signed_in_browser();
+    revoked.store(true, Ordering::SeqCst);
+    let err = run(fx.service.set_favorite("30207", true)).unwrap_err();
+    assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
 }
 
 #[test]
@@ -755,14 +1175,21 @@ fn token_revoked_while_browsing_ends_the_session() {
     assert!(stored_token(&fx).is_none());
     assert!(fx.service.current_user().is_none());
     let fx = reopen(fx.store, fx.path);
-    assert!(run(fx.service.restore()).unwrap().is_none());
+    assert_eq!(
+        reauth_kind(run(fx.service.restore()).unwrap()),
+        "sessionExpired"
+    );
 }
 
 #[test]
 fn artwork_is_fetched_with_auth_and_checked() {
     use super::images::ImageRequest;
     let (server, fx, _) = signed_in_browser();
-    let req = ImageRequest::parse("/101/Primary", Some("tag=7b213eb5_6379&maxWidth=360")).unwrap();
+    let req = ImageRequest::parse(
+        &format!("/{SERVER_ID}/101/Primary"),
+        Some("tag=7b213eb5_6379&maxWidth=360"),
+    )
+    .unwrap();
     let (content_type, bytes) = run(fx.service.image(&req)).unwrap();
     assert_eq!(content_type, "image/jpeg");
     assert_eq!(bytes, b"fake-jpeg-bytes");
@@ -775,9 +1202,24 @@ fn artwork_is_fetched_with_auth_and_checked() {
     assert!(sent.path.contains("maxWidth=360") && sent.path.contains("tag=7b213eb5_6379"));
     assert!(sent.auth.unwrap().contains(&format!("Token=\"{TOKEN}\"")));
 
-    let not_image = ImageRequest::parse("/102/Primary", Some("tag=x&maxWidth=360")).unwrap();
+    let not_image = ImageRequest::parse(
+        &format!("/{SERVER_ID}/102/Primary"),
+        Some("tag=x&maxWidth=360"),
+    )
+    .unwrap();
     let err = run(fx.service.image(&not_image)).unwrap_err();
     assert!(matches!(err, EmbyError::InvalidResponse(_)), "{err:?}");
+
+    // A URL built for another server is refused without any request (ADR 0012).
+    let before = server.requests().len();
+    let foreign = ImageRequest::parse(
+        "/otherserver/101/Primary",
+        Some("tag=7b213eb5_6379&maxWidth=360"),
+    )
+    .unwrap();
+    let err = run(fx.service.image(&foreign)).unwrap_err();
+    assert!(matches!(err, EmbyError::Forbidden), "{err:?}");
+    assert_eq!(server.requests().len(), before);
 
     run(fx.service.sign_out()).unwrap();
     let err = run(fx.service.image(&req)).unwrap_err();
@@ -796,6 +1238,7 @@ fn movie_detail_maps_metadata_and_tech_info_without_the_nas_path() {
     assert!(!json.contains(&server.url), "server address leaked: {json}");
 
     assert_eq!(d.kind, super::models::DetailKind::Movie);
+    assert!(d.favorite);
     assert_eq!(d.original_title.as_deref(), Some("2 Hearts"));
     assert_eq!(
         d.tagline.as_deref(),
@@ -1157,10 +1600,9 @@ fn continue_watching_maps_films_and_episodes_with_wide_artwork() {
     assert_eq!(film["runtimeMinutes"], 101);
     assert_eq!(film["resume"]["positionSeconds"], 1831);
     assert!(
-        film["image"]["src"]
-            .as_str()
-            .unwrap()
-            .starts_with("http://emby-img.localhost/30207/Thumb?tag=bbcac8ec_6379"),
+        film["image"]["src"].as_str().unwrap().starts_with(&format!(
+            "http://emby-img.localhost/{SERVER_ID}/30207/Thumb?tag=bbcac8ec_6379"
+        )),
         "{film}"
     );
     let episode = &rows[1];
@@ -1433,7 +1875,7 @@ fn real_server_sign_in_restore_sign_out() {
     assert!(!file.contains(token.expose()));
 
     let fx = reopen(fx.store, fx.path);
-    let restored = run(fx.service.restore()).unwrap().unwrap();
+    let restored = authenticated(run(fx.service.restore()).unwrap());
     assert_eq!(restored.user_id, user.user_id);
 
     run(fx.service.sign_out()).unwrap();
@@ -1444,7 +1886,10 @@ fn real_server_sign_in_restore_sign_out() {
         .unwrap();
     let fx = reopen(fx.store, fx.path);
     // sign_out cleared the session record, so restore has nothing to try.
-    assert!(run(fx.service.restore()).unwrap().is_none());
+    assert!(matches!(
+        run(fx.service.restore()).unwrap(),
+        SessionStatus::SignedOut
+    ));
     let client = super::client::EmbyClient::new(
         super::server_url::ServerUrl::parse(&url).unwrap(),
         super::client::DeviceIdentity {
@@ -1493,10 +1938,13 @@ fn real_server_libraries_and_pages() {
         assert!(!libs.is_empty());
         for lib in &libs {
             let started = std::time::Instant::now();
-            let first = run(fx.service.items(&lib.id, 0, 60)).unwrap();
+            let first = run(fx.service.items(&lib.id, 0, 60, &Default::default())).unwrap();
             let elapsed = started.elapsed();
             let last_start = first.total.saturating_sub(1) / 60 * 60;
-            let last = run(fx.service.items(&lib.id, last_start, 60)).unwrap();
+            let last = run(fx
+                .service
+                .items(&lib.id, last_start, 60, &Default::default()))
+            .unwrap();
             println!(
                 "{:?} {}: total={} first={} ({} ms) last page start={} n={} posters={}/{}",
                 lib.kind,
@@ -1514,7 +1962,7 @@ fn real_server_libraries_and_pages() {
         let poster = libs
             .iter()
             .find_map(|l| {
-                run(fx.service.items(&l.id, 0, 10))
+                run(fx.service.items(&l.id, 0, 10, &Default::default()))
                     .unwrap()
                     .items
                     .into_iter()
@@ -1572,7 +2020,7 @@ fn real_server_details_seasons_episodes() {
         let (mut details, mut seasons_seen, mut episodes_seen) = (0, 0, 0);
         let mut slowest = std::time::Duration::ZERO;
         for lib in run(fx.service.libraries()).unwrap() {
-            let page = run(fx.service.items(&lib.id, 0, sample)).unwrap();
+            let page = run(fx.service.items(&lib.id, 0, sample, &Default::default())).unwrap();
             for item in page.items {
                 let started = std::time::Instant::now();
                 let d = run(fx.service.item_detail(&item.id))
@@ -1654,7 +2102,10 @@ fn real_server_playback_negotiation() {
         let mut first = None;
         let mut slowest = std::time::Duration::ZERO;
         for lib in run(fx.service.libraries()).unwrap() {
-            for item in run(fx.service.items(&lib.id, 0, sample)).unwrap().items {
+            for item in run(fx.service.items(&lib.id, 0, sample, &Default::default()))
+                .unwrap()
+                .items
+            {
                 // A series plays through the first episode of its first season.
                 let id = if item.item_type == "Series" {
                     let seasons = run(fx.service.seasons(&item.id)).unwrap();
@@ -1784,7 +2235,11 @@ fn real_server_playback_reporting_and_resume() {
         .unwrap()
         .into_iter()
         .filter(|l| l.kind == LibraryKind::Movies)
-        .flat_map(|l| run(fx.service.items(&l.id, 0, 60)).unwrap().items)
+        .flat_map(|l| {
+            run(fx.service.items(&l.id, 0, 60, &Default::default()))
+                .unwrap()
+                .items
+        })
         .filter(|i| !i.played)
         .find(|i| {
             run(fx.service.item_detail(&i.id))
@@ -1889,7 +2344,11 @@ fn real_server_transcoding() {
         .unwrap()
         .into_iter()
         .filter(|l| l.kind == LibraryKind::Movies)
-        .flat_map(|l| run(service.items(&l.id, 0, 60)).unwrap().items)
+        .flat_map(|l| {
+            run(service.items(&l.id, 0, 60, &Default::default()))
+                .unwrap()
+                .items
+        })
         .filter(|i| !i.played)
         .find(|i| {
             run(service.item_detail(&i.id))
@@ -2097,7 +2556,11 @@ fn real_server_home_rows() {
     let film = libraries
         .iter()
         .filter(|l| l.kind == LibraryKind::Movies)
-        .flat_map(|l| run(fx.service.items(&l.id, 0, 60)).unwrap().items)
+        .flat_map(|l| {
+            run(fx.service.items(&l.id, 0, 60, &Default::default()))
+                .unwrap()
+                .items
+        })
         .find(|i| !i.played && before.iter().all(|b| b.id != i.id))
         .expect("a film not in progress on the test account");
     println!("film: {} ({})", film.name, film.id);
@@ -2164,7 +2627,7 @@ fn real_server_next_up() {
         .into_iter()
         .find(|l| l.kind == LibraryKind::TvShows && l.name == "Séries TV")
         .expect("Séries TV library");
-    let (series, first, second) = run(fx.service.items(&library.id, 0, 30))
+    let (series, first, second) = run(fx.service.items(&library.id, 0, 30, &Default::default()))
         .unwrap()
         .items
         .into_iter()
@@ -2268,6 +2731,170 @@ fn utc_stamp() -> String {
 }
 
 /// Search on the real server (ADR 0011), read-only: accents and case folded,
+/// Sort and filters of library grids against the real server (ADR 0013), read
+/// only: orders, watched split, favorites and genres as Emby 4.10 applies them.
+#[test]
+#[ignore = "needs the real Emby server and VIEWER_EMBY_* variables"]
+fn real_server_library_filters() {
+    use super::models::{ItemsOptions, MediaItem, SortKey, WatchFilter};
+    let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} manquant"));
+    let path = std::env::temp_dir()
+        .join(format!("viewer-emby-real-{}", uuid::Uuid::new_v4()))
+        .join("session.json");
+    SessionFile {
+        device_id: REAL_DEVICE_ID.into(),
+        ..SessionFile::default()
+    }
+    .save(&path)
+    .unwrap();
+    let fx = reopen(Arc::new(MemoryCredentialStore::default()), path);
+    run(fx.service.sign_in(
+        &var("VIEWER_EMBY_URL"),
+        &var("VIEWER_EMBY_USER"),
+        &var("VIEWER_EMBY_PASSWORD"),
+    ))
+    .unwrap();
+
+    let page = |id: &str, options: &ItemsOptions| {
+        let t = std::time::Instant::now();
+        let p = run(fx.service.items(id, 0, 60, options)).unwrap();
+        (p, t.elapsed().as_millis())
+    };
+    let names = |items: &[MediaItem]| items.iter().map(|i| i.name.clone()).collect::<Vec<_>>();
+
+    for lib in run(fx.service.libraries()).unwrap() {
+        let (all, ms) = page(&lib.id, &ItemsOptions::default());
+        println!(
+            "{} ({:?}): {} au total, {ms} ms",
+            lib.name, lib.kind, all.total
+        );
+        if all.total == 0 {
+            continue;
+        }
+
+        let years = |descending: bool| {
+            let (p, ms) = page(
+                &lib.id,
+                &ItemsOptions {
+                    sort: SortKey::Year,
+                    descending,
+                    ..Default::default()
+                },
+            );
+            println!(
+                "  année {}: {:?} en {ms} ms",
+                if descending { "↓" } else { "↑" },
+                p.items.iter().take(5).map(|i| i.year).collect::<Vec<_>>()
+            );
+            p
+        };
+        let down = years(true);
+        let ys: Vec<i32> = down.items.iter().filter_map(|i| i.year).collect();
+        assert!(
+            ys.windows(2).all(|w| w[0] >= w[1]),
+            "années décroissantes : {ys:?}"
+        );
+        assert_eq!(down.total, all.total, "le tri ne change pas le total");
+        let up = years(false);
+        let ys: Vec<i32> = up.items.iter().filter_map(|i| i.year).collect();
+        assert!(
+            ys.windows(2).all(|w| w[0] <= w[1]),
+            "années croissantes : {ys:?}"
+        );
+
+        let (added, ms) = page(
+            &lib.id,
+            &ItemsOptions {
+                sort: SortKey::DateAdded,
+                descending: true,
+                ..Default::default()
+            },
+        );
+        println!(
+            "  ajout ↓: {:?} en {ms} ms",
+            names(&added.items[..added.items.len().min(3)])
+        );
+        let (rated, ms) = page(
+            &lib.id,
+            &ItemsOptions {
+                sort: SortKey::Rating,
+                descending: true,
+                ..Default::default()
+            },
+        );
+        println!(
+            "  note ↓: {:?} en {ms} ms",
+            names(&rated.items[..rated.items.len().min(3)])
+        );
+
+        let count = |watch: WatchFilter| {
+            let (p, ms) = page(
+                &lib.id,
+                &ItemsOptions {
+                    watch,
+                    ..Default::default()
+                },
+            );
+            println!("  {watch:?}: {} en {ms} ms", p.total);
+            p
+        };
+        let played = count(WatchFilter::Played);
+        let unplayed = count(WatchFilter::Unplayed);
+        let in_progress = count(WatchFilter::InProgress);
+        assert!(played.items.iter().all(|i| i.played), "Vus : tous vus");
+        assert!(
+            unplayed.items.iter().all(|i| !i.played),
+            "Non vus : aucun vu"
+        );
+        println!(
+            "  vus + non vus = {} (total {}) ; en cours : {}",
+            played.total + unplayed.total,
+            all.total,
+            in_progress.total
+        );
+
+        let (favorites, _) = page(
+            &lib.id,
+            &ItemsOptions {
+                favorites: true,
+                ..Default::default()
+            },
+        );
+        println!("  favoris : {}", favorites.total);
+
+        let t = std::time::Instant::now();
+        let genres = run(fx.service.genres(&lib.id)).unwrap();
+        println!(
+            "  {} genres en {} ms : {:?}",
+            genres.len(),
+            t.elapsed().as_millis(),
+            &genres[..genres.len().min(8)]
+        );
+        if let Some(genre) = genres.first() {
+            let (g, ms) = page(
+                &lib.id,
+                &ItemsOptions {
+                    genre: Some(genre.clone()),
+                    ..Default::default()
+                },
+            );
+            println!("  genre {genre:?} : {} en {ms} ms", g.total);
+            assert!(g.total > 0 && g.total <= all.total, "{genre}: {}", g.total);
+            let combined = page(
+                &lib.id,
+                &ItemsOptions {
+                    genre: Some(genre.clone()),
+                    watch: WatchFilter::Unplayed,
+                    ..Default::default()
+                },
+            )
+            .0;
+            assert!(combined.total <= g.total, "les filtres se combinent");
+        }
+    }
+    run(fx.service.sign_out()).unwrap();
+}
+
 /// word-prefix matching, films and series apart, too-short queries not sent.
 #[test]
 #[ignore = "needs the real Emby server and VIEWER_EMBY_* variables"]
@@ -2330,4 +2957,481 @@ fn real_server_search() {
     assert!(none.movies.is_empty() && none.series.is_empty());
     assert_eq!(search("a"), super::models::SearchResults::default());
     run(fx.service.sign_out()).unwrap();
+}
+
+// --- Gate 2.1: persistent session and reconnection (ADR 0012) ---
+
+/// Points the saved session at another address and restarts the service, e.g. a
+/// NAS that is off at startup.
+fn retarget(fx: Fixture, url: &str) -> Fixture {
+    let mut file: SessionFile =
+        serde_json::from_str(&std::fs::read_to_string(&fx.path).unwrap()).unwrap();
+    file.session.as_mut().unwrap().server_url = url.to_owned();
+    file.save(&fx.path).unwrap();
+    reopen(fx.store, fx.path)
+}
+
+fn short_timeouts(fx: Fixture) -> Fixture {
+    Fixture {
+        service: fx.service.with_timeouts(
+            std::time::Duration::from_millis(500),
+            std::time::Duration::from_millis(300),
+        ),
+        ..fx
+    }
+}
+
+fn closed_port_url() -> String {
+    let port = TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    format!("http://127.0.0.1:{port}")
+}
+
+fn session_file(fx: &Fixture) -> SessionFile {
+    serde_json::from_str(&std::fs::read_to_string(&fx.path).unwrap()).unwrap()
+}
+
+/// `emby_like` whose `/Users/{Id}` answer is chosen by the test.
+fn user_answer(status: u16, body: String) -> Route {
+    let base = emby_like(204);
+    Box::new(move |r| {
+        if r.path == format!("/emby/Users/{USER_ID}") {
+            (status, body.clone())
+        } else {
+            base(r)
+        }
+    })
+}
+
+#[test]
+fn restore_with_nas_offline_keeps_the_session_and_recovers_later() {
+    let server = FakeEmby::start(emby_like(204));
+    let fx = fixture();
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+
+    let fx = retarget(fx, &closed_port_url());
+    let status = run(fx.service.restore()).unwrap();
+    assert_eq!(unreachable_kind(status), "unreachable");
+    // Nothing is wiped by a connectivity failure, even after several attempts.
+    let status = run(fx.service.restore()).unwrap();
+    assert_eq!(unreachable_kind(status), "unreachable");
+    assert_eq!(stored_token(&fx).unwrap().expose(), TOKEN);
+    assert!(session_file(&fx).session.is_some());
+    assert!(session_file(&fx).reauth.is_none());
+    assert!(fx.service.current_user().is_none());
+
+    // The NAS comes back: the same session opens without a password.
+    let fx = retarget(fx, &server.url);
+    let user = authenticated(run(fx.service.restore()).unwrap());
+    assert_eq!(user.user_id, USER_ID);
+}
+
+#[test]
+fn restore_on_timeout_or_server_errors_never_invalidates() {
+    for (route, kind) in [
+        (user_answer(500, String::new()), "server"),
+        (user_answer(503, String::new()), "server"),
+        (
+            user_answer(200, "<html>proxy</html>".into()),
+            "invalidResponse",
+        ),
+        (
+            Box::new(|r: &Recorded| match r.path.as_str() {
+                "/emby/System/Info/Public" => (502u16, String::new()),
+                _ => (200, String::new()),
+            }) as Route,
+            "server",
+        ),
+    ] {
+        let good = FakeEmby::start(emby_like(204));
+        let fx = fixture();
+        run(fx.service.sign_in(&good.url, "testeur", PASSWORD)).unwrap();
+        let bad = FakeEmby::start(route);
+        let fx = retarget(fx, &bad.url);
+        let status = run(fx.service.restore()).unwrap();
+        assert_eq!(unreachable_kind(status), kind);
+        assert_eq!(stored_token(&fx).unwrap().expose(), TOKEN, "{kind}");
+        assert!(session_file(&fx).session.is_some(), "{kind}");
+    }
+
+    // A server that accepts the connection but never answers in time.
+    let good = FakeEmby::start(emby_like(204));
+    let fx = fixture();
+    run(fx.service.sign_in(&good.url, "testeur", PASSWORD)).unwrap();
+    let base = emby_like(204);
+    let slow = FakeEmby::start(Box::new(move |r| {
+        if r.path == format!("/emby/Users/{USER_ID}") {
+            std::thread::sleep(std::time::Duration::from_millis(800));
+        }
+        base(r)
+    }));
+    let fx = short_timeouts(retarget(fx, &slow.url));
+    let status = run(fx.service.restore()).unwrap();
+    assert_eq!(unreachable_kind(status), "timeout");
+    assert_eq!(stored_token(&fx).unwrap().expose(), TOKEN);
+    assert!(session_file(&fx).session.is_some());
+}
+
+#[test]
+fn restore_probes_without_the_token_and_refuses_another_server() {
+    let good = FakeEmby::start(emby_like(204));
+    let fx = fixture();
+    run(fx.service.sign_in(&good.url, "testeur", PASSWORD)).unwrap();
+    // Another Emby server now answers at the saved address.
+    let other = FakeEmby::start(Box::new(|r| match r.path.as_str() {
+        "/emby/System/Info/Public" => (200, public_info().replace(SERVER_ID, "otherid")),
+        _ => (200, user()),
+    }));
+    let fx = retarget(fx, &other.url);
+    let status = run(fx.service.restore()).unwrap();
+    assert_eq!(unreachable_kind(status), "serverMismatch");
+    let reqs = other.requests();
+    assert_eq!(reqs.len(), 1, "only the public probe: {reqs:?}");
+    assert!(
+        !reqs[0]
+            .auth
+            .as_deref()
+            .unwrap_or_default()
+            .contains("Token=")
+    );
+    assert_eq!(stored_token(&fx).unwrap().expose(), TOKEN);
+
+    // On the right server, the probe still goes without the token.
+    let fx = retarget(fx, &good.url);
+    let before = good.requests().len();
+    authenticated(run(fx.service.restore()).unwrap());
+    let reqs = good.requests();
+    let probe = &reqs[before];
+    assert_eq!(probe.path, "/emby/System/Info/Public");
+    assert!(!probe.auth.as_deref().unwrap_or_default().contains("Token="));
+}
+
+#[test]
+fn disabled_or_deleted_account_requires_reauthentication() {
+    let disabled = format!(
+        r#"{{"Name":"testeur","Id":"{USER_ID}","Policy":{{"IsAdministrator":false,"IsDisabled":true}}}}"#
+    );
+    for route in [
+        user_answer(200, disabled),
+        user_answer(404, "\"User not found\"".into()),
+        user_answer(403, String::new()),
+    ] {
+        let good = FakeEmby::start(emby_like(204));
+        let fx = fixture();
+        run(fx.service.sign_in(&good.url, "testeur", PASSWORD)).unwrap();
+        let server = FakeEmby::start(route);
+        let fx = retarget(fx, &server.url);
+        let status = run(fx.service.restore()).unwrap();
+        assert_eq!(reauth_kind(status), "accountUnavailable");
+        assert!(stored_token(&fx).is_none());
+        let file = session_file(&fx);
+        assert!(file.session.is_none());
+        assert_eq!(file.reauth.unwrap().user_name, "testeur");
+    }
+}
+
+#[test]
+fn a_token_removed_from_the_vault_asks_for_the_password() {
+    let server = FakeEmby::start(emby_like(204));
+    let fx = fixture();
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    fx.store.delete(&account(SERVER_ID, USER_ID)).unwrap();
+    let fx = reopen(fx.store, fx.path);
+    let before = server.requests().len();
+    assert_eq!(
+        reauth_kind(run(fx.service.restore()).unwrap()),
+        "sessionExpired"
+    );
+    assert_eq!(
+        server.requests().len(),
+        before,
+        "no request without a token"
+    );
+}
+
+#[test]
+fn server_errors_while_browsing_keep_the_session() {
+    let mode = Arc::new(std::sync::atomic::AtomicU8::new(0));
+    let flag = Arc::clone(&mode);
+    let base = browse_like(Arc::new(AtomicBool::new(false)));
+    let server = FakeEmby::start(Box::new(move |r| match flag.load(Ordering::SeqCst) {
+        1 => (503, String::new()),
+        2 => (0, String::new()), // connection dropped
+        _ => base(r),
+    }));
+    let fx = fixture();
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    run(fx.service.libraries()).unwrap();
+
+    mode.store(1, Ordering::SeqCst);
+    let err = run(fx.service.libraries()).unwrap_err();
+    assert!(matches!(err, EmbyError::Server(503)), "{err:?}");
+    mode.store(2, Ordering::SeqCst);
+    let err = run(fx.service.items("5", 0, 50, &Default::default())).unwrap_err();
+    assert!(
+        matches!(
+            err,
+            EmbyError::Unreachable(_) | EmbyError::InvalidResponse(_)
+        ),
+        "{err:?}"
+    );
+    assert_eq!(
+        unreachable_kind(run(fx.service.restore()).unwrap()),
+        "unreachable"
+    );
+    assert!(fx.service.current_user().is_some());
+    assert_eq!(stored_token(&fx).unwrap().expose(), TOKEN);
+
+    // Back online: the check succeeds and the known libraries are still accepted.
+    mode.store(0, Ordering::SeqCst);
+    authenticated(run(fx.service.restore()).unwrap());
+    let before = server.requests().len();
+    run(fx.service.items("5", 0, 50, &Default::default())).unwrap();
+    assert_eq!(server.requests().len(), before + 1, "no /Views refetch");
+}
+
+/// Fake server issuing a new token at each sign-in (`tokA`, then `tokB`) and
+/// accepting both, so a test can hold a client of a previous session.
+fn rotating_tokens() -> Route {
+    let issued = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    Box::new(move |r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/emby/System/Info/Public") => (200, public_info()),
+        ("POST", "/emby/Users/AuthenticateByName") => {
+            let n = issued.fetch_add(1, Ordering::SeqCst);
+            let token = if n == 0 { "tokA" } else { "tokB" };
+            (200, auth_result().replace(TOKEN, token))
+        }
+        ("POST", "/emby/Sessions/Logout") => (204, String::new()),
+        _ => (200, user()),
+    })
+}
+
+#[test]
+fn a_late_401_from_a_previous_session_is_ignored() {
+    let server = FakeEmby::start(rotating_tokens());
+    let fx = fixture();
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    let old = fx.service.client().unwrap();
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+
+    let late = fx
+        .service
+        .expire_on_401(&old, Err::<(), _>(EmbyError::SessionExpired));
+    assert!(matches!(late, Err(EmbyError::Cancelled)), "{late:?}");
+    assert!(fx.service.current_user().is_some());
+    assert_eq!(stored_token(&fx).unwrap().expose(), "tokB");
+
+    // After a sign-out, a late 401 of the closed session changes nothing either.
+    let current = fx.service.client().unwrap();
+    run(fx.service.sign_out()).unwrap();
+    let late = fx
+        .service
+        .expire_on_401(&current, Err::<(), _>(EmbyError::SessionExpired));
+    assert!(matches!(late, Err(EmbyError::Cancelled)), "{late:?}");
+}
+
+#[test]
+fn concurrent_401s_end_the_session_once() {
+    let server = FakeEmby::start(rotating_tokens());
+    let fx = fixture();
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    let client = fx.service.client().unwrap();
+    // Several home rows fail together with the same token.
+    let results: Vec<_> = std::thread::scope(|sc| {
+        let handles: Vec<_> = (0..4)
+            .map(|_| {
+                sc.spawn(|| {
+                    fx.service
+                        .expire_on_401(&client, Err::<(), _>(EmbyError::SessionExpired))
+                        .unwrap_err()
+                        .kind()
+                })
+            })
+            .collect();
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
+    });
+    // Each failing request reports the expiry; the session ends once.
+    assert!(
+        results.iter().all(|k| *k == "sessionExpired"),
+        "{results:?}"
+    );
+    assert!(fx.service.current_user().is_none());
+    assert!(stored_token(&fx).is_none());
+}
+
+#[test]
+fn change_server_during_a_check_cancels_it() {
+    let good = FakeEmby::start(emby_like(204));
+    let fx = fixture();
+    run(fx.service.sign_in(&good.url, "testeur", PASSWORD)).unwrap();
+    let base = emby_like(204);
+    let slow = FakeEmby::start(Box::new(move |r| {
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        base(r)
+    }));
+    let fx = retarget(fx, &slow.url);
+    let result = std::thread::scope(|sc| {
+        sc.spawn(|| {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            fx.service.change_server().unwrap();
+        });
+        run(fx.service.restore())
+    });
+    assert!(matches!(result, Err(EmbyError::Cancelled)), "{result:?}");
+    assert!(fx.service.current_user().is_none());
+    assert_eq!(fx.service.saved_sessions().len(), 1);
+    assert_eq!(stored_token(&fx).unwrap().expose(), TOKEN);
+}
+
+#[test]
+fn change_server_sets_the_session_aside_and_returns_to_it() {
+    let server = FakeEmby::start(emby_like(204));
+    let fx = fixture();
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    let before = server.requests().len();
+    fx.service.change_server().unwrap();
+
+    assert!(fx.service.current_user().is_none());
+    assert_eq!(server.requests().len(), before, "no logout, nothing sent");
+    assert_eq!(stored_token(&fx).unwrap().expose(), TOKEN);
+    let fx = reopen(fx.store, fx.path);
+    assert!(matches!(
+        run(fx.service.restore()).unwrap(),
+        SessionStatus::SignedOut
+    ));
+    let saved = fx.service.saved_sessions();
+    assert_eq!(saved.len(), 1);
+    assert_eq!(
+        (saved[0].user_name.as_str(), saved[0].name.as_str()),
+        ("testeur", "ServeurTest")
+    );
+    let json = serde_json::to_string(&saved).unwrap();
+    assert!(!json.contains(TOKEN), "{json}");
+
+    let err = run(fx.service.resume_saved("unknown", USER_ID)).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
+    let user = authenticated(run(fx.service.resume_saved(SERVER_ID, USER_ID)).unwrap());
+    assert_eq!(user.user_id, USER_ID);
+    assert!(fx.service.saved_sessions().is_empty());
+    assert!(session_file(&fx).session.is_some());
+}
+
+#[test]
+fn set_aside_sessions_are_bounded_and_the_oldest_token_is_deleted() {
+    let server = FakeEmby::start(emby_like(204));
+    let fx = fixture();
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    let mut file = session_file(&fx);
+    let template = file.session.clone().unwrap();
+    for i in 0..super::session::MAX_SAVED {
+        let mut r = template.clone();
+        r.server_id = format!("srv{i}");
+        fx.store
+            .save(
+                &account(&r.server_id, USER_ID),
+                &AccessToken::new(format!("t{i}")),
+            )
+            .unwrap();
+        file.saved.push(r);
+    }
+    file.save(&fx.path).unwrap();
+    let fx = reopen(fx.store, fx.path);
+    authenticated(run(fx.service.restore()).unwrap());
+    fx.service.change_server().unwrap();
+
+    let saved = fx.service.saved_sessions();
+    assert_eq!(saved.len(), super::session::MAX_SAVED);
+    assert_eq!(saved[0].id, SERVER_ID, "newest first");
+    let oldest = account(&format!("srv{}", super::session::MAX_SAVED - 1), USER_ID);
+    assert!(fx.store.load(&oldest).unwrap().is_none());
+    assert!(fx.store.load(&account("srv0", USER_ID)).unwrap().is_some());
+}
+
+#[test]
+fn sign_out_keeps_set_aside_sessions_and_clears_the_hint() {
+    let server = FakeEmby::start(emby_like(204));
+    let fx = fixture();
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    fx.service.change_server().unwrap();
+    // A second server with its own id and user.
+    let other_user = "0b1a2c3d4e5f60718293a4b5c6d7e8f9";
+    let second = FakeEmby::start(Box::new(move |r| {
+        let body = match r.path.as_str() {
+            "/emby/System/Info/Public" => public_info().replace(SERVER_ID, "secondsrv"),
+            "/emby/Users/AuthenticateByName" => auth_result()
+                .replace(SERVER_ID, "secondsrv")
+                .replace(USER_ID, other_user),
+            _ => String::new(),
+        };
+        (if body.is_empty() { 204 } else { 200 }, body)
+    }));
+    run(fx.service.sign_in(&second.url, "testeur", PASSWORD)).unwrap();
+    run(fx.service.sign_out()).unwrap();
+    let saved = fx.service.saved_sessions();
+    assert_eq!(saved.len(), 1);
+    assert_eq!(saved[0].id, SERVER_ID);
+    assert_eq!(stored_token(&fx).unwrap().expose(), TOKEN);
+    assert!(session_file(&fx).reauth.is_none());
+}
+
+/// Home hero (ADR 0015) on the real server, read only: at most five titles, one per
+/// film or series, each with a backdrop; a series plays an episode not watched.
+#[test]
+#[ignore = "needs the real Emby server and VIEWER_EMBY_* variables"]
+fn real_server_hero() {
+    use super::models::HeroReason;
+    let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} manquant"));
+    let path = std::env::temp_dir()
+        .join(format!("viewer-emby-real-{}", uuid::Uuid::new_v4()))
+        .join("session.json");
+    SessionFile {
+        device_id: REAL_DEVICE_ID.into(),
+        ..SessionFile::default()
+    }
+    .save(&path)
+    .unwrap();
+    let fx = reopen(Arc::new(MemoryCredentialStore::default()), path);
+    run(fx.service.sign_in(
+        &var("VIEWER_EMBY_URL"),
+        &var("VIEWER_EMBY_USER"),
+        &var("VIEWER_EMBY_PASSWORD"),
+    ))
+    .unwrap();
+
+    let t = std::time::Instant::now();
+    let hero = run(fx.service.hero()).unwrap();
+    println!("{} titre(s), {} ms", hero.len(), t.elapsed().as_millis());
+    assert!(!hero.is_empty() && hero.len() <= 5);
+    for (i, h) in hero.iter().enumerate() {
+        println!(
+            "{:?} {} « {} » logo={} résumé={} lecture={:?} épisode={:?} reprise={:?}",
+            h.reason,
+            h.detail.item_type,
+            h.detail.name,
+            h.logo.is_some(),
+            h.overview.is_some(),
+            h.play_id,
+            h.episode,
+            h.resume.as_ref().map(|r| r.position_seconds),
+        );
+        assert!(hero[..i].iter().all(|o| o.detail.id != h.detail.id));
+        assert!(matches!(h.detail.item_type.as_str(), "Movie" | "Series"));
+        assert!(!h.backdrop.src.is_empty());
+        if h.reason == HeroReason::Latest && h.detail.item_type == "Series" {
+            let e = h.episode.as_ref().expect("épisode à lire");
+            assert!(e.season_index.is_some_and(|s| s > 0), "{e:?}");
+        }
+        if h.detail.item_type == "Movie" {
+            assert_eq!(h.play_id.as_deref(), Some(h.detail.id.as_str()));
+        }
+    }
+    let resumed = hero.iter().filter(|h| h.reason == HeroReason::Resume);
+    assert!(
+        hero.iter()
+            .skip(resumed.count())
+            .all(|h| h.reason == HeroReason::Latest)
+    );
 }
