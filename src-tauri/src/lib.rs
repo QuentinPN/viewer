@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
+use emby::reporting::Reporter;
 use player::mpv::{MpvConfig, MpvEngine};
 use player::{PlayerEngine, PlayerError};
 use video_surface::SurfaceMode;
@@ -23,6 +24,8 @@ pub struct AppState {
     pub mode: SurfaceMode,
     pub library: PathBuf,
     pub wid: Option<i64>,
+    /// Emby playback reports (ADR 0008), fed with every player event.
+    pub reporter: Reporter,
     app: tauri::AppHandle,
     #[cfg(windows)]
     _surface: Option<video_surface::ChildSurface>,
@@ -42,10 +45,12 @@ impl AppState {
             ..MpvConfig::default()
         };
         let emitter = app.clone();
+        let reporter = self.reporter.clone();
         let engine = Arc::new(MpvEngine::new(
             &self.library,
             &config,
             Box::new(move |ev| {
+                reporter.player_event(&ev);
                 let _ = emitter.emit(PLAYER_EVENT, &ev);
             }),
         )?);
@@ -61,6 +66,7 @@ impl AppState {
             engine.shutdown();
             // The event thread is gone, so notify the UI ourselves: whoever closed the
             // player (UI, scenario, window close), the overlay must return to idle.
+            self.reporter.player_event(&player::PlayerEvent::Shutdown);
             let _ = self.app.emit(PLAYER_EVENT, player::PlayerEvent::Shutdown);
         }
     }
@@ -201,6 +207,7 @@ pub fn run() {
                 mode,
                 library: resolve_libmpv(),
                 wid,
+                reporter: Reporter::spawn(app.handle().clone()),
                 app: app.handle().clone(),
                 #[cfg(windows)]
                 _surface: surface,
@@ -232,7 +239,12 @@ pub fn run() {
                     api.prevent_close();
                     let window = window.clone();
                     std::thread::spawn(move || {
-                        window.state::<AppState>().close_player();
+                        let state = window.state::<AppState>();
+                        state.close_player();
+                        // Let the stop report reach the server before the process ends.
+                        if !state.reporter.flush(std::time::Duration::from_secs(3)) {
+                            log::warn!("playback stop report not confirmed before exit");
+                        }
                         if let Err(e) = window.destroy() {
                             log::warn!("window destroy failed: {e}");
                             window.app_handle().exit(0);

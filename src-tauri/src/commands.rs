@@ -9,10 +9,11 @@ use crate::emby::EmbyError;
 use crate::emby::models::{
     EpisodePage, ItemDetail, ItemPage, Library, PlaybackStart, Season, ServerSummary, SignedInUser,
 };
+use crate::emby::reporting::ActivePlayback;
 use crate::emby::session::EmbyService;
 use crate::player::{
     MediaSource, PlaybackRequest, PlayerCommand, PlayerDiagnostics, PlayerEngine, PlayerError,
-    Track,
+    PlayerEvent, Track,
 };
 use crate::video_surface::SurfaceMode;
 
@@ -180,19 +181,28 @@ pub async fn emby_episodes(
 
 /// Plays a film or episode from the server (ADR 0007): PlaybackInfo, choice of the
 /// source, then the player. The UI gets the method only, never the URL or token.
+/// With `resume`, starts where the server says the user stopped; the playback is
+/// then reported to the server (ADR 0008).
 #[tauri::command]
 pub async fn emby_play(
     state: State<'_, AppState>,
     emby: State<'_, EmbyService>,
     item_id: String,
+    resume: bool,
 ) -> Result<PlaybackStart, EmbyError> {
-    let (plan, http_headers) = emby.prepare_playback(&item_id).await?;
+    let (plan, http_headers) = emby.prepare_playback(&item_id, resume).await?;
+    let start_seconds = (plan.start_ticks > 0).then(|| plan.start_ticks as f64 / 10_000_000.0);
+    state.reporter.begin(ActivePlayback::new(&item_id, &plan));
     let request = PlaybackRequest {
         source: plan.url,
         http_headers,
-        start_seconds: None,
+        start_seconds,
     };
-    let player = |e: PlayerError| EmbyError::Player(e.to_string());
+    let player = |e: PlayerError| {
+        // Nothing was loaded: drop the announced playback, nothing is reported.
+        state.reporter.player_event(&PlayerEvent::Shutdown);
+        EmbyError::Player(e.to_string())
+    };
     let source = MediaSource::parse(&request.source).map_err(player)?;
     state
         .engine()

@@ -12,10 +12,11 @@ use super::credentials::{self, CredentialStore};
 use super::images::{self, ImageRequest, ImageType};
 use super::models::{
     BaseItemDto, CastMember, DetailKind, Episode, EpisodePage, ItemDetail, ItemPage, Library,
-    LibraryKind, MediaInfo, MediaItem, MediaSourceDto, MediaStreamDto, ResumePoint, Season,
-    ServerSummary, SignedInUser, StreamInfo, UserItemData, VideoInfo,
+    LibraryKind, MediaInfo, MediaItem, MediaSourceDto, MediaStreamDto, PlaybackStopped,
+    ResumePoint, Season, ServerSummary, SignedInUser, StreamInfo, UserItemData, VideoInfo,
 };
 use super::playback::{self, PlaybackPlan};
+use super::reporting::Report;
 use super::server_url::ServerUrl;
 
 /// Contents of `session.json`. Contains no secret.
@@ -292,9 +293,11 @@ impl EmbyService {
 
     /// Negotiates playback of a film or episode (ADR 0007). Returns the plan and the
     /// headers the player must send, authentication included; the URL holds no token.
+    /// With `resume`, the plan starts at the position the server holds now (ADR 0008).
     pub async fn prepare_playback(
         &self,
         item_id: &str,
+        resume: bool,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
         let (client, user_id) = self.session()?;
         let response = self.expire_on_401(
@@ -302,10 +305,47 @@ impl EmbyService {
                 .playback_info(&user_id, item_id, &playback::device_profile())
                 .await,
         )?;
-        let plan = playback::plan(client.server(), response)?;
+        let mut plan = playback::plan(client.server(), response)?;
+        if resume {
+            let dto = self.expire_on_401(client.item(&user_id, item_id).await)?;
+            let runtime = plan.run_time_ticks.or(dto.run_time_ticks);
+            plan.start_ticks = dto
+                .user_data
+                .filter(|u| !u.played)
+                .map(|u| u.playback_position_ticks)
+                .filter(|&t| t > 0 && runtime.is_none_or(|r| t < r))
+                .unwrap_or(0);
+        }
         let mut headers = plan.headers.clone();
         headers.extend(client.stream_auth_headers()?);
         Ok((plan, headers))
+    }
+
+    /// Sends one playback report (ADR 0008).
+    pub async fn report_playback(&self, report: &Report) -> Result<(), EmbyError> {
+        let client = self.client()?;
+        self.expire_on_401(
+            client
+                .report_playback(report.kind.path(), &report.body)
+                .await,
+        )
+    }
+
+    /// Watched status and resume point the server holds for an item.
+    pub async fn playback_state(&self, item_id: &str) -> Result<PlaybackStopped, EmbyError> {
+        let (client, user_id) = self.session()?;
+        let dto = self.expire_on_401(client.item(&user_id, item_id).await)?;
+        if dto.id != item_id {
+            return Err(EmbyError::InvalidResponse(
+                "le serveur a renvoyé un autre élément".into(),
+            ));
+        }
+        let user_data = dto.user_data.unwrap_or_default();
+        Ok(PlaybackStopped {
+            item_id: dto.id,
+            played: user_data.played,
+            resume: resume(&user_data, dto.run_time_ticks),
+        })
     }
 
     /// One page of episodes of a season, `limit` clamped to `1..=MAX_PAGE`. A season

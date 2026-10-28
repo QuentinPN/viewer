@@ -190,3 +190,10 @@ export interface PlaybackStart {
   method: PlayMethod;
   container: string | null;
 }
+
+/** Server state of an item once its playback stopped and was reported (ADR 0008). */
+export interface PlaybackStopped {
+  itemId: string;
+  played: boolean;
+  resume: ResumePoint | null;
+}

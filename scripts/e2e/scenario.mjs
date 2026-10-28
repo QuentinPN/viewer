@@ -70,6 +70,35 @@ export async function signOut(page) {
   await signInHeading(page).waitFor({ timeout: 15000 });
 }
 
+/** Badge of the player showing how the server delivers the media. */
+export const playerBadge = (page) =>
+  page.locator('[title="Décision du serveur Emby"]');
+
+/** Engine diagnostics (`timePos`, `duration`, codecs…), or `{ ok: false }`. */
+export const diagnostics = (page) =>
+  page.evaluate(() =>
+    window.__TAURI_INTERNALS__
+      .invoke("player_diagnostics")
+      .then((d) => ({ ok: true, ...d }))
+      .catch((e) => ({ ok: false, error: String(e) })),
+  );
+
+/** Polls diagnostics until `accept(d)`; returns the last snapshot either way. */
+export async function waitForDiagnostics(page, accept, timeoutMs = 20000) {
+  const deadline = Date.now() + timeoutMs;
+  let last = null;
+  while (Date.now() < deadline) {
+    last = await diagnostics(page);
+    if (last.ok && accept(last)) return last;
+    await page.waitForTimeout(250);
+  }
+  return last;
+}
+
+/** Waits until the engine reports a position past `seconds`. */
+export const waitForPosition = (page, seconds, timeoutMs) =>
+  waitForDiagnostics(page, (d) => (d.timePos ?? 0) > seconds, timeoutMs);
+
 /** Fills the sign-in form; `url` overrides the prefilled server address. */
 export async function signIn(page, { url, user }, password) {
   if (await page.locator("#server-url").count()) {

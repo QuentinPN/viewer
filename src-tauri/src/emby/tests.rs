@@ -182,7 +182,8 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
             p if (p == views_path
                 || p.starts_with(&items)
                 || p.starts_with("/emby/Items/")
-                || p.starts_with("/emby/Shows/"))
+                || p.starts_with("/emby/Shows/")
+                || p.starts_with("/emby/Sessions/"))
                 && !token_ok =>
             {
                 (401, String::new())
@@ -208,6 +209,13 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
             "/emby/Items/30207/PlaybackInfo" if r.method == "POST" => (200, playback_direct()),
             "/emby/Items/40000/PlaybackInfo" if r.method == "POST" => (200, playback_transcode()),
             p if p.ends_with("/PlaybackInfo") => (404, NOT_FOUND_TEXT.into()),
+            "/emby/Sessions/Playing"
+            | "/emby/Sessions/Playing/Progress"
+            | "/emby/Sessions/Playing/Stopped"
+                if r.method == "POST" =>
+            {
+                (204, String::new())
+            }
             _ => base(r),
         }
     })
@@ -811,7 +819,7 @@ fn playback_negotiates_direct_play_with_the_token_in_a_header_only() {
     use super::models::PlayMethod;
     let (server, fx, _) = signed_in_browser();
 
-    let (plan, headers) = run(fx.service.prepare_playback("30207")).unwrap();
+    let (plan, headers) = run(fx.service.prepare_playback("30207", false)).unwrap();
     assert_eq!(plan.method, PlayMethod::DirectPlay);
     assert_eq!(
         plan.url,
@@ -847,17 +855,17 @@ fn playback_negotiates_direct_play_with_the_token_in_a_header_only() {
 #[test]
 fn playback_reports_transcode_unknown_items_and_bad_ids() {
     let (server, fx, _) = signed_in_browser();
-    let err = run(fx.service.prepare_playback("40000")).unwrap_err();
+    let err = run(fx.service.prepare_playback("40000", false)).unwrap_err();
     assert_eq!(err.kind(), "transcodeRequired");
     assert!(err.to_string().contains("conteneur non pris en charge"));
     assert!(!err.to_string().contains(TOKEN));
 
-    let err = run(fx.service.prepare_playback("99999")).unwrap_err();
+    let err = run(fx.service.prepare_playback("99999", false)).unwrap_err();
     assert!(matches!(err, EmbyError::NotFound), "{err:?}");
 
     let before = server.requests().len();
     for id in ["../Users", "1?x=2", ""] {
-        assert!(run(fx.service.prepare_playback(id)).is_err());
+        assert!(run(fx.service.prepare_playback(id, false)).is_err());
     }
     assert_eq!(server.requests().len(), before);
 }
@@ -866,9 +874,120 @@ fn playback_reports_transcode_unknown_items_and_bad_ids() {
 fn playback_with_a_revoked_token_ends_the_session() {
     let (_server, fx, revoked) = signed_in_browser();
     revoked.store(true, Ordering::SeqCst);
-    let err = run(fx.service.prepare_playback("30207")).unwrap_err();
+    let err = run(fx.service.prepare_playback("30207", false)).unwrap_err();
     assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
     assert!(fx.service.current_user().is_none());
+}
+
+#[test]
+fn resume_starts_at_the_server_position_within_the_runtime() {
+    let (server, fx, _) = signed_in_browser();
+    let (plan, _) = run(fx.service.prepare_playback("30207", true)).unwrap();
+    // Film detail: PlaybackPositionTicks 18310167000, source runtime 60000000000.
+    assert_eq!(plan.start_ticks, 18_310_167_000);
+    assert_eq!(plan.run_time_ticks, Some(60_000_000_000));
+    let paths: Vec<String> = server.requests().into_iter().map(|r| r.path).collect();
+    assert!(paths.contains(&format!("/emby/Users/{USER_ID}/Items/30207")));
+
+    let before = server.requests().len();
+    let (plan, _) = run(fx.service.prepare_playback("30207", false)).unwrap();
+    assert_eq!(plan.start_ticks, 0);
+    assert_eq!(
+        server.requests().len(),
+        before + 1,
+        "no item read without resume"
+    );
+}
+
+#[test]
+fn playback_reports_post_typed_bodies_with_auth_in_the_header() {
+    use super::models::PlaybackReportBody;
+    use super::reporting::{Report, ReportKind};
+    let (server, fx, revoked) = signed_in_browser();
+    let report = |kind, event_name, failed| Report {
+        kind,
+        body: PlaybackReportBody {
+            item_id: "30207".into(),
+            media_source_id: "mediasource_30207".into(),
+            play_session_id: Some("ps1".into()),
+            position_ticks: 18_310_167_000,
+            run_time_ticks: Some(60_000_000_000),
+            is_paused: (kind != ReportKind::Stopped).then_some(false),
+            can_seek: (kind != ReportKind::Stopped).then_some(true),
+            play_method: (kind != ReportKind::Stopped).then_some("DirectPlay"),
+            event_name,
+            failed,
+        },
+    };
+    for r in [
+        report(ReportKind::Start, None, None),
+        report(ReportKind::Progress, Some("TimeUpdate"), None),
+        report(ReportKind::Stopped, None, Some(false)),
+    ] {
+        run(fx.service.report_playback(&r)).unwrap();
+    }
+    let sent: Vec<Recorded> = server
+        .requests()
+        .into_iter()
+        .filter(|r| r.path.starts_with("/emby/Sessions/"))
+        .collect();
+    let paths: Vec<&str> = sent.iter().map(|r| r.path.as_str()).collect();
+    assert_eq!(
+        paths,
+        [
+            "/emby/Sessions/Playing",
+            "/emby/Sessions/Playing/Progress",
+            "/emby/Sessions/Playing/Stopped"
+        ]
+    );
+    for r in &sent {
+        assert_eq!(r.method, "POST");
+        assert!(
+            r.auth
+                .as_deref()
+                .unwrap()
+                .contains(&format!("Token=\"{TOKEN}\""))
+        );
+        assert!(!r.path.contains(TOKEN) && !r.body.contains(TOKEN));
+    }
+    let progress: serde_json::Value = serde_json::from_str(&sent[1].body).unwrap();
+    assert_eq!(progress["ItemId"], "30207");
+    assert_eq!(progress["PlaySessionId"], "ps1");
+    assert_eq!(progress["PositionTicks"], 18_310_167_000_i64);
+    assert_eq!(progress["EventName"], "TimeUpdate");
+    assert_eq!(progress["PlayMethod"], "DirectPlay");
+    let stopped: serde_json::Value = serde_json::from_str(&sent[2].body).unwrap();
+    assert_eq!(stopped["Failed"], false);
+    assert!(stopped.get("IsPaused").is_none());
+
+    // A bad id never reaches the server; a revoked token ends the session.
+    let mut bad = report(ReportKind::Progress, None, None);
+    bad.body.item_id = "../Users".into();
+    assert!(run(fx.service.report_playback(&bad)).is_err());
+    revoked.store(true, Ordering::SeqCst);
+    let err = run(fx
+        .service
+        .report_playback(&report(ReportKind::Stopped, None, None)))
+    .unwrap_err();
+    assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
+    assert!(fx.service.current_user().is_none());
+}
+
+#[test]
+fn state_after_playback_has_watched_status_and_resume_point() {
+    let (_server, fx, _) = signed_in_browser();
+    let film = run(fx.service.playback_state("30207")).unwrap();
+    assert_eq!(film.item_id, "30207");
+    assert!(!film.played);
+    let resume = film.resume.unwrap();
+    assert_eq!(resume.position_seconds, 1831);
+    let json = serde_json::to_value(run(fx.service.playback_state("80475")).unwrap()).unwrap();
+    assert_eq!(json["itemId"], "80475");
+    assert!(json.get("played").is_some() && json.get("resume").is_some());
+    assert!(matches!(
+        run(fx.service.playback_state("99999")).unwrap_err(),
+        EmbyError::NotFound
+    ));
 }
 
 /// Real server check, run on demand only:
@@ -1153,7 +1272,7 @@ fn real_server_playback_negotiation() {
                     item.id.clone()
                 };
                 let started = std::time::Instant::now();
-                let outcome = run(fx.service.prepare_playback(&id));
+                let outcome = run(fx.service.prepare_playback(&id, false));
                 slowest = slowest.max(started.elapsed());
                 let key = match &outcome {
                     Ok((plan, headers)) => {
@@ -1211,4 +1330,127 @@ fn real_server_playback_negotiation() {
     if let Err(e) = result {
         std::panic::resume_unwind(e);
     }
+}
+
+/// Real server, on demand, **writes to the test account** (authorized 2026-10-28):
+/// a film never started is reported started, paused, sought to 20 % and stopped
+/// through the tracker; the server must then hold that resume point and hand it to
+/// `prepare_playback(…, true)`. Cleanup: a playback stopped at 0 clears it again.
+#[test]
+#[ignore = "needs a real Emby server and credentials in environment variables"]
+fn real_server_playback_reporting_and_resume() {
+    use super::models::LibraryKind;
+    use super::reporting::{ActivePlayback, Tracker};
+    use crate::player::PlayerEvent;
+    use std::time::{Duration, Instant};
+
+    let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} manquant"));
+    let path = std::env::temp_dir()
+        .join(format!("viewer-emby-real-{}", uuid::Uuid::new_v4()))
+        .join("session.json");
+    SessionFile {
+        device_id: REAL_DEVICE_ID.into(),
+        ..SessionFile::default()
+    }
+    .save(&path)
+    .unwrap();
+    let fx = reopen(Arc::new(MemoryCredentialStore::default()), path);
+    run(fx.service.sign_in(
+        &var("VIEWER_EMBY_URL"),
+        &var("VIEWER_EMBY_USER"),
+        &var("VIEWER_EMBY_PASSWORD"),
+    ))
+    .unwrap();
+
+    // Sends what the tracker produces for `events`, in order, like the reporter task.
+    let play = |id: &str, resume: bool, events: &[PlayerEvent]| {
+        let (plan, _) = run(fx.service.prepare_playback(id, resume)).unwrap();
+        let mut tracker = Tracker::default();
+        let mut now = Instant::now();
+        let mut reports = tracker.begin(ActivePlayback::new(id, &plan), now);
+        for e in events {
+            now += Duration::from_secs(1);
+            reports.extend(tracker.on_event(e, now));
+        }
+        for r in &reports {
+            run(fx.service.report_playback(r)).unwrap_or_else(|e| panic!("{:?}: {e}", r.kind));
+        }
+        let sent: Vec<String> = reports
+            .iter()
+            .map(|r| format!("{:?}{}", r.kind, r.body.event_name.unwrap_or("")))
+            .collect();
+        (plan, sent)
+    };
+
+    let film = run(fx.service.libraries())
+        .unwrap()
+        .into_iter()
+        .filter(|l| l.kind == LibraryKind::Movies)
+        .flat_map(|l| run(fx.service.items(&l.id, 0, 60)).unwrap().items)
+        .filter(|i| !i.played)
+        .find(|i| {
+            run(fx.service.item_detail(&i.id))
+                .map(|d| d.resume.is_none())
+                .unwrap_or(false)
+        })
+        .expect("a film never started on the test account");
+    println!("film: {} ({})", film.name, film.id);
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let (plan, _) = run(fx.service.prepare_playback(&film.id, false)).unwrap();
+        let runtime = plan.run_time_ticks.expect("runtime") as f64 / 1e7;
+        let target = (runtime * 0.2).round();
+        let (_, sent) = play(
+            &film.id,
+            false,
+            &[
+                PlayerEvent::FileLoaded,
+                PlayerEvent::TimePos { seconds: 10.0 },
+                PlayerEvent::Paused { paused: true },
+                PlayerEvent::Paused { paused: false },
+                PlayerEvent::Seeked,
+                PlayerEvent::TimePos { seconds: target },
+                PlayerEvent::Shutdown,
+            ],
+        );
+        println!("sent: {sent:?}");
+        assert_eq!(
+            sent,
+            [
+                "Start",
+                "ProgressPause",
+                "ProgressUnpause",
+                "ProgressTimeUpdate",
+                "Stopped"
+            ]
+        );
+
+        let state = run(fx.service.playback_state(&film.id)).unwrap();
+        println!("after stop at {target} s of {runtime:.0} s: {state:?}");
+        assert!(!state.played);
+        let resume = state.resume.expect("resume point kept by the server");
+        assert!((f64::from(resume.position_seconds) - target).abs() <= 1.0);
+
+        let (resumed, _) = run(fx.service.prepare_playback(&film.id, true)).unwrap();
+        println!("resume start: {} s", resumed.start_ticks as f64 / 1e7);
+        assert!((resumed.start_ticks as f64 / 1e7 - target).abs() <= 1.0);
+    }));
+
+    // Cleanup, also after a failed check: a playback stopped at 0 clears the point.
+    let (_, sent) = play(
+        &film.id,
+        false,
+        &[
+            PlayerEvent::FileLoaded,
+            PlayerEvent::TimePos { seconds: 0.0 },
+            PlayerEvent::Shutdown,
+        ],
+    );
+    let state = run(fx.service.playback_state(&film.id)).unwrap();
+    println!("cleanup {sent:?}: {state:?}");
+    run(fx.service.sign_out()).unwrap();
+    if let Err(e) = result {
+        std::panic::resume_unwind(e);
+    }
+    assert!(!state.played && state.resume.is_none(), "cleanup failed");
 }

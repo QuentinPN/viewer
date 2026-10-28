@@ -527,6 +527,8 @@ pub struct MediaSourceInfo {
     #[serde(default)]
     pub container: Option<String>,
     #[serde(default)]
+    pub run_time_ticks: Option<i64>,
+    #[serde(default)]
     pub supports_direct_play: bool,
     #[serde(default)]
     pub supports_direct_stream: bool,
@@ -555,6 +557,17 @@ pub enum PlayMethod {
     Transcode,
 }
 
+impl PlayMethod {
+    /// Value of `PlayMethod` in Emby's playback reports.
+    pub fn as_emby(self) -> &'static str {
+        match self {
+            Self::DirectPlay => "DirectPlay",
+            Self::DirectStream => "DirectStream",
+            Self::Transcode => "Transcode",
+        }
+    }
+}
+
 /// What the UI learns about a started playback: no URL, no token.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -562,4 +575,38 @@ pub struct PlaybackStart {
     pub item_id: String,
     pub method: PlayMethod,
     pub container: Option<String>,
+}
+
+/// Body of `POST /Sessions/Playing`, `/Sessions/Playing/Progress` and
+/// `/Sessions/Playing/Stopped` (ADR 0008). Fields a report does not use are omitted.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackReportBody {
+    pub item_id: String,
+    pub media_source_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub play_session_id: Option<String>,
+    pub position_ticks: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_time_ticks: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_paused: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub can_seek: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub play_method: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub event_name: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failed: Option<bool>,
+}
+
+/// Server state of an item after a playback stopped, sent to the UI so the detail
+/// page shows the new resume point or watched status without reloading.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaybackStopped {
+    pub item_id: String,
+    pub played: bool,
+    pub resume: Option<ResumePoint>,
 }

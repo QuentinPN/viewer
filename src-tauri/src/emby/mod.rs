@@ -6,6 +6,7 @@ pub mod credentials;
 pub mod images;
 pub mod models;
 pub mod playback;
+pub mod reporting;
 pub mod server_url;
 pub mod session;
 #[cfg(test)]

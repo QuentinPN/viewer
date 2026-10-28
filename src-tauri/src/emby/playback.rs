@@ -62,6 +62,9 @@ pub struct PlaybackPlan {
     pub media_source_id: String,
     pub play_session_id: Option<String>,
     pub container: Option<String>,
+    pub run_time_ticks: Option<i64>,
+    /// Where the player starts: 0, or the server's resume position (ADR 0008).
+    pub start_ticks: i64,
 }
 
 /// Picks the first source the server offers and the best way to play it.
@@ -89,6 +92,7 @@ pub fn plan(server: &ServerUrl, response: PlaybackInfoResponse) -> Result<Playba
     let MediaSourceInfo {
         id,
         container,
+        run_time_ticks,
         supports_direct_play,
         supports_direct_stream,
         supports_transcoding,
@@ -114,6 +118,8 @@ pub fn plan(server: &ServerUrl, response: PlaybackInfoResponse) -> Result<Playba
         media_source_id: id,
         play_session_id,
         container,
+        run_time_ticks: run_time_ticks.filter(|&t| t > 0),
+        start_ticks: 0,
     })
 }
 

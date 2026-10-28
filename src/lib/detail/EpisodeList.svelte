@@ -2,7 +2,12 @@
 // Season switcher and paged episode list of a series (DESIGN.md, Series).
 import { onMount } from "svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
-import type { EmbyError, Episode, Season } from "../emby/types";
+import type {
+  EmbyError,
+  Episode,
+  PlaybackStopped,
+  Season,
+} from "../emby/types";
 import { formatMinutes } from "../format/duration";
 import { appendPage, emptyPager } from "../library/pager";
 import { defaultSeason, episodeNumber, formatDate } from "./format";
@@ -10,7 +15,8 @@ import { defaultSeason, episodeNumber, formatDate } from "./format";
 interface Props {
   seriesId: string;
   onError: (error: EmbyError) => EmbyError;
-  onPlay: (episodeId: string) => void;
+  /** `resume`: start where the server says the episode was left. */
+  onPlay: (episodeId: string, resume: boolean) => void;
   /** Episode being opened by the server, if any. */
   starting: string | null;
 }
@@ -78,8 +84,32 @@ function episodeMeta(e: Episode): string {
     .join(" · ");
 }
 
+/** New state of a played episode (ADR 0008), patched in place: the list, its
+ * scroll position and the focused episode stay as they are. */
+function onStopped(state: PlaybackStopped) {
+  const episode = pager.items.find((e) => e.id === state.itemId);
+  if (!episode) return;
+  episode.played = state.played;
+  episode.resume = state.resume;
+  // Unwatched counts of the seasons changed too.
+  embyApi
+    .seasons(seriesId)
+    .then((fresh) => {
+      for (const s of seasons ?? []) {
+        const f = fresh.find((x) => x.id === s.id);
+        if (f) {
+          s.played = f.played;
+          s.unplayedCount = f.unplayedCount;
+        }
+      }
+    })
+    .catch(() => {});
+}
+
 onMount(() => {
   void loadSeasons();
+  const unlisten = embyApi.onPlaybackStopped(onStopped);
+  return () => void unlisten.then((stop) => stop());
 });
 </script>
 
@@ -127,10 +157,10 @@ onMount(() => {
           <button
             type="button"
             class="thumb"
-            onclick={() => onPlay(e.id)}
+            onclick={() => onPlay(e.id, e.resume !== null)}
             aria-disabled={starting !== null}
             aria-busy={starting === e.id}
-            aria-label={`Lire ${number ? `${number} : ` : ""}${e.name}`}
+            aria-label={`${e.resume ? "Reprendre" : "Lire"} ${number ? `${number} : ` : ""}${e.name}`}
           >
             {#if e.thumb}
               <img

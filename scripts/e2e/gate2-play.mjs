@@ -6,39 +6,21 @@
 // show the HTML overlay only, never the video. Starts in any state, ends signed out.
 import { launch } from "./app.mjs";
 import {
+  playerBadge as badge,
   cards,
   createReport,
   detailTitle,
+  diagnostics,
   libraryNav,
   signIn,
   signOut,
   startScreen,
   testAccount,
+  waitForPosition,
 } from "./scenario.mjs";
 
 const account = testAccount();
 const { check, shot, finish } = createReport("gate2-play");
-
-const badge = (page) => page.locator('[title="Décision du serveur Emby"]');
-const diagnostics = (page) =>
-  page.evaluate(() =>
-    window.__TAURI_INTERNALS__
-      .invoke("player_diagnostics")
-      .then((d) => ({ ok: true, ...d }))
-      .catch((e) => ({ ok: false, error: String(e) })),
-  );
-
-/** Waits until the engine reports a position past `seconds`. */
-async function waitForPosition(page, seconds, timeoutMs = 20000) {
-  const deadline = Date.now() + timeoutMs;
-  let last = null;
-  while (Date.now() < deadline) {
-    last = await diagnostics(page);
-    if (last.ok && (last.timePos ?? 0) > seconds) return last;
-    await page.waitForTimeout(250);
-  }
-  return last;
-}
 
 /** Started from the focused control: player shown, method, playback advancing. */
 async function checkPlaying(page, label) {

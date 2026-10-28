@@ -21,7 +21,7 @@ Services: `EmbyClient`, `LibraryService`, `PlaybackCoordinator`, `PlayerEngine`,
 5. Report start/progress/stop to Emby, including seek/pause/stop transitions as supported; reconcile server watched state.
 6. Release native resources on navigation/exit, including failure paths.
 
-Implemented so far (ADR 0007): steps 1–4 for Direct Play / Direct Stream in `src-tauri/src/emby/playback.rs` (`emby_play` command). The stream URL comes from the server with its `api_key` removed; the token goes to mpv as an `X-Emby-Token` header. Transcoding and step 5 are not implemented yet.
+Implemented so far (ADR 0007): steps 1–4 for Direct Play / Direct Stream in `src-tauri/src/emby/playback.rs` (`emby_play` command). The stream URL comes from the server with its `api_key` removed; the token goes to mpv as an `X-Emby-Token` header. Step 5 is implemented in `src-tauri/src/emby/reporting.rs` (ADR 0008): engine events become start/progress/stopped reports sent from Rust, the stop is flushed on window close, and the watched state and resume point are read back from the server afterwards. Transcoding is not implemented yet.
 
 ## Important uncertainty
 

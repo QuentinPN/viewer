@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   EmbyError,
   EpisodePage,
@@ -6,12 +7,15 @@ import type {
   ItemPage,
   Library,
   PlaybackStart,
+  PlaybackStopped,
   Season,
   ServerSummary,
   SignedInUser,
 } from "./types";
 
 // Thin typed wrapper over the Emby commands of src-tauri/src/commands.rs.
+
+export const PLAYBACK_STOPPED_EVENT = "emby://playback-stopped";
 
 export const embyApi = {
   probe: (url: string) => invoke<ServerSummary>("emby_probe", { url }),
@@ -38,8 +42,17 @@ export const embyApi = {
       startIndex,
       limit,
     }),
-  /** Negotiates with the server and starts the player (ADR 0007). */
-  play: (itemId: string) => invoke<PlaybackStart>("emby_play", { itemId }),
+  /**
+   * Negotiates with the server and starts the player (ADR 0007). With `resume`,
+   * starts where the server says the user stopped (ADR 0008).
+   */
+  play: (itemId: string, resume: boolean) =>
+    invoke<PlaybackStart>("emby_play", { itemId, resume }),
+  /** The item's new state, once a playback stopped and was reported. */
+  onPlaybackStopped: (
+    handler: (state: PlaybackStopped) => void,
+  ): Promise<UnlistenFn> =>
+    listen<PlaybackStopped>(PLAYBACK_STOPPED_EVENT, (e) => handler(e.payload)),
 };
 
 /** Normalizes a rejected command into an `EmbyError`, whatever was thrown. */

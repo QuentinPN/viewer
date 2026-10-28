@@ -8,6 +8,7 @@ import type {
   ItemDetail,
   MediaItem,
   PlaybackStart,
+  PlaybackStopped,
 } from "../emby/types";
 import EpisodeList from "./EpisodeList.svelte";
 import {
@@ -42,7 +43,11 @@ let heading = $state<HTMLElement | null>(null);
 let section = $state<HTMLElement | null>(null);
 /** Id of the film or episode being opened by the server. */
 let starting = $state<string | null>(null);
+/** The film is opened from the start rather than resumed. */
+let fromStart = $state(false);
 let playError = $state<EmbyError | null>(null);
+let playButton = $state<HTMLButtonElement | null>(null);
+let fromStartButton = $state<HTMLButtonElement | null>(null);
 
 const poster = $derived(detail?.poster ?? item.poster);
 const meta = $derived(detail ? metaParts(detail) : []);
@@ -59,16 +64,42 @@ async function load() {
   }
 }
 
-async function play(id: string) {
+async function play(id: string, resume: boolean) {
   if (starting) return;
   starting = id;
+  fromStart = !resume;
   playError = null;
   try {
-    onPlay(await embyApi.play(id));
+    onPlay(await embyApi.play(id, resume));
   } catch (e) {
     playError = onError(toEmbyError(e));
   } finally {
     starting = null;
+  }
+}
+
+/** New watched status and resume point after a playback (ADR 0008). */
+async function onStopped(state: PlaybackStopped) {
+  const d = detail;
+  if (!d) return;
+  if (d.kind === "series") {
+    // Episode counts changed: refresh quietly, the page stays as it is.
+    embyApi
+      .itemDetail(d.id)
+      .then((fresh) => {
+        if (fresh.id === detail?.id) detail = fresh;
+      })
+      .catch(() => {});
+    return;
+  }
+  if (state.itemId !== d.id) return;
+  const hadFocus = document.activeElement === fromStartButton;
+  d.played = state.played;
+  d.resume = state.resume;
+  await tick();
+  // "Lire depuis le début" disappears once the film is finished.
+  if (hadFocus && !fromStartButton?.isConnected) {
+    playButton?.focus({ preventScroll: true });
   }
 }
 
@@ -96,6 +127,8 @@ function onMouseup(e: MouseEvent) {
 onMount(() => {
   void load();
   void tick().then(() => heading?.focus({ preventScroll: true }));
+  const unlisten = embyApi.onPlaybackStopped(onStopped);
+  return () => void unlisten.then((stop) => stop());
 });
 </script>
 
@@ -206,13 +239,26 @@ onMount(() => {
               <button
                 type="button"
                 class="primary play"
-                onclick={() => play(detail?.id ?? item.id)}
+                bind:this={playButton}
+                onclick={() => play(detail?.id ?? item.id, detail?.resume != null)}
                 aria-disabled={starting !== null}
-                aria-busy={starting !== null}
+                aria-busy={starting !== null && !fromStart}
               >
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.8v10.4L13 8z" /></svg>
-                {#if starting}Ouverture…{:else if detail.resume}Lire depuis le début{:else}Lecture{/if}
+                {#if starting && !fromStart}Ouverture…{:else if detail.resume}Reprendre{:else}Lecture{/if}
               </button>
+              {#if detail.resume}
+                <button
+                  type="button"
+                  class="secondary from-start"
+                  bind:this={fromStartButton}
+                  onclick={() => play(detail?.id ?? item.id, false)}
+                  aria-disabled={starting !== null}
+                  aria-busy={starting !== null && fromStart}
+                >
+                  {#if starting && fromStart}Ouverture…{:else}Lire depuis le début{/if}
+                </button>
+              {/if}
             </div>
           {/if}
         {:else if !error}
@@ -680,7 +726,11 @@ onMount(() => {
     height: 16px;
     fill: currentColor;
   }
-  .play[aria-disabled="true"] {
+  .from-start {
+    padding: var(--space-2) var(--space-4);
+  }
+  .play[aria-disabled="true"],
+  .from-start[aria-disabled="true"] {
     opacity: 0.7;
     cursor: progress;
   }

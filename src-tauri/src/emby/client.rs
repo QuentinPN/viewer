@@ -10,7 +10,7 @@ use super::EmbyError;
 use super::images::{self, ImageRequest};
 use super::models::{
     AuthenticateUserByName, AuthenticationResult, BaseItemDto, DeviceProfile, PlaybackInfoRequest,
-    PlaybackInfoResponse, PublicSystemInfo, QueryResult, UserDto,
+    PlaybackInfoResponse, PlaybackReportBody, PublicSystemInfo, QueryResult, UserDto,
 };
 use super::playback::MAX_STREAMING_BITRATE;
 use super::server_url::ServerUrl;
@@ -290,6 +290,19 @@ impl EmbyClient {
             .send()
             .await?;
         json(check(res, true)?).await
+    }
+
+    /// Playback report (ADR 0008) to `/Sessions/Playing`, `…/Progress` or
+    /// `…/Stopped`. Emby 4.10.1.0 answers 204.
+    pub async fn report_playback(
+        &self,
+        path: &str,
+        body: &PlaybackReportBody,
+    ) -> Result<(), EmbyError> {
+        self.require_token()?;
+        path_segment(&body.item_id)?;
+        let res = self.request(Method::POST, path).json(body).send().await?;
+        check(res, true).map(drop)
     }
 
     /// Authentication for the player's HTTP requests: a header, never the URL.
