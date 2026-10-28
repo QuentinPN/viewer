@@ -45,7 +45,9 @@ export function episodePosition(ep: EpisodeContext): string | null {
 }
 
 /** `S2 · É1`, `S1 · É2–3`, `Spécial 3` for the previous/next buttons. */
-export function episodeLinkCode(link: EpisodeLink): string | null {
+export function episodeLinkCode(
+  link: Pick<EpisodeLink, "seasonIndex" | "index" | "indexEnd">,
+): string | null {
   if (link.seasonIndex === 0)
     return link.index == null ? "Spécial" : `Spécial ${link.index}`;
   const index =

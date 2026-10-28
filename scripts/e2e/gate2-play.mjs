@@ -100,9 +100,10 @@ try {
   await episode.focus();
   await page.keyboard.press("Enter");
   await checkPlaying(page, "episode");
-  await page
-    .getByRole("button", { name: "Arrêter et revenir à la fiche" })
-    .click();
+  // The controls fade after 3 s (ADR 0017): move the mouse first, as a user would.
+  await page.mouse.move(400, 300);
+  await page.mouse.move(420, 320);
+  await page.getByRole("button", { name: "Revenir", exact: true }).click();
   await checkBack(page, "episode", "li.episode button.thumb");
   check("episode_label", /^Lire /.test(episodeLabel ?? ""), episodeLabel);
   await shot(page, "episode-back");

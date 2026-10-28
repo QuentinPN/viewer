@@ -853,6 +853,20 @@ pub struct PlaybackStart {
     pub container: Option<String>,
     /// Why the server transcodes, in French.
     pub transcode_reasons: Option<String>,
+    /// What the player shows at the top (ADR 0017); `None` when the item could not be read.
+    pub title: Option<PlaybackTitle>,
+}
+
+/// Name of what plays and, for an episode, where it sits in its series (ADR 0017).
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaybackTitle {
+    pub name: String,
+    pub series_name: Option<String>,
+    /// `0` is the specials season.
+    pub season_index: Option<u32>,
+    pub index: Option<u32>,
+    pub index_end: Option<u32>,
 }
 
 /// Body of `POST /Sessions/Playing`, `/Sessions/Playing/Progress` and

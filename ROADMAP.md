@@ -73,7 +73,7 @@ Goal: sign in once, then reopen Viewer without entering credentials again, while
 - Acceptance criteria: a user authenticates once; subsequent launches connect automatically while credentials remain valid; a NAS outage shows a recovery screen instead of login; retry recovers the existing session; only a confirmed invalid session requests credentials; server switching is safe and explicit.
 - TODO: episode detail, search, sorting and filters come with Gate 3.
 
-## Gate 3 — Core experience [IN PROGRESS · home page with hero, search, sorting, filters, favorites and episode page VERIFIED]
+## Gate 3 — Core experience [IN PROGRESS · home page with hero, search, sorting, filters, favorites, episode page and final player UI VERIFIED]
 
 Home, film/series browsing, details, search, accessible player UI, responsive layouts and artwork cache.
 
@@ -83,7 +83,8 @@ Home, film/series browsing, details, search, accessible player UI, responsive la
 - DONE: favorites (ADR 0014) — "Favori" toggle on film and series detail pages (optimistic, rolled back on failure); home row "Favoris" (films and series by title, hidden when empty, read again after a change).
 - DONE: home hero (ADR 0015) — up to 5 titles with a backdrop, those to resume first, then films and series added recently and not watched; one title at a time, arrows, dots and ← →, no automatic rotation; "Lecture"/"Reprendre" plays the film or the episode, "Plus d'infos" opens the film or series.
 - DONE: episode page (ADR 0016) — in a series the title opens the episode page and the thumbnail plays; series logo or name, "Saison N · Épisode M", episode image (else the series backdrop), air date, runtime, overview, directors, writers, guest stars, technical info, "Lecture"/"Reprendre"; previous/next across seasons with the focus kept; Escape back to the series on that episode, in its season. Home cards and the hero keep playing directly.
-- TODO: search of episodes, final player UI, artwork cache.
+- DONE: final player UI (ADR 0017) — `PlayerView.svelte` for Emby playback: title (series, season and episode for an episode), controls fading after 3 s (kept while paused, buffering, scrubbing, over the bar or with a panel open), seek bar with remaining time, ±10 s, volume and mute kept per PC, "Audio", "Sous-titres" and "Informations de lecture" panels, fullscreen, keys M, ↑/↓, I, Escape. Tracks stay chosen by the server. `PlayerSpike` remains for the Gate 1 prototype.
+- TODO: next-episode card with a 10 s countdown at the end of an episode (user choice, 2026-10-28), search of episodes, artwork cache.
 - DROPPED (user decision, 2026-10-28): search of people.
 - Known input: the control bar hides subtitles at narrow widths (Gate 1 finding); views must provide an opaque background when no video plays (transparent window).
 
@@ -274,3 +275,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Server side effects**: short playbacks rewound to 0 before stopping; no resume point left (checked). Interrupted runs had left a resume point on one episode, origin not explained, cleared by the next run.
 - **Not verified**: specials and double episodes on the real server; return to an episode outside the loaded pages; narrow window; screen readers.
 - **Next**: search of episodes, or the final player UI (Gate 3).
+
+### 2026-10-28 — Final player UI
+
+- **Changed**: ADR 0017; `PlaybackStart.title` (`PlaybackTitle`: name, series, season, episode numbers) read in parallel with PlaybackInfo (`tokio::join!`; without resume a failed item read gives no title, a 401 still ends the session); `PlayerDiagnostics.volume`; `src/lib/player/PlayerView.svelte`; `volume.ts` (level and mute in `localStorage` key `viewer.player.volume`); `format.ts` `formatRemaining`, `playbackHeading`; `keyboard.ts` M, ↑/↓ (±5 %), I; `App.svelte` uses `PlayerView` for Emby playback; scenarios `gate2-play`, `gate2-resume`, `gate2-transcode`, `gate3-home` follow the new controls; new scenario `scripts/e2e/gate3-player.mjs`.
+- **Tests**: `npm run verify` green (Vitest 100/100, cargo test 86 passed / 13 ignored); `gate3-player` 34/34; regressions listed in `docs/evidence/gate3-lecteur-2026-10-28.md`.
+- **Server side effects**: short playbacks rewound to 0 before stopping; no resume point left (checked).
+- **Not verified**: real mouse hit-testing over the native video (CDP events only), audible volume (E2E audio output is `null`), narrow window, screen readers, fullscreen rendering by eye.
+- **Next**: next-episode card with a 10 s countdown (Gate 3).

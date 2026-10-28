@@ -60,6 +60,8 @@ export interface PlayerDiagnostics {
   timePos: number | null;
   duration: number | null;
   paused: boolean | null;
+  /** Engine volume in percent (ADR 0017). */
+  volume: number | null;
   frameDropCount: number | null;
   decoderFrameDropCount: number | null;
 }

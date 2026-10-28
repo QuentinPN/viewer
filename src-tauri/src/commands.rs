@@ -301,5 +301,6 @@ pub async fn emby_play(
         method: plan.method,
         container: plan.container,
         transcode_reasons: plan.transcode_reasons,
+        title: plan.title,
     })
 }

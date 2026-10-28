@@ -371,6 +371,7 @@ impl PlayerEngine for MpvEngine {
             time_pos: f("time-pos"),
             duration: f("duration"),
             paused: s("pause").map(|v| v == "yes"),
+            volume: f("volume"),
             frame_drop_count: i("frame-drop-count"),
             decoder_frame_drop_count: i("decoder-frame-drop-count"),
         }

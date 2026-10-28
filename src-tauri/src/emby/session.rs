@@ -16,8 +16,8 @@ use super::models::{
     BaseItemDto, CastMember, DetailKind, Episode, EpisodeContext, EpisodeLink, EpisodePage,
     HeroEpisode, HeroItem, HeroReason, ImageRef, ItemDetail, ItemPage, ItemsOptions, Library,
     LibraryKind, MediaInfo, MediaItem, MediaSourceDto, MediaStreamDto, PlaybackStopped,
-    ResumePoint, SavedServer, SearchResults, Season, ServerSummary, SessionStatus, SignedInUser,
-    StreamInfo, UserItemData, VideoInfo, WatchItem, WatchKind, is_usable_genre,
+    PlaybackTitle, ResumePoint, SavedServer, SearchResults, Season, ServerSummary, SessionStatus,
+    SignedInUser, StreamInfo, UserItemData, VideoInfo, WatchItem, WatchKind, is_usable_genre,
 };
 use super::playback::{self, PlaybackPlan};
 use super::reporting::Report;
@@ -681,25 +681,33 @@ impl EmbyService {
     /// Negotiates playback of a film or episode (ADR 0007). Returns the plan and the
     /// headers the player must send, authentication included; the URL holds no token.
     /// With `resume`, the plan starts at the position the server holds now (ADR 0008).
+    /// The item is read alongside PlaybackInfo for the player's title (ADR 0017); without
+    /// `resume`, failing to read it only leaves the title out.
     pub async fn prepare_playback(
         &self,
         item_id: &str,
         resume: bool,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
         let (client, user_id) = self.session()?;
-        let response = self.expire_on_401(
-            &client,
-            client
-                .playback_info(
-                    &user_id,
-                    item_id,
-                    &playback::device_profile(self.max_streaming_bitrate),
-                )
-                .await,
-        )?;
+        let profile = playback::device_profile(self.max_streaming_bitrate);
+        let (info, item) = tokio::join!(
+            client.playback_info(&user_id, item_id, &profile),
+            client.item(&user_id, item_id)
+        );
+        let response = self.expire_on_401(&client, info)?;
         let mut plan = playback::plan(client.server(), response)?;
-        if resume {
-            let dto = self.expire_on_401(&client, client.item(&user_id, item_id).await)?;
+        let item = match self.expire_on_401(&client, item) {
+            Ok(dto) if dto.id == item_id => Some(dto),
+            Ok(_) if resume => {
+                return Err(EmbyError::InvalidResponse(
+                    "le serveur a renvoyé un autre élément".into(),
+                ));
+            }
+            Err(e) if resume || matches!(e, EmbyError::SessionExpired) => return Err(e),
+            _ => None,
+        };
+        plan.title = item.as_ref().and_then(playback_title);
+        if let Some(dto) = item.filter(|_| resume) {
             let runtime = plan.run_time_ticks.or(dto.run_time_ticks);
             plan.start_ticks = dto
                 .user_data
@@ -1283,6 +1291,18 @@ fn resume(user_data: &UserItemData, runtime_ticks: Option<i64>) -> Option<Resume
         fraction: runtime_ticks
             .filter(|&r| r > 0)
             .map(|r| (position as f64 / r as f64).clamp(0.0, 1.0)),
+    })
+}
+
+/// Title of a film or episode for the player (ADR 0017).
+fn playback_title(dto: &BaseItemDto) -> Option<PlaybackTitle> {
+    let episode = dto.item_type == "Episode";
+    Some(PlaybackTitle {
+        name: text(Some(dto.name.clone()))?,
+        series_name: text(dto.series_name.clone().filter(|_| episode)),
+        season_index: dto.parent_index_number.filter(|_| episode),
+        index: dto.index_number.filter(|_| episode),
+        index_end: dto.index_number_end.filter(|_| episode),
     })
 }
 

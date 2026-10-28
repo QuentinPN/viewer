@@ -188,6 +188,8 @@ pub struct PlayerDiagnostics {
     pub time_pos: Option<f64>,
     pub duration: Option<f64>,
     pub paused: Option<bool>,
+    /// Engine volume in percent (0–130), as set by `SetVolume` (ADR 0017).
+    pub volume: Option<f64>,
     pub frame_drop_count: Option<i64>,
     pub decoder_frame_drop_count: Option<i64>,
 }

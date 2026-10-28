@@ -79,25 +79,33 @@ try {
   );
 
   // External subtitles: Emby extracts them from the file, which may take a while.
-  const subOptions = page
-    .locator("label.select", { hasText: "Sous-titres" })
-    .locator("option");
-  const external = subOptions.filter({ hasText: "(externe)" });
+  // They are listed in the "Sous-titres" panel of the player (ADR 0017).
+  const subsButton = page.getByRole("button", {
+    name: "Sous-titres",
+    exact: true,
+  });
+  await subsButton.click();
+  const subsPanel = page.getByRole("dialog", { name: "Sous-titres" });
+  const external = subsPanel
+    .locator("label.choice")
+    .filter({ hasText: "(externe)" });
   await external
     .first()
     .waitFor({ state: "attached", timeout: 45000 })
     .catch(() => {});
-  const labels = await external.allTextContents();
-  const selected = await page
-    .locator("label.select", { hasText: "Sous-titres" })
-    .locator("select")
-    .evaluate((s) => s.selectedOptions[0]?.textContent ?? "");
+  const labels = (await external.allTextContents()).map((t) => t.trim());
+  const selected = await subsPanel
+    .locator("label.choice", { has: page.locator("input:checked") })
+    .textContent()
+    .then((t) => t.trim())
+    .catch(() => "");
   check(
     "external_subtitles_listed",
     labels.length > 0,
     `${labels.join(" | ")} · choisi : ${selected}`,
   );
   await shot(page, "transcoding");
+  await subsButton.click();
 
   await command(page, { type: "seekAbsolute", seconds: SEEK_TARGET });
   const seekStart = Date.now();

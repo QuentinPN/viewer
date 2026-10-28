@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatTime, playMethodLabel, trackLabel } from "./format";
+import {
+  formatRemaining,
+  formatTime,
+  playbackHeading,
+  playMethodLabel,
+  trackLabel,
+} from "./format";
 import type { Track } from "./types";
 
 const track = (over: Partial<Track>): Track => ({
@@ -12,6 +18,50 @@ const track = (over: Partial<Track>): Track => ({
   external: false,
   default: false,
   ...over,
+});
+
+describe("formatRemaining", () => {
+  it("counts down with a minus sign, never below zero", () => {
+    expect(formatRemaining(60, 3725)).toBe("−1:01:05");
+    expect(formatRemaining(90, 60)).toBe("−0:00");
+    expect(formatRemaining(0, Number.NaN)).toBe("−0:00");
+  });
+});
+
+describe("playbackHeading", () => {
+  const title = {
+    name: "On va carrément se battre en duel ?",
+    seriesName: "Aharen-san wa Hakarenai",
+    seasonIndex: 1,
+    index: 12,
+    indexEnd: null,
+  };
+
+  it("puts the series and the episode code above an episode", () => {
+    expect(playbackHeading(title)).toEqual({
+      kicker: "Aharen-san wa Hakarenai · S1 · É12",
+      name: "On va carrément se battre en duel ?",
+    });
+    expect(playbackHeading({ ...title, seasonIndex: 0, index: 3 }).kicker).toBe(
+      "Aharen-san wa Hakarenai · Spécial 3",
+    );
+  });
+
+  it("shows a film by its name alone", () => {
+    expect(
+      playbackHeading({
+        name: "2 Coeurs",
+        seriesName: null,
+        seasonIndex: null,
+        index: null,
+        indexEnd: null,
+      }),
+    ).toEqual({ kicker: null, name: "2 Coeurs" });
+  });
+
+  it("falls back to Lecture without a title", () => {
+    expect(playbackHeading(null)).toEqual({ kicker: null, name: "Lecture" });
+  });
 });
 
 describe("formatTime", () => {
@@ -54,7 +104,6 @@ describe("playMethodLabel", () => {
   it("names the server's decision in French with the container", () => {
     expect(
       playMethodLabel({
-        itemId: "1",
         method: "directPlay",
         container: "mkv",
         transcodeReasons: null,
@@ -62,7 +111,6 @@ describe("playMethodLabel", () => {
     ).toBe("Lecture directe · MKV");
     expect(
       playMethodLabel({
-        itemId: "1",
         method: "transcode",
         container: null,
         transcodeReasons: null,
@@ -70,7 +118,6 @@ describe("playMethodLabel", () => {
     ).toBe("Transcodage");
     expect(
       playMethodLabel({
-        itemId: "1",
         method: "directStream",
         container: "mp4",
         transcodeReasons: null,
@@ -81,7 +128,6 @@ describe("playMethodLabel", () => {
   it("shows why the server transcodes instead of the container", () => {
     expect(
       playMethodLabel({
-        itemId: "1",
         method: "transcode",
         container: "ts",
         transcodeReasons: "débit trop élevé",

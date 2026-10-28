@@ -1,4 +1,5 @@
-import type { PlaybackStart } from "../emby/types";
+import { episodeLinkCode } from "../detail/format";
+import type { PlaybackStart, PlaybackTitle } from "../emby/types";
 import { languageName } from "../format/language";
 import type { Track } from "./types";
 
@@ -12,6 +13,27 @@ export function formatTime(seconds: number | null | undefined): string {
   const s = total % 60;
   const ss = String(s).padStart(2, "0");
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
+
+/** Time left, with a minus sign: `−12:05`. Never negative. */
+export function formatRemaining(position: number, duration: number): string {
+  const left = Number.isFinite(duration - position) ? duration - position : 0;
+  return `−${formatTime(Math.max(0, left))}`;
+}
+
+/**
+ * Heading of the player (ADR 0017): the name, and above it, for an episode,
+ * "Série · S1 · É12". Without a title the player says "Lecture".
+ */
+export function playbackHeading(title: PlaybackTitle | null): {
+  kicker: string | null;
+  name: string;
+} {
+  if (!title) return { kicker: null, name: "Lecture" };
+  const kicker = [title.seriesName, episodeLinkCode(title)]
+    .filter(Boolean)
+    .join(" · ");
+  return { kicker: kicker || null, name: title.name };
 }
 
 /** Human label for a track selector, in French. */
@@ -34,7 +56,9 @@ const METHOD_LABELS: Record<PlaybackStart["method"], string> = {
  * "Lecture directe · MKV" or "Transcodage · débit trop élevé": how the server
  * delivers the media. A transcode shows its reasons rather than the container.
  */
-export function playMethodLabel(start: PlaybackStart): string {
+export function playMethodLabel(
+  start: Pick<PlaybackStart, "method" | "container" | "transcodeReasons">,
+): string {
   const method = METHOD_LABELS[start.method];
   if (start.method === "transcode" && start.transcodeReasons)
     return `${method} · ${start.transcodeReasons}`;

@@ -6,7 +6,7 @@
 use super::EmbyError;
 use super::models::{
     DeviceProfile, DirectPlayProfile, MediaSourceInfo, PlayMethod, PlaybackInfoResponse,
-    SubtitleProfile, TranscodingProfile,
+    PlaybackTitle, SubtitleProfile, TranscodingProfile,
 };
 use super::server_url::ServerUrl;
 use crate::player::ExternalSubtitle;
@@ -79,6 +79,8 @@ pub struct PlaybackPlan {
     pub transcode_reasons: Option<String>,
     /// Text subtitles a transcode delivers as files, URLs without token.
     pub subtitles: Vec<ExternalSubtitle>,
+    /// Set by the session from the item, not by PlaybackInfo (ADR 0017).
+    pub title: Option<PlaybackTitle>,
 }
 
 /// Picks the first source the server offers and the best way to play it.
@@ -147,6 +149,7 @@ pub fn plan(server: &ServerUrl, response: PlaybackInfoResponse) -> Result<Playba
         start_ticks: 0,
         transcode_reasons: transcode.then(|| transcode_reasons(&raw)),
         subtitles,
+        title: None,
     })
 }
 

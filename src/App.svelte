@@ -9,6 +9,7 @@ import type { EmbyError, PlaybackStart } from "./lib/emby/types";
 import LibraryBrowser from "./lib/library/LibraryBrowser.svelte";
 import { playerApi } from "./lib/player/api";
 import PlayerSpike from "./lib/player/PlayerSpike.svelte";
+import PlayerView from "./lib/player/PlayerView.svelte";
 
 // Session first (ADR 0012): the saved Emby session is restored behind a branded
 // screen, never the sign-in form. The signed-in app stays mounted (inert) under
@@ -184,7 +185,7 @@ async function signOut() {
       </div>
     {/key}
     {#if playing}
-      <PlayerSpike
+      <PlayerView
         playback={playing}
         onExit={stopPlaying}
         onInterrupted={playbackInterrupted}

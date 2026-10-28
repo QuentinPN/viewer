@@ -301,6 +301,18 @@ export interface PlaybackStart {
   container: string | null;
   /** Why the server transcodes, in French ("débit trop élevé"); null otherwise. */
   transcodeReasons: string | null;
+  /** What the player shows at the top (ADR 0017); null when the item could not be read. */
+  title: PlaybackTitle | null;
+}
+
+/** Name of what plays and, for an episode, where it sits in its series. */
+export interface PlaybackTitle {
+  name: string;
+  seriesName: string | null;
+  /** `0` is the specials season. */
+  seasonIndex: number | null;
+  index: number | null;
+  indexEnd: number | null;
 }
 
 /** Server state of an item once its playback stopped and was reported (ADR 0008). */

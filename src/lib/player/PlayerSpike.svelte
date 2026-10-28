@@ -1,7 +1,7 @@
 <script lang="ts">
 // Gate 1 prototype: minimal player overlay used to validate native video
-// composition, focus and keyboard handling. Not the final player UI. With
-// `playback`, it shows a stream already started from Emby and `onExit` goes back.
+// composition, focus and keyboard handling. Emby playback uses PlayerView
+// (ADR 0017); this view stays as the test bench of the prototype mode.
 import { onDestroy, onMount } from "svelte";
 import type { PlaybackStart } from "../emby/types";
 import { playerApi } from "./api";
@@ -173,6 +173,7 @@ function onKeydown(e: KeyboardEvent) {
   e.preventDefault();
   if (action.kind === "command") void run(action.command);
   else if (action.kind === "toggleFullscreen") void toggleFullscreen();
+  else if (action.kind !== "exitFullscreen") return;
   else if (fullscreen) void toggleFullscreen(false);
   // Escape outside fullscreen goes back, like on the detail page.
   else if (onExit) void close();

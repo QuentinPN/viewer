@@ -230,7 +230,7 @@ try {
   );
   await page.waitForTimeout(1500);
   const slider = await page.evaluate(() => {
-    const r = document.querySelector('input[type="range"]');
+    const r = document.querySelector("input.seek");
     return r ? `${r.value} / ${r.max}` : null;
   });
   check("seek_slider_value", true, slider);

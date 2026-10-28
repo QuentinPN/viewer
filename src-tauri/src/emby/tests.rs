@@ -254,7 +254,11 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
                 (200, r#"{"Items":[],"TotalRecordCount":0}"#.into())
             }
             p if p.starts_with("/emby/Shows/") => (404, NOT_FOUND_TEXT.into()),
-            "/emby/Items/30207/PlaybackInfo" if r.method == "POST" => (200, playback_direct()),
+            "/emby/Items/30207/PlaybackInfo" | "/emby/Items/80475/PlaybackInfo"
+                if r.method == "POST" =>
+            {
+                (200, playback_direct())
+            }
             "/emby/Items/40000/PlaybackInfo" if r.method == "POST" => (200, playback_transcode()),
             p if p.ends_with("/PlaybackInfo") => (404, NOT_FOUND_TEXT.into()),
             "/emby/Sessions/Playing"
@@ -1549,7 +1553,12 @@ fn playback_negotiates_direct_play_with_the_token_in_a_header_only() {
     assert_eq!(plan.media_source_id, "mediasource_30207");
     assert_eq!(plan.play_session_id.as_deref(), Some("ps1"));
 
-    let req = server.requests().pop().unwrap();
+    // The item is read at the same time (ADR 0017): find PlaybackInfo among both.
+    let req = server
+        .requests()
+        .into_iter()
+        .find(|r| r.path.contains("/PlaybackInfo"))
+        .unwrap();
     assert_eq!(req.method, "POST");
     assert_eq!(
         req.path,
@@ -1602,8 +1611,12 @@ fn playback_transcodes_through_hls_under_the_bitrate_limit() {
     assert!(!format!("{plan:?}").contains(TOKEN));
     assert_eq!(headers, vec![("X-Emby-Token".to_owned(), TOKEN.to_owned())]);
 
-    let body: serde_json::Value =
-        serde_json::from_str(&server.requests().pop().unwrap().body).unwrap();
+    let info = server
+        .requests()
+        .into_iter()
+        .find(|r| r.path.contains("/PlaybackInfo"))
+        .unwrap();
+    let body: serde_json::Value = serde_json::from_str(&info.body).unwrap();
     assert_eq!(body["MaxStreamingBitrate"], 3_000_000);
     assert_eq!(body["DeviceProfile"]["MaxStreamingBitrate"], 3_000_000);
 }
@@ -1640,14 +1653,48 @@ fn resume_starts_at_the_server_position_within_the_runtime() {
     let paths: Vec<String> = server.requests().into_iter().map(|r| r.path).collect();
     assert!(paths.contains(&format!("/emby/Users/{USER_ID}/Items/30207")));
 
-    let before = server.requests().len();
     let (plan, _) = run(fx.service.prepare_playback("30207", false)).unwrap();
     assert_eq!(plan.start_ticks, 0);
+}
+
+#[test]
+fn playback_carries_the_title_of_a_film_or_an_episode() {
+    use super::models::PlaybackTitle;
+    let (server, fx, _) = signed_in_browser();
+
+    let (plan, _) = run(fx.service.prepare_playback("30207", false)).unwrap();
+    let film = plan.title.unwrap();
+    assert_eq!(film.name, "2 Coeurs");
+    assert_eq!(film.series_name, None);
+    assert_eq!((film.season_index, film.index), (None, None));
+    // The item is read alongside PlaybackInfo, even without resume.
+    let paths: Vec<String> = server.requests().into_iter().map(|r| r.path).collect();
+    assert!(paths.contains(&format!("/emby/Users/{USER_ID}/Items/30207")));
+
+    let (plan, _) = run(fx.service.prepare_playback("80475", false)).unwrap();
     assert_eq!(
-        server.requests().len(),
-        before + 1,
-        "no item read without resume"
+        plan.title,
+        Some(PlaybackTitle {
+            name: "La Nouvelle Recrue".into(),
+            series_name: Some("2.5 Dimensional Seduction".into()),
+            season_index: Some(1),
+            index: Some(1),
+            index_end: None,
+        })
     );
+}
+
+#[test]
+fn playback_starts_without_a_title_when_the_item_cannot_be_read() {
+    let server = FakeEmby::start(browse_like(Arc::new(AtomicBool::new(false))));
+    let fx = fixture();
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    // 40000 has PlaybackInfo but no item in the fake server.
+    let (plan, _) = run(fx.service.prepare_playback("40000", false)).unwrap();
+    assert_eq!(plan.title, None);
+    // With resume the item is required: its error is the playback's.
+    let err = run(fx.service.prepare_playback("40000", true)).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
 }
 
 #[test]

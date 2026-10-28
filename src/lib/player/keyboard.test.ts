@@ -21,6 +21,29 @@ describe("mapPlayerKey", () => {
     });
   });
 
+  it("handles volume, mute and info", () => {
+    expect(mapPlayerKey("ArrowUp", { inTextField: false })).toEqual({
+      kind: "volume",
+      delta: 5,
+    });
+    expect(mapPlayerKey("ArrowDown", { inTextField: false })).toEqual({
+      kind: "volume",
+      delta: -5,
+    });
+    expect(mapPlayerKey("m", { inTextField: false })).toEqual({
+      kind: "toggleMute",
+    });
+    expect(mapPlayerKey("M", { inTextField: false })).toEqual({
+      kind: "toggleMute",
+    });
+    expect(mapPlayerKey("i", { inTextField: false })).toEqual({
+      kind: "toggleInfo",
+    });
+    expect(mapPlayerKey("F", { inTextField: false })).toEqual({
+      kind: "toggleFullscreen",
+    });
+  });
+
   it("never hijacks typing in text fields", () => {
     expect(mapPlayerKey(" ", { inTextField: true })).toBeNull();
     expect(mapPlayerKey("f", { inTextField: true })).toBeNull();
