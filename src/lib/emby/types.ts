@@ -29,7 +29,11 @@ export type EmbyErrorKind =
   | "notFound"
   | "notSignedIn"
   | "sessionExpired"
-  | "credentialStore";
+  | "credentialStore"
+  | "playbackRefused"
+  | "noCompatibleStream"
+  | "transcodeRequired"
+  | "player";
 
 export interface EmbyError {
   kind: EmbyErrorKind;
@@ -175,4 +179,14 @@ export interface EpisodePage {
   startIndex: number;
   nextIndex: number;
   total: number;
+}
+
+/** How the server delivers the media (ADR 0007). */
+export type PlayMethod = "directPlay" | "directStream" | "transcode";
+
+/** A started playback: the method only, never the stream URL or the token. */
+export interface PlaybackStart {
+  itemId: string;
+  method: PlayMethod;
+  container: string | null;
 }

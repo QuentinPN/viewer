@@ -5,6 +5,7 @@ pub mod client;
 pub mod credentials;
 pub mod images;
 pub mod models;
+pub mod playback;
 pub mod server_url;
 pub mod session;
 #[cfg(test)]
@@ -42,6 +43,15 @@ pub enum EmbyError {
     SessionExpired,
     #[error("coffre d'identification Windows indisponible : {0}")]
     CredentialStore(String),
+    #[error("lecture refusée : {0}")]
+    PlaybackRefused(String),
+    #[error("aucune version de ce média n'est lisible par cette application")]
+    NoCompatibleStream,
+    #[error("ce média demande un transcodage par le serveur, pas encore pris en charge ({0})")]
+    TranscodeRequired(String),
+    /// The player could not start the stream chosen by the server.
+    #[error("lecteur indisponible : {0}")]
+    Player(String),
 }
 
 impl EmbyError {
@@ -59,6 +69,10 @@ impl EmbyError {
             Self::NotSignedIn => "notSignedIn",
             Self::SessionExpired => "sessionExpired",
             Self::CredentialStore(_) => "credentialStore",
+            Self::PlaybackRefused(_) => "playbackRefused",
+            Self::NoCompatibleStream => "noCompatibleStream",
+            Self::TranscodeRequired(_) => "transcodeRequired",
+            Self::Player(_) => "player",
         }
     }
 }

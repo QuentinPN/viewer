@@ -3,7 +3,12 @@
 // library grid, which stays mounted so its scroll position survives the return.
 import { onMount, tick } from "svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
-import type { EmbyError, ItemDetail, MediaItem } from "../emby/types";
+import type {
+  EmbyError,
+  ItemDetail,
+  MediaItem,
+  PlaybackStart,
+} from "../emby/types";
 import EpisodeList from "./EpisodeList.svelte";
 import {
   audioLabel,
@@ -23,15 +28,21 @@ interface Props {
   onClose: () => void;
   /** Returns the error; a rejected token also ends the session. */
   onError: (error: EmbyError) => EmbyError;
+  /** Playback started by the server negotiation: show the player. */
+  onPlay: (start: PlaybackStart) => void;
 }
 
-let { item, onClose, onError }: Props = $props();
+let { item, onClose, onError, onPlay }: Props = $props();
 
 let detail = $state<ItemDetail | null>(null);
 let error = $state<EmbyError | null>(null);
 let backdropFailed = $state(false);
 let logoFailed = $state(false);
 let heading = $state<HTMLElement | null>(null);
+let section = $state<HTMLElement | null>(null);
+/** Id of the film or episode being opened by the server. */
+let starting = $state<string | null>(null);
+let playError = $state<EmbyError | null>(null);
 
 const poster = $derived(detail?.poster ?? item.poster);
 const meta = $derived(detail ? metaParts(detail) : []);
@@ -48,8 +59,26 @@ async function load() {
   }
 }
 
+async function play(id: string) {
+  if (starting) return;
+  starting = id;
+  playError = null;
+  try {
+    onPlay(await embyApi.play(id));
+  } catch (e) {
+    playError = onError(toEmbyError(e));
+  } finally {
+    starting = null;
+  }
+}
+
+/** Hidden under the player: keys belong to the player then. */
+function active() {
+  return section?.checkVisibility() ?? false;
+}
+
 function onKeydown(e: KeyboardEvent) {
-  if (e.defaultPrevented) return;
+  if (e.defaultPrevented || !active()) return;
   if (e.key === "Escape" || (e.altKey && e.key === "ArrowLeft")) {
     e.preventDefault();
     onClose();
@@ -58,7 +87,7 @@ function onKeydown(e: KeyboardEvent) {
 
 /** Mouse "back" button. */
 function onMouseup(e: MouseEvent) {
-  if (e.button === 3) {
+  if (e.button === 3 && active()) {
     e.preventDefault();
     onClose();
   }
@@ -72,7 +101,12 @@ onMount(() => {
 
 <svelte:window onkeydown={onKeydown} onmouseup={onMouseup} />
 
-<section class="detail" aria-labelledby="detail-title" aria-busy={!detail && !error}>
+<section
+  class="detail"
+  aria-labelledby="detail-title"
+  aria-busy={!detail && !error}
+  bind:this={section}
+>
   <div class="hero">
     {#if detail?.backdrop && !backdropFailed}
       <img
@@ -166,6 +200,21 @@ onMount(() => {
               </span>
             {/if}
           </div>
+
+          {#if detail.kind === "movie"}
+            <div class="play-actions">
+              <button
+                type="button"
+                class="primary play"
+                onclick={() => play(detail?.id ?? item.id)}
+                aria-disabled={starting !== null}
+                aria-busy={starting !== null}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.8v10.4L13 8z" /></svg>
+                {#if starting}Ouverture…{:else if detail.resume}Lire depuis le début{:else}Lecture{/if}
+              </button>
+            </div>
+          {/if}
         {:else if !error}
           <div class="sk-meta" aria-hidden="true"></div>
           <p class="sr-only">Chargement de la fiche…</p>
@@ -231,7 +280,7 @@ onMount(() => {
       </div>
 
       {#if detail.kind === "series"}
-        <EpisodeList seriesId={detail.id} {onError} />
+        <EpisodeList seriesId={detail.id} {onError} onPlay={play} {starting} />
       {:else if detail.media.length > 0}
         <section class="tech" aria-labelledby="tech-title">
           <h2 id="tech-title">Informations techniques</h2>
@@ -304,6 +353,16 @@ onMount(() => {
       </div>
     {/if}
   </div>
+  {#if playError}
+    <div class="play-error" role="alert">
+      <div>
+        <p class="state-title">Lecture impossible</p>
+        <p>{playError.message}</p>
+        {#if errorHint(playError)}<p class="hint">{errorHint(playError)}</p>{/if}
+      </div>
+      <button type="button" class="secondary" onclick={() => (playError = null)}>Fermer</button>
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -603,6 +662,49 @@ onMount(() => {
     padding: var(--space-2) var(--space-4);
     font: inherit;
     cursor: pointer;
+  }
+  .play-actions {
+    margin-top: var(--space-4);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .play {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-6);
+  }
+  .play svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+  }
+  .play[aria-disabled="true"] {
+    opacity: 0.7;
+    cursor: progress;
+  }
+  .play-error {
+    position: sticky;
+    bottom: var(--space-4);
+    margin: var(--space-4) auto 0;
+    width: min(640px, calc(100% - 2 * var(--space-4)));
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--color-elevated);
+    border-left: 3px solid var(--color-danger);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 40%);
+  }
+  .play-error p {
+    margin: 0;
+  }
+  .play-error .state-title {
+    font-weight: 600;
+    margin-bottom: var(--space-1);
   }
   .primary {
     background: var(--color-accent);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTime, trackLabel } from "./format";
+import { formatTime, playMethodLabel, trackLabel } from "./format";
 import type { Track } from "./types";
 
 const track = (over: Partial<Track>): Track => ({
@@ -47,5 +47,23 @@ describe("trackLabel", () => {
     expect(trackLabel(track({ lang: "xyz", external: true }))).toBe(
       "xyz (externe)",
     );
+  });
+});
+
+describe("playMethodLabel", () => {
+  it("names the server's decision in French with the container", () => {
+    expect(
+      playMethodLabel({ itemId: "1", method: "directPlay", container: "mkv" }),
+    ).toBe("Lecture directe · MKV");
+    expect(
+      playMethodLabel({ itemId: "1", method: "transcode", container: null }),
+    ).toBe("Transcodage");
+    expect(
+      playMethodLabel({
+        itemId: "1",
+        method: "directStream",
+        container: "mp4",
+      }),
+    ).toBe("Flux direct · MP4");
   });
 });

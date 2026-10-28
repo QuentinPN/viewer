@@ -10,9 +10,12 @@ import { defaultSeason, episodeNumber, formatDate } from "./format";
 interface Props {
   seriesId: string;
   onError: (error: EmbyError) => EmbyError;
+  onPlay: (episodeId: string) => void;
+  /** Episode being opened by the server, if any. */
+  starting: string | null;
 }
 
-let { seriesId, onError }: Props = $props();
+let { seriesId, onError, onPlay, starting }: Props = $props();
 
 /** Long anime seasons exist; the rest comes with "Afficher plus d'épisodes". */
 const EPISODE_PAGE = 50;
@@ -121,7 +124,14 @@ onMount(() => {
         {@const number = episodeNumber(e)}
         {@const meta = episodeMeta(e)}
         <li class="episode">
-          <div class="thumb">
+          <button
+            type="button"
+            class="thumb"
+            onclick={() => onPlay(e.id)}
+            aria-disabled={starting !== null}
+            aria-busy={starting === e.id}
+            aria-label={`Lire ${number ? `${number} : ` : ""}${e.name}`}
+          >
             {#if e.thumb}
               <img
                 src={e.thumb.src}
@@ -144,7 +154,14 @@ onMount(() => {
                 ><span style:width="{Math.round(e.resume.fraction * 100)}%"></span></span
               >
             {/if}
-          </div>
+            <span class="play" class:visible={starting === e.id} aria-hidden="true">
+              {#if starting === e.id}
+                <span class="spinner"></span>
+              {:else}
+                <svg viewBox="0 0 16 16"><path d="M4.5 2.8v10.4L13 8z" /></svg>
+              {/if}
+            </span>
+          </button>
           <div class="body">
             <p class="kicker">{[number, meta].filter(Boolean).join(" · ")}</p>
             <h3>{e.name}</h3>
@@ -258,6 +275,65 @@ onMount(() => {
     border-radius: var(--radius-sm);
     overflow: hidden;
     background: linear-gradient(160deg, var(--color-elevated), var(--color-surface));
+  }
+  button.thumb {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    display: block;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  button.thumb[aria-disabled="true"] {
+    cursor: progress;
+  }
+  button.thumb:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  .play {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 22px;
+    display: grid;
+    place-items: center;
+    background: rgb(11 13 17 / 70%);
+    color: var(--color-text);
+    opacity: 0;
+    transition: opacity var(--motion-fast);
+  }
+  button.thumb:hover .play,
+  button.thumb:focus-visible .play,
+  .play.visible {
+    opacity: 1;
+  }
+  .play svg {
+    width: 18px;
+    height: 18px;
+    margin-left: 2px;
+    fill: currentColor;
+  }
+  .spinner {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid rgb(255 255 255 / 30%);
+    border-top-color: var(--color-text);
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spinner {
+      animation: none;
+    }
   }
   .thumb img {
     width: 100%;

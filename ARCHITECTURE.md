@@ -21,6 +21,8 @@ Services: `EmbyClient`, `LibraryService`, `PlaybackCoordinator`, `PlayerEngine`,
 5. Report start/progress/stop to Emby, including seek/pause/stop transitions as supported; reconcile server watched state.
 6. Release native resources on navigation/exit, including failure paths.
 
+Implemented so far (ADR 0007): steps 1–4 for Direct Play / Direct Stream in `src-tauri/src/emby/playback.rs` (`emby_play` command). The stream URL comes from the server with its `api_key` removed; the token goes to mpv as an `X-Emby-Token` header. Transcoding and step 5 are not implemented yet.
+
 ## Important uncertainty
 
 Tauri WebView2 and libmpv rendering/overlay composition can conflict. Prototype embedded native surface vs separate video window and record evidence in an ADR. Do not commit to a fragile embedding mechanism without tests.

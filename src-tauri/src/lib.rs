@@ -37,6 +37,8 @@ impl AppState {
         }
         let config = MpvConfig {
             wid: self.wid,
+            // Debug builds only: scripted UI tests (scripts/e2e) stay silent.
+            silent: cfg!(debug_assertions) && std::env::var_os("VIEWER_E2E_SILENT").is_some(),
             ..MpvConfig::default()
         };
         let emitter = app.clone();
@@ -258,6 +260,7 @@ pub fn run() {
             commands::emby_item_detail,
             commands::emby_seasons,
             commands::emby_episodes,
+            commands::emby_play,
         ])
         .build(context())
         .expect("error while building Viewer");

@@ -8,6 +8,7 @@ import type {
   EmbyError,
   Library,
   MediaItem,
+  PlaybackStart,
   SignedInUser,
 } from "../emby/types";
 import PosterCard from "./PosterCard.svelte";
@@ -20,10 +21,18 @@ interface Props {
   onOpenPlayer: () => void;
   /** The token was refused while browsing: back to sign-in. */
   onSessionExpired: (error: EmbyError) => void;
+  /** A film or episode started playing: show the player over this view. */
+  onPlay: (start: PlaybackStart) => void;
 }
 
-let { user, signingOut, onSignOut, onOpenPlayer, onSessionExpired }: Props =
-  $props();
+let {
+  user,
+  signingOut,
+  onSignOut,
+  onOpenPlayer,
+  onSessionExpired,
+  onPlay,
+}: Props = $props();
 
 let libraries = $state<Library[] | null>(null);
 let librariesError = $state<EmbyError | null>(null);
@@ -229,7 +238,7 @@ $effect(() => {
   </main>
   {#if opened}
     {#key opened.id}
-      <ItemDetail item={opened} onClose={closeDetail} onError={fail} />
+      <ItemDetail item={opened} onClose={closeDetail} onError={fail} {onPlay} />
     {/key}
   {/if}
   </div>

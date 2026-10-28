@@ -445,3 +445,121 @@ pub struct EpisodePage {
     pub next_index: u32,
     pub total: u32,
 }
+
+/// `POST /Items/{Id}/PlaybackInfo` request body (ADR 0007).
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackInfoRequest<'a> {
+    pub user_id: &'a str,
+    pub max_streaming_bitrate: u64,
+    pub device_profile: &'a DeviceProfile,
+    /// The answer is used to start playback, not only to inspect the item.
+    pub is_playback: bool,
+    pub auto_open_live_stream: bool,
+}
+
+/// What the player can play, as Emby's `DeviceProfile` describes it. Comma
+/// separated lists, as the server expects.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct DeviceProfile {
+    pub name: &'static str,
+    pub max_streaming_bitrate: u64,
+    pub direct_play_profiles: Vec<DirectPlayProfile>,
+    pub transcoding_profiles: Vec<TranscodingProfile>,
+    pub subtitle_profiles: Vec<SubtitleProfile>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct DirectPlayProfile {
+    #[serde(rename = "Type")]
+    pub kind: &'static str,
+    pub container: &'static str,
+    pub video_codec: &'static str,
+    pub audio_codec: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct TranscodingProfile {
+    #[serde(rename = "Type")]
+    pub kind: &'static str,
+    pub container: &'static str,
+    pub protocol: &'static str,
+    pub video_codec: &'static str,
+    pub audio_codec: &'static str,
+    pub context: &'static str,
+    pub max_audio_channels: &'static str,
+    pub break_on_non_key_frames: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct SubtitleProfile {
+    pub format: &'static str,
+    /// `Embed`, `External`, `Encode`, `Hls`.
+    pub method: &'static str,
+}
+
+/// `POST /Items/{Id}/PlaybackInfo` response.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackInfoResponse {
+    #[serde(default)]
+    pub media_sources: Vec<MediaSourceInfo>,
+    #[serde(default)]
+    pub play_session_id: Option<String>,
+    /// `NotAllowed`, `NoCompatibleStream`, `RateLimitExceeded`.
+    #[serde(default)]
+    pub error_code: Option<String>,
+}
+
+/// One playable source with the server's decision. `Path` is left out on purpose;
+/// the stream URLs carry the token in `api_key` (removed before use).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct MediaSourceInfo {
+    pub id: String,
+    /// `File`, `Http`…
+    #[serde(default)]
+    pub protocol: Option<String>,
+    #[serde(default)]
+    pub container: Option<String>,
+    #[serde(default)]
+    pub supports_direct_play: bool,
+    #[serde(default)]
+    pub supports_direct_stream: bool,
+    #[serde(default)]
+    pub supports_transcoding: bool,
+    #[serde(default)]
+    pub direct_stream_url: Option<String>,
+    #[serde(default)]
+    pub transcoding_url: Option<String>,
+    /// `hls` for a transcode.
+    #[serde(default)]
+    pub transcoding_sub_protocol: Option<String>,
+    #[serde(default)]
+    pub transcoding_container: Option<String>,
+    /// Headers the stream needs, in addition to authentication.
+    #[serde(default)]
+    pub required_http_headers: Option<std::collections::HashMap<String, String>>,
+}
+
+/// How the server delivers the media.
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum PlayMethod {
+    DirectPlay,
+    DirectStream,
+    Transcode,
+}
+
+/// What the UI learns about a started playback: no URL, no token.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaybackStart {
+    pub item_id: String,
+    pub method: PlayMethod,
+    pub container: Option<String>,
+}

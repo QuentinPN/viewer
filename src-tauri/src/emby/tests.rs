@@ -205,9 +205,41 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
                 (200, foreign_episodes())
             }
             p if p.starts_with("/emby/Shows/") => (404, NOT_FOUND_TEXT.into()),
+            "/emby/Items/30207/PlaybackInfo" if r.method == "POST" => (200, playback_direct()),
+            "/emby/Items/40000/PlaybackInfo" if r.method == "POST" => (200, playback_transcode()),
+            p if p.ends_with("/PlaybackInfo") => (404, NOT_FOUND_TEXT.into()),
             _ => base(r),
         }
     })
+}
+
+/// PlaybackInfo answer of Emby 4.10.1.0 for a film it lets the client play directly
+/// (trimmed): the stream URL carries the token in `api_key`.
+fn playback_direct() -> String {
+    format!(
+        r#"{{"MediaSources":[{{"Chapters":[],"Protocol":"File","Id":"mediasource_30207",
+        "Path":"/share/Films/2 Coeurs (2020)/2 Coeurs.mkv","Type":"Default","Container":"mkv",
+        "Size":3760231036,"Name":"2 Coeurs","IsRemote":false,"HasMixedProtocols":false,
+        "RunTimeTicks":60000000000,"SupportsTranscoding":true,"SupportsDirectStream":true,
+        "SupportsDirectPlay":true,"IsInfiniteStream":false,"RequiresOpening":false,
+        "RequiresClosing":false,"RequiresLooping":false,"SupportsProbing":false,
+        "MediaStreams":[],"Formats":[],"Bitrate":5000000,"RequiredHttpHeaders":{{}},
+        "DirectStreamUrl":"/videos/30207/original.mkv?DeviceId=dev&MediaSourceId=mediasource_30207&PlaySessionId=ps1&api_key={TOKEN}",
+        "AddApiKeyToDirectStreamUrl":false,"ReadAtNativeFramerate":false,
+        "DefaultAudioStreamIndex":1,"DefaultSubtitleStreamIndex":3,"ItemId":"30207",
+        "MimeType":"video/x-matroska"}}],"PlaySessionId":"ps1"}}"#
+    )
+}
+
+/// Same shape when the profile does not cover the file: HLS transcode and reasons.
+fn playback_transcode() -> String {
+    format!(
+        r#"{{"MediaSources":[{{"Protocol":"File","Id":"mediasource_40000","Container":"avi",
+        "SupportsTranscoding":true,"SupportsDirectStream":false,"SupportsDirectPlay":false,
+        "RequiredHttpHeaders":{{}},
+        "TranscodingUrl":"/videos/40000/master.m3u8?DeviceId=dev&MediaSourceId=mediasource_40000&PlaySessionId=ps2&api_key={TOKEN}&VideoCodec=h264&TranscodeReasons=ContainerNotSupported",
+        "TranscodingSubProtocol":"hls","TranscodingContainer":"ts"}}],"PlaySessionId":"ps2"}}"#
+    )
 }
 
 /// 404 body of Emby 4.10.1.0 for an unknown item: French text, not JSON.
@@ -774,6 +806,71 @@ fn detail_refuses_foreign_seasons_unknown_ids_and_other_types() {
     assert!(stored_token(&fx).is_none());
 }
 
+#[test]
+fn playback_negotiates_direct_play_with_the_token_in_a_header_only() {
+    use super::models::PlayMethod;
+    let (server, fx, _) = signed_in_browser();
+
+    let (plan, headers) = run(fx.service.prepare_playback("30207")).unwrap();
+    assert_eq!(plan.method, PlayMethod::DirectPlay);
+    assert_eq!(
+        plan.url,
+        format!(
+            "{}/emby/videos/30207/original.mkv?DeviceId=dev&MediaSourceId=mediasource_30207&PlaySessionId=ps1",
+            server.url
+        )
+    );
+    assert!(!plan.url.contains(TOKEN));
+    assert_eq!(headers, vec![("X-Emby-Token".to_owned(), TOKEN.to_owned())]);
+    assert_eq!(plan.media_source_id, "mediasource_30207");
+    assert_eq!(plan.play_session_id.as_deref(), Some("ps1"));
+
+    let req = server.requests().pop().unwrap();
+    assert_eq!(req.method, "POST");
+    assert_eq!(
+        req.path,
+        format!("/emby/Items/30207/PlaybackInfo?UserId={USER_ID}")
+    );
+    assert!(req.auth.unwrap().contains(&format!("Token=\"{TOKEN}\"")));
+    let body: serde_json::Value = serde_json::from_str(&req.body).unwrap();
+    assert_eq!(body["UserId"], USER_ID);
+    assert_eq!(body["IsPlayback"], true);
+    assert_eq!(body["AutoOpenLiveStream"], false);
+    assert!(body["MaxStreamingBitrate"].as_u64().unwrap() > 0);
+    assert_eq!(
+        body["DeviceProfile"]["DirectPlayProfiles"][0]["Type"],
+        "Video"
+    );
+    assert!(!req.body.contains(TOKEN));
+}
+
+#[test]
+fn playback_reports_transcode_unknown_items_and_bad_ids() {
+    let (server, fx, _) = signed_in_browser();
+    let err = run(fx.service.prepare_playback("40000")).unwrap_err();
+    assert_eq!(err.kind(), "transcodeRequired");
+    assert!(err.to_string().contains("conteneur non pris en charge"));
+    assert!(!err.to_string().contains(TOKEN));
+
+    let err = run(fx.service.prepare_playback("99999")).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
+
+    let before = server.requests().len();
+    for id in ["../Users", "1?x=2", ""] {
+        assert!(run(fx.service.prepare_playback(id)).is_err());
+    }
+    assert_eq!(server.requests().len(), before);
+}
+
+#[test]
+fn playback_with_a_revoked_token_ends_the_session() {
+    let (_server, fx, revoked) = signed_in_browser();
+    revoked.store(true, Ordering::SeqCst);
+    let err = run(fx.service.prepare_playback("30207")).unwrap_err();
+    assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
+    assert!(fx.service.current_user().is_none());
+}
+
 /// Real server check, run on demand only:
 /// `VIEWER_EMBY_URL=… VIEWER_EMBY_USER=… VIEWER_EMBY_PASSWORD=… cargo test -- --ignored real_server`
 /// Signs in, restores from the credential store, then signs out (revokes the token).
@@ -999,6 +1096,116 @@ fn real_server_details_seasons_episodes() {
         let (content_type, bytes) = run(fx.service.image(&req)).unwrap();
         println!("backdrop: {content_type}, {} bytes", bytes.len());
         assert!(content_type.starts_with("image/"));
+    }));
+    run(fx.service.sign_out()).unwrap();
+    if let Err(e) = result {
+        std::panic::resume_unwind(e);
+    }
+}
+
+/// Real server, on demand: PlaybackInfo for sampled films and first episodes, the
+/// method chosen for each, then one stream read with the token in a header (Range,
+/// 1 KiB), refused without it. `VIEWER_PLAYBACK_SAMPLE` items per library (20).
+#[test]
+#[ignore = "needs a real Emby server and credentials in environment variables"]
+fn real_server_playback_negotiation() {
+    use std::collections::BTreeMap;
+    let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} manquant"));
+    let sample: u32 = std::env::var("VIEWER_PLAYBACK_SAMPLE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20);
+    let path = std::env::temp_dir()
+        .join(format!("viewer-emby-real-{}", uuid::Uuid::new_v4()))
+        .join("session.json");
+    SessionFile {
+        device_id: REAL_DEVICE_ID.into(),
+        ..SessionFile::default()
+    }
+    .save(&path)
+    .unwrap();
+    let fx = reopen(Arc::new(MemoryCredentialStore::default()), path);
+    run(fx.service.sign_in(
+        &var("VIEWER_EMBY_URL"),
+        &var("VIEWER_EMBY_USER"),
+        &var("VIEWER_EMBY_PASSWORD"),
+    ))
+    .unwrap();
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut methods: BTreeMap<String, u32> = BTreeMap::new();
+        let mut first = None;
+        let mut slowest = std::time::Duration::ZERO;
+        for lib in run(fx.service.libraries()).unwrap() {
+            for item in run(fx.service.items(&lib.id, 0, sample)).unwrap().items {
+                // A series plays through the first episode of its first season.
+                let id = if item.item_type == "Series" {
+                    let seasons = run(fx.service.seasons(&item.id)).unwrap();
+                    let Some(season) = seasons.iter().find(|s| s.index != Some(0)) else {
+                        continue;
+                    };
+                    let eps = run(fx.service.episodes(&item.id, &season.id, 0, 1)).unwrap();
+                    let Some(ep) = eps.items.first() else {
+                        continue;
+                    };
+                    ep.id.clone()
+                } else {
+                    item.id.clone()
+                };
+                let started = std::time::Instant::now();
+                let outcome = run(fx.service.prepare_playback(&id));
+                slowest = slowest.max(started.elapsed());
+                let key = match &outcome {
+                    Ok((plan, headers)) => {
+                        let token = &headers.last().unwrap().1;
+                        assert!(!plan.url.contains(token.as_str()), "token in URL");
+                        assert!(!plan.url.to_ascii_lowercase().contains("api_key"));
+                        if first.is_none() {
+                            first = Some((plan.clone(), headers.clone()));
+                        }
+                        format!(
+                            "{:?} {}",
+                            plan.method,
+                            plan.container.as_deref().unwrap_or("?")
+                        )
+                    }
+                    Err(e) => format!("{} ({e})", e.kind()),
+                };
+                *methods.entry(key).or_default() += 1;
+            }
+        }
+        println!(
+            "methods: {methods:?}; slowest PlaybackInfo {} ms",
+            slowest.as_millis()
+        );
+
+        let (plan, headers) = first.expect("at least one playable item");
+        let http = reqwest::Client::new();
+        let get = |with_auth: bool| {
+            let mut req = http.get(&plan.url).header("Range", "bytes=0-1023");
+            if with_auth {
+                for (k, v) in &headers {
+                    req = req.header(k, v);
+                }
+            }
+            run(async { req.send().await.unwrap() })
+        };
+        assert_eq!(get(false).status().as_u16(), 401);
+        let res = get(true);
+        assert_eq!(res.status().as_u16(), 206);
+        let content_type = res
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_owned();
+        let bytes = run(res.bytes()).unwrap();
+        println!(
+            "stream: {:?}, {content_type}, {} bytes with the header, 401 without",
+            plan.method,
+            bytes.len()
+        );
+        assert_eq!(bytes.len(), 1024);
     }));
     run(fx.service.sign_out()).unwrap();
     if let Err(e) = result {

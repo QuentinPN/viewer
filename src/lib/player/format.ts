@@ -1,3 +1,4 @@
+import type { PlaybackStart } from "../emby/types";
 import { languageName } from "../format/language";
 import type { Track } from "./types";
 
@@ -21,4 +22,18 @@ export function trackLabel(track: Track): string {
   );
   const base = parts.length > 0 ? parts.join(" · ") : `Piste ${track.id}`;
   return track.external ? `${base} (externe)` : base;
+}
+
+const METHOD_LABELS: Record<PlaybackStart["method"], string> = {
+  directPlay: "Lecture directe",
+  directStream: "Flux direct",
+  transcode: "Transcodage",
+};
+
+/** "Lecture directe · MKV": how the server delivers the media. */
+export function playMethodLabel(start: PlaybackStart): string {
+  const method = METHOD_LABELS[start.method];
+  return start.container
+    ? `${method} · ${start.container.toUpperCase()}`
+    : method;
 }

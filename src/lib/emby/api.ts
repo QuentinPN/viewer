@@ -5,6 +5,7 @@ import type {
   ItemDetail,
   ItemPage,
   Library,
+  PlaybackStart,
   Season,
   ServerSummary,
   SignedInUser,
@@ -37,6 +38,8 @@ export const embyApi = {
       startIndex,
       limit,
     }),
+  /** Negotiates with the server and starts the player (ADR 0007). */
+  play: (itemId: string) => invoke<PlaybackStart>("emby_play", { itemId }),
 };
 
 /** Normalizes a rejected command into an `EmbyError`, whatever was thrown. */
@@ -74,6 +77,11 @@ export function errorHint(error: EmbyError): string | null {
       return "Elle a peut-être été supprimée ou masquée. Actualisez la liste.";
     case "credentialStore":
       return "Le Gestionnaire d'identification Windows n'a pas pu enregistrer la session.";
+    case "noCompatibleStream":
+    case "transcodeRequired":
+      return "Les informations techniques de la fiche indiquent le format du fichier.";
+    case "player":
+      return "Vérifiez que libmpv-2.dll est présent (scripts/fetch-libmpv.ps1).";
     default:
       return null;
   }

@@ -28,6 +28,9 @@ pub struct MpvConfig {
     pub headless: bool,
     /// mpv `hwdec` value. `auto-safe` only enables decoders mpv considers reliable.
     pub hwdec: String,
+    /// `ao=null` with video still shown: scripted UI tests must not play sound on
+    /// the user's speakers (ADR 0006).
+    pub silent: bool,
 }
 
 impl Default for MpvConfig {
@@ -36,6 +39,7 @@ impl Default for MpvConfig {
             wid: None,
             headless: false,
             hwdec: "auto-safe".into(),
+            silent: false,
         }
     }
 }
@@ -217,6 +221,8 @@ impl MpvEngine {
         }
         if config.headless {
             inner.set_option("vo", "null")?;
+        }
+        if config.headless || config.silent {
             inner.set_option("ao", "null")?;
         }
         if let Some(wid) = config.wid {

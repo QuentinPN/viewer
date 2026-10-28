@@ -9,9 +9,10 @@ use serde::de::DeserializeOwned;
 use super::EmbyError;
 use super::images::{self, ImageRequest};
 use super::models::{
-    AuthenticateUserByName, AuthenticationResult, BaseItemDto, PublicSystemInfo, QueryResult,
-    UserDto,
+    AuthenticateUserByName, AuthenticationResult, BaseItemDto, DeviceProfile, PlaybackInfoRequest,
+    PlaybackInfoResponse, PublicSystemInfo, QueryResult, UserDto,
 };
+use super::playback::MAX_STREAMING_BITRATE;
 use super::server_url::ServerUrl;
 
 pub const CLIENT_NAME: &str = "Viewer";
@@ -261,6 +262,40 @@ impl EmbyClient {
         ];
         let res = self.request_url(Method::GET, &url, &params).send().await?;
         json(check(res, true)?).await
+    }
+
+    /// Playback negotiation (ADR 0007): the server answers with its sources and how
+    /// each can be played for this profile. Unknown id: 404.
+    pub async fn playback_info(
+        &self,
+        user_id: &str,
+        item_id: &str,
+        profile: &DeviceProfile,
+    ) -> Result<PlaybackInfoResponse, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Items/{}/PlaybackInfo", path_segment(item_id)?));
+        let user_id = path_segment(user_id)?;
+        let body = PlaybackInfoRequest {
+            user_id,
+            max_streaming_bitrate: MAX_STREAMING_BITRATE,
+            device_profile: profile,
+            is_playback: true,
+            auto_open_live_stream: false,
+        };
+        let res = self
+            .request_url(Method::POST, &url, &[("UserId", user_id)])
+            .json(&body)
+            .send()
+            .await?;
+        json(check(res, true)?).await
+    }
+
+    /// Authentication for the player's HTTP requests: a header, never the URL.
+    pub fn stream_auth_headers(&self) -> Result<Vec<(String, String)>, EmbyError> {
+        let token = self.token.as_ref().ok_or(EmbyError::NotSignedIn)?;
+        Ok(vec![("X-Emby-Token".to_owned(), token.expose().to_owned())])
     }
 
     /// Artwork bytes and content type for the `emby-img` protocol (ADR 0005).

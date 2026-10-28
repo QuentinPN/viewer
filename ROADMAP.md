@@ -29,7 +29,7 @@ Prove local MKV, authorized HTTP stream, audio, subtitle switching, seek, fullsc
   - release build on a clean machine.
 - Next: a HEVC sample and a sample with SRT/PGS subtitles, then rerun `scripts/spike/run-gate1.ps1`; manual 125/150 % DPI check.
 
-## Gate 2 — Emby integration [IN PROGRESS · sign-in, libraries, grid and detail pages VERIFIED]
+## Gate 2 — Emby integration [IN PROGRESS · sign-in, libraries, detail pages and direct play VERIFIED]
 Connection/auth, typed API client, libraries, item details, PlaybackInfo, secure tokens, session reporting, fake-server contract tests.
 - Access authorized by the user (2026-10-27): Emby 4.10.1.0 on the QNAP, LAN HTTP only, non-admin test account. Decision: ADR 0004 (`EmbyClient` in Rust, token in the Windows Credential Manager).
 - VERIFIED (2026-10-27), evidence in `docs/evidence/gate2-2026-10-27.md`:
@@ -42,7 +42,9 @@ Connection/auth, typed API client, libraries, item details, PlaybackInfo, secure
 - VERIFIED (2026-10-28), evidence in `docs/evidence/gate2-2026-10-28.md`: film and series detail pages (backdrop, logo, metadata, people, technical info without the NAS path), seasons and paged episodes, back to the grid with scroll and focus kept; real server: 195 details, 267 seasons, 3 454 episodes deserialized.
 - NOT VERIFIED: HTTPS with TLS validation against a real server (none available); retries, cancellation, offline state; 125/150 % DPI; resume and watched display against real data (test account has no history).
 - Measured limitation: a cold poster costs ~170–230 ms on the NAS (server-side resize), so a fast scroll leaves posters blank for a few seconds; no virtualization yet (707 cards stay in the DOM).
-- TODO: PlaybackInfo / MediaSources and a play button on the detail page, then session reporting. Episode detail, search, sorting and filters come with Gate 3.
+- VERIFIED (2026-10-28), evidence in `docs/evidence/gate2-lecture-2026-10-28.md`, ADR 0007: PlaybackInfo with a libmpv device profile, Direct Play / Direct Stream / Transcode decision from the server, stream URL without its `api_key` and token in the `X-Emby-Token` header, play button on the film detail page and on each episode, back to the detail page with focus kept; real server: 90 sampled items all Direct Play, stream 206 with the header and 401 without; CDP scenario `gate2-play` 13/13.
+- NOT VERIFIED (playback): picture, sound and subtitles seen or heard by a person through the Emby path; HEVC/AV1/HDR/Dolby Vision/DTS/TrueHD rendering; items with several sources.
+- TODO: session reporting (`/Sessions/Playing`, progress, stopped) with resume from the server position, then transcoding (needs the stop report to end the server's encoding). Episode detail, search, sorting and filters come with Gate 3.
 
 ## Gate 3 — Core experience [TODO]
 Home, film/series browsing, details, search, accessible player UI, responsive layouts and artwork cache.
@@ -126,3 +128,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Script bugs found on the way**: a locator kept from the page closed by the restart; libraries counted before the list was filled; Playwright's `click()` scrolls its target into view, which moved the grid before the detail opened (the app keeps the scroll offset; the test now clicks a card already on screen). After a resize the grid reflows and scroll anchoring changes the offset, so that case checks the opened card is focused and on screen instead.
 - **Retired**: `scripts/gate2/e2e-signin.ps1`, `e2e-browse.ps1`, `e2e-detail.ps1` (still in git history).
 - **Next**: PlaybackInfo with a device profile, Direct Play / Direct Stream / Transcode decision, play button from the detail page.
+
+### 2026-10-28 — Playback negotiation and play button
+- **Changed**: ADR 0007; `src-tauri/src/emby/playback.rs` (device profile, source choice, stream URL without token, safe server headers); `EmbyClient::playback_info`, `EmbyService::prepare_playback`, command `emby_play` (the UI only gets method and container); typed errors `playbackRefused`, `noCompatibleStream`, `transcodeRequired`, `player`; "Lecture" button on the film detail page, episode thumbnails as play buttons; the player shows the server's decision and goes back on Escape, ✕ or end of file; the library stays mounted under the player. Debug-only `VIEWER_E2E_SILENT` (`ao=null`) for scenarios. `scripts/with-test-account.ps1` reads the test account for any command; `scripts/e2e/scenario.mjs` shares scenario helpers; new scenario `scripts/e2e/gate2-play.mjs`.
+- **Tests**: `npm run verify` green (Vitest 32/32, cargo test 42 passed / 5 ignored), release clippy clean; real server: `real_server_playback_negotiation` 90/90 Direct Play, 206 with header / 401 without; `gate2-play` 13/13 and `gate2-ui` 15/15, screenshots reviewed.
+- **Bugs found and fixed**: play buttons lost focus while disabled, so focus was not given back after playback (now `aria-disabled`); argument splatting in `with-test-account.ps1`.
+- **Not verified**: video, audio and subtitles by eye and ear through the Emby path (CDP screenshots do not show mpv); playback reporting and resume do not exist yet.
+- **Next**: playback reporting (start, progress, pause, stopped) with resume from the server position, verified on the real test account.

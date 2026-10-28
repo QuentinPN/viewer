@@ -15,6 +15,7 @@ use super::models::{
     LibraryKind, MediaInfo, MediaItem, MediaSourceDto, MediaStreamDto, ResumePoint, Season,
     ServerSummary, SignedInUser, StreamInfo, UserItemData, VideoInfo,
 };
+use super::playback::{self, PlaybackPlan};
 use super::server_url::ServerUrl;
 
 /// Contents of `session.json`. Contains no secret.
@@ -287,6 +288,24 @@ impl EmbyService {
                 }
             })
             .collect())
+    }
+
+    /// Negotiates playback of a film or episode (ADR 0007). Returns the plan and the
+    /// headers the player must send, authentication included; the URL holds no token.
+    pub async fn prepare_playback(
+        &self,
+        item_id: &str,
+    ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
+        let (client, user_id) = self.session()?;
+        let response = self.expire_on_401(
+            client
+                .playback_info(&user_id, item_id, &playback::device_profile())
+                .await,
+        )?;
+        let plan = playback::plan(client.server(), response)?;
+        let mut headers = plan.headers.clone();
+        headers.extend(client.stream_auth_headers()?);
+        Ok((plan, headers))
     }
 
     /// One page of episodes of a season, `limit` clamped to `1..=MAX_PAGE`. A season

@@ -7,7 +7,7 @@ use tauri::{State, WebviewWindow};
 use crate::AppState;
 use crate::emby::EmbyError;
 use crate::emby::models::{
-    EpisodePage, ItemDetail, ItemPage, Library, Season, ServerSummary, SignedInUser,
+    EpisodePage, ItemDetail, ItemPage, Library, PlaybackStart, Season, ServerSummary, SignedInUser,
 };
 use crate::emby::session::EmbyService;
 use crate::player::{
@@ -176,4 +176,32 @@ pub async fn emby_episodes(
 ) -> Result<EpisodePage, EmbyError> {
     emby.episodes(&series_id, &season_id, start_index, limit)
         .await
+}
+
+/// Plays a film or episode from the server (ADR 0007): PlaybackInfo, choice of the
+/// source, then the player. The UI gets the method only, never the URL or token.
+#[tauri::command]
+pub async fn emby_play(
+    state: State<'_, AppState>,
+    emby: State<'_, EmbyService>,
+    item_id: String,
+) -> Result<PlaybackStart, EmbyError> {
+    let (plan, http_headers) = emby.prepare_playback(&item_id).await?;
+    let request = PlaybackRequest {
+        source: plan.url,
+        http_headers,
+        start_seconds: None,
+    };
+    let player = |e: PlayerError| EmbyError::Player(e.to_string());
+    let source = MediaSource::parse(&request.source).map_err(player)?;
+    state
+        .engine()
+        .map_err(player)?
+        .load(&request, &source)
+        .map_err(player)?;
+    Ok(PlaybackStart {
+        item_id,
+        method: plan.method,
+        container: plan.container,
+    })
 }

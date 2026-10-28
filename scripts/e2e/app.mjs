@@ -58,6 +58,8 @@ export async function launch({
       ...inherited,
       ...env,
       VIEWER_E2E_OFFSCREEN: "1",
+      // No sound on the user's speakers during a scenario (debug builds only).
+      VIEWER_E2E_SILENT: "1",
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: [
         `--remote-debugging-port=${port}`,
         "--disable-features=CalculateNativeWinOcclusion",

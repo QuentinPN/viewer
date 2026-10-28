@@ -6,34 +6,21 @@
 // from the Windows Credential Manager; the password never reaches the app's
 // environment, the command line or the report.
 import { spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { launch, runDir } from "./app.mjs";
+import { launch } from "./app.mjs";
+import {
+  cards,
+  createReport,
+  detailTitle,
+  libraryNav,
+  signIn,
+  signOut,
+  startScreen,
+  testAccount,
+} from "./scenario.mjs";
 
-const {
-  VIEWER_EMBY_URL: url,
-  VIEWER_EMBY_USER: user,
-  VIEWER_EMBY_PASSWORD: password,
-} = process.env;
-if (!user || !password)
-  throw new Error("VIEWER_EMBY_USER and VIEWER_EMBY_PASSWORD are required");
-
-const out = runDir("e2e", "gate2-ui");
-const checks = [];
-let shots = 0;
-
-function check(name, passed, detail = "") {
-  checks.push({ name, passed: Boolean(passed), detail: String(detail) });
-  console.log(
-    `${passed ? "PASS" : "FAIL"} ${name}${detail ? ` — ${detail}` : ""}`,
-  );
-}
-
-async function shot(page, name) {
-  await page.screenshot({
-    path: join(out, `${String(shots++).padStart(2, "0")}-${name}.png`),
-  });
-}
+const account = testAccount();
+const { password } = account;
+const { check, shot, finish } = createReport("gate2-ui");
 
 /** Moves and resizes the real window without activating it (SetWindowPos). */
 function resizeWindow(pid, width, height) {
@@ -49,41 +36,11 @@ if (-not [U.P]::SetWindowPos($h, [System.IntPtr]::Zero, 0, 0, ${width}, ${height
     throw new Error(`resize failed (${r.status}) ${r.stderr}`);
 }
 
-const signInHeading = (page) => page.locator("#signin-title");
-const libraryNav = (page) =>
-  page.getByRole("navigation", { name: "Bibliothèques" });
-const cards = (page) => page.locator("ul.grid button.card");
-const detailTitle = (page) => page.locator("#detail-title");
 const focusedItemId = (page) =>
   page.evaluate(
     () => document.activeElement?.getAttribute("data-item-id") ?? null,
   );
 
-async function startScreen(page) {
-  await Promise.race([
-    signInHeading(page).waitFor({ timeout: 20000 }),
-    libraryNav(page).waitFor({ timeout: 20000 }),
-  ]);
-  return (await libraryNav(page).count()) > 0 ? "signedIn" : "signedOut";
-}
-
-async function signOut(page) {
-  await page.getByRole("button", { name: "Se déconnecter" }).click();
-  await signInHeading(page).waitFor({ timeout: 15000 });
-}
-
-async function signIn(page, pass) {
-  if (await page.locator("#server-url").count()) {
-    if (url) await page.locator("#server-url").fill(url);
-    await page.getByRole("button", { name: "Continuer" }).click();
-    await page.locator("#username").waitFor({ timeout: 15000 });
-  }
-  await page.locator("#username").fill(user);
-  await page.locator("#password").fill(pass);
-  await page.getByRole("button", { name: "Se connecter" }).click();
-}
-
-const report = { out, startedAt: new Date().toISOString(), checks };
 let app = await launch();
 try {
   let page = app.page;
@@ -91,7 +48,7 @@ try {
   await shot(page, "signed-out");
 
   // Wrong password: an error, no session.
-  await signIn(page, `${password}-wrong`);
+  await signIn(page, account, `${password}-wrong`);
   const alert = page.getByRole("alert");
   await alert.waitFor({ timeout: 15000 });
   check(
@@ -343,9 +300,5 @@ try {
   if (app) await shot(app.page, "error").catch(() => {});
 } finally {
   if (app) await app.close().catch(() => {});
-  report.finishedAt = new Date().toISOString();
-  report.passed = checks.every((c) => c.passed);
-  writeFileSync(join(out, "report.json"), JSON.stringify(report, null, 2));
-  console.log(`${report.passed ? "ALL PASSED" : "FAILURES"} — ${out}`);
-  process.exitCode = report.passed ? 0 : 1;
+  finish();
 }

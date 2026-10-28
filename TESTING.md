@@ -12,9 +12,11 @@
 
 Preferred for UI checks: they drive the debug build over WebView2's DevTools protocol, with the window off-screen and never activated, so the user can keep working. Screenshots show the HTML UI only (never mpv video).
 
-- Prerequisites: `cargo build` (debug), Vite dev server (`npm run dev`), and once, the Emby test account in the Windows Credential Manager: `cmdkey /generic:viewer-e2e-emby /user:<test user> /pass` (password prompted, hidden). Optional `VIEWER_EMBY_URL`, otherwise the address prefilled by the app is used.
+- Prerequisites: `cargo build` (debug), Vite dev server (`npm run dev`), and once, the Emby test account in the Windows Credential Manager: `cmdkey /generic:viewer-e2e-emby /user:<test user> /pass` (password prompted, hidden). Optional `VIEWER_EMBY_URL`, otherwise the last server the app signed in to (`session.json`).
+- `./scripts/with-test-account.ps1 <command…>` runs any command with `VIEWER_EMBY_URL` / `VIEWER_EMBY_USER` / `VIEWER_EMBY_PASSWORD` set for it only (real-server cargo tests below, scenarios). The app is started with `VIEWER_E2E_SILENT` (debug only): mpv uses `ao=null`, no sound on the speakers.
 - `./scripts/e2e/run.ps1` (default scenario `gate2-ui`): wrong password, sign-in, restore after restart, keyboard library switch, grid paging, series detail with season switch, Escape back with focus kept, film detail, narrow real window without horizontal overflow, scroll kept, sign-out, no app credential left. Asserted checks plus screenshots in `artifacts/e2e/gate2-ui-<run>/` (`report.json`). Starts in any state, ends signed out.
-- Reusable launcher: `scripts/e2e/app.mjs` (`launch()`, `runDir()`).
+- `./scripts/e2e/run.ps1 gate2-play`: film played from its detail page by keyboard, episode from its series; checks the server's decision shown in the player, playback advancing (engine diagnostics: codec, hwdec, position), Escape / ✕ back to the detail page with focus on the play control, player closed. Ends signed out.
+- Reusable launcher: `scripts/e2e/app.mjs` (`launch()`, `runDir()`); checks, screenshots, report and sign-in: `scripts/e2e/scenario.mjs`.
 - Ask the user before any check that needs real OS input or screen capture (Gate 1 scripts below).
 
 ## Gate 1 playback scenario
@@ -34,10 +36,11 @@ Cases: H.264 MP4, HEVC MKV, AV1 if supported, 4K sample, multiple audio tracks, 
 Mock Emby API for auth failures, pagination, permissions, missing fields, playback selection and session lifecycle. With user approval, verify progress and watched state on a real test account and test media.
 
 - `src-tauri/src/emby/tests.rs` runs `EmbyService` against a local fake Emby server (one request per connection) and an in-memory credential store. Fake responses mirror real server responses recorded in `docs/evidence/`.
-- Real server, opt-in: credentials only through environment variables, never as arguments or in files: `VIEWER_EMBY_URL`, `VIEWER_EMBY_USER`, `VIEWER_EMBY_PASSWORD`.
+- Real server, opt-in: credentials only through environment variables, never as arguments or in files: `VIEWER_EMBY_URL`, `VIEWER_EMBY_USER`, `VIEWER_EMBY_PASSWORD`. Prefix the commands below with `./scripts/with-test-account.ps1` to take them from the Windows Credential Manager.
   - `./scripts/with-msvc.ps1 cargo test --manifest-path src-tauri/Cargo.toml real_server_sign_in_restore_sign_out '--' --ignored`: sign-in, restore, sign-out, revoked token refused. It reuses the fixed device id `viewer-real-server-test`.
   - `… cargo test … real_server_libraries_and_pages '--' --ignored --nocapture`: lists libraries, reads the first and last page of each, fetches one poster, signs out.
   - `… cargo test … real_server_details_seasons_episodes '--' --ignored --nocapture` (optional `VIEWER_DETAIL_SAMPLE`, default 40 items per library): detail of each sampled item, seasons and first page of episodes of each series, one backdrop.
+  - `… cargo test … real_server_playback_negotiation '--' --ignored --nocapture` (optional `VIEWER_PLAYBACK_SAMPLE`, default 20 items per library): PlaybackInfo for films and first episodes, method per item, no `api_key` in stream URLs, one 1 KiB stream read with the token header (206) and without it (401).
 - Windows Credential Manager, opt-in: `cargo test … windows_store_round_trip '--' --ignored`, then check `cmdkey /list` shows no `Viewer` entry.
 
 ## Release gate

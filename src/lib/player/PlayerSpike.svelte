@@ -1,9 +1,11 @@
 <script lang="ts">
 // Gate 1 prototype: minimal player overlay used to validate native video
-// composition, focus and keyboard handling. Not the final player UI.
+// composition, focus and keyboard handling. Not the final player UI. With
+// `playback`, it shows a stream already started from Emby and `onExit` goes back.
 import { onDestroy, onMount } from "svelte";
+import type { PlaybackStart } from "../emby/types";
 import { playerApi } from "./api";
-import { formatTime, trackLabel } from "./format";
+import { formatTime, playMethodLabel, trackLabel } from "./format";
 import { mapPlayerKey } from "./keyboard";
 import type {
   AppInfo,
@@ -12,6 +14,14 @@ import type {
   PlayerEvent,
   Track,
 } from "./types";
+
+interface Props {
+  /** Playback started by `emby_play`; the open form is not shown then. */
+  playback?: PlaybackStart | null;
+  onExit?: () => void;
+}
+
+let { playback = null, onExit }: Props = $props();
 
 let info = $state<AppInfo | null>(null);
 let source = $state("");
@@ -58,6 +68,7 @@ function onEvent(ev: PlayerEvent) {
     case "endFile":
       if (ev.reason === "error")
         error = `Lecture impossible : ${ev.error ?? "erreur inconnue"}`;
+      else if (ev.reason === "eof" && onExit) void close();
       break;
     case "shutdown":
       active = false;
@@ -118,12 +129,14 @@ async function open(event: SubmitEvent) {
 }
 
 async function close() {
+  if (fullscreen) await toggleFullscreen(false).catch(() => {});
   await playerApi.close();
   active = false;
   tracks = [];
   diag = null;
   position = 0;
   duration = 0;
+  onExit?.();
 }
 
 async function toggleFullscreen(force?: boolean) {
@@ -135,11 +148,14 @@ function onKeydown(e: KeyboardEvent) {
   const inTextField =
     target?.tagName === "INPUT" && (target as HTMLInputElement).type === "text";
   const action = mapPlayerKey(e.key, { inTextField, shift: e.shiftKey });
-  if (!action || !active) return;
+  if (!action || (!active && !(onExit && action.kind === "exitFullscreen")))
+    return;
   e.preventDefault();
   if (action.kind === "command") void run(action.command);
   else if (action.kind === "toggleFullscreen") void toggleFullscreen();
   else if (fullscreen) void toggleFullscreen(false);
+  // Escape outside fullscreen goes back, like on the detail page.
+  else if (onExit) void close();
 }
 
 function onSeekInput(e: Event) {
@@ -163,7 +179,17 @@ function trackId(value: string): number | null {
 <svelte:window onkeydown={onKeydown} />
 
 <div class="root" class:idle={!active}>
-  {#if !active}
+  {#if !active && playback}
+    <main class="open-panel" aria-busy={!error}>
+      <h1>Lecture</h1>
+      {#if error}
+        <p class="error" role="alert">{error}</p>
+      {:else}
+        <p class="subtitle">Ouverture du flux…</p>
+      {/if}
+      <button type="button" onclick={close}>Retour</button>
+    </main>
+  {:else if !active}
     <main class="open-panel">
       <h1>Viewer</h1>
       <p class="subtitle">Prototype de lecture native — Gate 1</p>
@@ -186,7 +212,11 @@ function trackId(value: string): number | null {
     </main>
   {:else}
     <header class="top">
-      <span class="badge">Prototype Gate 1 · surface {info?.surfaceMode ?? "?"}</span>
+      {#if playback}
+        <span class="badge" title="Décision du serveur Emby">{playMethodLabel(playback)}</span>
+      {:else}
+        <span class="badge">Prototype Gate 1 · surface {info?.surfaceMode ?? "?"}</span>
+      {/if}
       {#if diag}
         <span class="badge" title="Diagnostic du moteur">
           {diag.videoCodec ?? "?"} · {diag.videoWidth}×{diag.videoHeight} · décodage
@@ -239,7 +269,7 @@ function trackId(value: string): number | null {
       <button onclick={() => toggleFullscreen()} aria-label={fullscreen ? "Quitter le plein écran" : "Plein écran"}>
         {fullscreen ? "⤡" : "⤢"}
       </button>
-      <button onclick={close} aria-label="Fermer la lecture">✕</button>
+      <button onclick={close} aria-label={onExit ? "Arrêter et revenir à la fiche" : "Fermer la lecture"}>✕</button>
     </section>
   {/if}
 </div>
