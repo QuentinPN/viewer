@@ -280,13 +280,51 @@ impl EmbyService {
     /// Home row "À suivre": the next episode of each series in progress.
     pub async fn next_up(&self) -> Result<Vec<WatchItem>, EmbyError> {
         let (client, user_id) = self.session()?;
-        let res = self.expire_on_401(client.next_up(&user_id, HOME_ROW).await)?;
-        Ok(res
-            .items
+        // Emby 4.10.1.0 answers an empty `/Shows/NextUp` once an episode is watched,
+        // and lists the next one in its "resume" home section instead (ADR 0010).
+        let (shows, section) = tokio::join!(
+            client.next_up(&user_id, HOME_ROW),
+            self.resume_section(&client, &user_id)
+        );
+        let mut items = self.expire_on_401(shows)?.items;
+        for dto in section? {
+            if items.iter().all(|i| i.id != dto.id) {
+                items.push(dto);
+            }
+        }
+        Ok(items
             .into_iter()
             .filter(|i| i.item_type == "Episode")
+            .filter(|i| {
+                i.user_data
+                    .as_ref()
+                    .is_none_or(|u| !u.played && u.playback_position_ticks == 0)
+            })
             .filter_map(watch_item)
+            .take(HOME_ROW as usize)
             .collect())
+    }
+
+    /// Items of the server's "resume" home section when it includes Next Up; none
+    /// when the server has no home sections (404) or no such section.
+    async fn resume_section(
+        &self,
+        client: &EmbyClient,
+        user_id: &str,
+    ) -> Result<Vec<BaseItemDto>, EmbyError> {
+        let sections = match client.home_sections(user_id).await {
+            Err(EmbyError::NotFound) => return Ok(Vec::new()),
+            other => self.expire_on_401(other)?,
+        };
+        let Some(section) = sections
+            .into_iter()
+            .find(|s| s.section_type == "resume" && s.include_next_up_in_resume && is_id(&s.id))
+        else {
+            return Ok(Vec::new());
+        };
+        let page =
+            self.expire_on_401(client.section_items(user_id, &section.id, HOME_ROW).await)?;
+        Ok(page.items)
     }
 
     /// Home row "Ajoutés récemment" of a film or series library: films and series

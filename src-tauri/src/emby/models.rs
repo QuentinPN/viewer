@@ -88,6 +88,19 @@ pub struct QueryResult<T> {
     pub total_record_count: u32,
 }
 
+/// One section of the user's home screen as the server composes it
+/// (`/Users/{Id}/HomeSections`, a bare array on Emby 4.10.1.0).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct HomeSectionDto {
+    pub id: String,
+    #[serde(default)]
+    pub section_type: String,
+    /// The "resume" section also lists the next episode of each series in progress.
+    #[serde(default)]
+    pub include_next_up_in_resume: bool,
+}
+
 /// Subset of `BaseItemDto` used by library views and grids. Ids are opaque strings
 /// (numeric on Emby 4.10.1.0).
 #[derive(Debug, Clone, Deserialize)]

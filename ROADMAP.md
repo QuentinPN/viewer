@@ -52,7 +52,7 @@ Connection/auth, typed API client, libraries, item details, PlaybackInfo, secure
 
 ## Gate 3 — Core experience [IN PROGRESS · home page VERIFIED]
 Home, film/series browsing, details, search, accessible player UI, responsive layouts and artwork cache.
-- DONE: home page (ADR 0010) — Continue Watching, Next Up, latest additions per library, "Tout voir". Next Up checked with fake data only (no watched episode on the test account).
+- DONE: home page (ADR 0010) — Continue Watching, Next Up, latest additions per library, "Tout voir". Next Up verified on the real server (episode marked watched then unmarked): Emby 4.10.1.0 leaves `/Shows/NextUp` empty and lists the next episode in its "resume" home section, which the app now reads too.
 - TODO: hero and favorites on the home page, search, sorting and filters, episode detail, final player UI, artwork cache.
 - Known input: the control bar hides subtitles at narrow widths (Gate 1 finding); views must provide an opaque background when no video plays (transparent window).
 
@@ -163,3 +163,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `npm run verify` green (Vitest 37/37, cargo test 56 passed / 8 ignored); real server: `real_server_home_rows` passed; `gate3-home` 23/23; `gate2-ui` and `gate2-play` passed. Evidence: `docs/evidence/gate3-accueil-2026-10-28.md`.
 - **Not verified**: Next Up with real data (no watched episode on the test account; marking watched not authorized); screen readers; look on a real screen.
 - **Next**: search (Gate 3), then sort and filters in the library grid.
+
+### 2026-10-28 — Next Up on the real server
+- **Changed**: `emby_next_up` also reads the server's "resume" home section (`/Users/{Id}/HomeSections`, `/Users/{Id}/Sections/resume/Items`) in parallel with `/Shows/NextUp`, keeping unwatched, unstarted episodes (ADR 0010 revision); tokio `macros` feature for `join!`.
+- **Finding**: on Emby 4.10.1.0 `/Shows/NextUp` without `SeriesId` stays empty after an episode is marked watched (by `PlayedItems` or by a stop report); the web client gets Next Up from the "resume" section.
+- **Server side effects** (test account, authorized on 2026-10-28): episode 1 of one series marked watched then unwatched, several times while diagnosing; each run ended with the episode unwatched and Next Up empty.
+- **Tests**: `real_server_next_up` passed (episode 2 in Next Up in 99 ms, cleanup confirmed); `real_server_home_rows` passed; fake-server tests for the merge, the 404 fallback and the expired session.
+- **Not verified**: the Next Up row shown in the UI with real data (the app cannot mark watched yet).
+- **Next**: search (Gate 3).

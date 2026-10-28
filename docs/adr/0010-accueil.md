@@ -31,6 +31,20 @@ Ce qui a été observé sur Emby 4.10.1.0 (QNAP), en lecture seule, avec le comp
   - le défilement est instantané quand l'utilisateur préfère réduire les animations.
 - **Pas de hero ni de « Favoris » dans cette tranche** : ils seront décidés plus tard, avec des données réelles.
 
+## Révision (2026-10-28) : source de « À suivre »
+Observé avec le compte de test, après avoir marqué comme vu le premier épisode d'une série (autorisé, puis annulé) :
+- `GET /Shows/NextUp?UserId=` reste **vide**, avec ou sans `Limit`, `Fields` ou `ParentId`, et même 20 s plus tard. C'est pareil quand l'épisode est marqué vu par un rapport d'arrêt de lecture plutôt que par `PlayedItems`.
+- Avec `SeriesId`, le même appel renvoie bien l'épisode 2, puis tous les épisodes non vus de la série (203).
+- `GET /Users/{UserId}/HomeSections` renvoie un tableau nu de sections. La section `resume` porte `IncludeNextUpInResume: true`, et `GET /Users/{UserId}/Sections/resume/Items` contient l'épisode 2. C'est par là que l'accueil web d'Emby 4.10 obtient ses épisodes suivants.
+
+Décision :
+- `emby_next_up` lit **en parallèle** `/Shows/NextUp` et la section `resume`, à condition qu'elle soit déclarée avec `IncludeNextUpInResume`.
+- Les éléments de `/Shows/NextUp` viennent d'abord, puis ceux que seule la section donne. On ne garde que les épisodes non vus et non commencés : les éléments en cours restent dans « Reprendre ».
+- Un serveur sans sections d'accueil (404) garde le comportement d'origine.
+- Mesure : 99 ms pour la rangée, contre 1,9 s quand les appels étaient faits l'un après l'autre à froid.
+
+Écarté : appeler `/Shows/NextUp?SeriesId=` pour chaque série récemment lue. Cela demanderait de deviner ces séries, et ferait un appel par série.
+
 ## Alternatives
 - **Une carte « Reprendre » qui ouvre la fiche** : cohérent avec les affiches, mais cela ajoute un clic à l'action la plus fréquente. Écarté. La fiche reste accessible depuis la bibliothèque.
 - **`/Items?SortBy=DateCreated` au lieu de `/Items/Latest`** : renverrait chaque épisode séparément et inonderait la rangée d'une même série. Écarté.
@@ -38,7 +52,6 @@ Ce qui a été observé sur Emby 4.10.1.0 (QNAP), en lecture seule, avec le comp
 - **Cache local des rangées** : il reviendra avec le cache SQLite. Ces rangées dépendent de l'état de lecture, dont Emby reste la source de vérité.
 
 ## Conséquences
-- « À suivre » n'est vérifié qu'avec des données simulées : le compte de test n'a aucun épisode vu, et marquer des épisodes comme vus est une écriture qui n'a pas été autorisée.
 - Si la carte jouée quitte « Reprendre » après la lecture (lue jusqu'au bout ou remise à zéro), le focus clavier revient au début du document.
 - Pendant le chargement, le squelette porte le titre « Reprendre », même quand la rangée se révèle vide ensuite.
 - Le hero, les « Favoris », la recherche, le tri et les filtres restent à faire (Gate 3).

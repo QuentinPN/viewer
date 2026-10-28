@@ -178,8 +178,12 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
         let (path, query) = r.path.split_once('?').unwrap_or((&r.path, ""));
         let items = format!("/emby/Users/{USER_ID}/Items");
         let views_path = format!("/emby/Users/{USER_ID}/Views");
+        let sections = format!("/emby/Users/{USER_ID}/HomeSections");
+        let section_items = format!("/emby/Users/{USER_ID}/Sections/resume/Items");
         match path {
             p if (p == views_path
+                || p == sections
+                || p == section_items
                 || p.starts_with(&items)
                 || p.starts_with("/emby/Items/")
                 || p.starts_with("/emby/Shows/")
@@ -200,6 +204,8 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
             "/emby/Shows/NextUp" if query.contains(&format!("UserId={USER_ID}")) => {
                 (200, next_up())
             }
+            p if p == sections => (200, home_sections()),
+            p if p == section_items => (200, resume_section()),
             p if p == format!("{items}/30207") => (200, movie_detail()),
             p if p == format!("{items}/80473") => (200, series_detail()),
             p if p == format!("{items}/80475") => (200, episode_detail()),
@@ -373,6 +379,33 @@ fn next_up() -> String {
          "ImageTags":{},"ParentBackdropItemId":"70185","ParentBackdropImageTags":["6da1a59e_6384"],
          "UserData":{"PlaybackPositionTicks":0,"Played":false}}
     ],"TotalRecordCount":1}"#
+        .into()
+}
+
+/// `/Users/{Id}/HomeSections` (trimmed): a bare array; "resume" includes Next Up.
+fn home_sections() -> String {
+    r#"[
+        {"Name":"Mes Médias","Id":"smalllibrarytiles","SectionType":"userviews","IncludeNextUpInResume":true},
+        {"Name":"Reprendre la lecture","Id":"resume","SectionType":"resume","IncludeNextUpInResume":true},
+        {"Name":"Films : Derniers ajouts","Id":"latestmedia_5","SectionType":"latestmedia","ParentId":"5"}
+    ]"#
+    .into()
+}
+
+/// `/Users/{Id}/Sections/resume/Items` (trimmed): what Emby 4.10.1.0 lists when
+/// `/Shows/NextUp` is empty — films in progress and next episodes together.
+fn resume_section() -> String {
+    r#"{"Items":[
+        {"Name":"Runner","Id":"103617","Type":"Movie","RunTimeTicks":58680640000,"ImageTags":{},
+         "UserData":{"PlaybackPositionTicks":6000000000,"Played":false}},
+        {"Name":"01h00 - 02h00","Id":"44443","Type":"Episode","IndexNumber":2,"ParentIndexNumber":1,
+         "SeriesName":"24 Heures chrono","SeriesId":"44440","RunTimeTicks":24705280000,
+         "ImageTags":{"Primary":"df10f940_6381"},"ParentThumbItemId":"44440","ParentThumbImageTag":"858f5468_6381",
+         "UserData":{"PlaybackPositionTicks":0,"PlayCount":0,"Played":false}},
+        {"Name":"Épisode 4","Id":"70229","Type":"Episode","IndexNumber":4,"ParentIndexNumber":5,
+         "SeriesName":"La casa de papel","SeriesId":"70185","ImageTags":{},
+         "UserData":{"PlaybackPositionTicks":0,"Played":false}}
+    ],"TotalRecordCount":3}"#
         .into()
 }
 
@@ -1140,11 +1173,72 @@ fn continue_watching_maps_films_and_episodes_with_wide_artwork() {
 
 #[test]
 fn next_up_lists_episodes_with_the_series_backdrop_as_fallback() {
-    let (server, fx, _) = signed_in_browser();
+    let (server, fx, revoked) = signed_in_browser();
     let rows = run(fx.service.next_up()).unwrap();
-    let req = server.requests().into_iter().last().unwrap();
-    assert!(req.path.starts_with("/emby/Shows/NextUp?"), "{}", req.path);
-    assert!(!req.path.contains(TOKEN));
+    let paths: Vec<_> = server.requests().into_iter().map(|r| r.path).collect();
+    assert!(paths.iter().any(|p| p.starts_with("/emby/Shows/NextUp?")));
+    assert!(paths.iter().all(|p| !p.contains(TOKEN)));
+    let section = paths
+        .iter()
+        .find(|p| p.starts_with(&format!("/emby/Users/{USER_ID}/Sections/resume/Items?")))
+        .expect("the resume home section is read");
+    assert!(section.contains("Limit=16"), "{section}");
+    // `/Shows/NextUp` first, then what only the resume section lists: the film in
+    // progress and the duplicate are left out.
+    let ids: Vec<_> = rows.iter().map(|r| r.id.as_str()).collect();
+    assert_eq!(ids, ["70229", "44443"]);
+    assert_eq!(rows[1].series_name.as_deref(), Some("24 Heures chrono"));
+    assert!(
+        rows[1]
+            .image
+            .as_ref()
+            .unwrap()
+            .src
+            .contains("/44443/Primary?")
+    );
+    revoked.store(true, Ordering::SeqCst);
+    assert!(matches!(
+        run(fx.service.next_up()).unwrap_err(),
+        EmbyError::SessionExpired
+    ));
+}
+
+#[test]
+fn next_up_without_home_sections_keeps_shows_next_up() {
+    // A server without home sections answers 404: the row still comes from
+    // `/Shows/NextUp`.
+    let server = FakeEmby::start(Box::new({
+        let inner = browse_like(Arc::new(AtomicBool::new(false)));
+        move |r| {
+            if r.path.contains("/HomeSections") {
+                (404, NOT_FOUND_TEXT.into())
+            } else {
+                inner(r)
+            }
+        }
+    }));
+    let fx = fixture();
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    let rows = run(fx.service.next_up()).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].id, "70229");
+    assert!(
+        server
+            .requests()
+            .iter()
+            .all(|r| !r.path.contains("/Sections/")),
+        "no section read without the list"
+    );
+}
+
+#[test]
+fn next_up_episode_from_the_shows_endpoint() {
+    let (_server, fx, _) = signed_in_browser();
+    let rows: Vec<_> = run(fx.service.next_up())
+        .unwrap()
+        .into_iter()
+        .filter(|r| r.id == "70229")
+        .collect();
     assert_eq!(rows.len(), 1);
     assert!(rows[0].resume.is_none());
     assert_eq!(rows[0].runtime_minutes, Some(50));
@@ -1940,4 +2034,145 @@ fn real_server_home_rows() {
         std::panic::resume_unwind(e);
     }
     assert!(after.iter().all(|r| r.id != film.id), "cleanup failed");
+}
+
+/// Next Up on the real server (ADR 0010): marks the first episode of a series
+/// played, expects the second one in "À suivre" (Emby 4.10.1.0 lists it in its
+/// "resume" home section, not in `/Shows/NextUp`), then marks it unplayed again.
+/// Writes on the test account only, undone before signing out.
+#[test]
+#[ignore = "needs the real Emby server and VIEWER_EMBY_* variables"]
+fn real_server_next_up() {
+    use super::models::LibraryKind;
+
+    let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} manquant"));
+    let path = std::env::temp_dir()
+        .join(format!("viewer-emby-real-{}", uuid::Uuid::new_v4()))
+        .join("session.json");
+    SessionFile {
+        device_id: REAL_DEVICE_ID.into(),
+        ..SessionFile::default()
+    }
+    .save(&path)
+    .unwrap();
+    let fx = reopen(Arc::new(MemoryCredentialStore::default()), path);
+    let user = run(fx.service.sign_in(
+        &var("VIEWER_EMBY_URL"),
+        &var("VIEWER_EMBY_USER"),
+        &var("VIEWER_EMBY_PASSWORD"),
+    ))
+    .unwrap();
+    let client = fx.service.client().unwrap();
+
+    let before = run(fx.service.next_up()).unwrap();
+    println!("À suivre before: {} cards", before.len());
+    let in_progress = run(fx.service.continue_watching()).unwrap();
+
+    // First series whose first two episodes of season 1 are both unwatched.
+    let library = run(fx.service.libraries())
+        .unwrap()
+        .into_iter()
+        .find(|l| l.kind == LibraryKind::TvShows && l.name == "Séries TV")
+        .expect("Séries TV library");
+    let (series, first, second) = run(fx.service.items(&library.id, 0, 30))
+        .unwrap()
+        .items
+        .into_iter()
+        .find_map(|s| {
+            let season = run(fx.service.seasons(&s.id))
+                .ok()?
+                .into_iter()
+                .find(|x| x.index == Some(1))?;
+            let eps = run(fx.service.episodes(&s.id, &season.id, 0, 2))
+                .ok()?
+                .items;
+            let [a, b] = <[_; 2]>::try_from(eps).ok()?;
+            let fresh = |e: &super::models::Episode| !e.played && e.resume.is_none();
+            (fresh(&a)
+                && fresh(&b)
+                && a.index == Some(1)
+                && b.index == Some(2)
+                && before
+                    .iter()
+                    .all(|n| n.series_name.as_deref() != Some(&s.name))
+                && in_progress.iter().all(|r| r.id != a.id && r.id != b.id))
+            .then_some((s, a, b))
+        })
+        .expect("a series with two unwatched episodes");
+    println!(
+        "series: {} — E1 {} — E2 {}",
+        series.name, first.id, second.id
+    );
+
+    run(client.set_played(&user.user_id, &first.id, Some(&utc_stamp()))).unwrap();
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let t = std::time::Instant::now();
+        let rows = run(fx.service.next_up()).unwrap();
+        println!(
+            "À suivre after marking E1: {} cards in {} ms, first {:?}",
+            rows.len(),
+            t.elapsed().as_millis(),
+            rows.first()
+        );
+        let card = rows
+            .iter()
+            .find(|r| r.id == second.id)
+            .expect("E2 is in À suivre");
+        assert_eq!(card.series_name.as_deref(), Some(series.name.as_str()));
+        assert_eq!((card.season_index, card.index), (Some(1), Some(2)));
+        assert!(card.resume.is_none());
+        assert!(card.image.is_some(), "no 16:9 image for the card");
+        assert!(rows.iter().all(|r| r.id != first.id));
+    }));
+
+    run(client.set_played(&user.user_id, &first.id, None)).unwrap();
+    let after = run(fx.service.next_up()).unwrap();
+    let season = run(fx.service.seasons(&series.id))
+        .unwrap()
+        .into_iter()
+        .find(|x| x.index == Some(1))
+        .unwrap();
+    let restored = run(fx.service.episodes(&series.id, &season.id, 0, 1))
+        .unwrap()
+        .items;
+    println!(
+        "cleanup: À suivre has {} cards, E1 played = {}",
+        after.len(),
+        restored[0].played
+    );
+    run(fx.service.sign_out()).unwrap();
+    if let Err(e) = result {
+        std::panic::resume_unwind(e);
+    }
+    assert!(!restored[0].played, "E1 is still played");
+    assert_eq!(
+        after.iter().map(|r| &r.id).collect::<Vec<_>>(),
+        before.iter().map(|r| &r.id).collect::<Vec<_>>(),
+        "À suivre is not back to its state before"
+    );
+}
+
+/// Now as `yyyyMMddHHmmss` in UTC, the `DatePlayed` format.
+fn utc_stamp() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    let (days, rem) = (secs.div_euclid(86_400), secs.rem_euclid(86_400));
+    // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    format!(
+        "{year:04}{month:02}{day:02}{:02}{:02}{:02}",
+        rem / 3_600,
+        rem % 3_600 / 60,
+        rem % 60
+    )
 }

@@ -9,8 +9,9 @@ use serde::de::DeserializeOwned;
 use super::EmbyError;
 use super::images::{self, ImageRequest};
 use super::models::{
-    AuthenticateUserByName, AuthenticationResult, BaseItemDto, DeviceProfile, PlaybackInfoRequest,
-    PlaybackInfoResponse, PlaybackReportBody, PublicSystemInfo, QueryResult, UserDto,
+    AuthenticateUserByName, AuthenticationResult, BaseItemDto, DeviceProfile, HomeSectionDto,
+    PlaybackInfoRequest, PlaybackInfoResponse, PlaybackReportBody, PublicSystemInfo, QueryResult,
+    UserDto,
 };
 use super::server_url::ServerUrl;
 
@@ -247,6 +248,40 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
+    /// Sections of the user's home screen (`/Users/{Id}/HomeSections`).
+    pub async fn home_sections(&self, user_id: &str) -> Result<Vec<HomeSectionDto>, EmbyError> {
+        self.require_token()?;
+        let path = format!("/Users/{}/HomeSections", path_segment(user_id)?);
+        let res = self.request(Method::GET, &path).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// Items of one home section (`/Users/{Id}/Sections/{Id}/Items`). On Emby
+    /// 4.10.1.0 the "resume" section holds the next episodes `/Shows/NextUp` omits.
+    pub async fn section_items(
+        &self,
+        user_id: &str,
+        section_id: &str,
+        limit: u32,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self.server.api(&format!(
+            "/Users/{}/Sections/{}/Items",
+            path_segment(user_id)?,
+            path_segment(section_id)?
+        ));
+        let limit = limit.to_string();
+        let params = [
+            ("Limit", limit.as_str()),
+            ("Fields", WATCH_FIELDS),
+            ("EnableUserData", "true"),
+            ("ImageTypeLimit", "1"),
+            ("EnableImageTypes", WATCH_IMAGES),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
     /// Latest additions of a library, newest first (`/Users/{Id}/Items/Latest`).
     /// Episodes come grouped as their series; the answer is a bare array. Emby
     /// 4.10.1.0 answers 500 to an unknown `ParentId`: callers pass known ids only.
@@ -373,6 +408,30 @@ impl EmbyClient {
         self.require_token()?;
         path_segment(&body.item_id)?;
         let res = self.request(Method::POST, path).json(body).send().await?;
+        check(res, true).map(drop)
+    }
+
+    /// Marks an item played on `date_played` (`yyyyMMddHHmmss`, UTC), or unplayed
+    /// with `None` (`POST` / `DELETE /Users/{Id}/PlayedItems/{Id}`).
+    /// Real-server tests only: the app does not offer it yet.
+    #[cfg(test)]
+    pub async fn set_played(
+        &self,
+        user_id: &str,
+        item_id: &str,
+        date_played: Option<&str>,
+    ) -> Result<(), EmbyError> {
+        self.require_token()?;
+        let url = self.server.api(&format!(
+            "/Users/{}/PlayedItems/{}",
+            path_segment(user_id)?,
+            path_segment(item_id)?
+        ));
+        let req = match date_played {
+            Some(date) => self.request_url(Method::POST, &url, &[("DatePlayed", date)]),
+            None => self.request_url(Method::DELETE, &url, &[]),
+        };
+        let res = req.send().await?;
         check(res, true).map(drop)
     }
 
