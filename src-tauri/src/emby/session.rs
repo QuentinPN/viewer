@@ -13,11 +13,11 @@ use super::client::{AccessToken, DeviceIdentity, EmbyClient, EpisodesQuery, Item
 use super::credentials::{self, CredentialStore};
 use super::images::{self, ImageRequest, ImageType};
 use super::models::{
-    BaseItemDto, CastMember, DetailKind, Episode, EpisodePage, HeroEpisode, HeroItem, HeroReason,
-    ItemDetail, ItemPage, ItemsOptions, Library, LibraryKind, MediaInfo, MediaItem, MediaSourceDto,
-    MediaStreamDto, PlaybackStopped, ResumePoint, SavedServer, SearchResults, Season,
-    ServerSummary, SessionStatus, SignedInUser, StreamInfo, UserItemData, VideoInfo, WatchItem,
-    WatchKind, is_usable_genre,
+    BaseItemDto, CastMember, DetailKind, Episode, EpisodeContext, EpisodeLink, EpisodePage,
+    HeroEpisode, HeroItem, HeroReason, ImageRef, ItemDetail, ItemPage, ItemsOptions, Library,
+    LibraryKind, MediaInfo, MediaItem, MediaSourceDto, MediaStreamDto, PlaybackStopped,
+    ResumePoint, SavedServer, SearchResults, Season, ServerSummary, SessionStatus, SignedInUser,
+    StreamInfo, UserItemData, VideoInfo, WatchItem, WatchKind, is_usable_genre,
 };
 use super::playback::{self, PlaybackPlan};
 use super::reporting::Report;
@@ -634,7 +634,8 @@ impl EmbyService {
         Ok(data.is_favorite)
     }
 
-    /// Detail page of a film or series. Other item types are refused.
+    /// Detail page of a film, series or episode. Other item types are refused.
+    /// An episode also gets its neighbours in the series (ADR 0016).
     pub async fn item_detail(&self, item_id: &str) -> Result<ItemDetail, EmbyError> {
         let (client, user_id) = self.session()?;
         let dto = self.expire_on_401(&client, client.item(&user_id, item_id).await)?;
@@ -643,7 +644,17 @@ impl EmbyService {
                 "le serveur a renvoyé un autre élément".into(),
             ));
         }
-        item_detail(dto, &self.scope())
+        let mut detail = item_detail(dto, &self.scope())?;
+        if let Some(ep) = detail.episode.as_mut() {
+            let around = self.expire_on_401(
+                &client,
+                client
+                    .adjacent_episodes(&user_id, &ep.series_id, item_id)
+                    .await,
+            )?;
+            (ep.previous, ep.next) = neighbours(around.items, &ep.series_id, item_id);
+        }
+        Ok(detail)
     }
 
     /// Seasons of a series, in server order; unusable entries are dropped.
@@ -1335,10 +1346,80 @@ fn media_info(source: MediaSourceDto) -> MediaInfo {
     }
 }
 
+/// Episodes just before and after `episode_id` in the server's order, from the
+/// same series. None when the episode is missing from the answer.
+fn neighbours(
+    items: Vec<BaseItemDto>,
+    series_id: &str,
+    episode_id: &str,
+) -> (Option<EpisodeLink>, Option<EpisodeLink>) {
+    let items: Vec<_> = items
+        .into_iter()
+        .filter(|e| is_id(&e.id) && e.series_id.as_deref() == Some(series_id))
+        .collect();
+    let Some(at) = items.iter().position(|e| e.id == episode_id) else {
+        return (None, None);
+    };
+    let link = |e: &BaseItemDto| EpisodeLink {
+        id: e.id.clone(),
+        name: e.name.trim().to_owned(),
+        season_index: e.parent_index_number,
+        index: e.index_number,
+        index_end: e.index_number_end,
+    };
+    (
+        at.checked_sub(1).map(|i| link(&items[i])),
+        items.get(at + 1).map(link),
+    )
+}
+
+/// Artwork of an episode page: the series poster, its own image (else the series
+/// backdrop) and the series logo.
+fn episode_images(
+    dto: &BaseItemDto,
+    series_id: &str,
+    server: &str,
+) -> (Option<ImageRef>, Option<ImageRef>, Option<ImageRef>) {
+    let still = images::image_ref(
+        server,
+        &dto.id,
+        ImageType::Primary,
+        dto.image_tags.get("Primary").map(String::as_str),
+        images::BACKDROP_WIDTHS,
+    );
+    let backdrop = still.or_else(|| {
+        images::image_ref(
+            server,
+            dto.parent_backdrop_item_id.as_deref()?,
+            ImageType::Backdrop,
+            dto.parent_backdrop_image_tags.first().map(String::as_str),
+            images::BACKDROP_WIDTHS,
+        )
+    });
+    let poster = images::image_ref(
+        server,
+        series_id,
+        ImageType::Primary,
+        dto.series_primary_image_tag.as_deref(),
+        images::POSTER_WIDTHS,
+    );
+    let logo = dto.parent_logo_item_id.as_deref().and_then(|id| {
+        images::image_ref(
+            server,
+            id,
+            ImageType::Logo,
+            dto.parent_logo_image_tag.as_deref(),
+            images::LOGO_WIDTHS,
+        )
+    });
+    (poster, backdrop, logo)
+}
+
 fn item_detail(dto: BaseItemDto, server: &str) -> Result<ItemDetail, EmbyError> {
     let kind = match dto.item_type.as_str() {
         "Movie" => DetailKind::Movie,
         "Series" => DetailKind::Series,
+        "Episode" => DetailKind::Episode,
         other => {
             return Err(EmbyError::InvalidResponse(format!(
                 "type d'élément non pris en charge : {other}"
@@ -1355,11 +1436,35 @@ fn item_detail(dto: BaseItemDto, server: &str) -> Result<ItemDetail, EmbyError> 
         };
         images::image_ref(server, &dto.id, t, tag.map(String::as_str), widths)
     };
-    let poster = image(ImageType::Primary, images::POSTER_WIDTHS);
-    let backdrop = image(ImageType::Backdrop, images::BACKDROP_WIDTHS);
-    let logo = image(ImageType::Logo, images::LOGO_WIDTHS);
+    let episode = if kind == DetailKind::Episode {
+        let series_id = dto
+            .series_id
+            .clone()
+            .filter(|id| is_id(id))
+            .ok_or_else(|| EmbyError::InvalidResponse("épisode sans série".into()))?;
+        Some(EpisodeContext {
+            series_name: text(dto.series_name.clone()).unwrap_or_default(),
+            season_id: dto.season_id.clone().filter(|id| is_id(id)),
+            season_index: dto.parent_index_number,
+            index: dto.index_number,
+            index_end: dto.index_number_end,
+            previous: None,
+            next: None,
+            series_id,
+        })
+    } else {
+        None
+    };
+    let (poster, backdrop, logo) = match &episode {
+        Some(ep) => episode_images(&dto, &ep.series_id, server),
+        None => (
+            image(ImageType::Primary, images::POSTER_WIDTHS),
+            image(ImageType::Backdrop, images::BACKDROP_WIDTHS),
+            image(ImageType::Logo, images::LOGO_WIDTHS),
+        ),
+    };
     let user_data = dto.user_data.unwrap_or_default();
-    let is_movie = kind == DetailKind::Movie;
+    let is_series = kind == DetailKind::Series;
     let people_of = |t: &'static str| {
         dto.people
             .iter()
@@ -1368,20 +1473,26 @@ fn item_detail(dto: BaseItemDto, server: &str) -> Result<ItemDetail, EmbyError> 
     let name = dto.name.trim().to_owned();
     Ok(ItemDetail {
         directors: people_of("Director").map(|p| p.name.clone()).collect(),
-        cast: people_of("Actor")
-            .take(MAX_CAST)
-            .map(|p| CastMember {
-                name: p.name.clone(),
-                role: text(p.role.clone()),
-            })
-            .collect(),
+        writers: people_of("Writer").map(|p| p.name.clone()).collect(),
+        // An episode lists its guests: the regular cast belongs to the series.
+        cast: people_of(if episode.is_some() {
+            "GuestStar"
+        } else {
+            "Actor"
+        })
+        .take(MAX_CAST)
+        .map(|p| CastMember {
+            name: p.name.clone(),
+            role: text(p.role.clone()),
+        })
+        .collect(),
         original_title: text(dto.original_title).filter(|t| *t != name),
         year: dto.production_year,
-        end_year: year_of(dto.end_date.as_deref()).filter(|_| !is_movie),
+        end_year: year_of(dto.end_date.as_deref()).filter(|_| is_series),
         continuing: dto
             .status
             .as_deref()
-            .filter(|_| !is_movie)
+            .filter(|_| is_series)
             .and_then(|s| match s {
                 "Continuing" => Some(true),
                 "Ended" => Some(false),
@@ -1394,6 +1505,7 @@ fn item_detail(dto: BaseItemDto, server: &str) -> Result<ItemDetail, EmbyError> 
             .studios
             .into_iter()
             .filter_map(|s| text(Some(s.name)))
+            .filter(|_| episode.is_none())
             .collect(),
         official_rating: text(dto.official_rating),
         community_rating: dto
@@ -1404,21 +1516,23 @@ fn item_detail(dto: BaseItemDto, server: &str) -> Result<ItemDetail, EmbyError> 
             .critic_rating
             .filter(|r| r.is_finite() && (0.0..=100.0).contains(r))
             .map(|r| r.round() as u32),
-        runtime_minutes: minutes(dto.run_time_ticks).filter(|_| is_movie),
+        // Films and episodes are played from their page; a series is not.
+        runtime_minutes: minutes(dto.run_time_ticks).filter(|_| !is_series),
         premiere_date: text(dto.premiere_date),
-        resume: if is_movie {
-            resume(&user_data, dto.run_time_ticks)
-        } else {
+        resume: if is_series {
             None
+        } else {
+            resume(&user_data, dto.run_time_ticks)
         },
         played: user_data.played,
         favorite: user_data.is_favorite,
-        unplayed_count: user_data.unplayed_item_count.filter(|_| !is_movie),
-        media: if is_movie {
-            dto.media_sources.into_iter().map(media_info).collect()
-        } else {
+        unplayed_count: user_data.unplayed_item_count.filter(|_| is_series),
+        media: if is_series {
             Vec::new()
+        } else {
+            dto.media_sources.into_iter().map(media_info).collect()
         },
+        episode,
         id: dto.id,
         kind,
         name,

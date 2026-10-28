@@ -73,7 +73,7 @@ Goal: sign in once, then reopen Viewer without entering credentials again, while
 - Acceptance criteria: a user authenticates once; subsequent launches connect automatically while credentials remain valid; a NAS outage shows a recovery screen instead of login; retry recovers the existing session; only a confirmed invalid session requests credentials; server switching is safe and explicit.
 - TODO: episode detail, search, sorting and filters come with Gate 3.
 
-## Gate 3 — Core experience [IN PROGRESS · home page with hero, search, sorting, filters and favorites VERIFIED]
+## Gate 3 — Core experience [IN PROGRESS · home page with hero, search, sorting, filters, favorites and episode page VERIFIED]
 
 Home, film/series browsing, details, search, accessible player UI, responsive layouts and artwork cache.
 
@@ -82,7 +82,8 @@ Home, film/series browsing, details, search, accessible player UI, responsive la
 - DONE: sorting and filters of a library grid (ADR 0013) — sort by title, date added, year or rating with a direction; watched filter (all, unwatched, watched, in progress for films); favorites; one genre from `emby_genres`; done by the server with paging restarted; choices kept per library, user and server; filtered empty state with "Réinitialiser les filtres".
 - DONE: favorites (ADR 0014) — "Favori" toggle on film and series detail pages (optimistic, rolled back on failure); home row "Favoris" (films and series by title, hidden when empty, read again after a change).
 - DONE: home hero (ADR 0015) — up to 5 titles with a backdrop, those to resume first, then films and series added recently and not watched; one title at a time, arrows, dots and ← →, no automatic rotation; "Lecture"/"Reprendre" plays the film or the episode, "Plus d'infos" opens the film or series.
-- TODO: episode detail, search of episodes, final player UI, artwork cache.
+- DONE: episode page (ADR 0016) — in a series the title opens the episode page and the thumbnail plays; series logo or name, "Saison N · Épisode M", episode image (else the series backdrop), air date, runtime, overview, directors, writers, guest stars, technical info, "Lecture"/"Reprendre"; previous/next across seasons with the focus kept; Escape back to the series on that episode, in its season. Home cards and the hero keep playing directly.
+- TODO: search of episodes, final player UI, artwork cache.
 - DROPPED (user decision, 2026-10-28): search of people.
 - Known input: the control bar hides subtitles at narrow widths (Gate 1 finding); views must provide an opaque background when no video plays (transparent window).
 
@@ -264,3 +265,12 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `npm run verify` green (Vitest 83/83, cargo test 83 passed / 12 ignored); `real_server_hero` passed (5 titles, 1.9 s); `gate3-hero` 1 failure (`emby_hero` rejected right after the short playback, cause not captured), then 3 passes; `gate3-home`, `gate3-favorites` (read only), `gate3-sort-filter`, `gate2-ui` passed. Evidence: `docs/evidence/gate3-heros-2026-10-28.md`.
 - **Not verified**: the failure above; specials (season 0) as the first unwatched episode; a narrow window; screen readers.
 - **Next**: episode detail or search of episodes and people (Gate 3).
+
+### 2026-10-28 — Episode page
+
+- **Changed**: ADR 0016; `DetailKind::Episode`, `EpisodeContext`, `EpisodeLink`, `ItemDetail.writers`/`episode`; `EmbyClient::adjacent_episodes` (`/Shows/{Id}/Episodes?AdjacentTo=`, without images or user data); `EmbyService::item_detail` accepts episodes (guest stars as cast, series poster and logo, episode image else series backdrop) and keeps the two neighbours of the same series; `format.ts` `episodePosition`, `episodeLinkCode`, `episodeItem`; `ItemDetail.svelte` nests an episode page over a series page (`inert`, hidden) with previous/next and focus kept; `EpisodeList.svelte` title button and `reveal(episodeId, seasonId)`; scenario helper `episodeTitle`, new scenario `scripts/e2e/gate3-episode.mjs`.
+- **Server finding**: `AdjacentTo` returns up to 5 episodes before and the whole rest of the series, across seasons.
+- **Tests**: `npm run verify` green (Vitest 87/87, cargo test 84 passed / 13 ignored); `real_server_episode_detail` passed (3 series, next in season 2); `gate3-episode` 21/21 after a focus bug found and fixed; regressions `gate2-ui`, `gate21-session`, `gate3-home`, `gate3-hero`, `gate3-sort-filter`, `gate3-search` passed. Evidence: `docs/evidence/gate3-fiche-episode-2026-10-28.md`.
+- **Server side effects**: short playbacks rewound to 0 before stopping; no resume point left (checked). Interrupted runs had left a resume point on one episode, origin not explained, cleared by the next run.
+- **Not verified**: specials and double episodes on the real server; return to an episode outside the loaded pages; narrow window; screen readers.
+- **Next**: search of episodes, or the final player UI (Gate 3).

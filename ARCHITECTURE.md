@@ -29,6 +29,8 @@ Sort and filters (ADR 0013): `emby_items` takes optional `ItemsOptions` (sort ke
 
 Favorites (ADR 0014): `emby_set_favorite(item_id, favorite)` returns the state the server reports; `emby_favorites()` feeds the home row. The detail page changes the toggle optimistically (`src/lib/detail/favorite.ts`) and tells `LibraryBrowser.svelte`, which bumps `favoritesVersion` so `Home.svelte` reads its row again.
 
+Episode page (ADR 0016): `emby_item_detail` also accepts an episode and returns its `EpisodeContext` (series, season, number) with the previous and next episodes from `/Shows/{SeriesId}/Episodes?AdjacentTo=` (across seasons, other series filtered out). `ItemDetail.svelte` renders it and nests itself: a series page opens an episode page over its own section (`inert`, `visibility: hidden`), previous/next replace it, and the return calls `EpisodeList.reveal(episodeId, seasonId)`.
+
 Home hero (ADR 0015): `emby_hero()` returns up to five `HeroItem`s chosen in Rust (resume first, then recent unwatched films and series with a backdrop; a series' play target is its first unwatched episode). The item carries the `MediaItem` the detail page opens and the id the main button plays; `src/lib/home/Hero.svelte` only displays it.
 
 Search (ADR 0011): `emby_search(query)` cleans the query in Rust and returns `SearchResults` (films and series, each with a "more" flag); `src/lib/search/` renders them in place of the current view of `LibraryBrowser.svelte`, whose sidebar holds the field.

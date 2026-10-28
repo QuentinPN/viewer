@@ -1,6 +1,6 @@
 <script lang="ts">
 // Season switcher and paged episode list of a series (DESIGN.md, Series).
-import { onMount, untrack } from "svelte";
+import { onMount, tick, untrack } from "svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
 import type {
   EmbyError,
@@ -19,11 +19,13 @@ interface Props {
   onError: (error: EmbyError) => EmbyError;
   /** `resume`: start where the server says the episode was left. */
   onPlay: (episodeId: string, resume: boolean) => void;
+  /** The title opens the episode page (ADR 0016); the thumbnail plays. */
+  onOpen: (episode: Episode) => void;
   /** Episode being opened by the server, if any. */
   starting: string | null;
 }
 
-let { seriesId, refresh, onError, onPlay, starting }: Props = $props();
+let { seriesId, refresh, onError, onPlay, onOpen, starting }: Props = $props();
 
 /** Long anime seasons exist; the rest comes with "Afficher plus d'épisodes". */
 const EPISODE_PAGE = 50;
@@ -34,6 +36,7 @@ let selected = $state<Season | null>(null);
 let pager = $state(emptyPager<Episode>());
 let loading = $state(false);
 let pageError = $state<EmbyError | null>(null);
+let root = $state<HTMLElement | null>(null);
 // Bumped on every season switch: answers for a previous season are dropped.
 let generation = 0;
 
@@ -90,6 +93,35 @@ async function loadMore() {
   }
 }
 
+/** Lets a season page arrive before giving up, without blocking forever. */
+async function settled() {
+  for (let waited = 0; (loading || seasons === null) && waited < 15000; ) {
+    await new Promise((r) => setTimeout(r, 50));
+    waited += 50;
+  }
+  await tick();
+}
+
+/**
+ * Back from an episode page (ADR 0016): shows the episode's season and focuses
+ * its title. Not in the loaded pages: the focus goes to its season button.
+ */
+export async function reveal(episodeId: string, seasonId: string | null) {
+  await settled();
+  const season = seasons?.find((s) => s.id === seasonId);
+  if (season && season.id !== selected?.id) {
+    select(season);
+    await settled();
+  }
+  const title = root?.querySelector<HTMLElement>(
+    `[data-episode-id="${CSS.escape(episodeId)}"] .open`,
+  );
+  const fallback = root?.querySelector<HTMLElement>(
+    '.seasons button[aria-pressed="true"]',
+  );
+  (title ?? fallback)?.focus();
+}
+
 function episodeMeta(e: Episode): string {
   return [formatMinutes(e.runtimeMinutes), formatDate(e.premiereDate)]
     .filter(Boolean)
@@ -125,7 +157,7 @@ onMount(() => {
 });
 </script>
 
-<section class="episodes" aria-labelledby="episodes-title">
+<section class="episodes" aria-labelledby="episodes-title" bind:this={root}>
   <h2 id="episodes-title">Épisodes</h2>
 
   {#if seasonsError}
@@ -165,7 +197,7 @@ onMount(() => {
       {#each pager.items as e (e.id)}
         {@const number = episodeNumber(e)}
         {@const meta = episodeMeta(e)}
-        <li class="episode">
+        <li class="episode" data-episode-id={e.id}>
           <button
             type="button"
             class="thumb"
@@ -206,7 +238,9 @@ onMount(() => {
           </button>
           <div class="body">
             <p class="kicker">{[number, meta].filter(Boolean).join(" · ")}</p>
-            <h3>{e.name}</h3>
+            <h3>
+              <button type="button" class="open" onclick={() => onOpen(e)}>{e.name}</button>
+            </h3>
             {#if e.played}
               <p class="sr-only">Déjà vu</p>
             {:else if e.resume}
@@ -418,7 +452,13 @@ onMount(() => {
     background: var(--color-accent);
   }
   .body {
+    position: relative;
     min-width: 0;
+    border-radius: var(--radius-sm);
+  }
+  .body:has(.open:focus-visible) {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 4px;
   }
   .kicker {
     margin: 0;
@@ -428,6 +468,27 @@ onMount(() => {
   h3 {
     margin: 2px 0 var(--space-1);
     font-size: 15px;
+  }
+  /* The whole text opens the page; the thumbnail keeps playing. */
+  .open {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font-weight: inherit;
+    text-align: start;
+  }
+  .open::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+  .body:hover .open {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .open:focus-visible {
+    outline: none;
   }
   .overview {
     margin: 0;

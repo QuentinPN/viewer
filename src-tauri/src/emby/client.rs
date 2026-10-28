@@ -525,6 +525,29 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
+    /// Episodes around one of a series, across seasons (ADR 0016). Emby 4.10.1.0
+    /// answers up to 5 episodes before it then the rest of the series, not just
+    /// its two neighbours: no images nor user data, to keep the answer small.
+    pub async fn adjacent_episodes(
+        &self,
+        user_id: &str,
+        series_id: &str,
+        episode_id: &str,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Shows/{}/Episodes", path_segment(series_id)?));
+        let params = [
+            ("UserId", path_segment(user_id)?),
+            ("AdjacentTo", path_segment(episode_id)?),
+            ("EnableImages", "false"),
+            ("EnableUserData", "false"),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
     /// Playback negotiation (ADR 0007): the server answers with its sources and how
     /// each can be played for this profile. Unknown id: 404.
     pub async fn playback_info(

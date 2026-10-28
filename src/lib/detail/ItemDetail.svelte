@@ -1,10 +1,13 @@
 <script lang="ts">
-// Detail page of a film or series (DESIGN.md, Film detail / Series). Shown over the
-// library grid, which stays mounted so its scroll position survives the return.
+// Detail page of a film, series or episode (DESIGN.md, Film detail / Series; ADR
+// 0016). Shown over the library grid, which stays mounted so its scroll position
+// survives the return. A series opens its episodes as a nested page over itself.
 import { onMount, tick, untrack } from "svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
 import type {
   EmbyError,
+  Episode,
+  EpisodeLink,
   ItemDetail,
   MediaItem,
   PlaybackStart,
@@ -14,6 +17,9 @@ import EpisodeList from "./EpisodeList.svelte";
 import { changeFavorite } from "./favorite";
 import {
   audioLabel,
+  episodeItem,
+  episodeLinkCode,
+  episodePosition,
   formatBitrate,
   formatDate,
   formatSize,
@@ -23,6 +29,7 @@ import {
   subtitleLabel,
   videoLabel,
 } from "./format";
+import EpisodePage from "./ItemDetail.svelte";
 
 interface Props {
   /** Grid card: title and poster are shown at once while the detail loads. */
@@ -36,10 +43,32 @@ interface Props {
   onPlay: (start: PlaybackStart) => void;
   /** The server took a favorite change: the home row "Favoris" reloads (ADR 0014). */
   onFavoriteChange?: (itemId: string, favorite: boolean) => void;
+  /** Episode page: shows a neighbour episode instead (ADR 0016). */
+  onNavigate?: (link: EpisodeLink, via: Direction) => void;
+  /** Episode page reached by a previous/next button: the focus goes back to it. */
+  focusOnLoad?: Direction | null;
+  /** Episode page: called with each loaded detail. */
+  onLoaded?: (detail: ItemDetail) => void;
 }
 
-let { item, refresh, onClose, onError, onPlay, onFavoriteChange }: Props =
-  $props();
+type Direction = "previous" | "next";
+
+let {
+  item,
+  refresh,
+  onClose,
+  onError,
+  onPlay,
+  onFavoriteChange,
+  onNavigate,
+  focusOnLoad = null,
+  onLoaded,
+}: Props = $props();
+
+// Only an episode page is nested over another page: ids stay unique.
+const isEpisodePage = untrack(() => item.itemType === "Episode");
+const titleId = isEpisodePage ? "episode-title" : "detail-title";
+const techId = isEpisodePage ? "episode-tech-title" : "tech-title";
 
 let detail = $state<ItemDetail | null>(null);
 let error = $state<EmbyError | null>(null);
@@ -57,11 +86,23 @@ let fromStartButton = $state<HTMLButtonElement | null>(null);
 /** A favorite change is waiting for the server: further clicks are ignored. */
 let savingFavorite = $state(false);
 let favoriteError = $state<EmbyError | null>(null);
+let previousButton = $state<HTMLButtonElement | null>(null);
+let nextButton = $state<HTMLButtonElement | null>(null);
+/** Consumed by the first load only: a later reload leaves the focus alone. */
+let pendingFocus = untrack(() => focusOnLoad);
+/** Episode page open over this series page, and how it was reached. */
+let opened = $state<{ item: MediaItem; via: Direction | null } | null>(null);
+/** Season of the episode shown, for the return to the list. */
+let openedSeason: string | null = null;
+let episodeList = $state<ReturnType<typeof EpisodeList> | null>(null);
 
 const poster = $derived(detail?.poster ?? item.poster);
 const meta = $derived(detail ? metaParts(detail) : []);
 const rating = $derived(ratingLabel(detail?.communityRating ?? null));
 const premiere = $derived(formatDate(detail?.premiereDate ?? null));
+const position = $derived(
+  detail?.episode ? episodePosition(detail.episode) : null,
+);
 
 // Back online: read the page again in place (watched state may have changed).
 let seenRefresh = untrack(() => refresh);
@@ -78,7 +119,17 @@ async function load() {
   error = null;
   try {
     const d = await embyApi.itemDetail(item.id);
-    if (d.id === item.id) detail = d;
+    if (d.id !== item.id) return;
+    detail = d;
+    onLoaded?.(d);
+    if (pendingFocus) {
+      const via = pendingFocus;
+      pendingFocus = null;
+      await tick();
+      const button = via === "next" ? nextButton : previousButton;
+      if (button) button.focus();
+      else heading?.focus({ preventScroll: true });
+    }
   } catch (e) {
     error = onError(toEmbyError(e));
   }
@@ -142,9 +193,29 @@ async function onStopped(state: PlaybackStopped) {
   }
 }
 
-/** Hidden under the player: keys belong to the player then. */
+function openEpisode(e: Episode) {
+  openedSeason = null;
+  opened = { item: episodeItem(e), via: null };
+}
+
+function navigate(link: EpisodeLink, via: Direction) {
+  openedSeason = null;
+  opened = { item: episodeItem(link), via };
+}
+
+/** Back to the series, on the episode shown last (ADR 0016). */
+async function closeEpisode() {
+  const id = opened?.item.id;
+  const season = openedSeason;
+  opened = null;
+  if (!id) return;
+  await tick();
+  await episodeList?.reveal(id, season);
+}
+
+/** Hidden under the player or an episode page: keys belong to them then. */
 function active() {
-  return section?.checkVisibility() ?? false;
+  return !opened && (section?.checkVisibility() ?? false);
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -175,7 +246,9 @@ onMount(() => {
 
 <section
   class="detail"
-  aria-labelledby="detail-title"
+  class:covered={opened !== null}
+  inert={opened !== null}
+  aria-labelledby={titleId}
   aria-busy={!detail && !error}
   bind:this={section}
 >
@@ -208,8 +281,25 @@ onMount(() => {
       </div>
 
       <div class="headline">
-        <h1 id="detail-title" tabindex="-1" bind:this={heading}>
-          {#if detail?.logo && !logoFailed}
+        {#if detail?.episode}
+          <p class="series">
+            {#if detail.logo && !logoFailed}
+              <img
+                class="series-logo"
+                src={detail.logo.src}
+                srcset={detail.logo.srcset}
+                sizes="200px"
+                alt={detail.episode.seriesName}
+                onerror={() => (logoFailed = true)}
+              />
+            {:else}
+              {detail.episode.seriesName}
+            {/if}
+          </p>
+          {#if position}<p class="position">{position}</p>{/if}
+        {/if}
+        <h1 id={titleId} tabindex="-1" bind:this={heading}>
+          {#if detail?.logo && !logoFailed && detail.kind !== "episode"}
             <img
               class="logo"
               src={detail.logo.src}
@@ -274,7 +364,7 @@ onMount(() => {
           </div>
 
           <div class="play-actions">
-            {#if detail.kind === "movie"}
+            {#if detail.kind !== "series"}
               <button
                 type="button"
                 class="primary play"
@@ -299,6 +389,7 @@ onMount(() => {
                 </button>
               {/if}
             {/if}
+            {#if detail.kind !== "episode"}
             <button
               type="button"
               class="secondary favorite"
@@ -312,6 +403,7 @@ onMount(() => {
               >
               Favori
             </button>
+            {/if}
           </div>
         {:else if !error}
           <div class="sk-meta" aria-hidden="true"></div>
@@ -329,7 +421,9 @@ onMount(() => {
         {#if errorHint(error)}<p class="hint">{errorHint(error)}</p>{/if}
         <div class="actions">
           <button type="button" class="primary" onclick={load}>Réessayer</button>
-          <button type="button" class="secondary" onclick={onClose}>Retour à la bibliothèque</button>
+          <button type="button" class="secondary" onclick={onClose}
+            >{isEpisodePage ? "Retour à la série" : "Retour à la bibliothèque"}</button
+          >
         </div>
       </div>
     {:else if detail}
@@ -350,9 +444,15 @@ onMount(() => {
               <dd>{detail.directors.join(", ")}</dd>
             </div>
           {/if}
+          {#if detail.writers.length > 0}
+            <div>
+              <dt>Scénario</dt>
+              <dd>{detail.writers.join(", ")}</dd>
+            </div>
+          {/if}
           {#if detail.cast.length > 0}
             <div>
-              <dt>Avec</dt>
+              <dt>{detail.kind === "episode" ? "Invités" : "Avec"}</dt>
               <dd>{detail.cast.map((c) => c.name).join(", ")}</dd>
             </div>
           {/if}
@@ -362,7 +462,7 @@ onMount(() => {
               <dd>{detail.studios.join(", ")}</dd>
             </div>
           {/if}
-          {#if premiere}
+          {#if premiere && detail.kind !== "episode"}
             <div>
               <dt>{detail.kind === "series" ? "Première diffusion" : "Sortie"}</dt>
               <dd>{premiere}</dd>
@@ -379,15 +479,17 @@ onMount(() => {
 
       {#if detail.kind === "series"}
         <EpisodeList
+          bind:this={episodeList}
           seriesId={detail.id}
           {refresh}
           {onError}
           onPlay={play}
+          onOpen={openEpisode}
           {starting}
         />
       {:else if detail.media.length > 0}
-        <section class="tech" aria-labelledby="tech-title">
-          <h2 id="tech-title">Informations techniques</h2>
+        <section class="tech" aria-labelledby={techId}>
+          <h2 id={techId}>Informations techniques</h2>
           {#each detail.media as media, i (i)}
             <div class="media">
               {#if detail.media.length > 1}
@@ -449,6 +551,36 @@ onMount(() => {
           </p>
         </section>
       {/if}
+
+      {#if detail.episode && (detail.episode.previous || detail.episode.next)}
+        {@const ep = detail.episode}
+        <nav class="adjacent" aria-label="Épisodes voisins">
+          {#if ep.previous}
+            {@const link = ep.previous}
+            <button
+              type="button"
+              class="previous"
+              bind:this={previousButton}
+              onclick={() => onNavigate?.(link, "previous")}
+            >
+              <span class="direction">Épisode précédent</span>
+              <span class="target">{[episodeLinkCode(link), link.name].filter(Boolean).join(" · ")}</span>
+            </button>
+          {/if}
+          {#if ep.next}
+            {@const link = ep.next}
+            <button
+              type="button"
+              class="next"
+              bind:this={nextButton}
+              onclick={() => onNavigate?.(link, "next")}
+            >
+              <span class="direction">Épisode suivant</span>
+              <span class="target">{[episodeLinkCode(link), link.name].filter(Boolean).join(" · ")}</span>
+            </button>
+          {/if}
+        </nav>
+      {/if}
     {:else}
       <div class="sk-text" aria-hidden="true">
         <div></div>
@@ -479,6 +611,21 @@ onMount(() => {
   {/if}
 </section>
 
+{#if opened}
+  {#key opened.item.id}
+    <EpisodePage
+      item={opened.item}
+      {refresh}
+      onClose={closeEpisode}
+      {onError}
+      {onPlay}
+      onNavigate={navigate}
+      focusOnLoad={opened.via}
+      onLoaded={(d) => (openedSeason = d.episode?.seasonId ?? null)}
+    />
+  {/key}
+{/if}
+
 <style>
   .detail {
     position: absolute;
@@ -486,6 +633,10 @@ onMount(() => {
     overflow-y: auto;
     background: var(--color-bg);
     outline: none;
+  }
+  /* Under an episode page: kept with its scroll position, not painted. */
+  .covered {
+    visibility: hidden;
   }
   .hero {
     position: relative;
@@ -588,6 +739,69 @@ onMount(() => {
     max-height: 140px;
     object-fit: contain;
     object-position: left bottom;
+  }
+  .series {
+    margin: 0 0 var(--space-2);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+  }
+  .series-logo {
+    display: block;
+    max-width: min(200px, 60%);
+    max-height: 56px;
+    object-fit: contain;
+    object-position: left bottom;
+  }
+  .position {
+    margin: 0 0 var(--space-1);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+  .adjacent {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    margin-top: 40px;
+    max-width: 900px;
+  }
+  .adjacent button {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: var(--space-3) var(--space-4);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+    transition: background var(--motion-fast) ease-out;
+  }
+  .adjacent button:hover {
+    background: var(--color-elevated);
+  }
+  .adjacent .next {
+    grid-column: 2;
+    align-items: flex-end;
+    text-align: end;
+  }
+  .direction {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+  }
+  .target {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .original {
     margin: var(--space-2) 0 0;
@@ -908,6 +1122,12 @@ onMount(() => {
     }
     .media dl {
       grid-template-columns: 1fr;
+    }
+    .adjacent {
+      grid-template-columns: 1fr;
+    }
+    .adjacent .next {
+      grid-column: 1;
     }
   }
 </style>

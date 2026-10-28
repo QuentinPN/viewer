@@ -542,12 +542,39 @@ pub struct HeroEpisode {
     pub index: Option<u32>,
 }
 
-/// Kinds of item a detail page shows. Episodes open from their series for now.
+/// Kinds of item a detail page shows. Episodes open from their series (ADR 0016).
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum DetailKind {
     Movie,
     Series,
+    Episode,
+}
+
+/// Where an episode sits in its series, and its neighbours (ADR 0016).
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct EpisodeContext {
+    pub series_id: String,
+    pub series_name: String,
+    pub season_id: Option<String>,
+    /// `0` is the specials season.
+    pub season_index: Option<u32>,
+    pub index: Option<u32>,
+    pub index_end: Option<u32>,
+    /// Previous episode of the series, across seasons, in server order.
+    pub previous: Option<EpisodeLink>,
+    pub next: Option<EpisodeLink>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct EpisodeLink {
+    pub id: String,
+    pub name: String,
+    pub season_index: Option<u32>,
+    pub index: Option<u32>,
+    pub index_end: Option<u32>,
 }
 
 /// Where playback stopped, for an item started but not finished.
@@ -623,17 +650,22 @@ pub struct ItemDetail {
     pub genres: Vec<String>,
     pub studios: Vec<String>,
     pub directors: Vec<String>,
+    pub writers: Vec<String>,
+    /// Actors; guest stars for an episode.
     pub cast: Vec<CastMember>,
     pub official_rating: Option<String>,
     /// Out of 10, one decimal.
     pub community_rating: Option<f64>,
     /// Out of 100.
     pub critic_rating: Option<u32>,
-    /// Movie only.
+    /// Movie and episode only.
     pub runtime_minutes: Option<u32>,
     pub premiere_date: Option<String>,
+    /// The series poster for an episode.
     pub poster: Option<ImageRef>,
+    /// The episode's own image for an episode, else the series backdrop.
     pub backdrop: Option<ImageRef>,
+    /// The series logo for an episode.
     pub logo: Option<ImageRef>,
     pub played: bool,
     /// In the user's favorites (ADR 0014).
@@ -641,8 +673,10 @@ pub struct ItemDetail {
     pub resume: Option<ResumePoint>,
     /// Series only.
     pub unplayed_count: Option<u32>,
-    /// Movie only; empty for a series.
+    /// Movie and episode only; empty for a series.
     pub media: Vec<MediaInfo>,
+    /// Episode only.
+    pub episode: Option<EpisodeContext>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]

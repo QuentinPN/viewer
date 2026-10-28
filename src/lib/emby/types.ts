@@ -157,7 +157,30 @@ export interface ItemPage {
   total: number;
 }
 
-export type DetailKind = "movie" | "series";
+export type DetailKind = "movie" | "series" | "episode";
+
+/** Neighbour of an episode in its series (ADR 0016). */
+export interface EpisodeLink {
+  id: string;
+  name: string;
+  seasonIndex: number | null;
+  index: number | null;
+  indexEnd: number | null;
+}
+
+/** Where an episode sits in its series (ADR 0016). */
+export interface EpisodeContext {
+  seriesId: string;
+  seriesName: string;
+  seasonId: string | null;
+  /** 0 is the specials season. */
+  seasonIndex: number | null;
+  index: number | null;
+  indexEnd: number | null;
+  /** In server order, across seasons. */
+  previous: EpisodeLink | null;
+  next: EpisodeLink | null;
+}
 
 /** Where playback stopped on a started, unfinished item. */
 export interface ResumePoint {
@@ -215,6 +238,8 @@ export interface ItemDetail {
   genres: string[];
   studios: string[];
   directors: string[];
+  writers: string[];
+  /** Actors; guest stars for an episode. */
   cast: CastMember[];
   officialRating: string | null;
   communityRating: number | null;
@@ -231,6 +256,8 @@ export interface ItemDetail {
   resume: ResumePoint | null;
   unplayedCount: number | null;
   media: MediaInfo[];
+  /** Episode only. */
+  episode: EpisodeContext | null;
 }
 
 export interface Season {

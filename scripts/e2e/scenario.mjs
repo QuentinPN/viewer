@@ -58,6 +58,8 @@ export const cards = (page) => page.locator("ul.grid button.card");
 /** Home page, the default view once signed in (ADR 0010). */
 export const homeHeading = (page) => page.locator(".home h1");
 export const detailTitle = (page) => page.locator("#detail-title");
+/** Episode page nested over a series page (ADR 0016). */
+export const episodeTitle = (page) => page.locator("#episode-title");
 
 /** Waits for the first screen: `"signedIn"` or `"signedOut"`. */
 export async function startScreen(page) {

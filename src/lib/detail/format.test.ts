@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
-import type { Episode, ItemDetail, Season, StreamInfo } from "../emby/types";
+import type {
+  Episode,
+  EpisodeContext,
+  ItemDetail,
+  Season,
+  StreamInfo,
+} from "../emby/types";
 import { languageName } from "../format/language";
 import {
   audioLabel,
   defaultSeason,
+  episodeItem,
+  episodeLinkCode,
   episodeNumber,
+  episodePosition,
   formatBitrate,
   formatDate,
   formatSize,
@@ -29,6 +38,7 @@ const detail = (over: Partial<ItemDetail>): ItemDetail => ({
   genres: [],
   studios: [],
   directors: [],
+  writers: [],
   cast: [],
   officialRating: null,
   communityRating: null,
@@ -43,6 +53,19 @@ const detail = (over: Partial<ItemDetail>): ItemDetail => ({
   resume: null,
   unplayedCount: null,
   media: [],
+  episode: null,
+  ...over,
+});
+
+const context = (over: Partial<EpisodeContext>): EpisodeContext => ({
+  seriesId: "s",
+  seriesName: "Série",
+  seasonId: null,
+  seasonIndex: 2,
+  index: 14,
+  indexEnd: null,
+  previous: null,
+  next: null,
   ...over,
 });
 
@@ -122,6 +145,62 @@ describe("header", () => {
     const label = formatDate("2024-07-04T22:00:00.0000000Z");
     expect(label).toMatch(/juillet 2024$/);
     expect(formatDate("pas une date")).toBeNull();
+  });
+});
+
+describe("episode page", () => {
+  it("names the season and episode", () => {
+    expect(episodePosition(context({}))).toBe("Saison 2 · Épisode 14");
+    expect(episodePosition(context({ index: 2, indexEnd: 3 }))).toBe(
+      "Saison 2 · Épisodes 2–3",
+    );
+    expect(episodePosition(context({ seasonIndex: 0, index: 3 }))).toBe(
+      "Spécial 3",
+    );
+    expect(episodePosition(context({ seasonIndex: null }))).toBe("Épisode 14");
+    expect(
+      episodePosition(context({ seasonIndex: null, index: null })),
+    ).toBeNull();
+  });
+
+  it("labels the previous and next episodes", () => {
+    const link = { id: "1", name: "Pilote", indexEnd: null };
+    expect(episodeLinkCode({ ...link, seasonIndex: 2, index: 1 })).toBe(
+      "S2 · É1",
+    );
+    expect(
+      episodeLinkCode({ ...link, seasonIndex: 1, index: 2, indexEnd: 3 }),
+    ).toBe("S1 · É2–3");
+    expect(episodeLinkCode({ ...link, seasonIndex: 0, index: null })).toBe(
+      "Spécial",
+    );
+    expect(episodeLinkCode({ ...link, seasonIndex: null, index: null })).toBe(
+      null,
+    );
+  });
+
+  it("shows the air date instead of the year in the header", () => {
+    const parts = metaParts(
+      detail({
+        kind: "episode",
+        year: 2024,
+        premiereDate: "2024-07-04T22:00:00.0000000Z",
+        runtimeMinutes: 24,
+      }),
+    );
+    expect(parts).toHaveLength(2);
+    expect(parts[0]).toMatch(/juillet 2024$/);
+    expect(parts[1]).toBe("24 min");
+  });
+
+  it("builds the card shown while the page loads", () => {
+    expect(episodeItem({ id: "7", name: "Pilote" })).toMatchObject({
+      id: "7",
+      name: "Pilote",
+      itemType: "Episode",
+      poster: null,
+      played: false,
+    });
   });
 });
 

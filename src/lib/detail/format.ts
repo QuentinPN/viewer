@@ -1,7 +1,10 @@
 // Pure French labels for the detail page; unit tested in format.test.ts.
 import type {
   Episode,
+  EpisodeContext,
+  EpisodeLink,
   ItemDetail,
+  MediaItem,
   ResumePoint,
   Season,
   StreamInfo,
@@ -24,10 +27,64 @@ export function yearsLabel(d: ItemDetail): string | null {
   return String(d.year);
 }
 
-/** Year, duration and age rating of the header line. */
+/** `Saison 2 · Épisode 14`, `Saison 1 · Épisodes 2–3`, `Spécial 3` (ADR 0016). */
+export function episodePosition(ep: EpisodeContext): string | null {
+  if (ep.seasonIndex === 0)
+    return ep.index == null ? "Spécial" : `Spécial ${ep.index}`;
+  const episode =
+    ep.index == null
+      ? null
+      : ep.indexEnd != null && ep.indexEnd > ep.index
+        ? `Épisodes ${ep.index}–${ep.indexEnd}`
+        : `Épisode ${ep.index}`;
+  return (
+    [ep.seasonIndex == null ? null : `Saison ${ep.seasonIndex}`, episode]
+      .filter(Boolean)
+      .join(" · ") || null
+  );
+}
+
+/** `S2 · É1`, `S1 · É2–3`, `Spécial 3` for the previous/next buttons. */
+export function episodeLinkCode(link: EpisodeLink): string | null {
+  if (link.seasonIndex === 0)
+    return link.index == null ? "Spécial" : `Spécial ${link.index}`;
+  const index =
+    link.index == null
+      ? null
+      : link.indexEnd != null && link.indexEnd > link.index
+        ? `É${link.index}–${link.indexEnd}`
+        : `É${link.index}`;
+  return (
+    [link.seasonIndex == null ? null : `S${link.seasonIndex}`, index]
+      .filter(Boolean)
+      .join(" · ") || null
+  );
+}
+
+/** Card shown at once while an episode page loads. */
+export function episodeItem(e: {
+  id: string;
+  name: string;
+  runtimeMinutes?: number | null;
+  played?: boolean;
+}): MediaItem {
+  return {
+    id: e.id,
+    name: e.name,
+    itemType: "Episode",
+    year: null,
+    runtimeMinutes: e.runtimeMinutes ?? null,
+    poster: null,
+    aspectRatio: null,
+    played: e.played ?? false,
+    unplayedCount: null,
+  };
+}
+
+/** Year (air date for an episode), duration and age rating of the header line. */
 export function metaParts(d: ItemDetail): string[] {
   return [
-    yearsLabel(d),
+    d.kind === "episode" ? formatDate(d.premiereDate) : yearsLabel(d),
     formatMinutes(d.runtimeMinutes),
     d.officialRating,
   ].filter((p): p is string => !!p);

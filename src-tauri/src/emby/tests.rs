@@ -230,6 +230,8 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
             p if p == format!("{items}/30207") => (200, movie_detail()),
             p if p == format!("{items}/80473") => (200, series_detail()),
             p if p == format!("{items}/80475") => (200, episode_detail()),
+            p if p == format!("{items}/80476") => (200, bare_episode_detail()),
+            p if p == format!("{items}/80474") => (200, season_detail()),
             p if p.starts_with(&format!("{items}/")) => (404, NOT_FOUND_TEXT.into()),
             "/emby/Shows/80473/Seasons" => (200, seasons()),
             "/emby/Shows/80473/Episodes" if query.contains("IsPlayed=false") => {
@@ -244,6 +246,12 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
             // Emby trusts SeasonId: a season of another series returns its episodes.
             "/emby/Shows/80473/Episodes" if query.contains("SeasonId=67639") => {
                 (200, foreign_episodes())
+            }
+            "/emby/Shows/80473/Episodes" if query.contains("AdjacentTo=80475") => {
+                (200, adjacent_episodes())
+            }
+            "/emby/Shows/80473/Episodes" if query.contains("AdjacentTo=") => {
+                (200, r#"{"Items":[],"TotalRecordCount":0}"#.into())
             }
             p if p.starts_with("/emby/Shows/") => (404, NOT_FOUND_TEXT.into()),
             "/emby/Items/30207/PlaybackInfo" if r.method == "POST" => (200, playback_direct()),
@@ -338,8 +346,53 @@ fn series_detail() -> String {
         .into()
 }
 
+/// Trimmed `/Users/{Id}/Items/{Id}` answer of an episode (Emby 4.10.1.0 field set):
+/// series artwork comes as `Parent…` fields.
 fn episode_detail() -> String {
-    r#"{"Name":"La Nouvelle Recrue","Id":"80475","Type":"Episode","SeriesId":"80473"}"#.into()
+    r#"{"Name":" La Nouvelle Recrue ","Id":"80475","Type":"Episode","SeriesId":"80473",
+        "SeriesName":"2.5 Dimensional Seduction","SeasonId":"80474","SeasonName":"Saison 1",
+        "IndexNumber":1,"ParentIndexNumber":1,"Path":"/share/Anime/2.5/S01E01.mkv",
+        "PremiereDate":"2024-07-04T22:00:00.0000000Z","RunTimeTicks":14400640000,
+        "Overview":"Seul membre du club…","CommunityRating":7.4,"Studios":[{"Name":"J.C.Staff","Id":1}],
+        "People":[{"Name":"Kyo Kim","Id":"1","Type":"Director"},
+                  {"Name":"Mariko Kunisawa","Id":"2","Type":"Writer"},
+                  {"Name":"Habitué","Id":"3","Type":"Actor","Role":"Okumura"},
+                  {"Name":"Invitée","Id":"4","Type":"GuestStar","Role":"Lilysa"}],
+        "UserData":{"PlaybackPositionTicks":7200000000,"Played":false,"IsFavorite":false},
+        "ImageTags":{"Primary":"9e617fa1_6385"},"BackdropImageTags":[],
+        "ParentBackdropItemId":"80473","ParentBackdropImageTags":["b4ckd70p_6385"],
+        "ParentLogoItemId":"80473","ParentLogoImageTag":"l0g0_6385","SeriesPrimaryImageTag":"4b62464b_6385",
+        "MediaSources":[{"Protocol":"File","Id":"ms80475","Path":"/share/Anime/2.5/S01E01.mkv",
+          "Container":"mkv","Size":400000000,"Bitrate":2200000,
+          "MediaStreams":[{"Codec":"h264","Type":"Video","Height":1080,"Width":1920},
+                          {"Codec":"aac","Language":"jpn","Type":"Audio","Channels":2,"IsDefault":true},
+                          {"Codec":"ass","Language":"fre","Type":"Subtitle","IsDefault":true}]}]}"#
+        .into()
+}
+
+/// An episode without its own image, missing from the server's `AdjacentTo` answer.
+fn bare_episode_detail() -> String {
+    r#"{"Name":"Double","Id":"80476","Type":"Episode","SeriesId":"80473","SeasonId":"80474",
+        "IndexNumber":2,"IndexNumberEnd":3,"ParentIndexNumber":1,
+        "ParentBackdropItemId":"80473","ParentBackdropImageTags":["b4ckd70p_6385"]}"#
+        .into()
+}
+
+fn season_detail() -> String {
+    r#"{"Name":"Saison 1","Id":"80474","Type":"Season","SeriesId":"80473"}"#.into()
+}
+
+/// `AdjacentTo=80475`: Emby returns a few episodes before it, then the rest of the
+/// series across seasons; an item of another series is ignored.
+fn adjacent_episodes() -> String {
+    r#"{"Items":[
+        {"Name":"Spécial","Id":"80470","Type":"Episode","SeriesId":"80473","ParentIndexNumber":0,"IndexNumber":1},
+        {"Name":"Intrus","Id":"67640","Type":"Episode","SeriesId":"67638","ParentIndexNumber":1,"IndexNumber":9},
+        {"Name":"La Nouvelle Recrue","Id":"80475","Type":"Episode","SeriesId":"80473","ParentIndexNumber":1,"IndexNumber":1},
+        {"Name":" Double ","Id":"80476","Type":"Episode","SeriesId":"80473","ParentIndexNumber":1,"IndexNumber":2,"IndexNumberEnd":3},
+        {"Name":"Saison 2","Id":"80490","Type":"Episode","SeriesId":"80473","ParentIndexNumber":2,"IndexNumber":1}
+    ],"TotalRecordCount":5}"#
+        .into()
 }
 
 fn seasons() -> String {
@@ -1344,6 +1397,110 @@ fn series_detail_seasons_and_episodes() {
 }
 
 #[test]
+fn episode_detail_has_series_context_guests_and_neighbours_across_seasons() {
+    use super::models::DetailKind;
+    let (server, fx, _) = signed_in_browser();
+    let d = run(fx.service.item_detail("80475")).unwrap();
+    assert_eq!(d.kind, DetailKind::Episode);
+    assert_eq!(d.name, "La Nouvelle Recrue");
+    let json = serde_json::to_string(&d).unwrap();
+    assert!(!json.contains("/share"), "NAS path leaked: {json}");
+
+    let ep = d.episode.as_ref().unwrap();
+    assert_eq!(ep.series_id, "80473");
+    assert_eq!(ep.series_name, "2.5 Dimensional Seduction");
+    assert_eq!(ep.season_id.as_deref(), Some("80474"));
+    assert_eq!(
+        (ep.season_index, ep.index, ep.index_end),
+        (Some(1), Some(1), None)
+    );
+    let prev = ep.previous.as_ref().unwrap();
+    assert_eq!(
+        (prev.id.as_str(), prev.season_index, prev.index),
+        ("80470", Some(0), Some(1)),
+        "another series' episode in between is skipped"
+    );
+    let next = ep.next.as_ref().unwrap();
+    assert_eq!(
+        (next.id.as_str(), next.name.as_str(), next.index_end),
+        ("80476", "Double", Some(3))
+    );
+
+    assert_eq!(d.directors, ["Kyo Kim"]);
+    assert_eq!(d.writers, ["Mariko Kunisawa"]);
+    let guests: Vec<_> = d.cast.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(
+        guests,
+        ["Invitée"],
+        "the regular cast belongs to the series"
+    );
+    assert!(d.studios.is_empty());
+    assert_eq!(d.runtime_minutes, Some(24));
+    assert_eq!(d.community_rating, Some(7.4));
+    assert_eq!(d.resume.as_ref().unwrap().position_seconds, 720);
+    assert_eq!(
+        (d.end_year, d.continuing, d.unplayed_count),
+        (None, None, None)
+    );
+    assert!(
+        d.backdrop
+            .as_ref()
+            .unwrap()
+            .src
+            .contains("/80475/Primary?tag=9e617fa1_6385"),
+        "the episode's own image first"
+    );
+    assert!(d.backdrop.as_ref().unwrap().srcset.contains(" 1920w"));
+    assert!(
+        d.poster
+            .as_ref()
+            .unwrap()
+            .src
+            .contains("/80473/Primary?tag=4b62464b_6385")
+    );
+    assert!(
+        d.logo
+            .as_ref()
+            .unwrap()
+            .src
+            .contains("/80473/Logo?tag=l0g0_6385")
+    );
+    let media = &d.media[0];
+    assert_eq!(media.audio[0].language.as_deref(), Some("jpn"));
+    assert_eq!(media.subtitles.len(), 1);
+
+    let reqs = server.requests();
+    let adjacent = reqs.last().unwrap();
+    let (path, query) = adjacent.path.split_once('?').unwrap();
+    assert_eq!(path, "/emby/Shows/80473/Episodes");
+    for expected in [
+        "AdjacentTo=80475",
+        &format!("UserId={USER_ID}"),
+        "EnableImages=false",
+        "EnableUserData=false",
+    ] {
+        assert!(
+            query.split('&').any(|p| p == expected),
+            "{expected} in {query}"
+        );
+    }
+    assert!(!adjacent.path.contains(TOKEN));
+
+    // No own image: the series backdrop; not in the server's answer: no neighbours.
+    let bare = run(fx.service.item_detail("80476")).unwrap();
+    assert!(
+        bare.backdrop
+            .unwrap()
+            .src
+            .contains("/80473/Backdrop?tag=b4ckd70p_6385")
+    );
+    let ep = bare.episode.unwrap();
+    assert_eq!((ep.index, ep.index_end), (Some(2), Some(3)));
+    assert!(ep.previous.is_none() && ep.next.is_none());
+    assert!(bare.poster.is_none() && bare.logo.is_none());
+}
+
+#[test]
 fn detail_refuses_foreign_seasons_unknown_ids_and_other_types() {
     let (server, fx, revoked) = signed_in_browser();
     let err = run(fx.service.episodes("80473", "67639", 0, 50)).unwrap_err();
@@ -1353,7 +1510,7 @@ fn detail_refuses_foreign_seasons_unknown_ids_and_other_types() {
     assert!(matches!(err, EmbyError::NotFound), "{err:?}");
     let err = run(fx.service.seasons("999")).unwrap_err();
     assert!(matches!(err, EmbyError::NotFound), "{err:?}");
-    let err = run(fx.service.item_detail("80475")).unwrap_err();
+    let err = run(fx.service.item_detail("80474")).unwrap_err();
     assert!(matches!(err, EmbyError::InvalidResponse(_)), "{err:?}");
 
     let before = server.requests().len();
@@ -2044,6 +2201,7 @@ fn real_server_details_seasons_episodes() {
                             episodes_seen += eps.items.len();
                         }
                     }
+                    DetailKind::Episode => panic!("{}: episode in a library grid", d.name),
                 }
             }
         }
@@ -3434,4 +3592,96 @@ fn real_server_hero() {
             .skip(resumed.count())
             .all(|h| h.reason == HeroReason::Latest)
     );
+}
+
+/// Read only: the last episode of a season of a series with several seasons has
+/// its neighbours in the same season before and in the next season after (ADR 0016).
+#[test]
+#[ignore = "needs the real Emby server and VIEWER_EMBY_* variables"]
+fn real_server_episode_detail() {
+    use super::models::DetailKind;
+    let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} manquant"));
+    let path = std::env::temp_dir()
+        .join(format!("viewer-emby-real-{}", uuid::Uuid::new_v4()))
+        .join("session.json");
+    SessionFile {
+        device_id: REAL_DEVICE_ID.into(),
+        ..SessionFile::default()
+    }
+    .save(&path)
+    .unwrap();
+    let fx = reopen(Arc::new(MemoryCredentialStore::default()), path);
+    run(fx.service.sign_in(
+        &var("VIEWER_EMBY_URL"),
+        &var("VIEWER_EMBY_USER"),
+        &var("VIEWER_EMBY_PASSWORD"),
+    ))
+    .unwrap();
+
+    let mut checked = 0;
+    'libraries: for lib in run(fx.service.libraries()).unwrap() {
+        let page = run(fx.service.items(&lib.id, 0, 100, &Default::default())).unwrap();
+        for series in page.items.iter().filter(|i| i.item_type == "Series") {
+            let seasons: Vec<_> = run(fx.service.seasons(&series.id))
+                .unwrap()
+                .into_iter()
+                .filter(|s| s.index.is_some_and(|i| i > 0))
+                .collect();
+            if seasons.len() < 2 {
+                continue;
+            }
+            let eps = run(fx.service.episodes(&series.id, &seasons[0].id, 0, 200)).unwrap();
+            let regular: Vec<_> = eps
+                .items
+                .iter()
+                .filter(|e| e.season_index == seasons[0].index)
+                .collect();
+            let Some(last) = regular.last() else { continue };
+            let t = std::time::Instant::now();
+            let d = run(fx.service.item_detail(&last.id)).unwrap();
+            let ms = t.elapsed().as_millis();
+            let ep = d.episode.as_ref().expect("episode context");
+            let show = |l: &Option<super::models::EpisodeLink>| {
+                l.as_ref()
+                    .map(|l| format!("S{:?}E{:?} {}", l.season_index, l.index, l.name))
+            };
+            println!(
+                "{} S{:?}E{:?} « {} » en {ms} ms : précédent={:?} suivant={:?} réal={:?} scénario={:?} invités={} image={} logo={} médias={}",
+                ep.series_name,
+                ep.season_index,
+                ep.index,
+                d.name,
+                show(&ep.previous),
+                show(&ep.next),
+                d.directors,
+                d.writers,
+                d.cast.len(),
+                d.backdrop.is_some(),
+                d.logo.is_some(),
+                d.media.len(),
+            );
+            assert_eq!(d.kind, DetailKind::Episode);
+            assert_eq!(ep.series_id, series.id);
+            let next = ep
+                .next
+                .as_ref()
+                .expect("an episode after the season's last");
+            assert!(
+                next.season_index > ep.season_index,
+                "next crosses to a later season: {next:?}"
+            );
+            if regular.len() > 1 {
+                let prev = ep.previous.as_ref().expect("previous in the season");
+                assert_eq!(prev.id, regular[regular.len() - 2].id);
+            }
+            assert!(d.backdrop.is_some() && !d.media.is_empty());
+            let json = serde_json::to_string(&d).unwrap();
+            assert!(!json.contains("/share/"));
+            checked += 1;
+            if checked == 3 {
+                break 'libraries;
+            }
+        }
+    }
+    assert!(checked > 0, "no series with two regular seasons");
 }
