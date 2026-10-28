@@ -13,6 +13,7 @@ import {
   detailTitle,
   homeHeading,
   libraryNav,
+  resizeWindow,
   signIn,
   signOut,
   startScreen,
@@ -22,20 +23,6 @@ import {
 const account = testAccount();
 const { password } = account;
 const { check, shot, finish } = createReport("gate2-ui");
-
-/** Moves and resizes the real window without activating it (SetWindowPos). */
-function resizeWindow(pid, width, height) {
-  const ps = `
-Add-Type -Name P -Namespace U -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetWindowPos(System.IntPtr h, System.IntPtr a, int x, int y, int cx, int cy, uint f);'
-$h = (Get-Process -Id ${pid}).MainWindowHandle
-if ($h -eq 0) { exit 2 }
-if (-not [U.P]::SetWindowPos($h, [System.IntPtr]::Zero, 0, 0, ${width}, ${height}, 0x0016)) { exit 3 }`;
-  const r = spawnSync("powershell", ["-NoProfile", "-Command", ps], {
-    encoding: "utf8",
-  });
-  if (r.status !== 0)
-    throw new Error(`resize failed (${r.status}) ${r.stderr}`);
-}
 
 const focusedItemId = (page) =>
   page.evaluate(

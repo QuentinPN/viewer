@@ -248,6 +248,34 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
+    /// Films or series whose name matches `term`, across every library the user
+    /// can see (`/Users/{Id}/Items?SearchTerm=`). `item_type` is `Movie` or `Series`.
+    pub async fn search(
+        &self,
+        user_id: &str,
+        term: &str,
+        item_type: &str,
+        limit: u32,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Users/{}/Items", path_segment(user_id)?));
+        let limit = limit.to_string();
+        let params = [
+            ("SearchTerm", term),
+            ("Recursive", "true"),
+            ("IncludeItemTypes", item_type),
+            ("Limit", limit.as_str()),
+            ("Fields", "PrimaryImageAspectRatio,ProductionYear"),
+            ("EnableImageTypes", "Primary"),
+            ("ImageTypeLimit", "1"),
+            ("EnableUserData", "true"),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
     /// Sections of the user's home screen (`/Users/{Id}/HomeSections`).
     pub async fn home_sections(&self, user_id: &str) -> Result<Vec<HomeSectionDto>, EmbyError> {
         self.require_token()?;

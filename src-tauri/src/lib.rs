@@ -282,6 +282,7 @@ pub fn run() {
             commands::emby_continue_watching,
             commands::emby_next_up,
             commands::emby_latest,
+            commands::emby_search,
             commands::emby_item_detail,
             commands::emby_seasons,
             commands::emby_episodes,

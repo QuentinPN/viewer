@@ -1,18 +1,26 @@
 <script lang="ts">
-// Signed-in shell: the sidebar, then the home page (ADR 0010) or the paged poster
-// grid of a library (DESIGN.md, Films/Series), and the detail page of the opened
-// item shown over either.
+// Signed-in shell: the sidebar with the search field, then the home page
+// (ADR 0010), the paged poster grid of a library (DESIGN.md, Films/Series) or the
+// search results (ADR 0011), and the detail page of the opened item over them.
 import { onMount, tick } from "svelte";
 import ItemDetail from "../detail/ItemDetail.svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
 import type {
   EmbyError,
+  SearchResults as Found,
   Library,
   MediaItem,
   PlaybackStart,
   SignedInUser,
 } from "../emby/types";
 import Home from "../home/Home.svelte";
+import {
+  cleanQuery,
+  isSearchable,
+  SEARCH_DEBOUNCE_MS,
+  SEARCH_MAX_CHARS,
+} from "../search/query";
+import SearchResults from "../search/SearchResults.svelte";
 import PosterCard from "./PosterCard.svelte";
 import { appendPage, countLabel, emptyPager, PAGE_SIZE } from "./pager";
 
@@ -50,6 +58,20 @@ let generation = 0;
 let observer: IntersectionObserver | null = null;
 let opened = $state<MediaItem | null>(null);
 
+let query = $state("");
+let searchField = $state<HTMLInputElement | null>(null);
+let found = $state<Found | null>(null);
+let searchLoading = $state(false);
+let searchError = $state<EmbyError | null>(null);
+/** Results replace the current view while the field holds something. */
+const cleaned = $derived(cleanQuery(query));
+const searching = $derived(cleaned !== "");
+// Bumped on every search or when leaving it: older answers are dropped.
+let searchGeneration = 0;
+let debounce: ReturnType<typeof setTimeout> | undefined;
+/** Scroll of the view the search replaced, restored when leaving it. */
+let scrollBeforeSearch: number | null = null;
+
 function fail(e: unknown): EmbyError {
   const error = toEmbyError(e);
   if (error.kind === "sessionExpired") onSessionExpired(error);
@@ -80,8 +102,94 @@ async function closeDetail() {
     ?.focus({ preventScroll: true });
 }
 
+function onSearchInput(e: Event & { currentTarget: HTMLInputElement }) {
+  const value = e.currentTarget.value;
+  // Saved before the results replace the view, which resets the scroll.
+  const entering = scrollBeforeSearch === null && cleanQuery(value) !== "";
+  if (entering) scrollBeforeSearch = scroller?.scrollTop ?? 0;
+  query = value;
+  opened = null;
+  clearTimeout(debounce);
+  if (!searching) {
+    void leaveSearch(true);
+    return;
+  }
+  if (entering) scroller?.scrollTo({ top: 0 });
+  if (!isSearchable(cleaned)) {
+    // One letter finds nothing on Emby: no request, the results say so.
+    searchGeneration += 1;
+    found = null;
+    searchError = null;
+    searchLoading = false;
+    return;
+  }
+  debounce = setTimeout(() => void runSearch(), SEARCH_DEBOUNCE_MS);
+}
+
+async function runSearch(again = false) {
+  clearTimeout(debounce);
+  const q = cleaned;
+  if (!isSearchable(q)) return;
+  if (!again && found?.query === q && !searchError) return;
+  const gen = ++searchGeneration;
+  searchLoading = true;
+  searchError = null;
+  try {
+    const answer = await embyApi.search(q);
+    if (gen !== searchGeneration) return;
+    found = answer;
+  } catch (e) {
+    if (gen !== searchGeneration) return;
+    searchError = fail(e);
+  } finally {
+    if (gen === searchGeneration) searchLoading = false;
+  }
+}
+
+/** Empties the field; `restore` brings back the scroll of the view it replaced. */
+async function leaveSearch(restore: boolean) {
+  clearTimeout(debounce);
+  searchGeneration += 1;
+  query = "";
+  found = null;
+  searchError = null;
+  searchLoading = false;
+  const top = scrollBeforeSearch;
+  scrollBeforeSearch = null;
+  if (restore && top !== null) {
+    await tick();
+    scroller?.scrollTo({ top });
+  }
+}
+
+function onSearchKeydown(e: KeyboardEvent) {
+  if (e.key === "Escape" && query !== "") {
+    // Handled here: the detail page does not close on this Escape.
+    e.preventDefault();
+    void leaveSearch(true);
+  }
+}
+
+/** `Ctrl+F`, or `/` outside a text field, puts the focus in the search field. */
+function onWindowKeydown(e: KeyboardEvent) {
+  if (e.defaultPrevented || !searchField?.checkVisibility()) return;
+  const target = e.target as HTMLElement | null;
+  const typing =
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target?.isContentEditable === true;
+  const ctrlF =
+    e.ctrlKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "f";
+  const slash = e.key === "/" && !e.ctrlKey && !e.altKey && !typing;
+  if (!ctrlF && !slash) return;
+  e.preventDefault();
+  searchField.focus();
+  searchField.select();
+}
+
 function showHome() {
   opened = null;
+  if (searching) void leaveSearch(false);
   if (selected === null) return;
   generation += 1;
   selected = null;
@@ -93,6 +201,7 @@ function showHome() {
 
 function select(library: Library) {
   opened = null;
+  if (searching) void leaveSearch(false);
   if (selected?.id === library.id && pager.total !== null) return;
   generation += 1;
   selected = library;
@@ -129,7 +238,10 @@ async function loadMore() {
 
 onMount(() => {
   void loadLibraries();
-  return () => observer?.disconnect();
+  return () => {
+    observer?.disconnect();
+    clearTimeout(debounce);
+  };
 });
 
 $effect(() => {
@@ -149,16 +261,45 @@ $effect(() => {
 });
 </script>
 
+<svelte:window onkeydown={onWindowKeydown} />
+
 <div class="browser">
   <nav class="sidebar" aria-label="Bibliothèques">
     <p class="brand">Viewer</p>
+    <form
+      class="search-box"
+      role="search"
+      onsubmit={(e) => {
+        e.preventDefault();
+        void runSearch();
+      }}
+    >
+      <label class="sr-only" for="search-field">Rechercher un film ou une série</label>
+      <svg viewBox="0 0 16 16" aria-hidden="true"
+        ><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3 3" /></svg
+      >
+      <input
+        id="search-field"
+        type="search"
+        placeholder="Rechercher"
+        autocomplete="off"
+        spellcheck="false"
+        enterkeyhint="search"
+        maxlength={SEARCH_MAX_CHARS * 2}
+        aria-keyshortcuts="Control+F /"
+        bind:this={searchField}
+        value={query}
+        oninput={onSearchInput}
+        onkeydown={onSearchKeydown}
+      />
+    </form>
     {#if libraries === null && !librariesError}
       <p class="side-note" aria-busy="true">Chargement…</p>
     {:else if libraries}
       <button
         type="button"
         class="home-link"
-        aria-current={selected === null ? "page" : undefined}
+        aria-current={selected === null && !searching ? "page" : undefined}
         onclick={showHome}
       >
         Accueil
@@ -168,7 +309,9 @@ $effect(() => {
           <li>
             <button
               type="button"
-              aria-current={selected?.id === library.id ? "page" : undefined}
+              aria-current={selected?.id === library.id && !searching
+                ? "page"
+                : undefined}
               onclick={() => select(library)}
             >
               <span class="kind" aria-hidden="true"
@@ -214,6 +357,15 @@ $effect(() => {
         <p class="state-title">Aucune bibliothèque de films ou de séries</p>
         <p>Votre compte n'a accès à aucune bibliothèque de ce type sur {user.server.name}.</p>
       </div>
+    {:else if searching}
+      <SearchResults
+        query={cleaned}
+        results={found}
+        loading={searchLoading}
+        error={searchError}
+        onRetry={() => void runSearch(true)}
+        onOpen={open}
+      />
     {:else if libraries && selected === null}
       <Home
         {libraries}
@@ -288,6 +440,51 @@ $effect(() => {
     background: var(--color-surface);
     min-height: 0;
     overflow-y: auto;
+  }
+  .search-box {
+    position: relative;
+    margin: 0 var(--space-1);
+  }
+  .search-box svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    transform: translateY(-50%);
+    fill: none;
+    stroke: var(--color-text-muted);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    pointer-events: none;
+  }
+  .search-box input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: var(--space-2) var(--space-2) var(--space-2) 32px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font: inherit;
+  }
+  .search-box input::placeholder {
+    color: var(--color-text-muted);
+  }
+  .search-box input:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
   }
   .brand {
     margin: 0 var(--space-3);
@@ -500,6 +697,10 @@ $effect(() => {
     }
     .libraries {
       display: flex;
+    }
+    .search-box {
+      flex: 0 0 180px;
+      margin: 0;
     }
     .libraries button,
     .home-link {

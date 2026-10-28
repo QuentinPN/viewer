@@ -13,8 +13,8 @@ use super::images::{self, ImageRequest, ImageType};
 use super::models::{
     BaseItemDto, CastMember, DetailKind, Episode, EpisodePage, ItemDetail, ItemPage, Library,
     LibraryKind, MediaInfo, MediaItem, MediaSourceDto, MediaStreamDto, PlaybackStopped,
-    ResumePoint, Season, ServerSummary, SignedInUser, StreamInfo, UserItemData, VideoInfo,
-    WatchItem, WatchKind,
+    ResumePoint, SearchResults, Season, ServerSummary, SignedInUser, StreamInfo, UserItemData,
+    VideoInfo, WatchItem, WatchKind,
 };
 use super::playback::{self, PlaybackPlan};
 use super::reporting::Report;
@@ -72,6 +72,11 @@ impl SessionFile {
 pub const MAX_PAGE: u32 = 200;
 /// Cards per home row: about two window widths.
 const HOME_ROW: u32 = 16;
+/// Search results shown per type (ADR 0011); one more is asked to know if more exist.
+pub const SEARCH_SHOWN: usize = 24;
+/// Shorter queries are not sent: the server answers nothing to one letter.
+const SEARCH_MIN_CHARS: usize = 2;
+const SEARCH_MAX_CHARS: usize = 100;
 const TICKS_PER_MINUTE: i64 = 600_000_000;
 const IMAGE_CONCURRENCY: usize = 6;
 
@@ -325,6 +330,39 @@ impl EmbyService {
         let page =
             self.expire_on_401(client.section_items(user_id, &section.id, HOME_ROW).await)?;
         Ok(page.items)
+    }
+
+    /// Films and series whose title matches `query` (ADR 0011), both searched at
+    /// once. A query shorter than two characters once cleaned reaches no server.
+    pub async fn search(&self, query: &str) -> Result<SearchResults, EmbyError> {
+        let query = clean_search(query);
+        if query.chars().count() < SEARCH_MIN_CHARS {
+            return Ok(SearchResults::default());
+        }
+        let (client, user_id) = self.session()?;
+        let asked = SEARCH_SHOWN as u32 + 1;
+        let (movies, series) = tokio::join!(
+            client.search(&user_id, &query, "Movie", asked),
+            client.search(&user_id, &query, "Series", asked)
+        );
+        let keep = |dtos: Vec<BaseItemDto>, item_type: &str| {
+            let items: Vec<MediaItem> = dtos
+                .into_iter()
+                .filter(|d| d.item_type == item_type)
+                .filter_map(media_item)
+                .collect();
+            let more = items.len() > SEARCH_SHOWN;
+            (items.into_iter().take(SEARCH_SHOWN).collect(), more)
+        };
+        let (movies, more_movies) = keep(self.expire_on_401(movies)?.items, "Movie");
+        let (series, more_series) = keep(self.expire_on_401(series)?.items, "Series");
+        Ok(SearchResults {
+            query,
+            movies,
+            series,
+            more_movies,
+            more_series,
+        })
     }
 
     /// Home row "Ajoutés récemment" of a film or series library: films and series
@@ -705,6 +743,23 @@ fn watch_item(dto: BaseItemDto) -> Option<WatchItem> {
         kind,
         image,
     })
+}
+
+/// Search text as sent to the server: no control characters, single spaces, at
+/// most `SEARCH_MAX_CHARS` characters.
+pub fn clean_search(query: &str) -> String {
+    query
+        .chars()
+        .filter(|c| c.is_whitespace() || !c.is_control())
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(SEARCH_MAX_CHARS)
+        .collect::<String>()
+        .trim_end()
+        .to_string()
 }
 
 fn is_id(id: &str) -> bool {

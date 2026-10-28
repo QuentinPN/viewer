@@ -9,6 +9,7 @@ import type {
   MediaItem,
   PlaybackStart,
   PlaybackStopped,
+  SearchResults,
   Season,
   ServerSummary,
   SignedInUser,
@@ -33,6 +34,7 @@ export const embyApi = {
   nextUp: () => invoke<WatchItem[]>("emby_next_up"),
   latest: (libraryId: string) =>
     invoke<MediaItem[]>("emby_latest", { libraryId }),
+  search: (query: string) => invoke<SearchResults>("emby_search", { query }),
   itemDetail: (itemId: string) =>
     invoke<ItemDetail>("emby_item_detail", { itemId }),
   seasons: (seriesId: string) => invoke<Season[]>("emby_seasons", { seriesId }),

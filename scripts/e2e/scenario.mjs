@@ -1,5 +1,6 @@
 // Shared pieces of the CDP scenarios: asserted checks, numbered screenshots,
 // report.json, and the sign-in screen of the app.
+import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runDir } from "./app.mjs";
@@ -111,4 +112,18 @@ export async function signIn(page, { url, user }, password) {
   await page.locator("#username").fill(user);
   await page.locator("#password").fill(password);
   await page.getByRole("button", { name: "Se connecter" }).click();
+}
+
+/** Moves and resizes the real window without activating it (SetWindowPos). */
+export function resizeWindow(pid, width, height) {
+  const ps = `
+Add-Type -Name P -Namespace U -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetWindowPos(System.IntPtr h, System.IntPtr a, int x, int y, int cx, int cy, uint f);'
+$h = (Get-Process -Id ${pid}).MainWindowHandle
+if ($h -eq 0) { exit 2 }
+if (-not [U.P]::SetWindowPos($h, [System.IntPtr]::Zero, 0, 0, ${width}, ${height}, 0x0016)) { exit 3 }`;
+  const r = spawnSync("powershell", ["-NoProfile", "-Command", ps], {
+    encoding: "utf8",
+  });
+  if (r.status !== 0)
+    throw new Error(`resize failed (${r.status}) ${r.stderr}`);
 }

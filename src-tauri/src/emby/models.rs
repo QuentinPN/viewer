@@ -355,6 +355,19 @@ pub struct WatchItem {
     pub resume: Option<ResumePoint>,
 }
 
+/// Answer of a search (ADR 0011): films and series whose title matches `query`.
+#[derive(Debug, Clone, Serialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResults {
+    /// The query as sent to the server, after cleaning; empty when too short.
+    pub query: String,
+    pub movies: Vec<MediaItem>,
+    pub series: Vec<MediaItem>,
+    /// More films than shown: the server's total is not reliable with `SearchTerm`.
+    pub more_movies: bool,
+    pub more_series: bool,
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ItemPage {

@@ -50,10 +50,11 @@ Connection/auth, typed API client, libraries, item details, PlaybackInfo, secure
 - NOT VERIFIED (transcoding): image subtitles (PGS/VOBSUB) in a transcode; transcoded picture, sound and subtitles by eye and ear; no bitrate setting in the UI (debug-only override).
 - TODO: episode detail, search, sorting and filters come with Gate 3.
 
-## Gate 3 — Core experience [IN PROGRESS · home page VERIFIED]
+## Gate 3 — Core experience [IN PROGRESS · home page and search VERIFIED]
 Home, film/series browsing, details, search, accessible player UI, responsive layouts and artwork cache.
 - DONE: home page (ADR 0010) — Continue Watching, Next Up, latest additions per library, "Tout voir". Next Up verified on the real server (episode marked watched then unmarked): Emby 4.10.1.0 leaves `/Shows/NextUp` empty and lists the next episode in its "resume" home section, which the app now reads too.
-- TODO: hero and favorites on the home page, search, sorting and filters, episode detail, final player UI, artwork cache.
+- DONE: search (ADR 0011) — sidebar field (`/`, Ctrl+F), films and series searched in parallel through `SearchTerm`, results in place of the current view, detail and back with focus kept, Escape back to the previous view with its scroll.
+- TODO: hero and favorites on the home page, search of episodes and people, sorting and filters, episode detail, final player UI, artwork cache.
 - Known input: the control bar hides subtitles at narrow widths (Gate 1 finding); views must provide an opaque background when no video plays (transparent window).
 
 ## Gate 4 — End-to-end quality [TODO]
@@ -171,3 +172,12 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `real_server_next_up` passed (episode 2 in Next Up in 99 ms, cleanup confirmed); `real_server_home_rows` passed; fake-server tests for the merge, the 404 fallback and the expired session.
 - **Not verified**: the Next Up row shown in the UI with real data (the app cannot mark watched yet).
 - **Next**: search (Gate 3).
+
+### 2026-10-28 — Search
+- **Changed**: ADR 0011; `emby_search(query)` (Rust: query cleaned and bounded, nothing sent under 2 characters, films and series as two parallel `/Users/{Id}/Items?SearchTerm=` requests of 25 to show 24 and flag more, since `TotalRecordCount` is unreliable); `src/lib/search/` (query helpers with Vitest tests, results component); search field at the top of the sidebar of `LibraryBrowser.svelte`; new scenario `scripts/e2e/gate3-search.mjs`; `resizeWindow` moved to `scripts/e2e/scenario.mjs`.
+- **Finding**: no `/Search/Hints` on Emby 4.10.1.0; `SearchTerm` ignores case and accents, does not fold "œ", and matches the start of title words only.
+- **Fixed during verification**: leaving the search brought a scrolled library back to the top (`bind:value` re-rendered before the scroll was saved).
+- **Server side effects**: none (reads only).
+- **Tests**: `npm run verify` green (Vitest 44/44, cargo test 61 passed / 10 ignored); real server: `real_server_search` passed; `gate3-search` 21/21; `gate2-ui` and `gate3-home` passed. Evidence: `docs/evidence/gate3-recherche-2026-10-28.md`.
+- **Not verified**: screen readers; look on a real screen.
+- **Next**: sorting and filters in the library grid (Gate 3).

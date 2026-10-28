@@ -25,6 +25,8 @@ Implemented so far (ADR 0007): steps 1–4 for Direct Play / Direct Stream in `s
 
 Home page (ADR 0010): `emby_continue_watching`, `emby_next_up` and `emby_latest(library_id)` return typed rows (`WatchItem`, `MediaItem`) built in `src-tauri/src/emby/session.rs`; `src/lib/home/` renders them. Continue Watching / Next Up cards go straight to `emby_play`; both rows are read again on `emby://playback-stopped`.
 
+Search (ADR 0011): `emby_search(query)` cleans the query in Rust and returns `SearchResults` (films and series, each with a "more" flag); `src/lib/search/` renders them in place of the current view of `LibraryBrowser.svelte`, whose sidebar holds the field.
+
 ## Important uncertainty
 
 Tauri WebView2 and libmpv rendering/overlay composition can conflict. Prototype embedded native surface vs separate video window and record evidence in an ADR. Do not commit to a fragile embedding mechanism without tests.

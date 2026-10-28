@@ -193,6 +193,7 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
                 (401, String::new())
             }
             p if p == views_path => (200, views()),
+            p if p == items && query.contains("SearchTerm=") => (200, search_answer(query)),
             p if p == items && query.contains("ParentId=5") => (200, movies_page()),
             p if p == items => (200, r#"{"Items":[],"TotalRecordCount":0}"#.into()),
             "/emby/Items/101/Images/Primary" => (200, "JPEG:fake-jpeg-bytes".into()),
@@ -380,6 +381,30 @@ fn next_up() -> String {
          "UserData":{"PlaybackPositionTicks":0,"Played":false}}
     ],"TotalRecordCount":1}"#
         .into()
+}
+
+/// `/Users/{Id}/Items?SearchTerm=`: 25 films (one more than shown) with a series
+/// mixed in, or one series with `TotalRecordCount: 0` as Emby 4.10.1.0 answers.
+fn search_answer(query: &str) -> String {
+    if query.contains("IncludeItemTypes=Movie") {
+        let mut items: Vec<String> = (0..25)
+            .map(|i| {
+                format!(
+                    r#"{{"Name":"Film {i}","Id":"{}","Type":"Movie","ProductionYear":2001,
+                    "ImageTags":{{"Primary":"aa_{i}"}},"UserData":{{"Played":false}}}}"#,
+                    9000 + i
+                )
+            })
+            .collect();
+        items.insert(3, r#"{"Name":"Intrus","Id":"8999","Type":"Series"}"#.into());
+        format!(r#"{{"Items":[{}],"TotalRecordCount":0}}"#, items.join(","))
+    } else {
+        r#"{"Items":[
+            {"Name":"24 Heures chrono","Id":"44440","Type":"Series","ProductionYear":2001,
+             "ImageTags":{"Primary":"0e0af3ab_6381"},"UserData":{"UnplayedItemCount":204,"Played":false}}
+        ],"TotalRecordCount":0}"#
+            .into()
+    }
 }
 
 /// `/Users/{Id}/HomeSections` (trimmed): a bare array; "resume" includes Next Up.
@@ -1201,6 +1226,71 @@ fn next_up_lists_episodes_with_the_series_backdrop_as_fallback() {
         run(fx.service.next_up()).unwrap_err(),
         EmbyError::SessionExpired
     ));
+}
+
+#[test]
+fn search_asks_films_and_series_apart_and_flags_more_results() {
+    let (server, fx, revoked) = signed_in_browser();
+    let results = run(fx.service.search("  Heures\u{7}  chrono\n")).unwrap();
+    assert_eq!(results.query, "Heures chrono");
+    let searches: Vec<_> = server
+        .requests()
+        .into_iter()
+        .map(|r| r.path)
+        .filter(|p| p.contains("SearchTerm="))
+        .collect();
+    assert_eq!(searches.len(), 2, "{searches:?}");
+    for ty in ["Movie", "Series"] {
+        let path = searches
+            .iter()
+            .find(|p| p.contains(&format!("IncludeItemTypes={ty}&")))
+            .unwrap_or_else(|| panic!("no {ty} search"));
+        let (route, query) = path.split_once('?').unwrap();
+        assert_eq!(route, format!("/emby/Users/{USER_ID}/Items"));
+        let params: Vec<_> = query.split('&').collect();
+        assert!(params.contains(&"SearchTerm=Heures+chrono"), "{query}");
+        assert!(params.contains(&"Recursive=true") && params.contains(&"Limit=25"));
+        assert!(!query.contains(TOKEN) && !query.contains("ParentId"));
+    }
+    assert_eq!(results.movies.len(), 24);
+    assert!(results.more_movies, "a 25th film means more");
+    assert!(results.movies.iter().all(|m| m.item_type == "Movie"));
+    assert_eq!(results.series.len(), 1);
+    assert!(!results.more_series);
+    assert_eq!(results.series[0].unplayed_count, Some(204));
+
+    revoked.store(true, Ordering::SeqCst);
+    assert!(matches!(
+        run(fx.service.search("chrono")).unwrap_err(),
+        EmbyError::SessionExpired
+    ));
+}
+
+#[test]
+fn search_too_short_reaches_no_server() {
+    let (server, fx, _) = signed_in_browser();
+    let before = server.requests().len();
+    for query in ["", "   ", "a", " é ", "\u{7}b\u{0}"] {
+        assert_eq!(
+            run(fx.service.search(query)).unwrap(),
+            super::models::SearchResults::default(),
+            "{query:?}"
+        );
+    }
+    assert_eq!(server.requests().len(), before);
+}
+
+#[test]
+fn search_query_is_cleaned_and_bounded() {
+    use super::session::clean_search;
+    assert_eq!(clean_search("\tLa  casa\r\nde papel "), "La casa de papel");
+    assert_eq!(clean_search("a\u{0}b\u{1b}c"), "abc");
+    let long = "é".repeat(150);
+    assert_eq!(clean_search(&long).chars().count(), 100);
+    assert_eq!(
+        clean_search(&format!("{} x", "a".repeat(99))),
+        "a".repeat(99)
+    );
 }
 
 #[test]
@@ -2175,4 +2265,69 @@ fn utc_stamp() -> String {
         rem % 3_600 / 60,
         rem % 60
     )
+}
+
+/// Search on the real server (ADR 0011), read-only: accents and case folded,
+/// word-prefix matching, films and series apart, too-short queries not sent.
+#[test]
+#[ignore = "needs the real Emby server and VIEWER_EMBY_* variables"]
+fn real_server_search() {
+    let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} manquant"));
+    let path = std::env::temp_dir()
+        .join(format!("viewer-emby-real-{}", uuid::Uuid::new_v4()))
+        .join("session.json");
+    SessionFile {
+        device_id: REAL_DEVICE_ID.into(),
+        ..SessionFile::default()
+    }
+    .save(&path)
+    .unwrap();
+    let fx = reopen(Arc::new(MemoryCredentialStore::default()), path);
+    run(fx.service.sign_in(
+        &var("VIEWER_EMBY_URL"),
+        &var("VIEWER_EMBY_USER"),
+        &var("VIEWER_EMBY_PASSWORD"),
+    ))
+    .unwrap();
+
+    let search = |q: &str| {
+        let t = std::time::Instant::now();
+        let r = run(fx.service.search(q)).unwrap();
+        println!(
+            "{q:?} → {:?}: {} films{}, {} séries{} in {} ms",
+            r.query,
+            r.movies.len(),
+            if r.more_movies { "+" } else { "" },
+            r.series.len(),
+            if r.more_series { "+" } else { "" },
+            t.elapsed().as_millis()
+        );
+        r
+    };
+    let names = |items: &[super::models::MediaItem]| {
+        items.iter().map(|i| i.name.clone()).collect::<Vec<_>>()
+    };
+
+    let plain = search("reincarne");
+    let accented = search("RÉINCARNE");
+    assert!(!plain.movies.is_empty() && !plain.series.is_empty());
+    assert_eq!(names(&plain.movies), names(&accented.movies));
+    assert_eq!(names(&plain.series), names(&accented.series));
+    assert!(plain.movies.iter().all(|m| m.item_type == "Movie"));
+    assert!(plain.series.iter().all(|s| s.item_type == "Series"));
+    assert!(plain.movies.iter().all(|m| m.poster.is_some()));
+
+    let prefix = search("  heure ");
+    assert_eq!(prefix.query, "heure");
+    assert!(names(&prefix.series).contains(&"24 Heures chrono".to_string()));
+    assert!(search("eures").series.is_empty(), "not a substring search");
+
+    let many = search("the");
+    assert_eq!(many.movies.len(), super::session::SEARCH_SHOWN);
+    assert!(many.more_movies);
+
+    let none = search("zzzzqx");
+    assert!(none.movies.is_empty() && none.series.is_empty());
+    assert_eq!(search("a"), super::models::SearchResults::default());
+    run(fx.service.sign_out()).unwrap();
 }
