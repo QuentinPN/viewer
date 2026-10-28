@@ -53,17 +53,39 @@ describe("trackLabel", () => {
 describe("playMethodLabel", () => {
   it("names the server's decision in French with the container", () => {
     expect(
-      playMethodLabel({ itemId: "1", method: "directPlay", container: "mkv" }),
+      playMethodLabel({
+        itemId: "1",
+        method: "directPlay",
+        container: "mkv",
+        transcodeReasons: null,
+      }),
     ).toBe("Lecture directe · MKV");
     expect(
-      playMethodLabel({ itemId: "1", method: "transcode", container: null }),
+      playMethodLabel({
+        itemId: "1",
+        method: "transcode",
+        container: null,
+        transcodeReasons: null,
+      }),
     ).toBe("Transcodage");
     expect(
       playMethodLabel({
         itemId: "1",
         method: "directStream",
         container: "mp4",
+        transcodeReasons: null,
       }),
     ).toBe("Flux direct · MP4");
+  });
+
+  it("shows why the server transcodes instead of the container", () => {
+    expect(
+      playMethodLabel({
+        itemId: "1",
+        method: "transcode",
+        container: "ts",
+        transcodeReasons: "débit trop élevé",
+      }),
+    ).toBe("Transcodage · débit trop élevé");
   });
 });

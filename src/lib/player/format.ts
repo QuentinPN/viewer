@@ -30,9 +30,14 @@ const METHOD_LABELS: Record<PlaybackStart["method"], string> = {
   transcode: "Transcodage",
 };
 
-/** "Lecture directe · MKV": how the server delivers the media. */
+/**
+ * "Lecture directe · MKV" or "Transcodage · débit trop élevé": how the server
+ * delivers the media. A transcode shows its reasons rather than the container.
+ */
 export function playMethodLabel(start: PlaybackStart): string {
   const method = METHOD_LABELS[start.method];
+  if (start.method === "transcode" && start.transcodeReasons)
+    return `${method} · ${start.transcodeReasons}`;
   return start.container
     ? `${method} · ${start.container.toUpperCase()}`
     : method;

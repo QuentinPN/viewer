@@ -91,7 +91,6 @@ export function errorHint(error: EmbyError): string | null {
     case "credentialStore":
       return "Le Gestionnaire d'identification Windows n'a pas pu enregistrer la session.";
     case "noCompatibleStream":
-    case "transcodeRequired":
       return "Les informations techniques de la fiche indiquent le format du fichier.";
     case "player":
       return "Vérifiez que libmpv-2.dll est présent (scripts/fetch-libmpv.ps1).";

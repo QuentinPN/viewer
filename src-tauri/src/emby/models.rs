@@ -208,6 +208,15 @@ pub struct MediaStreamDto {
     #[serde(rename = "Type", default)]
     pub stream_type: String,
     #[serde(default)]
+    pub index: Option<i32>,
+    /// PlaybackInfo only: how a subtitle reaches the client (`Embed`, `External`,
+    /// `Encode`, `Hls`).
+    #[serde(default)]
+    pub delivery_method: Option<String>,
+    /// PlaybackInfo only, with `External`: relative URL holding the token in `api_key`.
+    #[serde(default)]
+    pub delivery_url: Option<String>,
+    #[serde(default)]
     pub codec: Option<String>,
     /// ISO 639 as stored in the file: `fre`, `fra`, `fr`, `und`… all seen on one server.
     #[serde(default)]
@@ -546,6 +555,11 @@ pub struct MediaSourceInfo {
     /// Headers the stream needs, in addition to authentication.
     #[serde(default)]
     pub required_http_headers: Option<std::collections::HashMap<String, String>>,
+    /// Subtitle the server picked from the user's preferences.
+    #[serde(default)]
+    pub default_subtitle_stream_index: Option<i32>,
+    #[serde(default)]
+    pub media_streams: Vec<MediaStreamDto>,
 }
 
 /// How the server delivers the media.
@@ -575,6 +589,8 @@ pub struct PlaybackStart {
     pub item_id: String,
     pub method: PlayMethod,
     pub container: Option<String>,
+    /// Why the server transcodes, in French.
+    pub transcode_reasons: Option<String>,
 }
 
 /// Body of `POST /Sessions/Playing`, `/Sessions/Playing/Progress` and

@@ -1,6 +1,6 @@
 # ADR 0007 — Négociation de la lecture avec PlaybackInfo
 
-Statut : Accepté (2026-10-28).
+Statut : Accepté (2026-10-28). Le report du transcodage est levé par l'ADR 0009.
 
 ## Contexte
 La fiche d'un film doit lancer la lecture dans le lecteur libmpv (Gate 1) à partir du serveur Emby. CLAUDE.md impose de négocier la lecture avec PlaybackInfo et les MediaSources, jamais en devinant d'après l'extension, et de ne jamais mettre le jeton dans une URL quand une autre voie existe.

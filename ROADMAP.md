@@ -46,7 +46,9 @@ Connection/auth, typed API client, libraries, item details, PlaybackInfo, secure
 - NOT VERIFIED (playback): picture, sound and subtitles seen or heard by a person through the Emby path; HEVC/AV1/HDR/Dolby Vision/DTS/TrueHD rendering; items with several sources.
 - VERIFIED (2026-10-28), evidence in `docs/evidence/gate2-suivi-2026-10-28.md`, ADR 0008: playback reporting from Rust (`/Sessions/Playing`, progress every 10 s and on pause / unpause / seek, stopped with `Failed` on error), stop flushed when the window closes during playback, watched state and resume point read back after the stop, "Reprendre" / "Lire depuis le début" on films, started episodes resume; real server (test account, cleaned up): resume point recorded at the stop position and cleared by a stop near 0; CDP scenario `gate2-resume` 20/20.
 - NOT VERIFIED (reporting): watched state set by the server at the end of a file; stop on a hard kill (none is sent by design); close with an unreachable server (3 s bound); audio/subtitle track choice not reported.
-- TODO: transcoding (the stop report now exists to end the server's encoding). Episode detail, search, sorting and filters come with Gate 3.
+- VERIFIED (2026-10-28), evidence in `docs/evidence/gate2-transcodage-2026-10-28.md`, ADR 0009: HLS transcoding when the server refuses Direct Play / Direct Stream (TranscodingUrl without `api_key`, token in the header), reasons shown in French in the player badge, text subtitles delivered as external files by the server and added to mpv asynchronously (server-side burn-in fails on this NAS), the stop report ends the encoding; real server at 3 Mbit/s (test account, short sessions, cleaned up): first segment in ~6 s, 4 external subtitles, no encoding left after the stop; CDP scenario `gate2-transcode` 10/10 including a seek to 10 min in 3.4 s.
+- NOT VERIFIED (transcoding): image subtitles (PGS/VOBSUB) in a transcode; transcoded picture, sound and subtitles by eye and ear; no bitrate setting in the UI (debug-only override).
+- TODO: episode detail, search, sorting and filters come with Gate 3.
 
 ## Gate 3 — Core experience [TODO]
 Home, film/series browsing, details, search, accessible player UI, responsive layouts and artwork cache.
@@ -144,3 +146,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `npm run verify` green (Vitest 32/32, cargo test 50 passed / 6 ignored), release clippy clean; real server: `real_server_playback_reporting_and_resume` passed with cleanup; `gate2-resume` 20/20, `gate2-play` and `gate2-ui` passed, screenshots reviewed.
 - **Not verified**: watched state at the end of a file on the real server; close with an unreachable server; video, audio and subtitles by eye and ear.
 - **Next**: transcoding through HLS with the stop report ending the server's encoding, or Gate 3 browsing (search, sort, filters, episode detail).
+
+### 2026-10-28 — HLS transcoding
+- **Changed**: ADR 0009; `playback.rs` plans `Transcode` from the `TranscodingUrl` (sanitized like the stream URL), French transcode reasons, `External` subtitle profiles for text formats and external subtitle URLs checked against the server; `PlaybackRequest.subtitles` added to mpv by asynchronous `sub-add` on `FILE_LOADED` (`mpv_command_async`); `EmbyService::with_max_streaming_bitrate`, debug-only `VIEWER_E2E_MAX_BITRATE`; the `transcodeRequired` error is removed; the player badge shows "Transcodage · <raison>". New scenario `scripts/e2e/gate2-transcode.mjs`.
+- **Findings**: Emby burns the forced subtitle in by default and ffmpeg fails on this NAS (no fontconfig fonts); HLS segments are served without authentication (only the `PlaySessionId` guards them); the first access to an external subtitle can take about a minute (extraction).
+- **Server side effects** (authorized 2026-10-28, test account, short sessions at 3 Mbit/s): two transcodes of one film, each ended by the stop report, no resume point left. Server configuration untouched.
+- **Tests**: `npm run verify` green (Vitest 33/33, cargo test 53 passed / 7 ignored), release clippy clean; real server: `real_server_transcoding` passed; `gate2-transcode` 10/10; `gate2-play`, `gate2-ui` passed; `gate2-resume` 20/20 on the second run (first run: server timeout while loading libraries, before any playback).
+- **Not verified**: image subtitles in a transcode; transcoded media by eye and ear.
+- **Next**: Gate 3 browsing (home, search, sort, filters, episode detail), or reporting the audio/subtitle tracks chosen in mpv.

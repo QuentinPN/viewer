@@ -18,6 +18,24 @@ pub struct PlaybackRequest {
     /// Resume position in seconds.
     #[serde(default)]
     pub start_seconds: Option<f64>,
+    /// Subtitle files added once the media is loaded (e.g. text tracks a transcode
+    /// delivers separately). Validated like `source`.
+    #[serde(default)]
+    pub subtitles: Vec<ExternalSubtitle>,
+}
+
+/// A subtitle file loaded next to the media, with the same HTTP headers.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExternalSubtitle {
+    pub source: String,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub lang: Option<String>,
+    /// Selected when loaded; otherwise left to the player's own track choice.
+    #[serde(default)]
+    pub selected: bool,
 }
 
 /// A validated source: only local files and http(s) are accepted from the app

@@ -32,7 +32,6 @@ export type EmbyErrorKind =
   | "credentialStore"
   | "playbackRefused"
   | "noCompatibleStream"
-  | "transcodeRequired"
   | "player";
 
 export interface EmbyError {
@@ -189,6 +188,8 @@ export interface PlaybackStart {
   itemId: string;
   method: PlayMethod;
   container: string | null;
+  /** Why the server transcodes, in French ("débit trop élevé"); null otherwise. */
+  transcodeReasons: string | null;
 }
 
 /** Server state of an item once its playback stopped and was reported (ADR 0008). */

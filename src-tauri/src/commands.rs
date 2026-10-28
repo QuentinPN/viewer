@@ -197,6 +197,7 @@ pub async fn emby_play(
         source: plan.url,
         http_headers,
         start_seconds,
+        subtitles: plan.subtitles,
     };
     let player = |e: PlayerError| {
         // Nothing was loaded: drop the announced playback, nothing is reported.
@@ -213,5 +214,6 @@ pub async fn emby_play(
         item_id,
         method: plan.method,
         container: plan.container,
+        transcode_reasons: plan.transcode_reasons,
     })
 }

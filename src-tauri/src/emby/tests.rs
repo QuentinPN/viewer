@@ -246,7 +246,11 @@ fn playback_transcode() -> String {
         "SupportsTranscoding":true,"SupportsDirectStream":false,"SupportsDirectPlay":false,
         "RequiredHttpHeaders":{{}},
         "TranscodingUrl":"/videos/40000/master.m3u8?DeviceId=dev&MediaSourceId=mediasource_40000&PlaySessionId=ps2&api_key={TOKEN}&VideoCodec=h264&TranscodeReasons=ContainerNotSupported",
-        "TranscodingSubProtocol":"hls","TranscodingContainer":"ts"}}],"PlaySessionId":"ps2"}}"#
+        "TranscodingSubProtocol":"hls","TranscodingContainer":"ts","DefaultSubtitleStreamIndex":2,
+        "MediaStreams":[{{"Type":"Video","Index":0}},{{"Type":"Subtitle","Index":2,"Codec":"subrip",
+        "Language":"fre","DeliveryMethod":"External",
+        "DeliveryUrl":"/Videos/40000/mediasource_40000/Subtitles/2/0/Stream.subrip?api_key={TOKEN}"}}]}}],
+        "PlaySessionId":"ps2"}}"#
     )
 }
 
@@ -853,13 +857,48 @@ fn playback_negotiates_direct_play_with_the_token_in_a_header_only() {
 }
 
 #[test]
-fn playback_reports_transcode_unknown_items_and_bad_ids() {
-    let (server, fx, _) = signed_in_browser();
-    let err = run(fx.service.prepare_playback("40000", false)).unwrap_err();
-    assert_eq!(err.kind(), "transcodeRequired");
-    assert!(err.to_string().contains("conteneur non pris en charge"));
-    assert!(!err.to_string().contains(TOKEN));
+fn playback_transcodes_through_hls_under_the_bitrate_limit() {
+    use super::models::PlayMethod;
+    let server = FakeEmby::start(browse_like(Arc::new(AtomicBool::new(false))));
+    let fx = fixture();
+    let service = fx.service.with_max_streaming_bitrate(3_000_000);
+    run(service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
 
+    let (plan, headers) = run(service.prepare_playback("40000", false)).unwrap();
+    assert_eq!(plan.method, PlayMethod::Transcode);
+    assert_eq!(
+        plan.url,
+        format!(
+            "{}/emby/videos/40000/master.m3u8?DeviceId=dev&MediaSourceId=mediasource_40000&PlaySessionId=ps2&VideoCodec=h264&TranscodeReasons=ContainerNotSupported",
+            server.url
+        )
+    );
+    assert_eq!(plan.container.as_deref(), Some("ts"));
+    assert_eq!(
+        plan.transcode_reasons.as_deref(),
+        Some("conteneur non pris en charge")
+    );
+    assert_eq!(plan.subtitles.len(), 1);
+    assert_eq!(
+        plan.subtitles[0].source,
+        format!(
+            "{}/emby/Videos/40000/mediasource_40000/Subtitles/2/0/Stream.subrip",
+            server.url
+        )
+    );
+    assert!(plan.subtitles[0].selected);
+    assert!(!format!("{plan:?}").contains(TOKEN));
+    assert_eq!(headers, vec![("X-Emby-Token".to_owned(), TOKEN.to_owned())]);
+
+    let body: serde_json::Value =
+        serde_json::from_str(&server.requests().pop().unwrap().body).unwrap();
+    assert_eq!(body["MaxStreamingBitrate"], 3_000_000);
+    assert_eq!(body["DeviceProfile"]["MaxStreamingBitrate"], 3_000_000);
+}
+
+#[test]
+fn playback_reports_unknown_items_and_bad_ids() {
+    let (server, fx, _) = signed_in_browser();
     let err = run(fx.service.prepare_playback("99999", false)).unwrap_err();
     assert!(matches!(err, EmbyError::NotFound), "{err:?}");
 
@@ -1452,5 +1491,173 @@ fn real_server_playback_reporting_and_resume() {
     if let Err(e) = result {
         std::panic::resume_unwind(e);
     }
+    assert!(!state.played && state.resume.is_none(), "cleanup failed");
+}
+
+/// Real server, on demand, **writes to the test account** (authorized 2026-10-28,
+/// short sessions): with a 3 Mbit/s limit the server must transcode to HLS. The
+/// playlist, first segment and external subtitles load with the header only, and
+/// the stop report must end the encoding on the NAS. Cleanup: stopped at 0.
+#[test]
+#[ignore = "needs a real Emby server and credentials in environment variables"]
+fn real_server_transcoding() {
+    use super::models::{LibraryKind, PlayMethod};
+    use super::reporting::{ActivePlayback, Tracker};
+    use crate::player::PlayerEvent;
+    use std::time::{Duration, Instant};
+
+    let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} manquant"));
+    let path = std::env::temp_dir()
+        .join(format!("viewer-emby-real-{}", uuid::Uuid::new_v4()))
+        .join("session.json");
+    SessionFile {
+        device_id: REAL_DEVICE_ID.into(),
+        ..SessionFile::default()
+    }
+    .save(&path)
+    .unwrap();
+    let fx = reopen(Arc::new(MemoryCredentialStore::default()), path);
+    let service = fx.service.with_max_streaming_bitrate(3_000_000);
+    let server_url = var("VIEWER_EMBY_URL");
+    run(service.sign_in(
+        &server_url,
+        &var("VIEWER_EMBY_USER"),
+        &var("VIEWER_EMBY_PASSWORD"),
+    ))
+    .unwrap();
+
+    let film = run(service.libraries())
+        .unwrap()
+        .into_iter()
+        .filter(|l| l.kind == LibraryKind::Movies)
+        .flat_map(|l| run(service.items(&l.id, 0, 60)).unwrap().items)
+        .filter(|i| !i.played)
+        .find(|i| {
+            run(service.item_detail(&i.id))
+                .map(|d| d.resume.is_none())
+                .unwrap_or(false)
+        })
+        .expect("a film never started on the test account");
+    println!("film: {} ({})", film.name, film.id);
+
+    let http = reqwest::Client::new();
+    let (plan, headers) = run(service.prepare_playback(&film.id, false)).unwrap();
+    let get = |url: &str| {
+        let mut req = http.get(url);
+        for (k, v) in &headers {
+            req = req.header(k, v);
+        }
+        run(async { req.send().await.unwrap() })
+    };
+    // One tracker for the whole playback; sends what it produces, like the reporter.
+    let tracker = std::cell::RefCell::new(Tracker::default());
+    let begun = tracker
+        .borrow_mut()
+        .begin(ActivePlayback::new(&film.id, &plan), Instant::now());
+    assert!(
+        begun.is_empty(),
+        "nothing is reported before the file loads"
+    );
+    let report = |events: &[PlayerEvent]| {
+        let mut sent = Vec::new();
+        for e in events {
+            for r in tracker.borrow_mut().on_event(e, Instant::now()) {
+                run(service.report_playback(&r)).unwrap_or_else(|e| panic!("{:?}: {e}", r.kind));
+                sent.push(format!("{:?}", r.kind));
+            }
+        }
+        sent
+    };
+    let transcoding_on_nas = || {
+        let url = format!("{server_url}/emby/Sessions?DeviceId={REAL_DEVICE_ID}");
+        let sessions: serde_json::Value = run(get(&url).json()).unwrap();
+        sessions
+            .as_array()
+            .into_iter()
+            .flatten()
+            .any(|s| !s["TranscodingInfo"].is_null())
+    };
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        println!(
+            "plan: {:?}, container {:?}, reasons {:?}, {} external subtitles",
+            plan.method,
+            plan.container,
+            plan.transcode_reasons,
+            plan.subtitles.len()
+        );
+        assert_eq!(plan.method, PlayMethod::Transcode);
+        assert!(plan.url.contains("/master.m3u8?"));
+        assert!(!plan.url.to_ascii_lowercase().contains("api_key"));
+        assert!(plan.subtitles.iter().all(|s| !s.source.contains("api_key")));
+        assert_eq!(plan.transcode_reasons.as_deref(), Some("débit trop élevé"));
+
+        let started = Instant::now();
+        assert_eq!(report(&[PlayerEvent::FileLoaded]), ["Start"]);
+        let master = run(get(&plan.url).text()).unwrap();
+        let base = url::Url::parse(&plan.url).unwrap();
+        let variant = base
+            .join(
+                master
+                    .lines()
+                    .find(|l| !l.is_empty() && !l.starts_with('#'))
+                    .unwrap(),
+            )
+            .unwrap();
+        let playlist = run(get(variant.as_str()).text()).unwrap();
+        let segment = variant
+            .join(
+                playlist
+                    .lines()
+                    .find(|l| !l.is_empty() && !l.starts_with('#'))
+                    .unwrap(),
+            )
+            .unwrap();
+        let res = get(segment.as_str());
+        assert_eq!(res.status().as_u16(), 200);
+        let bytes = run(res.bytes()).unwrap();
+        println!(
+            "segment 0: {} bytes after {:.1} s, transcoding on the NAS: {}",
+            bytes.len(),
+            started.elapsed().as_secs_f64(),
+            transcoding_on_nas()
+        );
+        assert!(
+            bytes.len() > 10_000 && bytes[0] == 0x47,
+            "MPEG-TS sync byte"
+        );
+
+        for s in &plan.subtitles {
+            let res = get(&s.source);
+            println!(
+                "subtitle {:?} {:?} selected={}: {}",
+                s.title,
+                s.lang,
+                s.selected,
+                res.status()
+            );
+            assert_eq!(res.status().as_u16(), 200);
+        }
+    }));
+
+    // Stop report at 0, also after a failed check: ends the encoding, keeps no resume.
+    let sent = report(&[PlayerEvent::TimePos { seconds: 0.0 }, PlayerEvent::Shutdown]);
+    println!("stop: {sent:?}");
+    let deadline = Instant::now() + Duration::from_secs(15);
+    let mut still_encoding = transcoding_on_nas();
+    while still_encoding && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(500));
+        still_encoding = transcoding_on_nas();
+    }
+    let state = run(service.playback_state(&film.id)).unwrap();
+    println!("after stop: encoding {still_encoding}, {state:?}");
+    run(service.sign_out()).unwrap();
+    if let Err(e) = result {
+        std::panic::resume_unwind(e);
+    }
+    assert!(
+        !still_encoding,
+        "the NAS still transcodes after the stop report"
+    );
     assert!(!state.played && state.resume.is_none(), "cleanup failed");
 }

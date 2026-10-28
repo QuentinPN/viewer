@@ -88,6 +88,8 @@ pub struct EmbyService {
     current: Mutex<Option<Current>>,
     /// Bounds concurrent artwork downloads to spare the NAS (ADR 0005).
     image_permits: tokio::sync::Semaphore,
+    /// Sent to PlaybackInfo; the server transcodes files above it (ADR 0009).
+    max_streaming_bitrate: u64,
 }
 
 impl EmbyService {
@@ -106,7 +108,14 @@ impl EmbyService {
             version,
             current: Mutex::new(None),
             image_permits: tokio::sync::Semaphore::new(IMAGE_CONCURRENCY),
+            max_streaming_bitrate: playback::MAX_STREAMING_BITRATE,
         }
+    }
+
+    /// Lower streaming limit, e.g. to make the server transcode in tests.
+    pub fn with_max_streaming_bitrate(mut self, bitrate: u64) -> Self {
+        self.max_streaming_bitrate = bitrate;
+        self
     }
 
     fn device(&self) -> DeviceIdentity {
@@ -302,7 +311,11 @@ impl EmbyService {
         let (client, user_id) = self.session()?;
         let response = self.expire_on_401(
             client
-                .playback_info(&user_id, item_id, &playback::device_profile())
+                .playback_info(
+                    &user_id,
+                    item_id,
+                    &playback::device_profile(self.max_streaming_bitrate),
+                )
                 .await,
         )?;
         let mut plan = playback::plan(client.server(), response)?;

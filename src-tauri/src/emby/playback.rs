@@ -1,6 +1,7 @@
-//! Playback negotiation (ADR 0007): the libmpv device profile sent to PlaybackInfo,
-//! the choice between Direct Play, Direct Stream and Transcode from the server's
-//! answer, and the stream URL with its token removed (the token travels in a header).
+//! Playback negotiation (ADR 0007, ADR 0009): the libmpv device profile sent to
+//! PlaybackInfo, the choice between Direct Play, Direct Stream and an HLS transcode
+//! from the server's answer, and stream and subtitle URLs with their token removed
+//! (the token travels in a header).
 
 use super::EmbyError;
 use super::models::{
@@ -8,31 +9,33 @@ use super::models::{
     SubtitleProfile, TranscodingProfile,
 };
 use super::server_url::ServerUrl;
+use crate::player::ExternalSubtitle;
 
 /// Local network only for now; becomes a setting with remote access.
 pub const MAX_STREAMING_BITRATE: u64 = 400_000_000;
+
+/// Text formats a transcode can deliver as separate files instead of burning them
+/// into the picture (burn-in fails on the test NAS, ADR 0009).
+const EXTERNAL_TEXT_SUBTITLES: [&str; 5] = ["ass", "ssa", "subrip", "srt", "vtt"];
 
 /// Query parameters that carry the token in server-built URLs (compared lowercase).
 const TOKEN_PARAMS: [&str; 4] = ["api_key", "apikey", "x-emby-token", "accesstoken"];
 
 /// What libmpv (FFmpeg) decodes. Declared, not tested one by one: see the playback
 /// matrix in TESTING.md for verified combinations.
-pub fn device_profile() -> DeviceProfile {
-    let embed = |format| SubtitleProfile {
-        format,
-        method: "Embed",
-    };
+/// `max_streaming_bitrate` above a file's bitrate makes the server transcode it.
+pub fn device_profile(max_streaming_bitrate: u64) -> DeviceProfile {
+    let subtitle = |method| move |format| SubtitleProfile { format, method };
     DeviceProfile {
         name: "Viewer (libmpv)",
-        max_streaming_bitrate: MAX_STREAMING_BITRATE,
+        max_streaming_bitrate,
         direct_play_profiles: vec![DirectPlayProfile {
             kind: "Video",
             container: "mkv,webm,mp4,m4v,mov,avi,ts,m2ts,mpegts,mpg,mpeg,wmv,asf,flv,3gp,ogv",
             video_codec: "h264,hevc,av1,vp8,vp9,mpeg4,mpeg2video,mpeg1video,vc1,wmv3,msmpeg4v3,h263,theora",
             audio_codec: "aac,ac3,eac3,dts,truehd,mlp,flac,opus,vorbis,mp3,mp2,alac,pcm_s16le,pcm_s24le,pcm_bluray,pcm_dvd,wmav2,wmapro",
         }],
-        // Declared so the server says when and why a transcode would be needed;
-        // transcoding itself is not started yet (ADR 0007).
+        // HLS in MPEG-TS, read by mpv; audio copied when it fits (ADR 0009).
         transcoding_profiles: vec![TranscodingProfile {
             kind: "Video",
             container: "ts",
@@ -43,11 +46,18 @@ pub fn device_profile() -> DeviceProfile {
             max_audio_channels: "8",
             break_on_non_key_frames: true,
         }],
+        // Embedded when playing the file; text tracks of a transcode come as
+        // separate files (MPEG-TS cannot carry them).
         subtitle_profiles: [
             "ass", "ssa", "subrip", "srt", "pgssub", "dvdsub", "vtt", "mov_text",
         ]
         .into_iter()
-        .map(embed)
+        .map(subtitle("Embed"))
+        .chain(
+            EXTERNAL_TEXT_SUBTITLES
+                .into_iter()
+                .map(subtitle("External")),
+        )
         .collect(),
     }
 }
@@ -65,6 +75,10 @@ pub struct PlaybackPlan {
     pub run_time_ticks: Option<i64>,
     /// Where the player starts: 0, or the server's resume position (ADR 0008).
     pub start_ticks: i64,
+    /// French reasons, for a transcode only.
+    pub transcode_reasons: Option<String>,
+    /// Text subtitles a transcode delivers as files, URLs without token.
+    pub subtitles: Vec<ExternalSubtitle>,
 }
 
 /// Picks the first source the server offers and the best way to play it.
@@ -98,18 +112,25 @@ pub fn plan(server: &ServerUrl, response: PlaybackInfoResponse) -> Result<Playba
         supports_transcoding,
         direct_stream_url,
         transcoding_url,
+        transcoding_container,
         required_http_headers,
+        default_subtitle_stream_index,
+        media_streams,
         ..
     } = source;
-    let (method, raw) = match direct_stream_url {
-        Some(url) if supports_direct_play => (PlayMethod::DirectPlay, url),
-        Some(url) if supports_direct_stream => (PlayMethod::DirectStream, url),
-        _ => match transcoding_url {
-            Some(url) if supports_transcoding => {
-                return Err(EmbyError::TranscodeRequired(transcode_reasons(&url)));
-            }
-            _ => return Err(EmbyError::NoCompatibleStream),
-        },
+    let (method, raw) = match (direct_stream_url, transcoding_url) {
+        // A transcode also fills `DirectStreamUrl` with the transcoding URL, so the
+        // flags decide, not which URL is present.
+        (Some(url), _) if supports_direct_play => (PlayMethod::DirectPlay, url),
+        (Some(url), _) if supports_direct_stream => (PlayMethod::DirectStream, url),
+        (_, Some(url)) if supports_transcoding => (PlayMethod::Transcode, url),
+        _ => return Err(EmbyError::NoCompatibleStream),
+    };
+    let transcode = method == PlayMethod::Transcode;
+    let subtitles = if transcode {
+        external_subtitles(server, &media_streams, default_subtitle_stream_index)?
+    } else {
+        Vec::new()
     };
     Ok(PlaybackPlan {
         method,
@@ -117,10 +138,38 @@ pub fn plan(server: &ServerUrl, response: PlaybackInfoResponse) -> Result<Playba
         headers: required_headers(required_http_headers.unwrap_or_default()),
         media_source_id: id,
         play_session_id,
-        container,
+        container: if transcode {
+            transcoding_container
+        } else {
+            container
+        },
         run_time_ticks: run_time_ticks.filter(|&t| t > 0),
         start_ticks: 0,
+        transcode_reasons: transcode.then(|| transcode_reasons(&raw)),
+        subtitles,
     })
+}
+
+/// Subtitles the server delivers as separate files (`External`), in its order;
+/// the one it picked from the user's preferences is selected.
+fn external_subtitles(
+    server: &ServerUrl,
+    streams: &[super::models::MediaStreamDto],
+    default_index: Option<i32>,
+) -> Result<Vec<ExternalSubtitle>, EmbyError> {
+    streams
+        .iter()
+        .filter(|s| s.stream_type == "Subtitle" && s.delivery_method.as_deref() == Some("External"))
+        .filter_map(|s| s.delivery_url.as_deref().map(|url| (s, url)))
+        .map(|(s, url)| {
+            Ok(ExternalSubtitle {
+                source: stream_url(server, url)?,
+                title: s.title.clone(),
+                lang: s.language.clone(),
+                selected: default_index.is_some() && s.index == default_index,
+            })
+        })
+        .collect()
 }
 
 /// Absolute stream URL from a server-relative `/videos/…` path, without any
@@ -251,21 +300,94 @@ mod tests {
         );
     }
 
+    // Shape of a real Emby 4.10.1.0 transcode (bitrate above the limit): the
+    // transcoding URL is in both fields, text subtitles are `External`.
+    const TRANSCODE: &str = r#"{"MediaSources":[{"Id":"mediasource_30207","Container":"mkv",
+        "SupportsDirectPlay":false,"SupportsDirectStream":false,"SupportsTranscoding":true,
+        "DirectStreamUrl":"/videos/30207/master.m3u8?PlaySessionId=p&api_key=SECRET&TranscodeReasons=ContainerBitrateExceedsLimit",
+        "TranscodingUrl":"/videos/30207/master.m3u8?PlaySessionId=p&api_key=SECRET&TranscodeReasons=ContainerBitrateExceedsLimit",
+        "TranscodingSubProtocol":"hls","TranscodingContainer":"ts","DefaultSubtitleStreamIndex":4,
+        "MediaStreams":[
+          {"Type":"Video","Index":0,"Codec":"h264"},
+          {"Type":"Subtitle","Index":3,"Codec":"subrip","Language":"fre","Title":"Forcés",
+           "DeliveryMethod":"External","DeliveryUrl":"/Videos/30207/mediasource_30207/Subtitles/3/0/Stream.subrip?api_key=SECRET"},
+          {"Type":"Subtitle","Index":4,"Codec":"subrip","Language":"eng",
+           "DeliveryMethod":"External","DeliveryUrl":"/Videos/30207/mediasource_30207/Subtitles/4/0/Stream.subrip?api_key=SECRET"},
+          {"Type":"Subtitle","Index":5,"Codec":"PGSSUB","DeliveryMethod":"Encode"}]}],
+        "PlaySessionId":"p"}"#;
+
     #[test]
-    fn transcode_is_reported_with_reasons_not_started() {
-        let json = r#"{"MediaSources":[{"Id":"m","SupportsDirectPlay":false,
-            "SupportsDirectStream":false,"SupportsTranscoding":true,
-            "TranscodingUrl":"/videos/1/master.m3u8?api_key=SECRET&TranscodeReasons=VideoCodecNotSupported,AudioCodecNotSupported",
-            "TranscodingSubProtocol":"hls","TranscodingContainer":"ts"}],"PlaySessionId":"p"}"#;
-        let err = plan(&server(), source(json)).unwrap_err();
-        let EmbyError::TranscodeRequired(reasons) = &err else {
-            panic!("{err:?}")
-        };
+    fn transcode_plays_hls_with_external_text_subtitles() {
+        let plan = plan(&server(), source(TRANSCODE)).unwrap();
+        assert_eq!(plan.method, PlayMethod::Transcode);
         assert_eq!(
-            reasons,
-            "codec vidéo non pris en charge, codec audio non pris en charge"
+            plan.url,
+            "http://192.168.1.20:8096/emby/videos/30207/master.m3u8?PlaySessionId=p&TranscodeReasons=ContainerBitrateExceedsLimit"
         );
-        assert!(!err.to_string().contains("SECRET"));
+        assert_eq!(plan.container.as_deref(), Some("ts"));
+        assert_eq!(plan.transcode_reasons.as_deref(), Some("débit trop élevé"));
+        let subs: Vec<_> = plan
+            .subtitles
+            .iter()
+            .map(|s| {
+                (
+                    s.source.as_str(),
+                    s.lang.as_deref(),
+                    s.title.as_deref(),
+                    s.selected,
+                )
+            })
+            .collect();
+        assert_eq!(
+            subs,
+            [
+                (
+                    "http://192.168.1.20:8096/emby/Videos/30207/mediasource_30207/Subtitles/3/0/Stream.subrip",
+                    Some("fre"),
+                    Some("Forcés"),
+                    false
+                ),
+                (
+                    "http://192.168.1.20:8096/emby/Videos/30207/mediasource_30207/Subtitles/4/0/Stream.subrip",
+                    Some("eng"),
+                    None,
+                    true
+                ),
+            ]
+        );
+        assert!(!format!("{plan:?}").contains("SECRET"));
+    }
+
+    #[test]
+    fn transcode_reasons_in_french_and_no_subtitles_when_playing_the_file() {
+        let json = TRANSCODE.replace(
+            "ContainerBitrateExceedsLimit",
+            "VideoCodecNotSupported,AudioCodecNotSupported",
+        );
+        assert_eq!(
+            plan(&server(), source(&json))
+                .unwrap()
+                .transcode_reasons
+                .as_deref(),
+            Some("codec vidéo non pris en charge, codec audio non pris en charge")
+        );
+        let direct = TRANSCODE.replace(
+            r#""SupportsDirectPlay":false"#,
+            r#""SupportsDirectPlay":true"#,
+        );
+        let plan = plan(&server(), source(&direct)).unwrap();
+        assert_eq!(plan.method, PlayMethod::DirectPlay);
+        assert!(plan.subtitles.is_empty() && plan.transcode_reasons.is_none());
+        assert_eq!(plan.container.as_deref(), Some("mkv"));
+    }
+
+    #[test]
+    fn subtitle_urls_off_the_server_are_refused() {
+        let json = TRANSCODE.replace(
+            "/Videos/30207/mediasource_30207/Subtitles/4/0/Stream.subrip",
+            "http://evil.example/sub.srt",
+        );
+        assert!(plan(&server(), source(&json)).is_err());
     }
 
     #[test]
@@ -331,7 +453,7 @@ mod tests {
 
     #[test]
     fn profile_serializes_as_emby_expects() {
-        let json = serde_json::to_value(device_profile()).unwrap();
+        let json = serde_json::to_value(device_profile(MAX_STREAMING_BITRATE)).unwrap();
         assert_eq!(json["DirectPlayProfiles"][0]["Type"], "Video");
         assert!(
             json["DirectPlayProfiles"][0]["VideoCodec"]
@@ -341,6 +463,14 @@ mod tests {
         );
         assert_eq!(json["TranscodingProfiles"][0]["Protocol"], "hls");
         assert_eq!(json["SubtitleProfiles"][0]["Method"], "Embed");
+        let external: Vec<_> = json["SubtitleProfiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|p| p["Method"] == "External")
+            .map(|p| p["Format"].as_str().unwrap())
+            .collect();
+        assert_eq!(external, EXTERNAL_TEXT_SUBTITLES);
         assert_eq!(json["MaxStreamingBitrate"], MAX_STREAMING_BITRATE);
     }
 }

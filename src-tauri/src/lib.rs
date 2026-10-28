@@ -103,12 +103,22 @@ fn emby_service(
     let store: Box<dyn emby::credentials::CredentialStore> =
         Box::new(emby::credentials::MemoryCredentialStore::default());
     let device_name = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC Windows".into());
-    Ok(emby::session::EmbyService::new(
+    let service = emby::session::EmbyService::new(
         store,
         path,
         device_name,
         env!("CARGO_PKG_VERSION").to_owned(),
-    ))
+    );
+    // Debug builds only: scripted UI tests (scripts/e2e) force a transcode with a
+    // low limit, in bits per second.
+    let e2e_bitrate = std::env::var("VIEWER_E2E_MAX_BITRATE")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|_| cfg!(debug_assertions));
+    Ok(match e2e_bitrate {
+        Some(bitrate) => service.with_max_streaming_bitrate(bitrate),
+        None => service,
+    })
 }
 
 /// Serves `emby-img` requests (ADR 0005): only validated artwork paths, fetched

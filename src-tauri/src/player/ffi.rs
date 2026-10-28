@@ -23,6 +23,7 @@ pub const MPV_FORMAT_DOUBLE: c_int = 5;
 pub const MPV_EVENT_NONE: c_int = 0;
 pub const MPV_EVENT_SHUTDOWN: c_int = 1;
 pub const MPV_EVENT_LOG_MESSAGE: c_int = 2;
+pub const MPV_EVENT_COMMAND_REPLY: c_int = 5;
 pub const MPV_EVENT_END_FILE: c_int = 7;
 pub const MPV_EVENT_FILE_LOADED: c_int = 8;
 pub const MPV_EVENT_VIDEO_RECONFIG: c_int = 17;
@@ -81,6 +82,7 @@ pub struct MpvApi {
     pub set_option_string:
         unsafe extern "C" fn(*mut MpvHandle, *const c_char, *const c_char) -> c_int,
     pub command: unsafe extern "C" fn(*mut MpvHandle, *mut *const c_char) -> c_int,
+    pub command_async: unsafe extern "C" fn(*mut MpvHandle, u64, *mut *const c_char) -> c_int,
     pub set_property_string:
         unsafe extern "C" fn(*mut MpvHandle, *const c_char, *const c_char) -> c_int,
     pub get_property_string: unsafe extern "C" fn(*mut MpvHandle, *const c_char) -> *mut c_char,
@@ -116,6 +118,7 @@ impl MpvApi {
                 terminate_destroy: sym!("mpv_terminate_destroy"),
                 set_option_string: sym!("mpv_set_option_string"),
                 command: sym!("mpv_command"),
+                command_async: sym!("mpv_command_async"),
                 set_property_string: sym!("mpv_set_property_string"),
                 get_property_string: sym!("mpv_get_property_string"),
                 observe_property: sym!("mpv_observe_property"),

@@ -386,8 +386,8 @@ onMount(() => {
             </div>
           {/each}
           <p class="note">
-            Décrit le fichier sur le serveur. La lecture directe ou le transcodage seront
-            négociés avec le serveur au lancement de la lecture.
+            Décrit le fichier sur le serveur. Au lancement, le serveur choisit entre
+            lecture directe et transcodage selon le fichier et le débit autorisé.
           </p>
         </section>
       {/if}

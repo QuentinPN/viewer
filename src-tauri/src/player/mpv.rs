@@ -13,8 +13,8 @@ use std::thread::JoinHandle;
 
 use super::ffi::{self, MpvApi, MpvHandle};
 use super::{
-    EndReason, MediaSource, PlaybackRequest, PlayerCommand, PlayerDiagnostics, PlayerEngine,
-    PlayerError, PlayerEvent, Track, TrackKind,
+    EndReason, ExternalSubtitle, MediaSource, PlaybackRequest, PlayerCommand, PlayerDiagnostics,
+    PlayerEngine, PlayerError, PlayerEvent, Track, TrackKind,
 };
 
 pub type EventSink = Box<dyn Fn(PlayerEvent) + Send + Sync>;
@@ -54,6 +54,9 @@ unsafe impl Sync for RawHandle {}
 struct Inner {
     api: MpvApi,
     handle: RawHandle,
+    /// Subtitles of the last `load`, added by the event thread on `FILE_LOADED`
+    /// (`sub-add` needs a loaded file).
+    pending_subtitles: Mutex<Vec<(String, ExternalSubtitle)>>,
 }
 
 impl Inner {
@@ -115,6 +118,20 @@ impl Inner {
         self.check(code, args.first().copied().unwrap_or("command"))
     }
 
+    /// Runs a command on mpv's worker threads; the outcome comes back as a
+    /// `MPV_EVENT_COMMAND_REPLY` carrying `reply`.
+    fn command_async(&self, reply: u64, args: &[&str]) -> Result<(), PlayerError> {
+        let owned = args
+            .iter()
+            .map(|a| cstring(a))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut ptrs: Vec<*const c_char> = owned.iter().map(|c| c.as_ptr()).collect();
+        ptrs.push(std::ptr::null());
+        // SAFETY: NULL-terminated argv; mpv copies the arguments before returning.
+        let code = unsafe { (self.api.command_async)(self.h(), reply, ptrs.as_mut_ptr()) };
+        self.check(code, args.first().copied().unwrap_or("command"))
+    }
+
     fn observe(&self, id: u64, name: &str, format: c_int) -> Result<(), PlayerError> {
         let n = cstring(name)?;
         // SAFETY: valid handle and NUL-terminated name.
@@ -139,6 +156,8 @@ const OBS_DURATION: u64 = 2;
 const OBS_PAUSE: u64 = 3;
 const OBS_CACHE: u64 = 4;
 const OBS_TRACKS: u64 = 5;
+/// Reply id of the asynchronous `sub-add` commands.
+const REPLY_SUBTITLE: u64 = 1;
 
 impl MpvEngine {
     /// Loads libmpv, configures and initialises a player instance, and starts the
@@ -170,6 +189,7 @@ impl MpvEngine {
         let inner = Inner {
             api,
             handle: RawHandle(raw),
+            pending_subtitles: Mutex::new(Vec::new()),
         };
 
         if let Err(e) = Self::configure(&inner, config) {
@@ -256,11 +276,6 @@ impl MpvEngine {
     fn load_raw(&self, target: &str) -> Result<(), PlayerError> {
         self.inner.command(&["loadfile", target, "replace"])
     }
-
-    #[cfg(test)]
-    fn command_raw(&self, args: &[&str]) -> Result<(), PlayerError> {
-        self.inner.command(args)
-    }
 }
 
 impl PlayerEngine for MpvEngine {
@@ -284,6 +299,18 @@ impl PlayerEngine for MpvEngine {
             }
             _ => inner.set_property("start", "none")?,
         }
+        let subtitles = request
+            .subtitles
+            .iter()
+            .map(|s| {
+                let target = MediaSource::parse(&s.source)?.as_mpv_arg();
+                Ok((target, s.clone()))
+            })
+            .collect::<Result<Vec<_>, PlayerError>>()?;
+        *inner
+            .pending_subtitles
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = subtitles;
         inner.set_property("pause", "no")?;
         inner.command(&["loadfile", &source.as_mpv_arg(), "replace"])
     }
@@ -459,6 +486,32 @@ fn find_secret_key(s: &str) -> Option<(usize, usize)> {
     .min()
 }
 
+/// `sub-add` for the subtitles of the file that just loaded. A failure leaves the
+/// media playing without that track.
+fn add_pending_subtitles(inner: &Inner) {
+    let pending = std::mem::take(
+        &mut *inner
+            .pending_subtitles
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()),
+    );
+    // Asynchronous: Emby may take a minute to extract a subtitle from the file, and
+    // a synchronous sub-add would stall playback meanwhile (ADR 0009).
+    for (target, sub) in pending {
+        let flag = if sub.selected { "select" } else { "auto" };
+        let title = sub.title.as_deref().unwrap_or("");
+        let lang = sub.lang.as_deref().unwrap_or("");
+        if let Err(e) =
+            inner.command_async(REPLY_SUBTITLE, &["sub-add", &target, flag, title, lang])
+        {
+            log::warn!(
+                "sous-titres externes non chargés : {}",
+                redact(&e.to_string())
+            );
+        }
+    }
+}
+
 fn event_loop(inner: &Inner, stop: &AtomicBool, sink: &EventSink) {
     while !stop.load(Ordering::SeqCst) {
         // SAFETY: only this thread calls mpv_wait_event; the returned event is
@@ -470,7 +523,20 @@ fn event_loop(inner: &Inner, stop: &AtomicBool, sink: &EventSink) {
                 sink(PlayerEvent::Shutdown);
                 break;
             }
-            ffi::MPV_EVENT_FILE_LOADED => sink(PlayerEvent::FileLoaded),
+            ffi::MPV_EVENT_FILE_LOADED => {
+                add_pending_subtitles(inner);
+                sink(PlayerEvent::FileLoaded);
+            }
+            ffi::MPV_EVENT_COMMAND_REPLY
+                if event.reply_userdata == REPLY_SUBTITLE && event.error < 0 =>
+            {
+                // SAFETY: mpv_error_string returns a static string for any code.
+                let message = unsafe { CStr::from_ptr((inner.api.error_string)(event.error)) };
+                log::warn!(
+                    "sous-titres externes non chargés : {}",
+                    message.to_string_lossy()
+                );
+            }
             ffi::MPV_EVENT_VIDEO_RECONFIG => sink(PlayerEvent::VideoReconfigured),
             ffi::MPV_EVENT_PLAYBACK_RESTART => sink(PlayerEvent::Seeked),
             ffi::MPV_EVENT_END_FILE => {
@@ -638,6 +704,22 @@ mod tests {
         )
         .expect("engine");
 
+        // External subtitle queued like `load` does, added on FILE_LOADED.
+        let srt = std::env::temp_dir().join(format!("viewer-test-{}.srt", std::process::id()));
+        std::fs::write(
+            &srt,
+            "1\n00:00:00,000 --> 00:00:30,000\nSous-titre de test\n",
+        )
+        .unwrap();
+        *engine.inner.pending_subtitles.lock().unwrap() = vec![(
+            srt.to_string_lossy().into_owned(),
+            ExternalSubtitle {
+                source: String::new(),
+                title: Some("Complets".into()),
+                lang: Some("fre".into()),
+                selected: true,
+            },
+        )];
         engine
             .load_raw("av://lavfi:testsrc2=size=320x240:rate=25:duration=30")
             .expect("loadfile");
@@ -671,15 +753,6 @@ mod tests {
             "seek reaches target"
         );
 
-        let srt = std::env::temp_dir().join(format!("viewer-test-{}.srt", std::process::id()));
-        std::fs::write(
-            &srt,
-            "1\n00:00:00,000 --> 00:00:30,000\nSous-titre de test\n",
-        )
-        .unwrap();
-        engine
-            .command_raw(&["sub-add", &srt.to_string_lossy(), "select"])
-            .unwrap();
         let subs: Vec<_> = engine
             .tracks()
             .unwrap()
@@ -688,6 +761,8 @@ mod tests {
             .collect();
         assert_eq!(subs.len(), 1, "external subtitle listed");
         assert!(subs[0].external && subs[0].selected);
+        assert_eq!(subs[0].title.as_deref(), Some("Complets"));
+        assert_eq!(subs[0].lang.as_deref(), Some("fre"));
         engine
             .command(&PlayerCommand::SetSubtitleTrack { id: None })
             .unwrap();

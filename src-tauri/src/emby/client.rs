@@ -12,7 +12,6 @@ use super::models::{
     AuthenticateUserByName, AuthenticationResult, BaseItemDto, DeviceProfile, PlaybackInfoRequest,
     PlaybackInfoResponse, PlaybackReportBody, PublicSystemInfo, QueryResult, UserDto,
 };
-use super::playback::MAX_STREAMING_BITRATE;
 use super::server_url::ServerUrl;
 
 pub const CLIENT_NAME: &str = "Viewer";
@@ -279,7 +278,7 @@ impl EmbyClient {
         let user_id = path_segment(user_id)?;
         let body = PlaybackInfoRequest {
             user_id,
-            max_streaming_bitrate: MAX_STREAMING_BITRATE,
+            max_streaming_bitrate: profile.max_streaming_bitrate,
             device_profile: profile,
             is_playback: true,
             auto_open_live_stream: false,

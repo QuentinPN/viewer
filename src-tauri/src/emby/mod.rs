@@ -48,8 +48,6 @@ pub enum EmbyError {
     PlaybackRefused(String),
     #[error("aucune version de ce média n'est lisible par cette application")]
     NoCompatibleStream,
-    #[error("ce média demande un transcodage par le serveur, pas encore pris en charge ({0})")]
-    TranscodeRequired(String),
     /// The player could not start the stream chosen by the server.
     #[error("lecteur indisponible : {0}")]
     Player(String),
@@ -72,7 +70,6 @@ impl EmbyError {
             Self::CredentialStore(_) => "credentialStore",
             Self::PlaybackRefused(_) => "playbackRefused",
             Self::NoCompatibleStream => "noCompatibleStream",
-            Self::TranscodeRequired(_) => "transcodeRequired",
             Self::Player(_) => "player",
         }
     }

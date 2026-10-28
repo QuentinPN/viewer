@@ -1,4 +1,4 @@
-//! Gate 1 automated playback scenario (debug builds only).
+﻿//! Gate 1 automated playback scenario (debug builds only).
 //!
 //! Enabled by `VIEWER_SPIKE_MEDIA=<path or http URL>` and `VIEWER_SPIKE_OUT=<dir>`.
 //! Drives the real app (same `AppState` and engine as the IPC commands), writes the
@@ -121,6 +121,7 @@ fn run(app: &AppHandle, media: &str, out: &Path) -> Report {
         source: media.into(),
         http_headers,
         start_seconds: None,
+        subtitles: Vec::new(),
     };
     let started = Instant::now();
     let loaded = engine.load(&request, &source).is_ok()
