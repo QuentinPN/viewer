@@ -141,6 +141,23 @@ async fn emby_image(
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// Debug builds only: `VIEWER_E2E_OFFSCREEN` opens the main window off-screen and
+/// without activating it, so scripted UI tests (`scripts/e2e`) do not take the
+/// user's foreground window or cover their desktop.
+fn context() -> tauri::Context<tauri::Wry> {
+    #[allow(unused_mut)]
+    let mut context = tauri::generate_context!();
+    #[cfg(debug_assertions)]
+    if std::env::var_os("VIEWER_E2E_OFFSCREEN").is_some() {
+        for window in &mut context.config_mut().app.windows {
+            window.focus = false;
+            window.x = Some(-20000.0);
+            window.y = Some(-20000.0);
+        }
+    }
+    context
+}
+
 pub fn run() {
     let app = tauri::Builder::default()
         .register_asynchronous_uri_scheme_protocol(
@@ -242,7 +259,7 @@ pub fn run() {
             commands::emby_seasons,
             commands::emby_episodes,
         ])
-        .build(tauri::generate_context!())
+        .build(context())
         .expect("error while building Viewer");
 
     app.run(|_app, event| {
