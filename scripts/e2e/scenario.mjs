@@ -54,6 +54,8 @@ export const signInHeading = (page) => page.locator("#signin-title");
 export const libraryNav = (page) =>
   page.getByRole("navigation", { name: "Bibliothèques" });
 export const cards = (page) => page.locator("ul.grid button.card");
+/** Home page, the default view once signed in (ADR 0010). */
+export const homeHeading = (page) => page.locator(".home h1");
 export const detailTitle = (page) => page.locator("#detail-title");
 
 /** Waits for the first screen: `"signedIn"` or `"signedOut"`. */

@@ -11,6 +11,7 @@ import {
   cards,
   createReport,
   detailTitle,
+  homeHeading,
   libraryNav,
   signIn,
   signOut,
@@ -65,7 +66,7 @@ try {
   await libraries.first().waitFor({ timeout: 20000 });
   const libraryCount = await libraries.count();
   check("signed_in_libraries", libraryCount > 0, `${libraryCount} libraries`);
-  await cards(page).first().waitFor({ timeout: 20000 });
+  await homeHeading(page).waitFor({ timeout: 20000 });
   await shot(page, "signed-in");
 
   // Restart: the session comes back from the credential store.
@@ -74,7 +75,7 @@ try {
   page = app.page;
   libraries = libraryNav(page).locator("ul.libraries button");
   check("restored_after_restart", (await startScreen(page)) === "signedIn");
-  await cards(page).first().waitFor({ timeout: 20000 });
+  await homeHeading(page).waitFor({ timeout: 20000 });
 
   // Library switch by keyboard, then grid paging by mouse wheel.
   const kinds = await libraries.evaluateAll((els) =>

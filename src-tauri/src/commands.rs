@@ -7,7 +7,8 @@ use tauri::{State, WebviewWindow};
 use crate::AppState;
 use crate::emby::EmbyError;
 use crate::emby::models::{
-    EpisodePage, ItemDetail, ItemPage, Library, PlaybackStart, Season, ServerSummary, SignedInUser,
+    EpisodePage, ItemDetail, ItemPage, Library, MediaItem, PlaybackStart, Season, ServerSummary,
+    SignedInUser, WatchItem,
 };
 use crate::emby::reporting::ActivePlayback;
 use crate::emby::session::EmbyService;
@@ -149,6 +150,26 @@ pub async fn emby_items(
     limit: u32,
 ) -> Result<ItemPage, EmbyError> {
     emby.items(&library_id, start_index, limit).await
+}
+
+#[tauri::command]
+pub async fn emby_continue_watching(
+    emby: State<'_, EmbyService>,
+) -> Result<Vec<WatchItem>, EmbyError> {
+    emby.continue_watching().await
+}
+
+#[tauri::command]
+pub async fn emby_next_up(emby: State<'_, EmbyService>) -> Result<Vec<WatchItem>, EmbyError> {
+    emby.next_up().await
+}
+
+#[tauri::command]
+pub async fn emby_latest(
+    emby: State<'_, EmbyService>,
+    library_id: String,
+) -> Result<Vec<MediaItem>, EmbyError> {
+    emby.latest(&library_id).await
 }
 
 #[tauri::command]

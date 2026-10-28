@@ -201,6 +201,78 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
+    /// Films and episodes started but not finished, most recent first
+    /// (`/Users/{Id}/Items/Resume`).
+    pub async fn resume_items(
+        &self,
+        user_id: &str,
+        limit: u32,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Users/{}/Items/Resume", path_segment(user_id)?));
+        let limit = limit.to_string();
+        let params = [
+            ("Limit", limit.as_str()),
+            ("MediaTypes", "Video"),
+            ("IncludeItemTypes", "Movie,Episode"),
+            ("Fields", WATCH_FIELDS),
+            ("EnableUserData", "true"),
+            ("ImageTypeLimit", "1"),
+            ("EnableImageTypes", WATCH_IMAGES),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// Next episode to watch of each series in progress (`/Shows/NextUp`).
+    pub async fn next_up(
+        &self,
+        user_id: &str,
+        limit: u32,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self.server.api("/Shows/NextUp");
+        let limit = limit.to_string();
+        let params = [
+            ("UserId", path_segment(user_id)?),
+            ("Limit", limit.as_str()),
+            ("Fields", WATCH_FIELDS),
+            ("EnableUserData", "true"),
+            ("ImageTypeLimit", "1"),
+            ("EnableImageTypes", WATCH_IMAGES),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// Latest additions of a library, newest first (`/Users/{Id}/Items/Latest`).
+    /// Episodes come grouped as their series; the answer is a bare array. Emby
+    /// 4.10.1.0 answers 500 to an unknown `ParentId`: callers pass known ids only.
+    pub async fn latest(
+        &self,
+        user_id: &str,
+        parent_id: &str,
+        limit: u32,
+    ) -> Result<Vec<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Users/{}/Items/Latest", path_segment(user_id)?));
+        let limit = limit.to_string();
+        let params = [
+            ("ParentId", path_segment(parent_id)?),
+            ("Limit", limit.as_str()),
+            ("Fields", "PrimaryImageAspectRatio,ProductionYear"),
+            ("EnableUserData", "true"),
+            ("ImageTypeLimit", "1"),
+            ("EnableImageTypes", "Primary"),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
     /// Full item as the user sees it (`/Users/{Id}/Items/{Id}`): overview, people,
     /// media sources and user data come without `Fields`. Unknown id: 404.
     pub async fn item(&self, user_id: &str, item_id: &str) -> Result<BaseItemDto, EmbyError> {
@@ -352,6 +424,11 @@ impl EmbyClient {
             .ok_or(EmbyError::NotSignedIn)
     }
 }
+
+/// "Reprendre" and "À suivre" rows: series name, runtime and the parent artwork
+/// come by default; the images feed the 16:9 card.
+const WATCH_FIELDS: &str = "PrimaryImageAspectRatio";
+const WATCH_IMAGES: &str = "Primary,Backdrop,Thumb";
 
 /// Parameters of one library page.
 #[derive(Debug, Clone)]

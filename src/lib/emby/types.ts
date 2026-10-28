@@ -67,6 +67,21 @@ export interface MediaItem {
   unplayedCount: number | null;
 }
 
+/** A film or episode of the home rows "Reprendre" and "À suivre" (ADR 0010). */
+export interface WatchItem {
+  id: string;
+  name: string;
+  kind: "movie" | "episode";
+  /** Episodes only. */
+  seriesName: string | null;
+  seasonIndex: number | null;
+  index: number | null;
+  /** 16:9: episode still, else the series or film thumb, else a backdrop. */
+  image: ImageRef | null;
+  runtimeMinutes: number | null;
+  resume: ResumePoint | null;
+}
+
 export interface ItemPage {
   items: MediaItem[];
   startIndex: number;

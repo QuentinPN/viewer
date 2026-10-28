@@ -23,6 +23,8 @@ Services: `EmbyClient`, `LibraryService`, `PlaybackCoordinator`, `PlayerEngine`,
 
 Implemented so far (ADR 0007): steps 1–4 for Direct Play / Direct Stream in `src-tauri/src/emby/playback.rs` (`emby_play` command). The stream URL comes from the server with its `api_key` removed; the token goes to mpv as an `X-Emby-Token` header. Step 5 is implemented in `src-tauri/src/emby/reporting.rs` (ADR 0008): engine events become start/progress/stopped reports sent from Rust, the stop is flushed on window close, and the watched state and resume point are read back from the server afterwards. HLS transcoding (ADR 0009) uses the server's `TranscodingUrl` the same way; text subtitles are delivered by the server as external files and added to mpv asynchronously, and the stop report ends the server's encoding.
 
+Home page (ADR 0010): `emby_continue_watching`, `emby_next_up` and `emby_latest(library_id)` return typed rows (`WatchItem`, `MediaItem`) built in `src-tauri/src/emby/session.rs`; `src/lib/home/` renders them. Continue Watching / Next Up cards go straight to `emby_play`; both rows are read again on `emby://playback-stopped`.
+
 ## Important uncertainty
 
 Tauri WebView2 and libmpv rendering/overlay composition can conflict. Prototype embedded native surface vs separate video window and record evidence in an ADR. Do not commit to a fragile embedding mechanism without tests.

@@ -6,11 +6,13 @@ import type {
   ItemDetail,
   ItemPage,
   Library,
+  MediaItem,
   PlaybackStart,
   PlaybackStopped,
   Season,
   ServerSummary,
   SignedInUser,
+  WatchItem,
 } from "./types";
 
 // Thin typed wrapper over the Emby commands of src-tauri/src/commands.rs.
@@ -27,6 +29,10 @@ export const embyApi = {
   libraries: () => invoke<Library[]>("emby_libraries"),
   items: (libraryId: string, startIndex: number, limit: number) =>
     invoke<ItemPage>("emby_items", { libraryId, startIndex, limit }),
+  continueWatching: () => invoke<WatchItem[]>("emby_continue_watching"),
+  nextUp: () => invoke<WatchItem[]>("emby_next_up"),
+  latest: (libraryId: string) =>
+    invoke<MediaItem[]>("emby_latest", { libraryId }),
   itemDetail: (itemId: string) =>
     invoke<ItemDetail>("emby_item_detail", { itemId }),
   seasons: (seriesId: string) => invoke<Season[]>("emby_seasons", { seriesId }),

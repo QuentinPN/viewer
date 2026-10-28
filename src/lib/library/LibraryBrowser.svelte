@@ -1,6 +1,7 @@
 <script lang="ts">
-// Signed-in home: library list, a paged poster grid (DESIGN.md, Films/Series) and
-// the detail page of the opened item, shown over the grid.
+// Signed-in shell: the sidebar, then the home page (ADR 0010) or the paged poster
+// grid of a library (DESIGN.md, Films/Series), and the detail page of the opened
+// item shown over either.
 import { onMount, tick } from "svelte";
 import ItemDetail from "../detail/ItemDetail.svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
@@ -11,6 +12,7 @@ import type {
   PlaybackStart,
   SignedInUser,
 } from "../emby/types";
+import Home from "../home/Home.svelte";
 import PosterCard from "./PosterCard.svelte";
 import { appendPage, countLabel, emptyPager, PAGE_SIZE } from "./pager";
 
@@ -36,6 +38,7 @@ let {
 
 let libraries = $state<Library[] | null>(null);
 let librariesError = $state<EmbyError | null>(null);
+/** The library shown in the grid; `null` is the home page. */
 let selected = $state<Library | null>(null);
 let pager = $state(emptyPager());
 let loading = $state(false);
@@ -58,8 +61,6 @@ async function loadLibraries() {
   libraries = null;
   try {
     libraries = await embyApi.libraries();
-    const first = libraries[0];
-    if (first) select(first);
   } catch (e) {
     librariesError = fail(e);
   }
@@ -77,6 +78,17 @@ async function closeDetail() {
   scroller
     ?.querySelector<HTMLElement>(`[data-item-id="${CSS.escape(id ?? "")}"]`)
     ?.focus({ preventScroll: true });
+}
+
+function showHome() {
+  opened = null;
+  if (selected === null) return;
+  generation += 1;
+  selected = null;
+  pager = emptyPager();
+  pageError = null;
+  loading = false;
+  scroller?.scrollTo({ top: 0 });
 }
 
 function select(library: Library) {
@@ -143,6 +155,14 @@ $effect(() => {
     {#if libraries === null && !librariesError}
       <p class="side-note" aria-busy="true">Chargement…</p>
     {:else if libraries}
+      <button
+        type="button"
+        class="home-link"
+        aria-current={selected === null ? "page" : undefined}
+        onclick={showHome}
+      >
+        Accueil
+      </button>
       <ul class="libraries">
         {#each libraries as library (library.id)}
           <li>
@@ -194,6 +214,15 @@ $effect(() => {
         <p class="state-title">Aucune bibliothèque de films ou de séries</p>
         <p>Votre compte n'a accès à aucune bibliothèque de ce type sur {user.server.name}.</p>
       </div>
+    {:else if libraries && selected === null}
+      <Home
+        {libraries}
+        userName={user.userName}
+        onOpen={open}
+        onShowLibrary={select}
+        {onPlay}
+        onError={fail}
+      />
     {:else if selected}
       <header class="heading">
         <h1>{selected.name}</h1>
@@ -277,7 +306,8 @@ $effect(() => {
     display: grid;
     gap: 2px;
   }
-  .libraries button {
+  .libraries button,
+  .home-link {
     width: 100%;
     text-align: left;
     background: transparent;
@@ -290,11 +320,13 @@ $effect(() => {
     display: grid;
     transition: background var(--motion-fast);
   }
-  .libraries button:hover {
+  .libraries button:hover,
+  .home-link:hover {
     background: var(--color-elevated);
     color: var(--color-text);
   }
-  .libraries button[aria-current="page"] {
+  .libraries button[aria-current="page"],
+  .home-link[aria-current="page"] {
     background: var(--color-elevated);
     color: var(--color-text);
     box-shadow: inset 3px 0 0 var(--color-accent);
@@ -469,8 +501,10 @@ $effect(() => {
     .libraries {
       display: flex;
     }
-    .libraries button {
+    .libraries button,
+    .home-link {
       white-space: nowrap;
+      width: auto;
     }
     .account {
       margin: 0 0 0 auto;

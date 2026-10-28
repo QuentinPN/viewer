@@ -151,6 +151,17 @@ pub struct BaseItemDto {
     pub series_id: Option<String>,
     #[serde(default)]
     pub season_id: Option<String>,
+    /// Episodes: the series' artwork, used when the episode has no still.
+    #[serde(default)]
+    pub series_name: Option<String>,
+    #[serde(default)]
+    pub parent_thumb_item_id: Option<String>,
+    #[serde(default)]
+    pub parent_thumb_image_tag: Option<String>,
+    #[serde(default)]
+    pub parent_backdrop_item_id: Option<String>,
+    #[serde(default)]
+    pub parent_backdrop_image_tags: Vec<String>,
     #[serde(default)]
     pub media_sources: Vec<MediaSourceDto>,
 }
@@ -303,6 +314,32 @@ pub struct MediaItem {
     pub played: bool,
     /// Series only: episodes not yet watched.
     pub unplayed_count: Option<u32>,
+}
+
+/// Kinds of item the home rows "Reprendre" and "À suivre" play.
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum WatchKind {
+    Movie,
+    Episode,
+}
+
+/// A film or episode of the home rows "Reprendre" and "À suivre" (ADR 0010): the
+/// card plays it, so it carries what the label needs and a 16:9 image.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct WatchItem {
+    pub id: String,
+    pub name: String,
+    pub kind: WatchKind,
+    /// Episodes only.
+    pub series_name: Option<String>,
+    pub season_index: Option<u32>,
+    pub index: Option<u32>,
+    /// Episode still, else the series or film thumb, else its backdrop.
+    pub image: Option<ImageRef>,
+    pub runtime_minutes: Option<u32>,
+    pub resume: Option<ResumePoint>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]

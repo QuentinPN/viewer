@@ -193,6 +193,13 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
             p if p == items => (200, r#"{"Items":[],"TotalRecordCount":0}"#.into()),
             "/emby/Items/101/Images/Primary" => (200, "JPEG:fake-jpeg-bytes".into()),
             "/emby/Items/102/Images/Primary" => (200, "<html>pas une image</html>".into()),
+            p if p == format!("{items}/Resume") => (200, resume_items()),
+            p if p == format!("{items}/Latest") && query.contains("ParentId=5") => {
+                (200, latest_movies())
+            }
+            "/emby/Shows/NextUp" if query.contains(&format!("UserId={USER_ID}")) => {
+                (200, next_up())
+            }
             p if p == format!("{items}/30207") => (200, movie_detail()),
             p if p == format!("{items}/80473") => (200, series_detail()),
             p if p == format!("{items}/80475") => (200, episode_detail()),
@@ -331,6 +338,53 @@ fn foreign_episodes() -> String {
     r#"{"Items":[{"Name":"Autre","Id":"67640","Type":"Episode","SeriesId":"67638","SeasonId":"67639"}],
         "TotalRecordCount":13}"#
         .into()
+}
+
+/// `/Users/{Id}/Items/Resume` (trimmed, field shapes of Emby 4.10.1.0): a film
+/// with a thumb, an episode with its still, one with only the series thumb, and
+/// items the home rows do not play.
+fn resume_items() -> String {
+    r#"{"Items":[
+        {"Name":"2 Coeurs","Id":"30207","Type":"Movie","RunTimeTicks":61033890000,
+         "ImageTags":{"Primary":"7b213eb5_6379","Thumb":"bbcac8ec_6379"},
+         "BackdropImageTags":["2edd4b0e_6379"],
+         "UserData":{"PlaybackPositionTicks":18310000000,"PlayedPercentage":30.0,"Played":false}},
+        {"Name":" Le Professeur ","Id":"70227","Type":"Episode","IndexNumber":2,"ParentIndexNumber":5,
+         "SeriesName":"La casa de papel","SeriesId":"70185","RunTimeTicks":30000000000,
+         "ImageTags":{"Primary":"b31c7276_6384"},"BackdropImageTags":[],
+         "ParentThumbItemId":"70185","ParentThumbImageTag":"724ef532_6384",
+         "ParentBackdropItemId":"70185","ParentBackdropImageTags":["6da1a59e_6384"],
+         "UserData":{"PlaybackPositionTicks":6000000000,"Played":false}},
+        {"Name":"Sans image","Id":"70228","Type":"Episode","IndexNumber":3,"ParentIndexNumber":5,
+         "SeriesName":"La casa de papel","SeriesId":"70185","ImageTags":{},
+         "ParentThumbItemId":"70185","ParentThumbImageTag":"724ef532_6384",
+         "UserData":{"PlaybackPositionTicks":600000000,"Played":false}},
+        {"Name":"Chanson","Id":"5000","Type":"Audio","UserData":{"PlaybackPositionTicks":10}},
+        {"Name":"Id douteux","Id":"../x","Type":"Movie"}
+    ],"TotalRecordCount":5}"#
+        .into()
+}
+
+/// `/Shows/NextUp` (trimmed): an unstarted episode with only the series backdrop.
+fn next_up() -> String {
+    r#"{"Items":[
+        {"Name":"Épisode 4","Id":"70229","Type":"Episode","IndexNumber":4,"ParentIndexNumber":5,
+         "SeriesName":"La casa de papel","SeriesId":"70185","RunTimeTicks":30000000000,
+         "ImageTags":{},"ParentBackdropItemId":"70185","ParentBackdropImageTags":["6da1a59e_6384"],
+         "UserData":{"PlaybackPositionTicks":0,"Played":false}}
+    ],"TotalRecordCount":1}"#
+        .into()
+}
+
+/// `/Users/{Id}/Items/Latest?ParentId=5`: a bare array, newest first.
+fn latest_movies() -> String {
+    r#"[
+        {"Name":"Runner","Id":"103617","Type":"Movie","ProductionYear":2026,"RunTimeTicks":58680640000,
+         "ImageTags":{"Primary":"aa11bb22_6390"},"PrimaryImageAspectRatio":0.6666666666666666,
+         "UserData":{"PlaybackPositionTicks":0,"Played":false}},
+        {"Name":"Coffret","Id":"103618","Type":"BoxSet","ImageTags":{}}
+    ]"#
+    .into()
 }
 
 fn signed_in_browser() -> (FakeEmby, Fixture, Arc<AtomicBool>) {
@@ -1013,6 +1067,127 @@ fn playback_reports_post_typed_bodies_with_auth_in_the_header() {
 }
 
 #[test]
+fn continue_watching_maps_films_and_episodes_with_wide_artwork() {
+    let (server, fx, revoked) = signed_in_browser();
+    let rows = run(fx.service.continue_watching()).unwrap();
+
+    let req = server.requests().into_iter().last().unwrap();
+    let (path, query) = req.path.split_once('?').unwrap();
+    assert_eq!(path, format!("/emby/Users/{USER_ID}/Items/Resume"));
+    for expected in [
+        "Limit=16",
+        "MediaTypes=Video",
+        "IncludeItemTypes=Movie%2CEpisode",
+        "EnableUserData=true",
+        "EnableImageTypes=Primary%2CBackdrop%2CThumb",
+    ] {
+        assert!(
+            query.split('&').any(|p| p == expected),
+            "{expected} in {query}"
+        );
+    }
+
+    let ids: Vec<_> = rows.iter().map(|r| r.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        ["30207", "70227", "70228"],
+        "audio and unsafe id dropped"
+    );
+    let film = serde_json::to_value(&rows[0]).unwrap();
+    assert_eq!(film["kind"], "movie");
+    assert!(film["seriesName"].is_null());
+    assert_eq!(film["runtimeMinutes"], 101);
+    assert_eq!(film["resume"]["positionSeconds"], 1831);
+    assert!(
+        film["image"]["src"]
+            .as_str()
+            .unwrap()
+            .starts_with("http://emby-img.localhost/30207/Thumb?tag=bbcac8ec_6379"),
+        "{film}"
+    );
+    let episode = &rows[1];
+    assert_eq!(episode.name, "Le Professeur");
+    assert_eq!(episode.series_name.as_deref(), Some("La casa de papel"));
+    assert_eq!((episode.season_index, episode.index), (Some(5), Some(2)));
+    assert_eq!(episode.resume.as_ref().unwrap().position_seconds, 600);
+    assert!(
+        episode
+            .image
+            .as_ref()
+            .unwrap()
+            .src
+            .contains("/70227/Primary?"),
+        "own still first"
+    );
+    assert!(
+        rows[2]
+            .image
+            .as_ref()
+            .unwrap()
+            .src
+            .contains("/70185/Thumb?tag=724ef532_6384"),
+        "series thumb when the episode has no still"
+    );
+
+    let text = serde_json::to_string(&rows).unwrap();
+    assert!(!text.contains(&server.url) && !text.contains(TOKEN));
+    revoked.store(true, Ordering::SeqCst);
+    assert!(matches!(
+        run(fx.service.continue_watching()).unwrap_err(),
+        EmbyError::SessionExpired
+    ));
+}
+
+#[test]
+fn next_up_lists_episodes_with_the_series_backdrop_as_fallback() {
+    let (server, fx, _) = signed_in_browser();
+    let rows = run(fx.service.next_up()).unwrap();
+    let req = server.requests().into_iter().last().unwrap();
+    assert!(req.path.starts_with("/emby/Shows/NextUp?"), "{}", req.path);
+    assert!(!req.path.contains(TOKEN));
+    assert_eq!(rows.len(), 1);
+    assert!(rows[0].resume.is_none());
+    assert_eq!(rows[0].runtime_minutes, Some(50));
+    assert!(
+        rows[0]
+            .image
+            .as_ref()
+            .unwrap()
+            .src
+            .contains("/70185/Backdrop?tag=6da1a59e_6384"),
+        "{:?}",
+        rows[0].image
+    );
+}
+
+#[test]
+fn latest_keeps_the_library_kind_and_refuses_unknown_libraries() {
+    let (server, fx, _) = signed_in_browser();
+    let items = run(fx.service.latest("5")).unwrap();
+    let req = server.requests().into_iter().last().unwrap();
+    let (path, query) = req.path.split_once('?').unwrap();
+    assert_eq!(path, format!("/emby/Users/{USER_ID}/Items/Latest"));
+    assert!(query.split('&').any(|p| p == "ParentId=5"), "{query}");
+    assert!(query.split('&').any(|p| p == "Limit=16"), "{query}");
+    let names: Vec<_> = items.iter().map(|i| i.name.as_str()).collect();
+    assert_eq!(names, ["Runner"], "the box set is not a film");
+    assert_eq!(items[0].year, Some(2026));
+
+    // Emby answers 500 to an unknown ParentId: such ids never reach it.
+    let before = server.requests().len();
+    assert!(matches!(
+        run(fx.service.latest("999")).unwrap_err(),
+        EmbyError::NotFound
+    ));
+    assert!(
+        server.requests()[before..]
+            .iter()
+            .all(|r| !r.path.contains("/Items/Latest")),
+        "only the library list is asked again"
+    );
+}
+
+#[test]
 fn state_after_playback_has_watched_status_and_resume_point() {
     let (_server, fx, _) = signed_in_browser();
     let film = run(fx.service.playback_state("30207")).unwrap();
@@ -1660,4 +1835,109 @@ fn real_server_transcoding() {
         "the NAS still transcodes after the stop report"
     );
     assert!(!state.played && state.resume.is_none(), "cleanup failed");
+}
+
+/// Real server, on demand, **writes to the test account** (authorized 2026-10-28):
+/// the home rows load, every library has latest additions, and a film stopped
+/// mid-way comes first in "Reprendre" at that position. Cleanup: stopped at 0.
+#[test]
+#[ignore = "needs a real Emby server and credentials in environment variables"]
+fn real_server_home_rows() {
+    use super::models::LibraryKind;
+    use super::reporting::{ActivePlayback, Tracker};
+    use crate::player::PlayerEvent;
+    use std::time::{Duration, Instant};
+
+    let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} manquant"));
+    let path = std::env::temp_dir()
+        .join(format!("viewer-emby-real-{}", uuid::Uuid::new_v4()))
+        .join("session.json");
+    SessionFile {
+        device_id: REAL_DEVICE_ID.into(),
+        ..SessionFile::default()
+    }
+    .save(&path)
+    .unwrap();
+    let fx = reopen(Arc::new(MemoryCredentialStore::default()), path);
+    run(fx.service.sign_in(
+        &var("VIEWER_EMBY_URL"),
+        &var("VIEWER_EMBY_USER"),
+        &var("VIEWER_EMBY_PASSWORD"),
+    ))
+    .unwrap();
+
+    let timed = |label: &str, started: Instant, n: usize| {
+        println!("{label}: {n} cards in {} ms", started.elapsed().as_millis());
+    };
+    let t = Instant::now();
+    let before = run(fx.service.continue_watching()).unwrap();
+    timed("Reprendre", t, before.len());
+    let t = Instant::now();
+    let next = run(fx.service.next_up()).unwrap();
+    timed("À suivre", t, next.len());
+    let libraries = run(fx.service.libraries()).unwrap();
+    for l in &libraries {
+        let t = Instant::now();
+        let latest = run(fx.service.latest(&l.id)).unwrap();
+        timed(&format!("Ajoutés récemment · {}", l.name), t, latest.len());
+        assert!(!latest.is_empty(), "{} has no latest additions", l.name);
+        let expected = if l.kind == LibraryKind::Movies {
+            "Movie"
+        } else {
+            "Series"
+        };
+        assert!(latest.iter().all(|i| i.item_type == expected));
+        assert!(latest.iter().all(|i| i.poster.is_some()), "{}", l.name);
+    }
+
+    // Stops a playback of `id` at `seconds`, like the reporter task would.
+    let stop_at = |id: &str, seconds: f64| {
+        let (plan, _) = run(fx.service.prepare_playback(id, false)).unwrap();
+        let mut tracker = Tracker::default();
+        let mut now = Instant::now();
+        let mut reports = tracker.begin(ActivePlayback::new(id, &plan), now);
+        for e in [
+            PlayerEvent::FileLoaded,
+            PlayerEvent::TimePos { seconds },
+            PlayerEvent::Shutdown,
+        ] {
+            now += Duration::from_secs(1);
+            reports.extend(tracker.on_event(&e, now));
+        }
+        for r in &reports {
+            run(fx.service.report_playback(r)).unwrap();
+        }
+        plan
+    };
+
+    let film = libraries
+        .iter()
+        .filter(|l| l.kind == LibraryKind::Movies)
+        .flat_map(|l| run(fx.service.items(&l.id, 0, 60)).unwrap().items)
+        .find(|i| !i.played && before.iter().all(|b| b.id != i.id))
+        .expect("a film not in progress on the test account");
+    println!("film: {} ({})", film.name, film.id);
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let plan = stop_at(&film.id, 600.0);
+        assert!(
+            plan.run_time_ticks.unwrap_or(0) > 1_200 * 10_000_000,
+            "film too short"
+        );
+        let rows = run(fx.service.continue_watching()).unwrap();
+        let first = rows.first().expect("Reprendre is empty after the stop");
+        println!("Reprendre after the stop: {first:?}");
+        assert_eq!(first.id, film.id, "the film comes first");
+        assert_eq!(first.resume.as_ref().unwrap().position_seconds, 600);
+        assert!(first.image.is_some() || first.runtime_minutes.is_some());
+    }));
+
+    stop_at(&film.id, 0.0);
+    let after = run(fx.service.continue_watching()).unwrap();
+    println!("cleanup: Reprendre has {} cards", after.len());
+    run(fx.service.sign_out()).unwrap();
+    if let Err(e) = result {
+        std::panic::resume_unwind(e);
+    }
+    assert!(after.iter().all(|r| r.id != film.id), "cleanup failed");
 }

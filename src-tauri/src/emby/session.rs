@@ -14,6 +14,7 @@ use super::models::{
     BaseItemDto, CastMember, DetailKind, Episode, EpisodePage, ItemDetail, ItemPage, Library,
     LibraryKind, MediaInfo, MediaItem, MediaSourceDto, MediaStreamDto, PlaybackStopped,
     ResumePoint, Season, ServerSummary, SignedInUser, StreamInfo, UserItemData, VideoInfo,
+    WatchItem, WatchKind,
 };
 use super::playback::{self, PlaybackPlan};
 use super::reporting::Report;
@@ -69,6 +70,8 @@ impl SessionFile {
 
 /// Largest page the UI may ask for.
 pub const MAX_PAGE: u32 = 200;
+/// Cards per home row: about two window widths.
+const HOME_ROW: u32 = 16;
 const TICKS_PER_MINUTE: i64 = 600_000_000;
 const IMAGE_CONCURRENCY: usize = 6;
 
@@ -265,6 +268,44 @@ impl EmbyService {
             start_index,
             total: page.total_record_count,
         })
+    }
+
+    /// Home row "Reprendre": films and episodes started but not finished.
+    pub async fn continue_watching(&self) -> Result<Vec<WatchItem>, EmbyError> {
+        let (client, user_id) = self.session()?;
+        let res = self.expire_on_401(client.resume_items(&user_id, HOME_ROW).await)?;
+        Ok(res.items.into_iter().filter_map(watch_item).collect())
+    }
+
+    /// Home row "À suivre": the next episode of each series in progress.
+    pub async fn next_up(&self) -> Result<Vec<WatchItem>, EmbyError> {
+        let (client, user_id) = self.session()?;
+        let res = self.expire_on_401(client.next_up(&user_id, HOME_ROW).await)?;
+        Ok(res
+            .items
+            .into_iter()
+            .filter(|i| i.item_type == "Episode")
+            .filter_map(watch_item)
+            .collect())
+    }
+
+    /// Home row "Ajoutés récemment" of a film or series library: films and series
+    /// (a series stands for its new episodes), newest first.
+    pub async fn latest(&self, library_id: &str) -> Result<Vec<MediaItem>, EmbyError> {
+        let kind = match self.library_kind(library_id) {
+            Some(k) => k,
+            None => {
+                self.libraries().await?;
+                self.library_kind(library_id).ok_or(EmbyError::NotFound)?
+            }
+        };
+        let (client, user_id) = self.session()?;
+        let items = self.expire_on_401(client.latest(&user_id, library_id, HOME_ROW).await)?;
+        Ok(items
+            .into_iter()
+            .filter(|i| i.item_type == kind.item_types())
+            .filter_map(media_item)
+            .collect())
     }
 
     /// Detail page of a film or series. Other item types are refused.
@@ -563,6 +604,68 @@ fn media_item(dto: BaseItemDto) -> Option<MediaItem> {
             .filter(|r| r.is_finite() && *r > 0.0),
         played: user_data.played,
         unplayed_count: user_data.unplayed_item_count,
+    })
+}
+
+/// Card of the "Reprendre" and "À suivre" rows; other item types are dropped.
+fn watch_item(dto: BaseItemDto) -> Option<WatchItem> {
+    if !is_id(&dto.id) {
+        return None;
+    }
+    let kind = match dto.item_type.as_str() {
+        "Movie" => WatchKind::Movie,
+        "Episode" => WatchKind::Episode,
+        _ => return None,
+    };
+    let own = |t: ImageType| {
+        images::image_ref(
+            &dto.id,
+            t,
+            dto.image_tags.get(t.as_str()).map(String::as_str),
+            images::THUMB_WIDTHS,
+        )
+    };
+    let image = match kind {
+        WatchKind::Episode => own(ImageType::Primary)
+            .or_else(|| {
+                images::image_ref(
+                    dto.parent_thumb_item_id.as_deref()?,
+                    ImageType::Thumb,
+                    dto.parent_thumb_image_tag.as_deref(),
+                    images::THUMB_WIDTHS,
+                )
+            })
+            .or_else(|| {
+                images::image_ref(
+                    dto.parent_backdrop_item_id.as_deref()?,
+                    ImageType::Backdrop,
+                    dto.parent_backdrop_image_tags.first().map(String::as_str),
+                    images::THUMB_WIDTHS,
+                )
+            }),
+        WatchKind::Movie => own(ImageType::Thumb).or_else(|| {
+            images::image_ref(
+                &dto.id,
+                ImageType::Backdrop,
+                dto.backdrop_image_tags.first().map(String::as_str),
+                images::THUMB_WIDTHS,
+            )
+        }),
+    };
+    let user_data = dto.user_data.unwrap_or_default();
+    Some(WatchItem {
+        resume: resume(&user_data, dto.run_time_ticks),
+        runtime_minutes: minutes(dto.run_time_ticks),
+        series_name: match kind {
+            WatchKind::Episode => text(dto.series_name),
+            WatchKind::Movie => None,
+        },
+        season_index: dto.parent_index_number,
+        index: dto.index_number,
+        id: dto.id,
+        name: dto.name.trim().to_owned(),
+        kind,
+        image,
     })
 }
 

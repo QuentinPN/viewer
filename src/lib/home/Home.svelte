@@ -1,0 +1,340 @@
+<script lang="ts">
+// Home page (DESIGN.md, Home; ADR 0010): "Reprendre" and "À suivre" play at once,
+// then the latest additions of each library open their detail page. Rows load in
+// parallel; "Reprendre" and "À suivre" are read again after every playback.
+import { onMount } from "svelte";
+import { embyApi, errorHint, toEmbyError } from "../emby/api";
+import type {
+  EmbyError,
+  Library,
+  MediaItem,
+  PlaybackStart,
+  WatchItem,
+} from "../emby/types";
+import PosterCard from "../library/PosterCard.svelte";
+import { watchTitle, withoutDuplicates } from "./format";
+import Row from "./Row.svelte";
+import WatchCard from "./WatchCard.svelte";
+
+interface Props {
+  libraries: Library[];
+  userName: string;
+  onOpen: (item: MediaItem) => void;
+  onShowLibrary: (library: Library) => void;
+  onPlay: (start: PlaybackStart) => void;
+  /** Reports the error upward (an expired session signs out) and returns it. */
+  onError: (e: unknown) => EmbyError;
+}
+
+let { libraries, userName, onOpen, onShowLibrary, onPlay, onError }: Props =
+  $props();
+
+interface RowState<T> {
+  items: T[] | null;
+  error: EmbyError | null;
+}
+
+function loadingRow<T>(): RowState<T> {
+  return { items: null, error: null };
+}
+
+let inProgress = $state<RowState<WatchItem>>(loadingRow());
+let nextUp = $state<RowState<WatchItem>>(loadingRow());
+let latest = $state<Record<string, RowState<MediaItem>>>({});
+let starting = $state<string | null>(null);
+let playError = $state<{ title: string; error: EmbyError } | null>(null);
+// Bumped by every reload of the watch rows: older answers are dropped.
+let watchGeneration = 0;
+
+const nextUpShown = $derived(
+  nextUp.items ? withoutDuplicates(nextUp.items, inProgress.items ?? []) : null,
+);
+const watchLoading = $derived(
+  (inProgress.items === null && !inProgress.error) ||
+    (nextUp.items === null && !nextUp.error),
+);
+const everythingEmpty = $derived(
+  inProgress.items?.length === 0 &&
+    nextUpShown?.length === 0 &&
+    libraries.every((l) => latest[l.id]?.items?.length === 0),
+);
+
+async function loadRow<T>(
+  fetch: () => Promise<T[]>,
+  set: (row: RowState<T>) => void,
+  isCurrent: () => boolean = () => true,
+) {
+  try {
+    const items = await fetch();
+    if (isCurrent()) set({ items, error: null });
+  } catch (e) {
+    if (isCurrent()) set({ items: null, error: onError(e) });
+  }
+}
+
+function loadWatchRows() {
+  const gen = ++watchGeneration;
+  const current = () => gen === watchGeneration;
+  void loadRow(embyApi.continueWatching, (r) => (inProgress = r), current);
+  void loadRow(embyApi.nextUp, (r) => (nextUp = r), current);
+}
+
+function loadLatest(library: Library) {
+  latest[library.id] = loadingRow();
+  void loadRow(
+    () => embyApi.latest(library.id),
+    (r) => (latest[library.id] = r),
+  );
+}
+
+async function play(item: WatchItem) {
+  if (starting) return;
+  starting = item.id;
+  playError = null;
+  try {
+    onPlay(await embyApi.play(item.id, item.resume !== null));
+  } catch (e) {
+    playError = { title: watchTitle(item), error: onError(toEmbyError(e)) };
+  } finally {
+    starting = null;
+  }
+}
+
+onMount(() => {
+  loadWatchRows();
+  for (const library of libraries) loadLatest(library);
+  const unlisten = embyApi.onPlaybackStopped(() => loadWatchRows());
+  return () => {
+    void unlisten.then((stop) => stop());
+  };
+});
+</script>
+
+{#snippet rowError(error: EmbyError, retry: () => void)}
+  <div class="row-error" role="alert">
+    <p>{error.message}</p>
+    {#if errorHint(error)}<p class="hint">{errorHint(error)}</p>{/if}
+    <button type="button" class="secondary" onclick={retry}>Réessayer</button>
+  </div>
+{/snippet}
+
+{#snippet skeleton(wide: boolean, count: number)}
+  {#each { length: count } as _, i (i)}
+    <li class="skeleton" class:wide aria-hidden="true">
+      <div class="sk-image"></div>
+      <div class="sk-line"></div>
+    </li>
+  {/each}
+{/snippet}
+
+<div class="home" aria-busy={watchLoading}>
+  <header class="heading">
+    <h1>Accueil</h1>
+    <p class="welcome">Bonjour {userName}</p>
+  </header>
+
+  {#if playError}
+    <div class="play-error" role="alert">
+      <p class="error-title">Impossible de lire « {playError.title} »</p>
+      <p>{playError.error.message}</p>
+      {#if errorHint(playError.error)}<p class="hint">{errorHint(playError.error)}</p>{/if}
+      <button type="button" class="secondary" onclick={() => (playError = null)}>Fermer</button>
+    </div>
+  {/if}
+
+  {#if watchLoading}
+    <Row title="Reprendre" id="row-loading" wide>
+      {@render skeleton(true, 4)}
+    </Row>
+  {:else}
+    {#if inProgress.error}
+      <section class="row-failed" aria-labelledby="row-resume">
+        <h2 id="row-resume">Reprendre</h2>
+        {@render rowError(inProgress.error, loadWatchRows)}
+      </section>
+    {:else if inProgress.items?.length}
+      <Row title="Reprendre" id="row-resume" wide>
+        {#each inProgress.items as item (item.id)}
+          <li>
+            <WatchCard
+              {item}
+              busy={starting === item.id}
+              disabled={starting !== null}
+              onPlay={play}
+            />
+          </li>
+        {/each}
+      </Row>
+    {/if}
+
+    {#if nextUp.error}
+      <section class="row-failed" aria-labelledby="row-next">
+        <h2 id="row-next">À suivre</h2>
+        {@render rowError(nextUp.error, loadWatchRows)}
+      </section>
+    {:else if nextUpShown?.length}
+      <Row title="À suivre" id="row-next" wide>
+        {#each nextUpShown as item (item.id)}
+          <li>
+            <WatchCard
+              {item}
+              busy={starting === item.id}
+              disabled={starting !== null}
+              onPlay={play}
+            />
+          </li>
+        {/each}
+      </Row>
+    {/if}
+  {/if}
+
+  {#each libraries as library (library.id)}
+    {@const row = latest[library.id]}
+    {#if row?.error}
+      <section class="row-failed" aria-labelledby="row-latest-{library.id}">
+        <h2 id="row-latest-{library.id}">Ajoutés récemment · {library.name}</h2>
+        {@render rowError(row.error, () => loadLatest(library))}
+      </section>
+    {:else if !row?.items || row.items.length > 0}
+      <Row title="Ajoutés récemment · {library.name}" id="row-latest-{library.id}">
+        {#snippet action()}
+          <button
+            type="button"
+            class="see-all"
+            aria-label="Tout voir dans {library.name}"
+            onclick={() => onShowLibrary(library)}>Tout voir</button
+          >
+        {/snippet}
+        {#if row?.items}
+          {#each row.items as item (item.id)}
+            <li><PosterCard {item} onOpen={onOpen} /></li>
+          {/each}
+        {:else}
+          {@render skeleton(false, 8)}
+        {/if}
+      </Row>
+    {/if}
+  {/each}
+
+  {#if everythingEmpty}
+    <div class="state">
+      <p class="state-title">Rien à afficher pour l'instant</p>
+      <p>Vos bibliothèques ne contiennent encore aucun film ni épisode récent.</p>
+    </div>
+  {/if}
+</div>
+
+<style>
+  .heading {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+  }
+  h1 {
+    margin: 0;
+    font-size: 28px;
+    letter-spacing: -0.01em;
+  }
+  .welcome {
+    margin: 0;
+    color: var(--color-text-muted);
+  }
+  .row-failed {
+    margin-bottom: 32px;
+  }
+  .row-failed h2 {
+    margin: 0 0 var(--space-2);
+    font-size: 20px;
+  }
+  .row-error,
+  .play-error {
+    max-width: 640px;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+  }
+  .play-error {
+    margin-bottom: var(--space-6);
+    border-left: 3px solid var(--color-danger);
+  }
+  .row-error p,
+  .play-error p {
+    margin: var(--space-1) 0;
+  }
+  .error-title {
+    color: var(--color-text);
+    font-weight: 600;
+  }
+  .hint {
+    font-size: 13px;
+    color: var(--color-text-muted);
+  }
+  button.secondary {
+    margin-top: var(--space-2);
+    background: var(--color-elevated);
+    color: var(--color-text);
+    border: 0;
+    border-radius: var(--radius-sm);
+    padding: var(--space-1) var(--space-3);
+    font: inherit;
+    cursor: pointer;
+  }
+  .see-all {
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm);
+    padding: var(--space-1) var(--space-2);
+    color: var(--color-accent);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .see-all:hover {
+    background: var(--color-surface);
+  }
+  button:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  .skeleton .sk-image {
+    aspect-ratio: 2 / 3;
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  .skeleton.wide .sk-image {
+    aspect-ratio: 16 / 9;
+  }
+  .skeleton .sk-line {
+    margin-top: var(--space-2);
+    height: 12px;
+    width: 70%;
+    border-radius: 6px;
+    background: var(--color-surface);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    50% {
+      opacity: 0.55;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton .sk-image,
+    .skeleton .sk-line {
+      animation: none;
+    }
+  }
+  .state {
+    max-width: 520px;
+    margin: 10vh auto 0;
+    text-align: center;
+    color: var(--color-text-secondary);
+  }
+  .state-title {
+    color: var(--color-text);
+    font-size: 18px;
+    font-weight: 600;
+  }
+</style>

@@ -50,8 +50,10 @@ Connection/auth, typed API client, libraries, item details, PlaybackInfo, secure
 - NOT VERIFIED (transcoding): image subtitles (PGS/VOBSUB) in a transcode; transcoded picture, sound and subtitles by eye and ear; no bitrate setting in the UI (debug-only override).
 - TODO: episode detail, search, sorting and filters come with Gate 3.
 
-## Gate 3 — Core experience [TODO]
+## Gate 3 — Core experience [IN PROGRESS · home page VERIFIED]
 Home, film/series browsing, details, search, accessible player UI, responsive layouts and artwork cache.
+- DONE: home page (ADR 0010) — Continue Watching, Next Up, latest additions per library, "Tout voir". Next Up checked with fake data only (no watched episode on the test account).
+- TODO: hero and favorites on the home page, search, sorting and filters, episode detail, final player UI, artwork cache.
 - Known input: the control bar hides subtitles at narrow widths (Gate 1 finding); views must provide an opaque background when no video plays (transparent window).
 
 ## Gate 4 — End-to-end quality [TODO]
@@ -154,3 +156,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `npm run verify` green (Vitest 33/33, cargo test 53 passed / 7 ignored), release clippy clean; real server: `real_server_transcoding` passed; `gate2-transcode` 10/10; `gate2-play`, `gate2-ui` passed; `gate2-resume` 20/20 on the second run (first run: server timeout while loading libraries, before any playback).
 - **Not verified**: image subtitles in a transcode; transcoded media by eye and ear.
 - **Next**: Gate 3 browsing (home, search, sort, filters, episode detail), or reporting the audio/subtitle tracks chosen in mpv.
+
+### 2026-10-28 — Home page
+- **Changed**: ADR 0010; `emby_continue_watching`, `emby_next_up`, `emby_latest(library_id)` (Rust, `WatchItem` with wide artwork and resume point, unknown library refused before reaching the server's 500); `src/lib/home/` (home page, horizontal rows with keyboard and scroll buttons, 16:9 watch cards that play at once); home is the default signed-in view with an "Accueil" entry; new scenario `scripts/e2e/gate3-home.mjs`, `gate2-ui` waits for the home page after sign-in.
+- **Server side effects** (test account, within the 2026-10-28 authorization): one film position written at 600 s / 20 % and cleared, by the cargo test and the scenario. Nothing marked watched.
+- **Tests**: `npm run verify` green (Vitest 37/37, cargo test 56 passed / 8 ignored); real server: `real_server_home_rows` passed; `gate3-home` 23/23; `gate2-ui` and `gate2-play` passed. Evidence: `docs/evidence/gate3-accueil-2026-10-28.md`.
+- **Not verified**: Next Up with real data (no watched episode on the test account; marking watched not authorized); screen readers; look on a real screen.
+- **Next**: search (Gate 3), then sort and filters in the library grid.
