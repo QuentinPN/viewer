@@ -410,7 +410,7 @@ $effect(() => {
         void runSearch();
       }}
     >
-      <label class="sr-only" for="search-field">Rechercher un film ou une série</label>
+      <label class="sr-only" for="search-field">Rechercher un film, une série ou un épisode</label>
       <svg viewBox="0 0 16 16" aria-hidden="true"
         ><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3 3" /></svg
       >
