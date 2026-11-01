@@ -320,3 +320,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Found**: a `disabled` button loses the keyboard focus while it works; the clear button uses `aria-disabled` while emptying.
 - **Not verified**: images still held by the WebView after clearing (until the next launch), clearing while images download, screen readers.
 - **Next**: Gate 3 remaining items, or a metadata cache (SQLite) for offline browsing.
+
+### 2026-11-01 — Startup baseline (metadata cache decision)
+
+- **Changed**: scenario `scripts/e2e/measure-startup.mjs` (three launches with the saved session, five calls of each home and grid command); no app code.
+- **Measured** (debug build, LAN): home complete ≈ 670 ms after process start, ≈ 440 ms of it before the page runs; commands 9–56 ms median. Details in `docs/evidence/mesure-demarrage-2026-11-01.md`.
+- **Decided**: no SQLite metadata cache for now — it could save only ≈ 100 ms on the LAN, for a dependency, a schema, migrations and invalidation. Reconsider for remote access or if offline metadata (post-MVP in PRODUCT.md) is asked for.
+- **Next**: Gate 4 — network interruptions and unsupported format fallback on the real server.
