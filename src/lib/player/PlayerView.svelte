@@ -1160,6 +1160,12 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   .actions .text-button {
     margin-top: 0;
   }
+  /* The card takes the focus on its own, often after a mouse action, when
+     :focus-visible would not match: Enter must show what it will do. */
+  .actions button:focus {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
   .play-now {
     display: inline-flex;
     align-items: center;

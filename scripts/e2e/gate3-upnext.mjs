@@ -155,11 +155,20 @@ try {
     leftAtFirst <= 10 && leftLater < leftAtFirst && leftLater > 0,
     `${leftAtFirst} → ${leftLater} s`,
   );
+  const focused = await page.evaluate(() => {
+    const e = document.activeElement;
+    const style = e ? getComputedStyle(e) : null;
+    return {
+      name: e?.textContent?.trim(),
+      outline: style ? `${style.outlineStyle} ${style.outlineWidth}` : "",
+    };
+  });
   check(
     "focus_on_play_now",
-    await page.evaluate(
-      () => document.activeElement?.textContent?.trim() === "Lire maintenant",
-    ),
+    focused.name === "Lire maintenant" &&
+      focused.outline.startsWith("solid") &&
+      focused.outline !== "solid 0px",
+    `anneau : ${focused.outline}`,
   );
   const background = await page
     .locator(".player")
