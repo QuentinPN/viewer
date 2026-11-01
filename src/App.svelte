@@ -87,6 +87,22 @@ async function playbackInterrupted(itemId: string) {
   void coordinator.verify();
 }
 
+/**
+ * Next episode from the end-of-episode card (ADR 0018): the player stays open and
+ * the focus still goes back, at the end, where the first playback started.
+ */
+async function playNext(itemId: string): Promise<string | null> {
+  if (!appActive) return "La session n'est pas disponible.";
+  try {
+    playing = await embyApi.play(itemId, true);
+    return null;
+  } catch (e) {
+    const error = toEmbyError(e);
+    void coordinator.report(error);
+    return error.message;
+  }
+}
+
 async function resumeInterrupted() {
   if (!interrupted || resuming) return;
   resuming = true;
@@ -189,6 +205,7 @@ async function signOut() {
         playback={playing}
         onExit={stopPlaying}
         onInterrupted={playbackInterrupted}
+        onPlayNext={playNext}
       />
     {/if}
   {/if}

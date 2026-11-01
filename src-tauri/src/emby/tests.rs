@@ -2910,6 +2910,40 @@ fn real_server_next_up() {
     );
 }
 
+/// Cleanup of `scripts/e2e/gate3-upnext.mjs` (ADR 0018): playing an episode to its
+/// end marks it played, so the scenario marks the items it listed in
+/// `VIEWER_UNPLAY_IDS` (comma-separated) unplayed again on the test account.
+#[test]
+#[ignore = "needs the real Emby server, VIEWER_EMBY_* and VIEWER_UNPLAY_IDS"]
+fn real_server_mark_unplayed() {
+    let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} manquant"));
+    let ids = var("VIEWER_UNPLAY_IDS");
+    let path = std::env::temp_dir()
+        .join(format!("viewer-emby-real-{}", uuid::Uuid::new_v4()))
+        .join("session.json");
+    SessionFile {
+        device_id: REAL_DEVICE_ID.into(),
+        ..SessionFile::default()
+    }
+    .save(&path)
+    .unwrap();
+    let fx = reopen(Arc::new(MemoryCredentialStore::default()), path);
+    let user = run(fx.service.sign_in(
+        &var("VIEWER_EMBY_URL"),
+        &var("VIEWER_EMBY_USER"),
+        &var("VIEWER_EMBY_PASSWORD"),
+    ))
+    .unwrap();
+    let client = fx.service.client().unwrap();
+    for id in ids.split(',').filter(|id| !id.is_empty()) {
+        run(client.set_played(&user.user_id, id, None)).unwrap();
+        let detail = run(fx.service.item_detail(id)).unwrap();
+        assert!(!detail.played, "{id} still played");
+        println!("{id} unplayed");
+    }
+    run(fx.service.sign_out()).unwrap();
+}
+
 /// Now as `yyyyMMddHHmmss` in UTC, the `DatePlayed` format.
 fn utc_stamp() -> String {
     let secs = std::time::SystemTime::now()

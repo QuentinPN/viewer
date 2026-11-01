@@ -2,8 +2,10 @@
 // Player of a playback started from Emby (ADR 0017): title at the top, controls
 // that fade after a few seconds without activity, audio, subtitles and
 // diagnostic panels. The video is the native surface under this transparent page.
+// At the end of an episode, a card offers the next one (ADR 0018).
 import { onDestroy, onMount, tick } from "svelte";
-import type { PlaybackStart } from "../emby/types";
+import { embyApi } from "../emby/api";
+import type { EpisodeLink, PlaybackStart } from "../emby/types";
 import { playerApi } from "./api";
 import {
   formatRemaining,
@@ -20,6 +22,12 @@ import type {
   PlayerEvent,
   Track,
 } from "./types";
+import {
+  isEpisode,
+  nextTitle,
+  startCountdown,
+  UP_NEXT_SECONDS,
+} from "./upnext";
 import {
   effectiveVolume,
   readVolume,
@@ -38,9 +46,14 @@ interface Props {
    * ADR 0012): the player closes and the app offers to resume.
    */
   onInterrupted: (itemId: string) => void;
+  /**
+   * Starts the next episode in the open engine; resolves with an error message
+   * when it could not start, `null` once the app shows the new playback.
+   */
+  onPlayNext: (itemId: string) => Promise<string | null>;
 }
 
-let { playback, onExit, onInterrupted }: Props = $props();
+let { playback, onExit, onInterrupted, onPlayNext }: Props = $props();
 
 /** Same margin as Rust's early end of file (`EARLY_EOF_TICKS`). */
 const EARLY_EOF_SECONDS = 30;
@@ -69,8 +82,25 @@ let audioButton = $state<HTMLButtonElement | null>(null);
 let subsButton = $state<HTMLButtonElement | null>(null);
 let infoButton = $state<HTMLButtonElement | null>(null);
 let panelElement = $state<HTMLElement | null>(null);
+/** Next episode of the series, looked up while this one plays. */
+let nextEpisode = $state<EpisodeLink | null>(null);
+/** Seconds left on the "Épisode suivant" card, shown once the episode ended. */
+let upNextLeft = $state<number | null>(null);
+/** Next episode being opened, until the app shows its playback. */
+let launching = $state<EpisodeLink | null>(null);
+let playNowButton = $state<HTMLButtonElement | null>(null);
+let stopCountdown: (() => void) | undefined;
 
-const heading = $derived(playbackHeading(playback.title));
+const heading = $derived(
+  playbackHeading(
+    launching ? nextTitle(launching, playback.title) : playback.title,
+  ),
+);
+const upNext = $derived(
+  upNextLeft !== null && nextEpisode
+    ? playbackHeading(nextTitle(nextEpisode, playback.title))
+    : null,
+);
 const decision = $derived(playMethodLabel(playback));
 const audioTracks = $derived(tracks.filter((t) => t.kind === "audio"));
 const subTracks = $derived(tracks.filter((t) => t.kind === "sub"));
@@ -87,8 +117,26 @@ const chromeVisible = $derived(
     scrubbing ||
     overChrome ||
     panel !== null ||
+    upNext !== null ||
     error !== null,
 );
+
+// Each episode looks up its successor; an answer for an older one is dropped.
+$effect(() => {
+  const { itemId, title } = playback;
+  launching = null;
+  nextEpisode = null;
+  if (!isEpisode(title)) return;
+  embyApi
+    .itemDetail(itemId)
+    .then((detail) => {
+      if (playback.itemId === itemId)
+        nextEpisode = detail.episode?.next ?? null;
+    })
+    .catch(() => {
+      // No card then: the end closes the player as for a film.
+    });
+});
 
 let unlisten: (() => void) | undefined;
 let diagTimer: ReturnType<typeof setInterval> | undefined;
@@ -140,7 +188,10 @@ function onEvent(ev: PlayerEvent) {
         void close(() => onInterrupted(playback.itemId));
       } else if (ev.reason === "error")
         error = `Lecture impossible : ${ev.error ?? "erreur inconnue"}`;
-      else if (ev.reason === "eof") void close();
+      else if (ev.reason === "eof") {
+        if (active && nextEpisode) void offerNext();
+        else void close();
+      }
       break;
     case "shutdown":
       active = false;
@@ -176,6 +227,7 @@ onMount(async () => {
 });
 
 onDestroy(() => {
+  stopCountdown?.();
   unlisten?.();
   clearInterval(diagTimer);
   clearTimeout(hideTimer);
@@ -208,7 +260,47 @@ function interruptedBy(reason: EndReason): boolean {
   );
 }
 
+/** The episode ended: the card counts down, then the next one starts. */
+async function offerNext() {
+  panel = null;
+  upNextLeft = UP_NEXT_SECONDS;
+  stopCountdown = startCountdown(
+    UP_NEXT_SECONDS,
+    (left) => (upNextLeft = left),
+    () => void playNext(),
+  );
+  await tick();
+  playNowButton?.focus();
+}
+
+function dismissNext() {
+  stopCountdown?.();
+  upNextLeft = null;
+}
+
+/**
+ * Opens the next episode in the same engine and view: the event subscription,
+ * fullscreen and volume stay; the opening screen shows its title meanwhile.
+ */
+async function playNext() {
+  const next = nextEpisode;
+  if (!next || launching) return;
+  dismissNext();
+  launching = next;
+  active = false;
+  error = null;
+  position = 0;
+  duration = 0;
+  paused = false;
+  buffering = false;
+  tracks = [];
+  diag = null;
+  const failure = await onPlayNext(next.id);
+  if (failure) error = failure;
+}
+
 async function close(then: () => void = onExit) {
+  dismissNext();
   if (fullscreen) await toggleFullscreen(false).catch(() => {});
   await playerApi.close();
   active = false;
@@ -253,6 +345,14 @@ function onKeydown(e: KeyboardEvent) {
   wake();
   if (e.ctrlKey || e.altKey || e.metaKey) return;
   const target = e.target as HTMLElement | null;
+  // On the card, Space and Enter belong to its buttons; Escape cancels.
+  if (upNext) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      void close();
+    }
+    return;
+  }
   if (e.key === "Escape" && panel) {
     e.preventDefault();
     closePanel();
@@ -359,7 +459,12 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   </svg>
 {/snippet}
 
-<div class="player" class:opening={!active} class:hidden={!chromeVisible}>
+<div
+  class="player"
+  class:opening={!active}
+  class:ended={upNext !== null}
+  class:hidden={!chromeVisible}
+>
   {#if !active}
     <main class="opening-panel" aria-busy={!error}>
       {#if heading.kicker}<p class="kicker">{heading.kicker}</p>{/if}
@@ -399,6 +504,24 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     {/if}
     {#if error}<p class="error floating" role="alert">{error}</p>{/if}
 
+    {#if upNext && upNextLeft !== null}
+      <div class="up-next" role="dialog" aria-label="Épisode suivant">
+        <p class="label">Épisode suivant</p>
+        {#if upNext.kicker}<p class="kicker">{upNext.kicker}</p>{/if}
+        <h2>{upNext.name}</h2>
+        <p class="countdown">Lecture dans {upNextLeft} s</p>
+        <span class="gauge" aria-hidden="true">
+          <span style:width={`${(upNextLeft / UP_NEXT_SECONDS) * 100}%`}></span>
+        </span>
+        <div class="actions">
+          <button type="button" class="play-now" bind:this={playNowButton} onclick={() => playNext()}>
+            {@render icon("play")}
+            Lire maintenant
+          </button>
+          <button type="button" class="text-button" onclick={() => close()}>Annuler</button>
+        </div>
+      </div>
+    {:else}
     <section
       class="bottom chrome"
       aria-label="Commandes de lecture"
@@ -607,6 +730,7 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
         </div>
       </div>
     </section>
+    {/if}
   {/if}
 </div>
 
@@ -970,6 +1094,91 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   }
   .text-button:hover {
     filter: brightness(1.15);
+  }
+
+  /* End of an episode (ADR 0018): no video under the page any more, so the
+     player paints its own background. */
+  .player.ended {
+    background:
+      radial-gradient(ellipse at 80% 100%, rgb(85 182 232 / 14%), transparent 60%),
+      var(--color-bg);
+  }
+  .up-next {
+    position: relative;
+    align-self: flex-end;
+    width: min(420px, calc(100% - 2 * var(--space-4)));
+    margin: 0 var(--space-6) var(--space-6);
+    padding: var(--space-4) var(--space-6) var(--space-6);
+    display: grid;
+    gap: var(--space-1);
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 24px 60px rgb(0 0 0 / 50%);
+  }
+  .up-next .label {
+    margin: 0 0 var(--space-2);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .up-next h2 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 650;
+    line-height: 1.25;
+  }
+  .countdown {
+    margin: var(--space-3) 0 0;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .gauge {
+    display: block;
+    height: 3px;
+    border-radius: 2px;
+    background: rgb(255 255 255 / 14%);
+    overflow: hidden;
+  }
+  .gauge span {
+    display: block;
+    height: 100%;
+    background: var(--color-accent);
+    transition: width 1s linear;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .gauge span {
+      transition: none;
+    }
+  }
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+  }
+  .actions .text-button {
+    margin-top: 0;
+  }
+  .play-now {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-6) var(--space-2) var(--space-4);
+    background: #fff;
+    color: #0b0d11;
+    border: 0;
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .play-now:hover {
+    background: #e6e8ec;
+  }
+  .play-now .icon {
+    width: 18px;
+    height: 18px;
   }
 
   @media (max-width: 640px) {
