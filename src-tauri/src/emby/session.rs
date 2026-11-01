@@ -2,13 +2,14 @@
 //! session metadata lives in `session.json`; the token lives in a `CredentialStore`.
 
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
 use super::EmbyError;
+use super::artwork_cache::{ArtworkCache, ArtworkCacheStats};
 use super::client::{AccessToken, DeviceIdentity, EmbyClient, EpisodesQuery, ItemsQuery};
 use super::credentials::{self, CredentialStore};
 use super::images::{self, ImageRequest, ImageType};
@@ -154,6 +155,8 @@ pub struct EmbyService {
     /// Client of the last session ended by a 401: its other requests in flight
     /// still answer `SessionExpired`, not `Cancelled`.
     expired: Mutex<Option<EmbyClient>>,
+    /// Artwork kept on disk across launches (ADR 0019); `None` fetches every time.
+    artwork: Option<Arc<ArtworkCache>>,
 }
 
 impl EmbyService {
@@ -176,7 +179,20 @@ impl EmbyService {
             epoch: AtomicU64::new(0),
             timeouts: None,
             expired: Mutex::new(None),
+            artwork: None,
         }
+    }
+
+    pub fn with_artwork_cache(mut self, cache: ArtworkCache) -> Self {
+        self.artwork = Some(Arc::new(cache));
+        self
+    }
+
+    pub async fn artwork_stats(&self) -> Option<ArtworkCacheStats> {
+        let cache = Arc::clone(self.artwork.as_ref()?);
+        tauri::async_runtime::spawn_blocking(move || cache.stats())
+            .await
+            .ok()
     }
 
     /// Short bounds, so tests can simulate a server that never answers.
@@ -790,17 +806,41 @@ impl EmbyService {
     }
 
     /// Artwork for the `emby-img` protocol, fetched with the open session.
+    /// Artwork of the open session's server: from the disk cache when it has it, else
+    /// downloaded (at most `IMAGE_CONCURRENCY` at once) and kept (ADR 0019).
     pub async fn image(&self, req: &ImageRequest) -> Result<(String, Vec<u8>), EmbyError> {
+        // Session and server first: the cache never answers for another session.
+        self.session()?;
+        if req.server_id != self.scope() {
+            return Err(EmbyError::Forbidden);
+        }
+        if let Some(cache) = &self.artwork {
+            let (cache, key) = (Arc::clone(cache), req.clone());
+            if let Ok(Some(hit)) =
+                tauri::async_runtime::spawn_blocking(move || cache.get(&key)).await
+            {
+                return Ok(hit);
+            }
+        }
         let _permit = self
             .image_permits
             .acquire()
             .await
             .map_err(|_| EmbyError::NotSignedIn)?;
+        // Read again after the wait: the session may have ended meanwhile.
         let (client, _) = self.session()?;
         if req.server_id != self.scope() {
             return Err(EmbyError::Forbidden);
         }
-        self.expire_on_401(&client, client.image(req).await)
+        let (content_type, bytes) = self.expire_on_401(&client, client.image(req).await)?;
+        if let Some(cache) = &self.artwork {
+            let (cache, key, data) = (Arc::clone(cache), req.clone(), bytes.clone());
+            let kept = tauri::async_runtime::spawn_blocking(move || cache.put(&key, &data)).await;
+            if let Ok(Err(e)) = kept {
+                log::debug!("artwork {} not cached: {:?}", req.item_id, e.kind());
+            }
+        }
+        Ok((content_type, bytes))
     }
 
     pub fn last_server_url(&self) -> Option<String> {

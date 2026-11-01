@@ -1,6 +1,7 @@
 //! Emby integration (ADR 0004). The access token stays in Rust: the UI only sees
 //! typed summaries, never the token or raw API URLs.
 
+pub mod artwork_cache;
 pub mod client;
 pub mod credentials;
 pub mod images;

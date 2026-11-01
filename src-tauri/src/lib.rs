@@ -115,6 +115,25 @@ fn emby_service(
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
         .filter(|_| cfg!(debug_assertions));
+    // Artwork cache (ADR 0019): disposable, so it lives in the local cache directory.
+    // Debug builds only: scripted UI tests (scripts/e2e) use their own folder.
+    let e2e_artwork = std::env::var_os("VIEWER_E2E_ARTWORK_DIR")
+        .filter(|_| cfg!(debug_assertions))
+        .map(PathBuf::from);
+    let artwork_dir = match e2e_artwork {
+        Some(dir) => Ok(dir),
+        None => app.path().app_cache_dir().map(|d| d.join("artwork")),
+    };
+    let service = match artwork_dir {
+        Ok(dir) => service.with_artwork_cache(emby::artwork_cache::ArtworkCache::new(
+            dir,
+            emby::artwork_cache::DEFAULT_QUOTA,
+        )),
+        Err(e) => {
+            log::warn!("no cache directory, artwork is not kept: {e}");
+            service
+        }
+    };
     Ok(match e2e_bitrate {
         Some(bitrate) => service.with_max_streaming_bitrate(bitrate),
         None => service,
@@ -285,6 +304,7 @@ pub fn run() {
             commands::emby_libraries,
             commands::emby_items,
             commands::emby_genres,
+            commands::artwork_cache_stats,
             commands::emby_continue_watching,
             commands::emby_next_up,
             commands::emby_latest,

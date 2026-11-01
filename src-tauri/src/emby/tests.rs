@@ -81,16 +81,23 @@ impl FakeEmby {
                 if status == 0 {
                     continue;
                 }
-                // A body starting with `JPEG:` is served as an image.
-                let (content_type, body) = match body.strip_prefix("JPEG:") {
-                    Some(b) => ("image/jpeg", b.to_owned()),
-                    None => ("application/json", body),
+                // A body starting with `JPEG:` is served as an image; `JFIF:` adds the
+                // JPEG signature the artwork cache checks (ADR 0019).
+                let (content_type, body) = if let Some(b) = body.strip_prefix("JFIF:") {
+                    (
+                        "image/jpeg",
+                        [&[0xFF, 0xD8, 0xFF][..], b.as_bytes()].concat(),
+                    )
+                } else if let Some(b) = body.strip_prefix("JPEG:") {
+                    ("image/jpeg", b.as_bytes().to_vec())
+                } else {
+                    ("application/json", body.into_bytes())
                 };
-                let reply = format!(
-                    "HTTP/1.1 {status} X\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                let head = format!(
+                    "HTTP/1.1 {status} X\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                     body.len()
                 );
-                let _ = stream.write_all(reply.as_bytes());
+                let _ = stream.write_all(&[head.as_bytes(), &body].concat());
             }
         });
         Self { url, requests }
@@ -218,6 +225,7 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
             p if p == items => (200, r#"{"Items":[],"TotalRecordCount":0}"#.into()),
             "/emby/Items/101/Images/Primary" => (200, "JPEG:fake-jpeg-bytes".into()),
             "/emby/Items/102/Images/Primary" => (200, "<html>pas une image</html>".into()),
+            "/emby/Items/103/Images/Primary" => (200, "JFIF:cached-artwork".into()),
             p if p == format!("{items}/Resume") => (200, resume_items()),
             p if p == format!("{items}/Latest") && query.contains("ParentId=5") => {
                 (200, latest_movies())
@@ -1281,6 +1289,79 @@ fn artwork_is_fetched_with_auth_and_checked() {
     run(fx.service.sign_out()).unwrap();
     let err = run(fx.service.image(&req)).unwrap_err();
     assert!(matches!(err, EmbyError::NotSignedIn), "{err:?}");
+}
+
+#[test]
+fn artwork_cache_spares_the_server_and_keeps_its_checks() {
+    use super::artwork_cache::ArtworkCache;
+    use super::images::ImageRequest;
+    let server = FakeEmby::start(browse_like(Arc::new(AtomicBool::new(false))));
+    let root = std::env::temp_dir().join(format!("viewer-artwork-svc-{}", uuid::Uuid::new_v4()));
+    let fx = fixture();
+    let fx = Fixture {
+        service: fx
+            .service
+            .with_artwork_cache(ArtworkCache::new(root.clone(), 1 << 20)),
+        ..fx
+    };
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    let image = |item: &str| {
+        ImageRequest::parse(
+            &format!("/{SERVER_ID}/{item}/Primary"),
+            Some("tag=c0ffee_1&maxWidth=360"),
+        )
+        .unwrap()
+    };
+    let fetched = || {
+        server
+            .requests()
+            .iter()
+            .filter(|r| r.path.contains("/Images/"))
+            .count()
+    };
+
+    // Downloaded once, then read from the disk.
+    let first = run(fx.service.image(&image("103"))).unwrap();
+    assert_eq!(first.0, "image/jpeg");
+    assert_eq!(&first.1[3..], b"cached-artwork");
+    assert_eq!(fetched(), 1);
+    assert_eq!(run(fx.service.image(&image("103"))).unwrap(), first);
+    assert_eq!(fetched(), 1);
+    let stats = run(fx.service.artwork_stats()).unwrap();
+    assert_eq!((stats.entries, stats.hits, stats.misses), (1, 1, 1));
+
+    // Bytes without an image signature are served as before but never kept.
+    run(fx.service.image(&image("101"))).unwrap();
+    run(fx.service.image(&image("101"))).unwrap();
+    assert_eq!(fetched(), 3);
+
+    // Only the server id and the image key on disk: no address, no token.
+    let file = root
+        .join(SERVER_ID)
+        .join("103")
+        .join("Primary-360-c0ffee_1.img");
+    assert!(file.is_file());
+    let names: Vec<_> = std::fs::read_dir(&root)
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name())
+        .collect();
+    assert_eq!(names, [SERVER_ID]);
+    let bytes = std::fs::read(&file).unwrap();
+    assert!(!bytes.windows(TOKEN.len()).any(|w| w == TOKEN.as_bytes()));
+
+    // The checks still come first: another server, or no session, gets nothing.
+    let foreign = ImageRequest::parse(
+        "/otherserver/103/Primary",
+        Some("tag=c0ffee_1&maxWidth=360"),
+    )
+    .unwrap();
+    let err = run(fx.service.image(&foreign)).unwrap_err();
+    assert!(matches!(err, EmbyError::Forbidden), "{err:?}");
+    run(fx.service.sign_out()).unwrap();
+    let err = run(fx.service.image(&image("103"))).unwrap_err();
+    assert!(matches!(err, EmbyError::NotSignedIn), "{err:?}");
+    assert_eq!(fetched(), 3);
 }
 
 #[test]

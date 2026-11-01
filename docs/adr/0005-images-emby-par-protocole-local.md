@@ -1,6 +1,6 @@
 # ADR 0005 — Images Emby servies par un protocole local géré par Rust
 
-Statut : Accepté pour la Gate 2 (2026-10-27). Le cache disque des images (Gate 3) se branchera derrière ce protocole.
+Statut : Accepté pour la Gate 2 (2026-10-27). Le cache disque des images est branché derrière ce protocole (ADR 0019).
 
 ## Contexte
 La grille des bibliothèques affiche des centaines d'affiches. Les contraintes :

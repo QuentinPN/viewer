@@ -73,7 +73,7 @@ Goal: sign in once, then reopen Viewer without entering credentials again, while
 - Acceptance criteria: a user authenticates once; subsequent launches connect automatically while credentials remain valid; a NAS outage shows a recovery screen instead of login; retry recovers the existing session; only a confirmed invalid session requests credentials; server switching is safe and explicit.
 - TODO: episode detail, search, sorting and filters come with Gate 3.
 
-## Gate 3 — Core experience [IN PROGRESS · home page with hero, search, sorting, filters, favorites, episode page, final player UI and next-episode card VERIFIED]
+## Gate 3 — Core experience [IN PROGRESS · home page with hero, search, sorting, filters, favorites, episode page, final player UI, next-episode card and artwork cache VERIFIED]
 
 Home, film/series browsing, details, search, accessible player UI, responsive layouts and artwork cache.
 
@@ -85,7 +85,8 @@ Home, film/series browsing, details, search, accessible player UI, responsive la
 - DONE: episode page (ADR 0016) — in a series the title opens the episode page and the thumbnail plays; series logo or name, "Saison N · Épisode M", episode image (else the series backdrop), air date, runtime, overview, directors, writers, guest stars, technical info, "Lecture"/"Reprendre"; previous/next across seasons with the focus kept; Escape back to the series on that episode, in its season. Home cards and the hero keep playing directly.
 - DONE: final player UI (ADR 0017) — `PlayerView.svelte` for Emby playback: title (series, season and episode for an episode), controls fading after 3 s (kept while paused, buffering, scrubbing, over the bar or with a panel open), seek bar with remaining time, ±10 s, volume and mute kept per PC, "Audio", "Sous-titres" and "Informations de lecture" panels, fullscreen, keys M, ↑/↓, I, Escape. Tracks stay chosen by the server. `PlayerSpike` remains for the Gate 1 prototype.
 - DONE: next-episode card (ADR 0018) — at the natural end of an episode with a next one (across seasons, from the server), a card "Épisode suivant" with a 10 s countdown, "Lire maintenant" and "Annuler"; the next episode plays in the same player, fullscreen kept. Films, last episodes and early ends close as before.
-- TODO: search of episodes, artwork cache.
+- DONE: artwork disk cache (ADR 0019) — behind `emby-img`, per server, 512 MiB with least-recently-used eviction, files only (no SQLite for artwork); served after the session and server checks, before the NAS download slots; `artwork_cache_stats`.
+- TODO: search of episodes; settings screen with "Vider le cache".
 - DROPPED (user decision, 2026-10-28): search of people.
 - Known input: the control bar hides subtitles at narrow widths (Gate 1 finding); views must provide an opaque background when no video plays (transparent window).
 
@@ -293,3 +294,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Environment**: the NAS moved to `http://192.0.2.14:8096` (Emby 4.10.2.0, same server id); runs use `VIEWER_EMBY_URL`.
 - **Not verified**: a film or the last episode at EOF (no card, closes; not run to avoid marking a film played), a failed launch of the next episode, screen readers, a real mouse over the native video.
 - **Next**: search of episodes or artwork cache (Gate 3).
+
+### 2026-11-01 — Artwork disk cache
+
+- **Changed**: ADR 0019; `src-tauri/src/emby/artwork_cache.rs` (`ArtworkCache`: `{serverId}/{itemId}/{Type}-{width}-{tag}.img` in `%LOCALAPPDATA%\io.github.quentinpn.viewer\artwork`, content type from the first bytes, write aside then rename, quota 512 MiB down to 80 % by last use, stale temporary files removed); `EmbyService::image` reads the cache after the session and server checks and keeps what it downloads; command `artwork_cache_stats`; debug-only `VIEWER_E2E_ARTWORK_DIR`; fake server `JFIF:` bodies; scenario `scripts/e2e/gate3-artwork.mjs`.
+- **Tests**: `npm run verify` green (Vitest 104/104, cargo test 92 passed / 14 ignored); `gate3-artwork` 7/7; regressions `gate2-ui`, `gate3-home`, `gate3-hero`, `gate3-episode`, `gate21-session` passed. Details in `docs/evidence/gate3-cache-images-2026-11-01.md`.
+- **Measured** (12 film posters, real server): 137 ms with an empty cache, 27 ms from the disk; second launch 71 hits, 0 downloads.
+- **Not verified**: eviction at the real 512 MiB size (unit-tested with a small quota), images during a NAS outage with the session open, disk full or read-only cache folder.
+- **Next**: search of episodes, or a settings screen (cache size, "Vider le cache").
