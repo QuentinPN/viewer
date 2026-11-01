@@ -3,10 +3,12 @@
 // (ADR 0010), the paged poster grid of a library (DESIGN.md, Films/Series) or the
 // search results (ADR 0011), and the detail page of the opened item over them.
 import { onMount, tick, untrack } from "svelte";
+import { episodeItem } from "../detail/format";
 import ItemDetail from "../detail/ItemDetail.svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
 import type {
   EmbyError,
+  EpisodeLink,
   SearchResults as Found,
   ItemsOptions,
   Library,
@@ -15,6 +17,7 @@ import type {
   SignedInUser,
   SortKey,
   WatchFilter,
+  WatchItem,
 } from "../emby/types";
 import Home from "../home/Home.svelte";
 import {
@@ -87,6 +90,10 @@ let sortSelect = $state<HTMLSelectElement | null>(null);
 const directions = $derived(directionLabels(options.sort));
 let observer: IntersectionObserver | null = null;
 let opened = $state<MediaItem | null>(null);
+/** Card that opened the detail: an episode page may move to its neighbours. */
+let openerId: string | null = null;
+/** Neighbour button that replaced the episode page, to focus it again. */
+let openedVia = $state<"previous" | "next" | null>(null);
 
 let query = $state("");
 let searchField = $state<HTMLInputElement | null>(null);
@@ -138,12 +145,26 @@ async function loadLibraries() {
 
 function open(item: MediaItem) {
   opened = item;
+  openerId = item.id;
+  openedVia = null;
+}
+
+/** An episode found by the search (ADR 0020). */
+function openEpisode(item: WatchItem) {
+  open(episodeItem(item));
+}
+
+/** Previous or next episode in place of the open one (ADR 0016). */
+function navigateEpisode(link: EpisodeLink, via: "previous" | "next") {
+  opened = episodeItem(link);
+  openedVia = via;
 }
 
 /** Back to the grid, focus on the card that opened the detail. */
 async function closeDetail() {
-  const id = opened?.id;
+  const id = openerId;
   opened = null;
+  openerId = null;
   await tick();
   scroller
     ?.querySelector<HTMLElement>(`[data-item-id="${CSS.escape(id ?? "")}"]`)
@@ -483,6 +504,7 @@ $effect(() => {
         error={searchError}
         onRetry={() => void runSearch(true)}
         onOpen={open}
+        onOpenEpisode={openEpisode}
       />
     {:else if libraries && selected === null}
       <Home
@@ -635,6 +657,9 @@ $effect(() => {
         onError={fail}
         {onPlay}
         onFavoriteChange={() => favoritesVersion++}
+        onNavigate={navigateEpisode}
+        focusOnLoad={openedVia}
+        backLabel={searching ? "Retour à la recherche" : undefined}
       />
     {/key}
   {/if}

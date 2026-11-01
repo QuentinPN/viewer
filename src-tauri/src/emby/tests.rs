@@ -506,8 +506,21 @@ fn next_up() -> String {
 }
 
 /// `/Users/{Id}/Items?SearchTerm=`: 25 films (one more than shown) with a series
-/// mixed in, or one series with `TotalRecordCount: 0` as Emby 4.10.1.0 answers.
+/// mixed in, episodes (one found by its series name only, one without an id),
+/// or one series with `TotalRecordCount: 0` as Emby 4.10.1.0 answers.
 fn search_answer(query: &str) -> String {
+    if query.contains("IncludeItemTypes=Episode") {
+        return r#"{"Items":[
+            {"Name":"Les heures chrono","Id":"44501","Type":"Episode","SeriesName":"24 Heures chrono",
+             "SeriesId":"44440","ParentIndexNumber":1,"IndexNumber":12,"RunTimeTicks":25800000000,
+             "ImageTags":{"Primary":"ep_12"},"UserData":{"Played":false,"PlaybackPositionTicks":0}},
+            {"Name":"Jour 2 : 8h00 - 9h00","Id":"44502","Type":"Episode","SeriesName":"24 Heures chrono",
+             "ParentIndexNumber":2,"IndexNumber":1},
+            {"Name":"Heures sombres","Id":"","Type":"Episode"},
+            {"Name":"Intrus","Id":"8998","Type":"Movie"}
+        ],"TotalRecordCount":0}"#
+            .into();
+    }
     if query.contains("IncludeItemTypes=Movie") {
         let mut items: Vec<String> = (0..25)
             .map(|i| {
@@ -1956,7 +1969,7 @@ fn next_up_lists_episodes_with_the_series_backdrop_as_fallback() {
 }
 
 #[test]
-fn search_asks_films_and_series_apart_and_flags_more_results() {
+fn search_asks_films_series_and_episodes_apart_and_flags_more_results() {
     let (server, fx, revoked) = signed_in_browser();
     let results = run(fx.service.search("  Heures\u{7}  chrono\n")).unwrap();
     assert_eq!(results.query, "Heures chrono");
@@ -1966,8 +1979,8 @@ fn search_asks_films_and_series_apart_and_flags_more_results() {
         .map(|r| r.path)
         .filter(|p| p.contains("SearchTerm="))
         .collect();
-    assert_eq!(searches.len(), 2, "{searches:?}");
-    for ty in ["Movie", "Series"] {
+    assert_eq!(searches.len(), 3, "{searches:?}");
+    for ty in ["Movie", "Series", "Episode"] {
         let path = searches
             .iter()
             .find(|p| p.contains(&format!("IncludeItemTypes={ty}&")))
@@ -1976,7 +1989,12 @@ fn search_asks_films_and_series_apart_and_flags_more_results() {
         assert_eq!(route, format!("/emby/Users/{USER_ID}/Items"));
         let params: Vec<_> = query.split('&').collect();
         assert!(params.contains(&"SearchTerm=Heures+chrono"), "{query}");
-        assert!(params.contains(&"Recursive=true") && params.contains(&"Limit=25"));
+        let limit = if ty == "Episode" {
+            "Limit=100"
+        } else {
+            "Limit=25"
+        };
+        assert!(params.contains(&"Recursive=true") && params.contains(&limit));
         assert!(!query.contains(TOKEN) && !query.contains("ParentId"));
     }
     assert_eq!(results.movies.len(), 24);
@@ -1986,11 +2004,61 @@ fn search_asks_films_and_series_apart_and_flags_more_results() {
     assert!(!results.more_series);
     assert_eq!(results.series[0].unplayed_count, Some(204));
 
+    // Episodes: the 16:9 images of the home cards, series and numbers kept.
+    let episode_search = searches
+        .iter()
+        .find(|p| p.contains("IncludeItemTypes=Episode&"))
+        .unwrap();
+    assert!(
+        episode_search.contains("EnableImageTypes=Primary%2CBackdrop%2CThumb")
+            && episode_search.contains("Limit=100"),
+        "{episode_search}"
+    );
+    assert_eq!(
+        results.episodes.len(),
+        1,
+        "found by series name only, no id or not an episode: dropped"
+    );
+    assert!(!results.more_episodes);
+    let episode = &results.episodes[0];
+    assert_eq!(episode.id, "44501");
+    assert_eq!(episode.series_name.as_deref(), Some("24 Heures chrono"));
+    assert_eq!((episode.season_index, episode.index), (Some(1), Some(12)));
+    assert_eq!(episode.runtime_minutes, Some(43));
+    assert!(
+        episode
+            .image
+            .as_ref()
+            .unwrap()
+            .src
+            .contains("/44501/Primary?")
+    );
+
     revoked.store(true, Ordering::SeqCst);
     assert!(matches!(
         run(fx.service.search("chrono")).unwrap_err(),
         EmbyError::SessionExpired
     ));
+}
+
+#[test]
+fn episode_titles_match_at_a_word_start_without_case_or_accents() {
+    use super::session::title_matches;
+    assert!(title_matches("Heureux Retours", "heureux"));
+    assert!(title_matches("Moins d'une heure", "HÉURE"));
+    assert!(title_matches("L'arnaque", "arnaq"));
+    assert!(title_matches("Rex, chien flic", "chien flic"));
+    assert!(title_matches("Él Niño", "el nino"));
+    assert!(!title_matches("Shizu", "reincarne"), "series name only");
+    assert!(
+        !title_matches("Les heures", "eures"),
+        "not a substring search"
+    );
+    assert!(
+        !title_matches("Nos cœurs", "coeur"),
+        "no ligature folding, as Emby"
+    );
+    assert!(!title_matches("Titre", ""));
 }
 
 #[test]
@@ -3241,14 +3309,26 @@ fn real_server_search() {
         let t = std::time::Instant::now();
         let r = run(fx.service.search(q)).unwrap();
         println!(
-            "{q:?} → {:?}: {} films{}, {} séries{} in {} ms",
+            "{q:?} → {:?}: {} films{}, {} séries{}, {} épisodes{} in {} ms",
             r.query,
             r.movies.len(),
             if r.more_movies { "+" } else { "" },
             r.series.len(),
             if r.more_series { "+" } else { "" },
+            r.episodes.len(),
+            if r.more_episodes { "+" } else { "" },
             t.elapsed().as_millis()
         );
+        for e in r.episodes.iter().take(5) {
+            println!(
+                "  épisode {:?} — {:?} S{:?}E{:?}, image {}",
+                e.name,
+                e.series_name,
+                e.season_index,
+                e.index,
+                e.image.is_some()
+            );
+        }
         r
     };
     let names = |items: &[super::models::MediaItem]| {
@@ -3264,9 +3344,18 @@ fn real_server_search() {
     assert!(plain.series.iter().all(|s| s.item_type == "Series"));
     assert!(plain.movies.iter().all(|m| m.poster.is_some()));
 
+    // Episodes (ADR 0020): the server also matches the series name; only
+    // episodes whose own title matches are kept.
+    assert!(plain.episodes.iter().all(|e| {
+        super::session::title_matches(&e.name, "reincarne")
+            && e.series_name.is_some()
+            && e.image.is_some()
+    }));
+
     let prefix = search("  heure ");
     assert_eq!(prefix.query, "heure");
     assert!(names(&prefix.series).contains(&"24 Heures chrono".to_string()));
+    assert!(!prefix.episodes.is_empty());
     assert!(search("eures").series.is_empty(), "not a substring search");
 
     let many = search("the");

@@ -73,7 +73,7 @@ Goal: sign in once, then reopen Viewer without entering credentials again, while
 - Acceptance criteria: a user authenticates once; subsequent launches connect automatically while credentials remain valid; a NAS outage shows a recovery screen instead of login; retry recovers the existing session; only a confirmed invalid session requests credentials; server switching is safe and explicit.
 - TODO: episode detail, search, sorting and filters come with Gate 3.
 
-## Gate 3 — Core experience [IN PROGRESS · home page with hero, search, sorting, filters, favorites, episode page, final player UI, next-episode card and artwork cache VERIFIED]
+## Gate 3 — Core experience [IN PROGRESS · home page with hero, search, sorting, filters, favorites, episode page, final player UI, next-episode card, artwork cache and episode search VERIFIED]
 
 Home, film/series browsing, details, search, accessible player UI, responsive layouts and artwork cache.
 
@@ -86,7 +86,8 @@ Home, film/series browsing, details, search, accessible player UI, responsive la
 - DONE: final player UI (ADR 0017) — `PlayerView.svelte` for Emby playback: title (series, season and episode for an episode), controls fading after 3 s (kept while paused, buffering, scrubbing, over the bar or with a panel open), seek bar with remaining time, ±10 s, volume and mute kept per PC, "Audio", "Sous-titres" and "Informations de lecture" panels, fullscreen, keys M, ↑/↓, I, Escape. Tracks stay chosen by the server. `PlayerSpike` remains for the Gate 1 prototype.
 - DONE: next-episode card (ADR 0018) — at the natural end of an episode with a next one (across seasons, from the server), a card "Épisode suivant" with a 10 s countdown, "Lire maintenant" and "Annuler"; the next episode plays in the same player, fullscreen kept. Films, last episodes and early ends close as before.
 - DONE: artwork disk cache (ADR 0019) — behind `emby-img`, per server, 512 MiB with least-recently-used eviction, files only (no SQLite for artwork); served after the session and server checks, before the NAS download slots; `artwork_cache_stats`.
-- TODO: search of episodes; settings screen with "Vider le cache".
+- DONE: search of episodes (ADR 0020) — a third parallel query (`Episode`, 100 asked) filtered in Rust on the episode's own title, because Emby also matches the series name; "Épisodes" section of 16:9 cards opening the episode page, previous/next in place, Escape back to the card.
+- TODO: settings screen with "Vider le cache".
 - DROPPED (user decision, 2026-10-28): search of people.
 - Known input: the control bar hides subtitles at narrow widths (Gate 1 finding); views must provide an opaque background when no video plays (transparent window).
 
@@ -302,3 +303,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Measured** (12 film posters, real server): 137 ms with an empty cache, 27 ms from the disk; second launch 71 hits, 0 downloads.
 - **Not verified**: eviction at the real 512 MiB size (unit-tested with a small quota), images during a NAS outage with the session open, disk full or read-only cache folder.
 - **Next**: search of episodes, or a settings screen (cache size, "Vider le cache").
+
+### 2026-11-01 — Search of episodes
+
+- **Changed**: ADR 0020; `EmbyClient::search` takes `Episode` with the home cards' images; `EmbyService::search` runs three queries and keeps episodes whose own title matches (`title_matches`, word start, case and Latin accents folded); `SearchResults.episodes`/`moreEpisodes`; `WatchCard` gains an "open" mode; `SearchResults.svelte` "Épisodes" section; `LibraryBrowser` opens the episode page, handles previous/next and returns focus to the opening card; `ItemDetail` `backLabel`.
+- **Tests**: `npm run verify` green (Vitest 106/106, cargo test 93 passed / 14 ignored); `real_server_search` passed; `gate3-search` 26/26; regressions `gate3-home`, `gate3-episode`, `gate2-ui` passed. Details in `docs/evidence/gate3-recherche-episodes-2026-11-01.md`.
+- **Found**: Emby's `SearchTerm` on episodes also matches the series name ("reincarne" returned the Slime series' episodes); no parameter in the server's OpenAPI avoids it.
+- **Not verified**: more than 100 episodes matched only by their series before a real result, titles with non-Latin accents, screen readers.
+- **Next**: settings screen (cache size, "Vider le cache"), or the Gate 3 remaining items.

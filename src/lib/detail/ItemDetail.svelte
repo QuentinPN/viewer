@@ -49,6 +49,8 @@ interface Props {
   focusOnLoad?: Direction | null;
   /** Episode page: called with each loaded detail. */
   onLoaded?: (detail: ItemDetail) => void;
+  /** Error state: where the return button goes, when not the default. */
+  backLabel?: string | undefined;
 }
 
 type Direction = "previous" | "next";
@@ -63,6 +65,7 @@ let {
   onNavigate,
   focusOnLoad = null,
   onLoaded,
+  backLabel,
 }: Props = $props();
 
 // Only an episode page is nested over another page: ids stay unique.
@@ -422,7 +425,8 @@ onMount(() => {
         <div class="actions">
           <button type="button" class="primary" onclick={load}>Réessayer</button>
           <button type="button" class="secondary" onclick={onClose}
-            >{isEpisodePage ? "Retour à la série" : "Retour à la bibliothèque"}</button
+            >{backLabel ??
+              (isEpisodePage ? "Retour à la série" : "Retour à la bibliothèque")}</button
           >
         </div>
       </div>

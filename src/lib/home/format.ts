@@ -55,21 +55,39 @@ export function watchMeta(item: WatchItem): string {
 export function watchAction(item: WatchItem): string {
   const what =
     item.kind === "episode" && item.seriesName
-      ? `${item.seriesName}, ${spokenEpisode(item)}${item.name}`
+      ? [item.seriesName, spokenEpisode(item), item.name]
+          .filter(Boolean)
+          .join(", ")
       : item.name;
   return item.resume ? `Reprendre ${what}` : `Lire ${what}`;
 }
 
-function spokenEpisode(item: WatchItem): string {
+/** Search result (ADR 0020): the episode title first, then where it sits. */
+export function foundMeta(item: WatchItem): string {
+  return [item.seriesName, episodeCode(item)].filter(Boolean).join(" · ");
+}
+
+/** What a search result card does, for screen readers: it opens the page. */
+export function openAction(item: WatchItem): string {
+  return [
+    `Ouvrir la fiche de ${item.name}`,
+    item.seriesName,
+    spokenEpisode(item),
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function spokenEpisode(item: WatchItem): string | null {
   if (item.seasonIndex === 0)
     return item.index == null
-      ? "épisode spécial, "
-      : `épisode spécial ${item.index}, `;
+      ? "épisode spécial"
+      : `épisode spécial ${item.index}`;
   const parts = [
     item.seasonIndex != null ? `saison ${item.seasonIndex}` : null,
     item.index != null ? `épisode ${item.index}` : null,
   ].filter(Boolean);
-  return parts.length ? `${parts.join(" ")}, ` : "";
+  return parts.length ? parts.join(" ") : null;
 }
 
 /** Next-up episodes already in "Reprendre" are not shown twice. */

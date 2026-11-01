@@ -1,8 +1,14 @@
 <script lang="ts">
-// Search results in place of the current view (ADR 0011): films then series,
-// as poster grids opening the detail page.
+// Search results in place of the current view (ADR 0011): films then series, as
+// poster grids, then episodes as 16:9 cards (ADR 0020); each opens its page.
 import { errorHint } from "../emby/api";
-import type { EmbyError, MediaItem, SearchResults } from "../emby/types";
+import type {
+  EmbyError,
+  MediaItem,
+  SearchResults,
+  WatchItem,
+} from "../emby/types";
+import WatchCard from "../home/WatchCard.svelte";
 import PosterCard from "../library/PosterCard.svelte";
 import { isSearchable, resultsLabel, SEARCH_SHOWN } from "./query";
 
@@ -15,15 +21,18 @@ interface Props {
   error: EmbyError | null;
   onRetry: () => void;
   onOpen: (item: MediaItem) => void;
+  onOpenEpisode: (item: WatchItem) => void;
 }
 
-let { query, results, loading, error, onRetry, onOpen }: Props = $props();
+let { query, results, loading, error, onRetry, onOpen, onOpenEpisode }: Props =
+  $props();
 
 const tooShort = $derived(!isSearchable(query));
 const empty = $derived(
   results !== null &&
     results.movies.length === 0 &&
-    results.series.length === 0,
+    results.series.length === 0 &&
+    results.episodes.length === 0,
 );
 const status = $derived.by(() => {
   if (tooShort) return "Saisissez au moins 2 caractères.";
@@ -59,7 +68,7 @@ const status = $derived.by(() => {
     </ul>
   {:else if empty}
     <div class="state" class:stale={loading}>
-      <p class="state-title">Aucun film ni aucune série pour « {results.query} »</p>
+      <p class="state-title">Aucun film, série ou épisode pour « {results.query} »</p>
       <p class="hint">
         La recherche porte sur le début des mots du titre : « heure » trouve
         « 24 Heures chrono », « eures » ne le trouve pas.
@@ -95,6 +104,21 @@ const status = $derived.by(() => {
             <p class="hint more">
               Seules les {SEARCH_SHOWN} premières séries sont affichées : précisez
               la recherche.
+            </p>
+          {/if}
+        </section>
+      {/if}
+      {#if results.episodes.length > 0}
+        <section aria-labelledby="search-episodes">
+          <h2 id="search-episodes">Épisodes</h2>
+          <ul class="grid wide" aria-labelledby="search-episodes">
+            {#each results.episodes as item (item.id)}
+              <li><WatchCard {item} onOpen={onOpenEpisode} /></li>
+            {/each}
+          </ul>
+          {#if results.moreEpisodes}
+            <p class="hint more">
+              D'autres épisodes peuvent correspondre : précisez la recherche.
             </p>
           {/if}
         </section>
@@ -144,9 +168,15 @@ const status = $derived.by(() => {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: var(--space-6) var(--space-4);
   }
+  .grid.wide {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
   @media (min-width: 1600px) {
     .grid {
       grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    }
+    .grid.wide {
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     }
   }
   .skeleton .sk-poster {

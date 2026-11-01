@@ -375,8 +375,9 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
-    /// Films or series whose name matches `term`, across every library the user
-    /// can see (`/Users/{Id}/Items?SearchTerm=`). `item_type` is `Movie` or `Series`.
+    /// Films, series or episodes whose name matches `term`, across every library
+    /// the user can see (`/Users/{Id}/Items?SearchTerm=`). `item_type` is `Movie`,
+    /// `Series` or `Episode`; episodes come with the 16:9 images of the home cards.
     pub async fn search(
         &self,
         user_id: &str,
@@ -389,13 +390,17 @@ impl EmbyClient {
             .server
             .api(&format!("/Users/{}/Items", path_segment(user_id)?));
         let limit = limit.to_string();
+        let (fields, images) = match item_type {
+            "Episode" => (WATCH_FIELDS, WATCH_IMAGES),
+            _ => ("PrimaryImageAspectRatio,ProductionYear", "Primary"),
+        };
         let params = [
             ("SearchTerm", term),
             ("Recursive", "true"),
             ("IncludeItemTypes", item_type),
             ("Limit", limit.as_str()),
-            ("Fields", "PrimaryImageAspectRatio,ProductionYear"),
-            ("EnableImageTypes", "Primary"),
+            ("Fields", fields),
+            ("EnableImageTypes", images),
             ("ImageTypeLimit", "1"),
             ("EnableUserData", "true"),
         ];

@@ -121,6 +121,9 @@ const HOME_ROW: u32 = 16;
 const HERO_SIZE: usize = 5;
 /// Search results shown per type (ADR 0011); one more is asked to know if more exist.
 pub const SEARCH_SHOWN: usize = 24;
+/// Episodes asked per search (ADR 0020): Emby also matches the series name, so
+/// the episodes of a matching series come first and are dropped here.
+pub const SEARCH_EPISODES_ASKED: u32 = 100;
 /// Shorter queries are not sent: the server answers nothing to one letter.
 const SEARCH_MIN_CHARS: usize = 2;
 const SEARCH_MAX_CHARS: usize = 100;
@@ -568,8 +571,9 @@ impl EmbyService {
         Ok(page.items)
     }
 
-    /// Films and series whose title matches `query` (ADR 0011), both searched at
-    /// once. A query shorter than two characters once cleaned reaches no server.
+    /// Films, series and episodes whose title matches `query` (ADR 0011, 0020),
+    /// all searched at once. A query shorter than two characters once cleaned
+    /// reaches no server.
     pub async fn search(&self, query: &str) -> Result<SearchResults, EmbyError> {
         let query = clean_search(query);
         if query.chars().count() < SEARCH_MIN_CHARS {
@@ -578,27 +582,44 @@ impl EmbyService {
         let (client, user_id) = self.session()?;
         let scope = self.scope();
         let asked = SEARCH_SHOWN as u32 + 1;
-        let (movies, series) = tokio::join!(
+        let (movies, series, episodes) = tokio::join!(
             client.search(&user_id, &query, "Movie", asked),
-            client.search(&user_id, &query, "Series", asked)
+            client.search(&user_id, &query, "Series", asked),
+            client.search(&user_id, &query, "Episode", SEARCH_EPISODES_ASKED)
         );
-        let keep = |dtos: Vec<BaseItemDto>, item_type: &str| {
-            let items: Vec<MediaItem> = dtos
-                .into_iter()
-                .filter(|d| d.item_type == item_type)
-                .filter_map(|d| media_item(d, &scope))
-                .collect();
+        fn shown<T>(items: Vec<T>) -> (Vec<T>, bool) {
             let more = items.len() > SEARCH_SHOWN;
             (items.into_iter().take(SEARCH_SHOWN).collect(), more)
+        }
+        let keep = |dtos: Vec<BaseItemDto>, item_type: &str| {
+            shown(
+                dtos.into_iter()
+                    .filter(|d| d.item_type == item_type)
+                    .filter_map(|d| media_item(d, &scope))
+                    .collect(),
+            )
         };
         let (movies, more_movies) = keep(self.expire_on_401(&client, movies)?.items, "Movie");
         let (series, more_series) = keep(self.expire_on_401(&client, series)?.items, "Series");
+        // Only episodes whose own title matches: a full page may hide others.
+        let episodes = self.expire_on_401(&client, episodes)?.items;
+        let page_full = episodes.len() >= SEARCH_EPISODES_ASKED as usize;
+        let (episodes, more) = shown(
+            episodes
+                .into_iter()
+                .filter(|d| d.item_type == "Episode" && title_matches(&d.name, &query))
+                .filter_map(|d| watch_item(d, &scope))
+                .collect(),
+        );
+        let more_episodes = more || page_full;
         Ok(SearchResults {
             query,
             movies,
             series,
+            episodes,
             more_movies,
             more_series,
+            more_episodes,
         })
     }
 
@@ -1304,6 +1325,53 @@ pub fn clean_search(query: &str) -> String {
         .collect::<String>()
         .trim_end()
         .to_string()
+}
+
+/// Whether `query` starts a word of `title`, ignoring case and accents, as Emby
+/// matches titles (ADR 0011). Used on episodes, which the server also finds by
+/// their series name (ADR 0020).
+pub fn title_matches(title: &str, query: &str) -> bool {
+    let title = fold(title);
+    let query = fold(query);
+    if query.is_empty() {
+        return false;
+    }
+    (0..title.len())
+        .any(|i| (i == 0 || !title[i - 1].is_alphanumeric()) && title[i..].starts_with(&query))
+}
+
+/// Lower case without the accents of Latin letters: `É` and `é` become `e`.
+fn fold(text: &str) -> Vec<char> {
+    const ACCENTED: [(&str, char); 19] = [
+        ("àáâãäåāăą", 'a'),
+        ("çćĉċč", 'c'),
+        ("ďđ", 'd'),
+        ("èéêëēĕėęě", 'e'),
+        ("ĝğġģ", 'g'),
+        ("ĥħ", 'h'),
+        ("ìíîïĩīĭįı", 'i'),
+        ("ĵ", 'j'),
+        ("ķ", 'k'),
+        ("ĺļľŀł", 'l'),
+        ("ñńņňŉ", 'n'),
+        ("òóôõöøōŏő", 'o'),
+        ("ŕŗř", 'r'),
+        ("śŝşšſ", 's'),
+        ("ţťŧ", 't'),
+        ("ùúûüũūŭůűų", 'u'),
+        ("ŵ", 'w'),
+        ("ýÿŷ", 'y'),
+        ("źżž", 'z'),
+    ];
+    text.chars()
+        .flat_map(char::to_lowercase)
+        .map(|c| {
+            ACCENTED
+                .iter()
+                .find(|(set, _)| set.contains(c))
+                .map_or(c, |&(_, plain)| plain)
+        })
+        .collect()
 }
 
 fn is_id(id: &str) -> bool {

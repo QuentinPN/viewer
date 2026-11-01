@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { WatchItem } from "../emby/types";
 import {
   episodeCode,
+  foundMeta,
+  openAction,
   remainingLabel,
   watchAction,
   watchMeta,
@@ -60,6 +62,16 @@ describe("home card labels", () => {
       "Reprendre La casa de papel, saison 5 épisode 2, Le Professeur",
     );
     expect(watchAction(film)).toBe("Lire 2 Coeurs");
+  });
+
+  it("labels a search result: the episode first, and it opens", () => {
+    expect(foundMeta(episode)).toBe("La casa de papel · S5 · É2");
+    expect(openAction(episode)).toBe(
+      "Ouvrir la fiche de Le Professeur, La casa de papel, saison 5 épisode 2",
+    );
+    expect(openAction({ ...episode, seasonIndex: 0, index: null })).toBe(
+      "Ouvrir la fiche de Le Professeur, La casa de papel, épisode spécial",
+    );
   });
 
   it("drops next-up episodes already in progress", () => {

@@ -1,6 +1,6 @@
 # ADR 0011 — Recherche
 
-Statut : Accepté (2026-10-28).
+Statut : Accepté (2026-10-28). Les épisodes sont cherchés depuis l'ADR 0020.
 
 ## Contexte
 `PRODUCT.md` demande la recherche dans les bibliothèques de films et de séries, et `DESIGN.md` la place avec le tri et les filtres. Emby 4.10.1.0 n'expose pas `/Search/Hints` : ce chemin est absent de son `/emby/openapi.json`. Le moyen documenté est le paramètre `SearchTerm` de `GET /Users/{UserId}/Items`.

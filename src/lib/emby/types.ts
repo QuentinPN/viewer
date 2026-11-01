@@ -88,15 +88,19 @@ export interface MediaItem {
   unplayedCount: number | null;
 }
 
-/** Films and series whose title words start with the query (ADR 0011). */
+/** Films, series and episodes whose title words start with the query (ADR 0011, 0020). */
 export interface SearchResults {
   /** The query as sent to the server, after cleaning; empty when too short. */
   query: string;
   movies: MediaItem[];
   series: MediaItem[];
+  /** Matched on their own title, not their series name. */
+  episodes: WatchItem[];
   /** More than shown: the server's total is not reliable with a search. */
   moreMovies: boolean;
   moreSeries: boolean;
+  /** Maybe more: the server also returns episodes of matching series. */
+  moreEpisodes: boolean;
 }
 
 /** A film or episode of the home rows "Reprendre" and "À suivre" (ADR 0010). */

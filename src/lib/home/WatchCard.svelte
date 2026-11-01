@@ -1,32 +1,54 @@
 <script lang="ts">
 // 16:9 card of "Reprendre" and "À suivre": activating it plays the film or episode
-// at once, from the resume point when there is one (ADR 0010).
+// at once, from the resume point when there is one (ADR 0010). An episode found by
+// the search opens its page instead, its own title first (ADR 0020).
 import type { WatchItem } from "../emby/types";
-import { watchAction, watchMeta, watchTitle } from "./format";
+import {
+  foundMeta,
+  openAction,
+  watchAction,
+  watchMeta,
+  watchTitle,
+} from "./format";
 
-interface Props {
-  item: WatchItem;
-  /** This card's playback is being negotiated. */
-  busy: boolean;
-  /** Another playback is starting: activating does nothing. */
-  disabled: boolean;
-  onPlay: (item: WatchItem) => void;
-}
+type Props = { item: WatchItem } & (
+  | {
+      /** This card's playback is being negotiated. */
+      busy: boolean;
+      /** Another playback is starting: activating does nothing. */
+      disabled: boolean;
+      onPlay: (item: WatchItem) => void;
+      onOpen?: never;
+    }
+  | {
+      onOpen: (item: WatchItem) => void;
+      busy?: never;
+      disabled?: never;
+      onPlay?: never;
+    }
+);
 
-let { item, busy, disabled, onPlay }: Props = $props();
+let { item, busy = false, disabled = false, onPlay, onOpen }: Props = $props();
 
 let failed = $state(false);
 const progress = $derived(item.resume?.fraction ?? null);
+const title = $derived(onOpen ? item.name : watchTitle(item));
+const meta = $derived(onOpen ? foundMeta(item) : watchMeta(item));
+
+function activate() {
+  if (onOpen) onOpen(item);
+  else if (!disabled) onPlay?.(item);
+}
 </script>
 
 <button
   type="button"
   class="card"
   data-item-id={item.id}
-  aria-label={watchAction(item)}
-  aria-disabled={disabled}
-  aria-busy={busy}
-  onclick={() => !disabled && onPlay(item)}
+  aria-label={onOpen ? openAction(item) : watchAction(item)}
+  aria-disabled={onOpen ? undefined : disabled}
+  aria-busy={onOpen ? undefined : busy}
+  onclick={activate}
 >
   <div class="frame">
     {#if item.image && !failed}
@@ -40,23 +62,25 @@ const progress = $derived(item.resume?.fraction ?? null);
         onerror={() => (failed = true)}
       />
     {:else}
-      <span class="placeholder" aria-hidden="true">{watchTitle(item)}</span>
+      <span class="placeholder" aria-hidden="true">{title}</span>
     {/if}
-    <span class="play" class:visible={busy} aria-hidden="true">
-      {#if busy}
-        <span class="spinner"></span>
-      {:else}
-        <svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" /></svg>
-      {/if}
-    </span>
+    {#if !onOpen}
+      <span class="play" class:visible={busy} aria-hidden="true">
+        {#if busy}
+          <span class="spinner"></span>
+        {:else}
+          <svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" /></svg>
+        {/if}
+      </span>
+    {/if}
     {#if progress !== null}
       <span class="progress" aria-hidden="true"
         ><span style:width="{Math.max(progress * 100, 2)}%"></span></span
       >
     {/if}
   </div>
-  <span class="title" aria-hidden="true">{watchTitle(item)}</span>
-  <span class="meta" aria-hidden="true">{watchMeta(item)}</span>
+  <span class="title" aria-hidden="true">{title}</span>
+  <span class="meta" aria-hidden="true">{meta}</span>
 </button>
 
 <style>

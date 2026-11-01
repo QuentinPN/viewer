@@ -483,7 +483,8 @@ pub struct WatchItem {
     pub resume: Option<ResumePoint>,
 }
 
-/// Answer of a search (ADR 0011): films and series whose title matches `query`.
+/// Answer of a search (ADR 0011, 0020): films, series and episodes whose title
+/// matches `query`.
 #[derive(Debug, Clone, Serialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchResults {
@@ -491,9 +492,12 @@ pub struct SearchResults {
     pub query: String,
     pub movies: Vec<MediaItem>,
     pub series: Vec<MediaItem>,
+    /// 16:9 cards, as on the home page, with their series and numbers.
+    pub episodes: Vec<WatchItem>,
     /// More films than shown: the server's total is not reliable with `SearchTerm`.
     pub more_movies: bool,
     pub more_series: bool,
+    pub more_episodes: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]

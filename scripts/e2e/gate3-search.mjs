@@ -3,6 +3,8 @@
 // - typing searches once after the pause (debounce), films and series in their grids;
 // - the server ignores case and accents: "HEURE" finds what "heure" finds;
 // - a result opens its detail page, Escape comes back with focus on the card;
+// - episodes (ADR 0020): matched on their own title, a card opens the episode page,
+//   "Épisode suivant" replaces it, Escape comes back to the card that opened it;
 // - one letter makes no request, an unknown word shows the empty state;
 // - Escape in the field returns to the view the search replaced, scroll kept.
 // Read only on the server; ends signed out.
@@ -142,6 +144,76 @@ try {
   check("focus_back_on_card", (await focusedItemId(page)) === firstId, firstId);
   check("query_kept", (await field(page).inputValue()) === "HÉURE");
 
+  // Episodes: their own title matches, a card opens the episode page.
+  const episodes = page.locator(
+    'ul[aria-labelledby="search-episodes"] button.card',
+  );
+  const episodeTitles = await episodes.evaluateAll((els) =>
+    els.map((e) => e.querySelector(".title")?.textContent?.trim() ?? ""),
+  );
+  check(
+    "episodes_match_their_title",
+    episodeTitles.length > 0 &&
+      episodeTitles.every((t) =>
+        t
+          .normalize("NFD")
+          .replace(/\p{M}/gu, "")
+          .toLowerCase()
+          .match(/(^|[^\p{L}\p{N}])heure/u),
+      ),
+    `${episodeTitles.length} épisode(s) : ${episodeTitles.slice(0, 4).join(" | ")}`,
+  );
+  const episodeCard = episodes.first();
+  const episodeId = await episodeCard.getAttribute("data-item-id");
+  const episodeLabel = await episodeCard.getAttribute("aria-label");
+  check(
+    "episode_card_opens",
+    episodeLabel?.startsWith("Ouvrir la fiche de ") ?? false,
+    episodeLabel,
+  );
+  await episodeCard.focus();
+  await page.keyboard.press("Enter");
+  const episodeTitle = page.locator("#episode-title");
+  await episodeTitle.waitFor({ timeout: 15000 });
+  await page.waitForFunction(
+    () => document.querySelector(".adjacent, .tech") !== null,
+    null,
+    { timeout: 15000 },
+  );
+  const openedTitle = (await episodeTitle.textContent()).trim();
+  check("episode_page_opened", openedTitle === episodeTitles[0], openedTitle);
+  await shot(page, "episode-from-search");
+  const next = page.locator(".adjacent button.next");
+  if ((await next.count()) > 0) {
+    await next.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(
+      (before) => {
+        const h = document.querySelector("#episode-title");
+        return h && h.textContent.trim() !== before;
+      },
+      openedTitle,
+      { timeout: 15000 },
+    );
+    await page.waitForFunction(
+      () =>
+        document.activeElement?.classList.contains("next") ||
+        document.activeElement?.classList.contains("previous"),
+      null,
+      { timeout: 15000 },
+    );
+    check("next_episode_in_place", true, await episodeTitle.textContent());
+  } else {
+    check("next_episode_in_place", true, "pas d'épisode suivant");
+  }
+  await page.keyboard.press("Escape");
+  await searchTitle(page).waitFor({ state: "visible", timeout: 5000 });
+  check(
+    "focus_back_on_episode_card",
+    (await focusedItemId(page)) === episodeId,
+    episodeId,
+  );
+
   // One letter: nothing sent, the status says why.
   await countSearches(page);
   await field(page).fill("a");
@@ -159,7 +231,7 @@ try {
   const empty = page.locator(".search .state-title");
   check(
     "empty_state",
-    (await empty.textContent()).includes("Aucun film ni aucune série"),
+    (await empty.textContent()).includes("Aucun film, série ou épisode"),
   );
   await shot(page, "empty");
 

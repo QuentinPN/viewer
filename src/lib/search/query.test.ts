@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { MediaItem, SearchResults } from "../emby/types";
+import type { MediaItem, SearchResults, WatchItem } from "../emby/types";
 import { cleanQuery, isSearchable, resultsLabel } from "./query";
 
 const item = (id: string): MediaItem => ({
@@ -14,16 +14,32 @@ const item = (id: string): MediaItem => ({
   unplayedCount: null,
 });
 
+const episode = (id: string): WatchItem => ({
+  id,
+  name: `Épisode ${id}`,
+  kind: "episode",
+  seriesName: "Série",
+  seasonIndex: 1,
+  index: 2,
+  image: null,
+  runtimeMinutes: null,
+  resume: null,
+});
+
 const results = (
   movies: number,
   series: number,
   more = false,
+  episodes = 0,
+  moreEpisodes = false,
 ): SearchResults => ({
   query: "heures",
   movies: Array.from({ length: movies }, (_, i) => item(`m${i}`)),
   series: Array.from({ length: series }, (_, i) => item(`s${i}`)),
+  episodes: Array.from({ length: episodes }, (_, i) => episode(`e${i}`)),
   moreMovies: more,
   moreSeries: false,
+  moreEpisodes,
 });
 
 describe("cleanQuery", () => {
@@ -65,6 +81,18 @@ describe("resultsLabel", () => {
   it("says when there are more than shown", () => {
     expect(resultsLabel(results(24, 0, true))).toBe(
       "plus de 24 films pour « heures »",
+    );
+  });
+
+  it("counts episodes, at least that many when the server may hide some", () => {
+    expect(resultsLabel(results(2, 1, false, 3))).toBe(
+      "2 films, 1 série et 3 épisodes pour « heures »",
+    );
+    expect(resultsLabel(results(0, 0, false, 1))).toBe(
+      "1 épisode pour « heures »",
+    );
+    expect(resultsLabel(results(0, 1, false, 1, true))).toBe(
+      "1 série et au moins 1 épisode pour « heures »",
     );
   });
 

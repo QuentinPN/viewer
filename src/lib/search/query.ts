@@ -32,8 +32,15 @@ export function isSearchable(cleaned: string): boolean {
   return Array.from(cleaned).length >= SEARCH_MIN_CHARS;
 }
 
-function count(n: number, more: boolean, one: string, many: string): string {
-  return `${more ? `plus de ${n}` : n} ${n > 1 || more ? many : one}`;
+function count(
+  n: number,
+  more: boolean,
+  one: string,
+  many: string,
+  maybe = false,
+): string {
+  const prefix = more ? (maybe ? "au moins " : "plus de ") : "";
+  return `${prefix}${n} ${n > 1 || (more && !maybe) ? many : one}`;
 }
 
 /** What the search found, also announced to screen readers. */
@@ -49,6 +56,19 @@ export function resultsLabel(results: SearchResults): string {
       count(results.series.length, results.moreSeries, "série", "séries"),
     );
   }
+  if (results.episodes.length > 0) {
+    parts.push(
+      count(
+        results.episodes.length,
+        results.moreEpisodes,
+        "épisode",
+        "épisodes",
+        true,
+      ),
+    );
+  }
   if (parts.length === 0) return `aucun résultat pour « ${results.query} »`;
-  return `${parts.join(" et ")} pour « ${results.query} »`;
+  const last = parts.pop();
+  const head = parts.join(", ");
+  return `${head ? `${head} et ` : ""}${last} pour « ${results.query} »`;
 }
