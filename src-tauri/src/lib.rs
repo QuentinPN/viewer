@@ -305,6 +305,7 @@ pub fn run() {
             commands::emby_items,
             commands::emby_genres,
             commands::artwork_cache_stats,
+            commands::artwork_cache_clear,
             commands::emby_continue_watching,
             commands::emby_next_up,
             commands::emby_latest,

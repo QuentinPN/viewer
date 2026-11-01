@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  ArtworkCacheCleared,
+  ArtworkCacheStats,
   EmbyError,
   EpisodePage,
   HeroItem,
@@ -80,6 +82,10 @@ export const embyApi = {
    */
   play: (itemId: string, resume: boolean) =>
     invoke<PlaybackStart>("emby_play", { itemId, resume }),
+  /** `null` when the app has no artwork cache directory. */
+  artworkStats: () => invoke<ArtworkCacheStats | null>("artwork_cache_stats"),
+  /** Empties the artwork cache of every server (ADR 0021). */
+  clearArtwork: () => invoke<ArtworkCacheCleared | null>("artwork_cache_clear"),
   /** The item's new state, once a playback stopped and was reported. */
   onPlaybackStopped: (
     handler: (state: PlaybackStopped) => void,

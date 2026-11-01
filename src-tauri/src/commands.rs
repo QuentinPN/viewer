@@ -6,7 +6,7 @@ use tauri::{State, WebviewWindow};
 
 use crate::AppState;
 use crate::emby::EmbyError;
-use crate::emby::artwork_cache::ArtworkCacheStats;
+use crate::emby::artwork_cache::{ArtworkCacheCleared, ArtworkCacheStats};
 use crate::emby::models::{
     EpisodePage, HeroItem, ItemDetail, ItemPage, ItemsOptions, Library, MediaItem, PlaybackStart,
     SavedServer, SearchResults, Season, ServerSummary, SessionStatus, SignedInUser, WatchItem,
@@ -188,6 +188,15 @@ pub async fn artwork_cache_stats(
     emby: State<'_, EmbyService>,
 ) -> Result<Option<ArtworkCacheStats>, EmbyError> {
     Ok(emby.artwork_stats().await)
+}
+
+/// Empties the artwork cache (ADR 0021): images and bytes removed, `None` when the
+/// app has no cache directory.
+#[tauri::command]
+pub async fn artwork_cache_clear(
+    emby: State<'_, EmbyService>,
+) -> Result<Option<ArtworkCacheCleared>, EmbyError> {
+    Ok(emby.clear_artwork().await)
 }
 
 #[tauri::command]

@@ -1375,6 +1375,13 @@ fn artwork_cache_spares_the_server_and_keeps_its_checks() {
     let err = run(fx.service.image(&image("103"))).unwrap_err();
     assert!(matches!(err, EmbyError::NotSignedIn), "{err:?}");
     assert_eq!(fetched(), 3);
+
+    // Emptied from the settings (ADR 0021): local only, no session needed.
+    let cleared = run(fx.service.clear_artwork()).unwrap();
+    assert_eq!((cleared.entries, cleared.bytes), (1, 3 + 14));
+    assert!(!file.exists());
+    assert_eq!(run(fx.service.artwork_stats()).unwrap().entries, 0);
+    assert_eq!(fetched(), 3);
 }
 
 #[test]

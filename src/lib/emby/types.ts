@@ -325,3 +325,18 @@ export interface PlaybackStopped {
   played: boolean;
   resume: ResumePoint | null;
 }
+
+/** The artwork disk cache (ADR 0019); `hits` and `misses` since the app started. */
+export interface ArtworkCacheStats {
+  entries: number;
+  bytes: number;
+  quotaBytes: number;
+  hits: number;
+  misses: number;
+}
+
+/** What emptying the artwork cache removed (ADR 0021). */
+export interface ArtworkCacheCleared {
+  entries: number;
+  bytes: number;
+}

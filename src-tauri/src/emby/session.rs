@@ -9,7 +9,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use super::EmbyError;
-use super::artwork_cache::{ArtworkCache, ArtworkCacheStats};
+use super::artwork_cache::{ArtworkCache, ArtworkCacheCleared, ArtworkCacheStats};
 use super::client::{AccessToken, DeviceIdentity, EmbyClient, EpisodesQuery, ItemsQuery};
 use super::credentials::{self, CredentialStore};
 use super::images::{self, ImageRequest, ImageType};
@@ -196,6 +196,19 @@ impl EmbyService {
         tauri::async_runtime::spawn_blocking(move || cache.stats())
             .await
             .ok()
+    }
+
+    /// Empties the artwork cache of every server (ADR 0021); `None` without a cache.
+    /// Returns what was removed. Images are downloaded again when next shown.
+    pub async fn clear_artwork(&self) -> Option<ArtworkCacheCleared> {
+        let cache = Arc::clone(self.artwork.as_ref()?);
+        tauri::async_runtime::spawn_blocking(move || {
+            let (entries, bytes) = cache.clear();
+            log::info!("artwork cache cleared: {entries} images, {bytes} bytes");
+            ArtworkCacheCleared { entries, bytes }
+        })
+        .await
+        .ok()
     }
 
     /// Short bounds, so tests can simulate a server that never answers.

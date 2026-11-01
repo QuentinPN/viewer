@@ -1,6 +1,6 @@
 # ADR 0019 — Cache disque des images Emby
 
-Statut : Accepté (2026-11-01). Complète l'ADR 0005.
+Statut : Accepté (2026-11-01). Complète l'ADR 0005. Le vidage depuis l'écran Réglages est décrit par l'ADR 0021.
 
 ## Contexte
 Chaque grille, la page d'accueil, le héros et les fiches affichent des dizaines à des centaines d'images. Aujourd'hui, toutes passent par le protocole `emby-img` (ADR 0005), qui les redemande au NAS à chaque lancement de l'application : au plus 6 en parallèle, et rien sans le serveur.

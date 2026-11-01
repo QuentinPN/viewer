@@ -34,6 +34,14 @@ pub struct ArtworkCacheStats {
     pub misses: u64,
 }
 
+/// What `ArtworkCache::clear` removed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtworkCacheCleared {
+    pub entries: u64,
+    pub bytes: u64,
+}
+
 pub struct ArtworkCache {
     root: PathBuf,
     quota: u64,
@@ -132,6 +140,24 @@ impl ArtworkCache {
         }
     }
 
+    /// Removes every cached image of every server, then the empty folders; files
+    /// that are not ours stay. Returns the images and bytes removed (ADR 0021).
+    pub fn clear(&self) -> (u64, u64) {
+        // Held throughout: no write counts its size against a half-emptied cache.
+        let mut size = self.size.lock().unwrap_or_else(|p| p.into_inner());
+        let (mut entries, mut bytes) = (0, 0);
+        for (path, len, _) in self.files() {
+            if fs::remove_file(&path).is_ok() {
+                entries += 1;
+                bytes += len;
+            }
+        }
+        self.remove_empty_dirs();
+        // Read again on the next write: an image kept meanwhile still counts.
+        *size = None;
+        (entries, bytes)
+    }
+
     fn forget_size(&self) {
         *self.size.lock().unwrap_or_else(|p| p.into_inner()) = None;
     }
@@ -181,6 +207,11 @@ impl ArtworkCache {
                 total -= len;
             }
         }
+        self.remove_empty_dirs();
+        total
+    }
+
+    fn remove_empty_dirs(&self) {
         for server_dir in subdirs(&self.root) {
             for item_dir in subdirs(&server_dir) {
                 // Fails while the folder still holds files, which is the point.
@@ -188,7 +219,6 @@ impl ArtworkCache {
             }
             let _ = fs::remove_dir(&server_dir);
         }
-        total
     }
 }
 
@@ -359,6 +389,36 @@ mod tests {
         let mut large = image(3);
         large.push(0);
         assert!(!cache.put(&req("6", 360), &large).unwrap());
+    }
+
+    #[test]
+    fn clear_removes_every_image_and_keeps_other_files() {
+        let dir = root();
+        let cache = ArtworkCache::new(dir.clone(), DEFAULT_QUOTA);
+        cache.put(&req("1", 360), JPEG).unwrap();
+        cache.put(&req("2", 360), JPEG).unwrap();
+        let other = ImageRequest::parse("/srv2/9/Backdrop", Some("tag=cd_1&maxWidth=720")).unwrap();
+        cache.put(&other, JPEG).unwrap();
+        // Not ours: never removed.
+        let foreign = dir.join("srv1").join("1").join("notes.txt");
+        fs::write(&foreign, b"x").unwrap();
+
+        assert_eq!(cache.clear(), (3, 3 * JPEG.len() as u64));
+        assert_eq!(cache.get(&req("1", 360)), None);
+        assert!(foreign.is_file());
+        assert!(
+            !dir.join("srv1").join("2").exists(),
+            "empty folders removed"
+        );
+        assert!(!dir.join("srv2").exists());
+        assert_eq!((cache.stats().entries, cache.stats().bytes), (0, 0));
+
+        // Still usable, and its size is counted again from the disk.
+        assert!(cache.put(&req("1", 360), JPEG).unwrap());
+        assert_eq!(cache.stats().entries, 1);
+        assert_eq!(cache.clear(), (1, JPEG.len() as u64));
+        assert_eq!(cache.clear(), (0, 0), "nothing left");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

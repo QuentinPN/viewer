@@ -27,6 +27,7 @@ import {
   SEARCH_MAX_CHARS,
 } from "../search/query";
 import SearchResults from "../search/SearchResults.svelte";
+import Settings from "../settings/Settings.svelte";
 import {
   DEFAULT_OPTIONS,
   directionLabels,
@@ -90,6 +91,8 @@ let sortSelect = $state<HTMLSelectElement | null>(null);
 const directions = $derived(directionLabels(options.sort));
 let observer: IntersectionObserver | null = null;
 let opened = $state<MediaItem | null>(null);
+/** The settings screen replaces the content; a search still takes over. */
+let settingsOpen = $state(false);
 /** Card that opened the detail: an episode page may move to its neighbours. */
 let openerId: string | null = null;
 /** Neighbour button that replaced the episode page, to focus it again. */
@@ -256,8 +259,16 @@ function onWindowKeydown(e: KeyboardEvent) {
   searchField.select();
 }
 
+function openSettings() {
+  opened = null;
+  if (searching) void leaveSearch(false);
+  settingsOpen = true;
+  scroller?.scrollTo({ top: 0 });
+}
+
 function showHome() {
   opened = null;
+  settingsOpen = false;
   if (searching) void leaveSearch(false);
   if (selected === null) return;
   generation += 1;
@@ -293,6 +304,7 @@ function restartGrid() {
 
 function select(library: Library) {
   opened = null;
+  settingsOpen = false;
   if (searching) void leaveSearch(false);
   if (selected?.id === library.id && pager.total !== null) return;
   selected = library;
@@ -435,7 +447,9 @@ $effect(() => {
       <button
         type="button"
         class="home-link"
-        aria-current={selected === null && !searching ? "page" : undefined}
+        aria-current={selected === null && !searching && !settingsOpen
+          ? "page"
+          : undefined}
         onclick={showHome}
       >
         Accueil
@@ -445,7 +459,9 @@ $effect(() => {
           <li>
             <button
               type="button"
-              aria-current={selected?.id === library.id && !searching
+              aria-current={selected?.id === library.id &&
+              !searching &&
+              !settingsOpen
                 ? "page"
                 : undefined}
               onclick={() => select(library)}
@@ -464,6 +480,14 @@ $effect(() => {
         {user.userName}
         <span>{user.server.name}{user.server.encrypted ? "" : " · non chiffré"}</span>
       </p>
+      <button
+        type="button"
+        class="quiet"
+        aria-current={settingsOpen && !searching ? "page" : undefined}
+        onclick={openSettings}
+      >
+        Réglages
+      </button>
       <button type="button" class="quiet" onclick={onChangeServer}>
         Changer de serveur
       </button>
@@ -506,6 +530,8 @@ $effect(() => {
         onOpen={open}
         onOpenEpisode={openEpisode}
       />
+    {:else if settingsOpen}
+      <Settings />
     {:else if libraries && selected === null}
       <Home
         {libraries}
@@ -803,6 +829,11 @@ $effect(() => {
     padding: var(--space-2) var(--space-3);
     font: inherit;
     cursor: pointer;
+  }
+  button.quiet[aria-current="page"] {
+    background: var(--color-elevated);
+    color: var(--color-text);
+    box-shadow: inset 3px 0 0 var(--color-accent);
   }
   button.quiet:hover:not(:disabled) {
     background: var(--color-elevated);
