@@ -4,7 +4,11 @@
 // the file on the NAS is untouched.
 // - "Reprendre": the server transcodes and playback starts at the saved position;
 // - "Lire depuis le début": the fallback keeps that choice;
-// - a transcode that cannot open either: an explanation, "Retour", no retry loop.
+// - a transcode that cannot open either: an explanation, "Retour", no retry loop;
+// - a direct source that never answers: the opening limit (ADR 0027), then the
+//   fallback;
+// - a file the server can no longer read (HTTP 500 on the file and on every HLS
+//   segment): the fallback, then the opening limit and the explanation.
 // Short sessions; writes then clears one resume position. Starts in any state, ends
 // signed out with the direct server address as last server.
 import { launch } from "./app.mjs";
@@ -33,6 +37,7 @@ const { check, shot, finish } = createReport("gate4-fallback");
 const proxy = await startProxy(account.url);
 const RESUME_AT = 600;
 const FALLBACK_BADGE = "Transcodage · échec de la lecture directe";
+const OPEN_LIMIT_MS = 45000; // OPEN_LIMIT in src-tauri/src/player/mod.rs
 
 const command = (page, cmd) =>
   page.evaluate(
@@ -176,6 +181,68 @@ try {
     "focus_back_on_play",
     await play.evaluate((el) => el === document.activeElement),
   );
+
+  // 5. A direct source that never answers: the limit, then the fallback.
+  await proxy.set("hold-direct");
+  let opened = Date.now();
+  await play.focus();
+  await page.keyboard.press("Enter");
+  await page.locator(".opening-panel").waitFor({ timeout: 10000 });
+  await page.waitForTimeout(3000);
+  const waiting = (await page.locator(".opening-panel").textContent()).trim();
+  check(
+    "silent_source_shows_the_opening",
+    waiting.includes("Ouverture du flux") &&
+      (await playerBadge(page).count()) === 0,
+    waiting,
+  );
+  await playerBadge(page).waitFor({ timeout: OPEN_LIMIT_MS + 30000 });
+  const heldFor = Date.now() - opened;
+  const heldBadge = (await playerBadge(page).textContent()).trim();
+  check(
+    "silent_source_falls_back_at_the_limit",
+    heldBadge === FALLBACK_BADGE &&
+      proxy.counts.held > 0 &&
+      heldFor >= OPEN_LIMIT_MS - 1000,
+    `${heldBadge} après ${heldFor} ms, ${proxy.counts.held} requête(s) sans réponse`,
+  );
+  const afterLimit = await waitForPosition(page, 0.5, 45000);
+  check(
+    "fallback_plays_after_the_limit",
+    (afterLimit?.timePos ?? 0) > 0.5,
+    `${afterLimit?.timePos} s`,
+  );
+  await rewindAndStop(page);
+  await play.filter({ hasText: "Lecture" }).waitFor({ timeout: 15000 });
+
+  // 6. The server can no longer read the file: fallback, limit, explanation.
+  await proxy.set("error-files");
+  opened = Date.now();
+  await play.focus();
+  await page.keyboard.press("Enter");
+  await failure.waitFor({ timeout: OPEN_LIMIT_MS + 30000 });
+  const failedAfter = Date.now() - opened;
+  const failureText = (await failure.textContent()).trim();
+  check(
+    "unreadable_file_is_explained_at_the_limit",
+    failureText ===
+      "Le lecteur n'a pas pu ouvrir ce fichier. Détail technique : le flux ne s'ouvre pas." &&
+      failedAfter >= OPEN_LIMIT_MS - 1000,
+    `${failureText} (${failedAfter} ms)`,
+  );
+  const errorsBefore = proxy.counts.errors;
+  await page.waitForTimeout(2000);
+  const settled = proxy.counts.errors;
+  await page.waitForTimeout(3000);
+  check(
+    "requests_stop_after_the_limit",
+    errorsBefore > 1 && proxy.counts.errors === settled,
+    `${errorsBefore} réponses 500, puis ${proxy.counts.errors}`,
+  );
+  await shot(page, "opening-limit");
+  await page.getByRole("button", { name: "Retour" }).click();
+  await detailTitle(page).waitFor({ state: "visible", timeout: 10000 });
+  check("player_closed_after_the_limit", !(await diagnostics(page)).ok);
 } catch (e) {
   check(
     "scenario_error",

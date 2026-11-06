@@ -227,33 +227,57 @@ impl Serialize for PlayerError {
 /// playback counts as interrupted (ADR 0022).
 pub const STALL_LIMIT: Duration = Duration::from_secs(30);
 
-/// Pure watch over the player events: the position must move while playing. Time is
-/// passed in. FFmpeg retries at each read of the demuxer, so a stream that stays
-/// dead never reaches an end of file by itself (ADR 0022).
+/// How long a file may take to load before the opening counts as failed (ADR 0027).
+pub const OPEN_LIMIT: Duration = Duration::from_secs(45);
+
+/// Which wait of [`StallWatch`] ran out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Stall {
+    Opening,
+    Playing,
+}
+
+/// Pure watch over the player events: a file must load, then its position must move
+/// while playing. Time is passed in. FFmpeg retries at each read of the demuxer and
+/// skips the HLS segments that fail, so a dead stream may never reach an end of file
+/// by itself (ADR 0022, ADR 0027).
 #[derive(Debug)]
 pub struct StallWatch {
     limit: Duration,
+    open_limit: Duration,
     armed: bool,
+    opening: bool,
     paused: bool,
     position: Option<f64>,
     last_progress: Instant,
 }
 
 impl StallWatch {
-    pub fn new(limit: Duration, now: Instant) -> Self {
+    pub fn new(limit: Duration, open_limit: Duration, now: Instant) -> Self {
         Self {
             limit,
+            open_limit,
             armed: false,
+            opening: false,
             paused: false,
             position: None,
             last_progress: now,
         }
     }
 
+    /// mpv started on a file. This is not a [`PlayerEvent`]: the UI has no use for it.
+    pub fn on_load_started(&mut self, now: Instant) {
+        self.armed = true;
+        self.opening = true;
+        self.position = None;
+        self.last_progress = now;
+    }
+
     pub fn on_event(&mut self, event: &PlayerEvent, now: Instant) {
         match event {
             PlayerEvent::FileLoaded => {
                 self.armed = true;
+                self.opening = false;
                 self.position = None;
                 self.last_progress = now;
             }
@@ -263,21 +287,33 @@ impl StallWatch {
             }
             PlayerEvent::Paused { paused } => {
                 self.paused = *paused;
-                self.last_progress = now;
+                if !self.opening {
+                    self.last_progress = now;
+                }
             }
-            PlayerEvent::EndFile { .. } | PlayerEvent::Shutdown => self.armed = false,
+            PlayerEvent::EndFile { .. } | PlayerEvent::Shutdown => {
+                self.armed = false;
+                self.opening = false;
+            }
             _ => {}
         }
     }
 
-    /// True once when the limit is reached; silent until the next file loads.
-    pub fn expired(&mut self, now: Instant) -> bool {
-        let expired =
-            self.armed && !self.paused && now.duration_since(self.last_progress) >= self.limit;
-        if expired {
-            self.armed = false;
+    /// Some once when a limit is reached; silent until the next file. Nothing plays
+    /// during an opening, so a pause does not suspend it.
+    pub fn expired(&mut self, now: Instant) -> Option<Stall> {
+        let (limit, stall) = if self.opening {
+            (self.open_limit, Stall::Opening)
+        } else {
+            (self.limit, Stall::Playing)
+        };
+        let waiting = self.opening || !self.paused;
+        if !self.armed || !waiting || now.duration_since(self.last_progress) < limit {
+            return None;
         }
-        expired
+        self.armed = false;
+        self.opening = false;
+        Some(stall)
     }
 }
 
@@ -296,13 +332,14 @@ mod tests {
     use super::*;
 
     const LIMIT: Duration = Duration::from_secs(30);
+    const OPENING: Duration = Duration::from_secs(45);
 
     fn at(start: Instant, seconds: u64) -> Instant {
         start + Duration::from_secs(seconds)
     }
 
     fn loaded(start: Instant) -> StallWatch {
-        let mut watch = StallWatch::new(LIMIT, start);
+        let mut watch = StallWatch::new(LIMIT, OPENING, start);
         watch.on_event(&PlayerEvent::FileLoaded, start);
         watch
     }
@@ -312,9 +349,56 @@ mod tests {
         let start = Instant::now();
         let mut watch = loaded(start);
         watch.on_event(&PlayerEvent::TimePos { seconds: 1.0 }, at(start, 10));
-        assert!(!watch.expired(at(start, 39)));
-        assert!(watch.expired(at(start, 40)));
-        assert!(!watch.expired(at(start, 80)), "reported once");
+        assert!(!watch.expired(at(start, 39)).is_some());
+        assert!(watch.expired(at(start, 40)).is_some());
+        assert!(!watch.expired(at(start, 80)).is_some(), "reported once");
+    }
+
+    #[test]
+    fn opening_expires_once_at_its_own_limit() {
+        let start = Instant::now();
+        let mut watch = StallWatch::new(LIMIT, OPENING, start);
+        watch.on_load_started(start);
+        assert_eq!(watch.expired(at(start, 44)), None);
+        assert_eq!(watch.expired(at(start, 45)), Some(Stall::Opening));
+        assert_eq!(watch.expired(at(start, 500)), None, "reported once");
+    }
+
+    #[test]
+    fn opening_is_not_extended_by_a_pause() {
+        let start = Instant::now();
+        let mut watch = StallWatch::new(LIMIT, OPENING, start);
+        watch.on_load_started(start);
+        watch.on_event(&PlayerEvent::Paused { paused: true }, at(start, 40));
+        assert_eq!(watch.expired(at(start, 45)), Some(Stall::Opening));
+    }
+
+    #[test]
+    fn loading_the_file_hands_over_to_the_position_limit() {
+        let start = Instant::now();
+        let mut watch = StallWatch::new(LIMIT, OPENING, start);
+        watch.on_load_started(start);
+        watch.on_event(&PlayerEvent::FileLoaded, at(start, 40));
+        assert_eq!(watch.expired(at(start, 69)), None);
+        assert_eq!(watch.expired(at(start, 70)), Some(Stall::Playing));
+    }
+
+    #[test]
+    fn an_end_of_file_cancels_the_opening() {
+        let start = Instant::now();
+        let mut watch = StallWatch::new(LIMIT, OPENING, start);
+        watch.on_load_started(start);
+        watch.on_event(
+            &PlayerEvent::EndFile {
+                reason: EndReason::Stopped,
+                error: None,
+            },
+            at(start, 10),
+        );
+        assert_eq!(watch.expired(at(start, 500)), None);
+        watch.on_load_started(at(start, 500));
+        assert_eq!(watch.expired(at(start, 544)), None, "next file, own limit");
+        assert_eq!(watch.expired(at(start, 545)), Some(Stall::Opening));
     }
 
     #[test]
@@ -323,16 +407,22 @@ mod tests {
         let mut watch = loaded(start);
         watch.on_event(&PlayerEvent::TimePos { seconds: 1.0 }, at(start, 10));
         watch.on_event(&PlayerEvent::TimePos { seconds: 1.0 }, at(start, 35));
-        assert!(watch.expired(at(start, 40)));
+        assert!(watch.expired(at(start, 40)).is_some());
     }
 
     #[test]
     fn stall_waits_for_a_file_and_stops_with_it() {
         let start = Instant::now();
-        let mut watch = StallWatch::new(LIMIT, start);
-        assert!(!watch.expired(at(start, 60)), "nothing loaded yet");
+        let mut watch = StallWatch::new(LIMIT, OPENING, start);
+        assert!(
+            !watch.expired(at(start, 60)).is_some(),
+            "nothing loaded yet"
+        );
         watch.on_event(&PlayerEvent::FileLoaded, at(start, 60));
-        assert!(!watch.expired(at(start, 89)), "loading does not count");
+        assert!(
+            !watch.expired(at(start, 89)).is_some(),
+            "loading does not count"
+        );
         watch.on_event(
             &PlayerEvent::EndFile {
                 reason: EndReason::Eof,
@@ -340,9 +430,12 @@ mod tests {
             },
             at(start, 70),
         );
-        assert!(!watch.expired(at(start, 200)), "end of file");
+        assert!(!watch.expired(at(start, 200)).is_some(), "end of file");
         watch.on_event(&PlayerEvent::FileLoaded, at(start, 200));
-        assert!(watch.expired(at(start, 230)), "next file watched again");
+        assert!(
+            watch.expired(at(start, 230)).is_some(),
+            "next file watched again"
+        );
     }
 
     #[test]
@@ -350,10 +443,13 @@ mod tests {
         let start = Instant::now();
         let mut watch = loaded(start);
         watch.on_event(&PlayerEvent::Paused { paused: true }, at(start, 10));
-        assert!(!watch.expired(at(start, 500)));
+        assert!(!watch.expired(at(start, 500)).is_some());
         watch.on_event(&PlayerEvent::Paused { paused: false }, at(start, 500));
-        assert!(!watch.expired(at(start, 529)), "counted from the unpause");
-        assert!(watch.expired(at(start, 530)));
+        assert!(
+            !watch.expired(at(start, 529)).is_some(),
+            "counted from the unpause"
+        );
+        assert!(watch.expired(at(start, 530)).is_some());
     }
 
     #[test]

@@ -10,12 +10,20 @@
 //   The public probe still goes through. Nothing reaches the server in that mode;
 // - "junk-direct": direct file requests get bytes no player can read, like a file
 //   mpv cannot open (ADR 0023). The rest is forwarded, transcodes included;
-// - "junk-all": HLS playlists too, so that a transcode cannot open either.
+// - "junk-all": HLS playlists too, so that a transcode cannot open either;
+// - "hold-direct": direct file requests are never answered, like a server that hangs
+//   on one file (ADR 0027). The rest is forwarded;
+// - "error-files": direct file and HLS segment requests get HTTP 500, like a file the
+//   server can no longer read. Playlists are forwarded: FFmpeg skips segment after
+//   segment (ADR 0027).
 import { randomBytes } from "node:crypto";
 import net from "node:net";
 
 const DIRECT_FILE = /^GET \S*\/videos\/\S+\/original\.\S* HTTP/i;
 const HLS_PLAYLIST = /^GET \S*\/videos\/\S+\.m3u8\S* HTTP/i;
+const HLS_SEGMENT = /^GET \S*\/videos\/\S+\.ts\S* HTTP/i;
+const ERROR_RESPONSE =
+  "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 17\r\nConnection: close\r\n\r\nStale file handle";
 const JUNK = randomBytes(256 * 1024);
 const JUNK_RESPONSE = Buffer.concat([
   Buffer.from(
@@ -33,7 +41,14 @@ export async function startProxy(targetUrl, port = 0) {
     throw new Error("the proxy only forwards plain HTTP (local server)");
   let mode = "up";
   const sockets = new Set();
-  const counts = { forwarded: 0, refused: 0, held: 0, rejected: 0, junk: 0 };
+  const counts = {
+    forwarded: 0,
+    refused: 0,
+    held: 0,
+    rejected: 0,
+    junk: 0,
+    errors: 0,
+  };
 
   const server = net.createServer((client) => {
     sockets.add(client);
@@ -49,7 +64,35 @@ export async function startProxy(targetUrl, port = 0) {
       return;
     }
     if (mode === "junk-direct" || mode === "junk-all") {
-      serveJunk(client, mode === "junk-all");
+      const playlistsToo = mode === "junk-all";
+      filterRequests(client, (line) => {
+        if (
+          !DIRECT_FILE.test(line) &&
+          !(playlistsToo && HLS_PLAYLIST.test(line))
+        )
+          return false;
+        counts.junk += 1;
+        client.end(JUNK_RESPONSE);
+        return true;
+      });
+      return;
+    }
+    if (mode === "hold-direct") {
+      filterRequests(client, (line) => {
+        if (!DIRECT_FILE.test(line)) return false;
+        counts.held += 1;
+        return true;
+      });
+      return;
+    }
+    if (mode === "error-files") {
+      filterRequests(client, (line) => {
+        if (!DIRECT_FILE.test(line) && !HLS_SEGMENT.test(line)) return false;
+        counts.errors += 1;
+        // Same delay as the real server: the limit comes before the end of the list.
+        setTimeout(() => client.end(ERROR_RESPONSE), 140);
+        return true;
+      });
       return;
     }
     counts.forwarded += 1;
@@ -94,15 +137,16 @@ export async function startProxy(targetUrl, port = 0) {
     });
   }
 
-  /** Same inspection as `rejectAuthenticated`, on the request line. */
-  function serveJunk(client, playlistsToo) {
+  /**
+   * Same inspection as `rejectAuthenticated`, on the request line: `answer` returns
+   * true when it took the request, which then does not reach the server.
+   */
+  function filterRequests(client, answer) {
     let upstream = null;
     client.on("data", (chunk) => {
       const line = chunk.toString("latin1").split("\r\n", 1)[0];
-      if (DIRECT_FILE.test(line) || (playlistsToo && HLS_PLAYLIST.test(line))) {
-        counts.junk += 1;
+      if (answer(line)) {
         upstream?.destroy();
-        client.end(JUNK_RESPONSE);
         return;
       }
       if (!upstream) {

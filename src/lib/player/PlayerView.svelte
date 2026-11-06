@@ -241,7 +241,8 @@ onMount(async () => {
     if (diag.duration != null) duration = diag.duration;
     if (diag.timePos != null) position = diag.timePos;
     if (diag.timePos != null) everPlayed = true;
-    active = true;
+    // An engine that answers may still be opening its file (ADR 0027).
+    if (diag.container != null) active = true;
     tracks = await playerApi.tracks();
     await applyVolume();
   } catch {

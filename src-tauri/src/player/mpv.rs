@@ -10,12 +10,13 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use super::ffi::{self, MpvApi, MpvHandle};
 use super::{
-    EndReason, ExternalSubtitle, MediaSource, PlaybackRequest, PlayerCommand, PlayerDiagnostics,
-    PlayerEngine, PlayerError, PlayerEvent, STALL_LIMIT, StallWatch, Track, TrackKind, tls_roots,
+    EndReason, ExternalSubtitle, MediaSource, OPEN_LIMIT, PlaybackRequest, PlayerCommand,
+    PlayerDiagnostics, PlayerEngine, PlayerError, PlayerEvent, STALL_LIMIT, Stall, StallWatch,
+    Track, TrackKind, tls_roots,
 };
 
 pub type EventSink = Box<dyn Fn(PlayerEvent) + Send + Sync>;
@@ -35,6 +36,8 @@ pub struct MpvConfig {
     /// Where to export the Windows root certificates for HTTPS sources. Without it,
     /// `tls-ca-file` stays empty and every HTTPS source is refused (ADR 0026).
     pub tls_roots: Option<PathBuf>,
+    /// Wait for a file to load (ADR 0027). Only tests shorten it.
+    pub open_limit: Duration,
 }
 
 impl Default for MpvConfig {
@@ -45,6 +48,7 @@ impl Default for MpvConfig {
             hwdec: "auto-safe".into(),
             silent: false,
             tls_roots: None,
+            open_limit: OPEN_LIMIT,
         }
     }
 }
@@ -225,12 +229,13 @@ impl MpvEngine {
 
         let inner = Arc::new(inner);
         let stop = Arc::new(AtomicBool::new(false));
+        let open_limit = config.open_limit;
         let thread = {
             let inner = Arc::clone(&inner);
             let stop = Arc::clone(&stop);
             std::thread::Builder::new()
                 .name("mpv-events".into())
-                .spawn(move || event_loop(&inner, &stop, &sink))
+                .spawn(move || event_loop(&inner, &stop, &sink, open_limit))
                 .map_err(|e| PlayerError::Mpv {
                     context: "thread".into(),
                     message: e.to_string(),
@@ -564,28 +569,40 @@ fn emit(stall: &mut StallWatch, sink: &EventSink, event: PlayerEvent) {
     sink(event);
 }
 
-/// The playback ends on an error, which follows the path of any failure (stop report
-/// with the last position, "Lecture interrompue"), and mpv stops its retries.
-fn end_stalled(inner: &Inner, sink: &EventSink) {
-    log::warn!(
-        "position figée depuis {} s : lecture interrompue",
-        STALL_LIMIT.as_secs()
-    );
-    sink(PlayerEvent::EndFile {
-        reason: EndReason::Error,
-        error: Some("le flux ne répond plus".into()),
-    });
+/// The playback ends on an error, which follows the path of any failure (fallback or
+/// message during an opening; stop report with the last position, "Lecture
+/// interrompue" afterwards), and mpv stops its retries.
+fn end_stalled(inner: &Inner, sink: &EventSink, stall: Stall) {
+    let detail = match stall {
+        Stall::Opening => {
+            log::warn!("flux non ouvert dans le délai : ouverture abandonnée");
+            "le flux ne s'ouvre pas"
+        }
+        Stall::Playing => {
+            log::warn!(
+                "position figée depuis {} s : lecture interrompue",
+                STALL_LIMIT.as_secs()
+            );
+            "le flux ne répond plus"
+        }
+    };
     // Asynchronous: this thread must keep draining events while mpv cancels the read.
+    // Before the event: the UI's fallback loads a file in reaction, and this stop must
+    // reach mpv first or it would cancel that load.
     if let Err(e) = inner.command_async(REPLY_STALL_STOP, &["stop"]) {
         log::warn!("arrêt après blocage du flux : {e}");
     }
+    sink(PlayerEvent::EndFile {
+        reason: EndReason::Error,
+        error: Some(detail.into()),
+    });
 }
 
-fn event_loop(inner: &Inner, stop: &AtomicBool, sink: &EventSink) {
-    let mut stall = StallWatch::new(STALL_LIMIT, Instant::now());
+fn event_loop(inner: &Inner, stop: &AtomicBool, sink: &EventSink, open_limit: Duration) {
+    let mut stall = StallWatch::new(STALL_LIMIT, open_limit, Instant::now());
     while !stop.load(Ordering::SeqCst) {
-        if stall.expired(Instant::now()) {
-            end_stalled(inner, sink);
+        if let Some(kind) = stall.expired(Instant::now()) {
+            end_stalled(inner, sink, kind);
         }
         // SAFETY: only this thread calls mpv_wait_event; the returned event is
         // valid until the next call, and we copy everything out before looping.
@@ -596,6 +613,7 @@ fn event_loop(inner: &Inner, stop: &AtomicBool, sink: &EventSink) {
                 emit(&mut stall, sink, PlayerEvent::Shutdown);
                 break;
             }
+            ffi::MPV_EVENT_START_FILE => stall.on_load_started(Instant::now()),
             ffi::MPV_EVENT_FILE_LOADED => {
                 add_pending_subtitles(inner);
                 emit(&mut stall, sink, PlayerEvent::FileLoaded);
@@ -628,6 +646,13 @@ fn event_loop(inner: &Inner, stop: &AtomicBool, sink: &EventSink) {
                         .to_string_lossy()
                         .into_owned()
                 });
+                // Once FFmpeg gives up on an HLS list, mpv tries each segment as a file:
+                // the first failure ends it (ADR 0027). Before the event, as in `end_stalled`.
+                if reason == EndReason::Error
+                    && let Err(e) = inner.command_async(REPLY_STALL_STOP, &["stop"])
+                {
+                    log::warn!("arrêt après un échec du flux : {e}");
+                }
                 emit(&mut stall, sink, PlayerEvent::EndFile { reason, error });
             }
             ffi::MPV_EVENT_LOG_MESSAGE => {
@@ -902,6 +927,150 @@ mod tests {
             }
         }
         panic!("no end of file: {events:?}");
+    }
+
+    /// Engine loading an HLS list of `segments` entries that all answer HTTP 500.
+    /// `None` when libmpv is not available.
+    #[allow(clippy::type_complexity)]
+    fn load_failing_segments(
+        segments: usize,
+        open_limit: Duration,
+    ) -> Option<(
+        MpvEngine,
+        mpsc::Receiver<PlayerEvent>,
+        std::sync::Arc<Mutex<Vec<String>>>,
+    )> {
+        let Some(lib) = libmpv_path() else {
+            eprintln!("SKIPPED: libmpv not found (set VIEWER_LIBMPV)");
+            return None;
+        };
+        let mut playlist = String::from(
+            "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:6\n#EXT-X-PLAYLIST-TYPE:VOD\n",
+        );
+        for n in 0..segments {
+            playlist.push_str(&format!("#EXTINF:6.0,\nseg/{n}.ts\n"));
+        }
+        playlist.push_str("#EXT-X-ENDLIST\n");
+        let (port, seen) = serve(move |path| {
+            if path.ends_with(".m3u8") {
+                http_response(
+                    "200 OK",
+                    "Content-Type: application/vnd.apple.mpegurl\r\n",
+                    &playlist,
+                )
+            } else {
+                http_response("500 Internal Server Error", "", "Stale file handle")
+            }
+        });
+        let (tx, rx) = mpsc::channel();
+        let tx = Mutex::new(tx);
+        let engine = MpvEngine::new(
+            &lib,
+            &MpvConfig {
+                headless: true,
+                open_limit,
+                ..MpvConfig::default()
+            },
+            Box::new(move |ev| {
+                let _ = tx.lock().unwrap().send(ev);
+            }),
+        )
+        .expect("engine");
+        let url = format!("http://127.0.0.1:{port}/main.m3u8");
+        let request = PlaybackRequest {
+            source: url.clone(),
+            http_headers: Vec::new(),
+            start_seconds: None,
+            subtitles: Vec::new(),
+        };
+        engine
+            .load(&request, &MediaSource::parse(&url).unwrap())
+            .expect("load");
+        Some((engine, rx, seen))
+    }
+
+    fn segment_requests(seen: &Mutex<Vec<String>>) -> usize {
+        seen.lock()
+            .unwrap()
+            .iter()
+            .filter(|l| l.contains(".ts"))
+            .count()
+    }
+
+    /// ADR 0027: once FFmpeg gives up on the list, mpv reads it as a playlist of files.
+    /// The first failure ends it: no second wave of requests, no series of errors.
+    #[test]
+    fn a_failed_hls_list_is_not_walked_as_a_playlist() {
+        const SEGMENTS: usize = 100;
+        let Some((engine, rx, seen)) = load_failing_segments(SEGMENTS, Duration::from_secs(30))
+        else {
+            return;
+        };
+        // mpv ends the list itself with "Other" (a redirect) when it reads it as a playlist.
+        let is_failure = |ev: &PlayerEvent| {
+            matches!(
+                ev,
+                PlayerEvent::EndFile {
+                    reason: EndReason::Error,
+                    ..
+                }
+            )
+        };
+        assert!(wait_for(&rx, Duration::from_secs(25), is_failure));
+        std::thread::sleep(Duration::from_secs(2));
+        let settled = segment_requests(&seen);
+        let later: Vec<_> = rx.try_iter().collect();
+        assert!(!later.iter().any(is_failure), "{later:?}");
+        std::thread::sleep(Duration::from_secs(1));
+        assert_eq!(segment_requests(&seen), settled);
+        assert!(settled < 3 * SEGMENTS, "{settled} segment requests");
+        engine.shutdown();
+    }
+
+    /// ADR 0027: FFmpeg skips HLS segments that fail, one after the other, and neither
+    /// loads the file nor ends it. The limit ends the opening and stops the requests.
+    #[test]
+    fn failing_hls_segments_end_at_the_opening_limit() {
+        let started = Instant::now();
+        let Some((_engine, rx, seen)) = load_failing_segments(50_000, Duration::from_secs(2))
+        else {
+            return;
+        };
+
+        let mut events = Vec::new();
+        while let Ok(ev) = rx.recv_timeout(Duration::from_secs(20)) {
+            let end = matches!(ev, PlayerEvent::EndFile { .. });
+            events.push(ev);
+            if end {
+                break;
+            }
+        }
+        assert_eq!(
+            events.last(),
+            Some(&PlayerEvent::EndFile {
+                reason: EndReason::Error,
+                error: Some("le flux ne s'ouvre pas".into()),
+            }),
+            "{events:?}"
+        );
+        assert!(!events.contains(&PlayerEvent::FileLoaded), "{events:?}");
+        let elapsed = started.elapsed();
+        assert!(elapsed >= Duration::from_secs(2), "{elapsed:?}");
+        assert!(elapsed < Duration::from_secs(5), "{elapsed:?}");
+        let segments = || segment_requests(&seen);
+        assert!(segments() > 1, "the demuxer went on to the next segments");
+
+        // The real end of file follows, then no more requests.
+        assert!(wait_for(&rx, Duration::from_secs(5), |ev| matches!(
+            ev,
+            PlayerEvent::EndFile {
+                reason: EndReason::Stopped,
+                ..
+            }
+        )));
+        let after_stop = segments();
+        std::thread::sleep(Duration::from_millis(500));
+        assert_eq!(segments(), after_stop);
     }
 
     /// ADR 0025: the token stops at the server the request was meant for.
