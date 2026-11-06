@@ -92,9 +92,13 @@ Home, film/series browsing, details, search, accessible player UI, responsive la
 - DROPPED (user decision, 2026-10-28): search of people.
 - Known input: the control bar hides subtitles at narrow widths (Gate 1 finding); views must provide an opaque background when no video plays (transparent window).
 
-## Gate 4 — End-to-end quality [TODO]
+## Gate 4 — End-to-end quality [IN PROGRESS · stream reconnection and stall limit VERIFIED]
 
 Verify real server resume/watched state, unsupported format fallback, network interruptions, performance and security reviews.
+
+- VERIFIED (2026-11-06): stream reconnection and stall limit (ADR 0022) through the local proxy, `docs/evidence/gate4-reseau-2026-11-06.md`.
+- NOT VERIFIED: a cut during an HLS transcode, a real network cut.
+- TODO: the other items above.
 
 ## Gate 5 — Packaging [TODO · BLOCKED on licence decision]
 
