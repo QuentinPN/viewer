@@ -5,7 +5,7 @@ Statut : Accepté (2026-10-28).
 ## Contexte
 `DESIGN.md` décrit l'accueil ainsi : un hero cinématographique, puis « Reprendre », « À suivre », « Ajoutés récemment » et « Favoris ». Jusqu'ici, l'application ouvrait directement la grille de la première bibliothèque. La reprise n'était donc accessible qu'en retrouvant l'élément dans sa bibliothèque.
 
-Ce qui a été observé sur Emby 4.10.1.0 (QNAP), en lecture seule, avec le compte de test, le 2026-10-28 :
+Ce qui a été observé sur Emby 4.10.1.0, en lecture seule, avec le compte de test, le 2026-10-28 :
 - `GET /Users/{UserId}/Items/Resume` renvoie un `QueryResult`. Les éléments sont triés du plus récent au plus ancien, et chacun a son `UserData.PlaybackPositionTicks`. Temps mesuré : 242 ms.
 - `GET /Shows/NextUp?UserId=` renvoie un `QueryResult` d'épisodes (3 ms). La liste est vide sur ce compte, qui n'a aucun épisode vu.
 - `GET /Users/{UserId}/Items/Latest?ParentId=` renvoie un **tableau nu**, pas un `QueryResult`. Les épisodes y sont regroupés par série : chaque série n'apparaît qu'une fois, avec son nombre d'épisodes non vus. Un `ParentId` inconnu donne une erreur **500**, pas une 404. Temps mesuré : 5 à 63 ms à chaud, 2,3 s au premier appel.

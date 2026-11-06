@@ -1,13 +1,13 @@
 // Gate 4 network cuts during an HLS transcode, on the real Emby test account, driven
 // over CDP (ADR 0022). The debug build caps the bitrate (VIEWER_E2E_MAX_BITRATE) so the
 // server transcodes; the app goes through the local proxy (net-proxy.mjs), the PC's
-// network and the NAS are not touched.
+// network and the server are not touched.
 // - a short cut (8 s): the playback goes on past what mpv had read ahead, and no part
 //   of the film is skipped (a lost HLS segment would show as a jump in the position);
 // - a long cut: "Lecture interrompue", no false "watched", the position played reaches
 //   the server once it is back (ADR 0024), and "Reprendre" starts a new transcode there.
 // Short transcodes; writes then clears one resume position. Starts in any state, ends
-// signed out with the direct NAS address as last server.
+// signed out with the direct server address as last server.
 import { launch } from "./app.mjs";
 import { startProxy } from "./net-proxy.mjs";
 import {
@@ -26,7 +26,9 @@ import {
 
 const account = testAccount();
 if (!account.url || /^http:\/\/(127\.0\.0\.1|localhost)/.test(account.url))
-  throw new Error(`VIEWER_EMBY_URL must be the NAS address, got ${account.url}`);
+  throw new Error(
+    `VIEWER_EMBY_URL must be the server address, got ${account.url}`,
+  );
 const { check, shot, finish } = createReport("gate4-hls-cut");
 const proxy = await startProxy(account.url);
 const BLIP_MS = 8000;
@@ -281,7 +283,7 @@ try {
           detail.resume === null && !detail.played,
         );
       }
-      // Leave the direct NAS address as last server.
+      // Leave the direct server address as last server.
       await signOut(page);
       await signIn(
         page,

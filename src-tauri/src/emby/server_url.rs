@@ -127,7 +127,7 @@ mod tests {
             ok(" http://192.168.1.10:8096/ "),
             "http://192.168.1.10:8096"
         );
-        assert_eq!(ok("http://nas.local:8096/emby"), "http://nas.local:8096");
+        assert_eq!(ok("http://emby.local:8096/emby"), "http://emby.local:8096");
         assert_eq!(
             ok("http://192.168.1.10:8096/web/index.html"),
             "http://192.168.1.10:8096"
@@ -155,8 +155,8 @@ mod tests {
             "http://[::1]:8096",
             "http://[fd12::1]",
             "http://localhost:8096",
-            "http://qnap.home.arpa",
-            "http://nas.lan",
+            "http://emby.home.arpa",
+            "http://emby.lan",
         ] {
             assert!(ServerUrl::parse(local).is_ok(), "{local}");
         }

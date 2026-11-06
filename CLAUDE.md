@@ -2,7 +2,7 @@
 
 ## Mission
 
-Build a production-quality Windows 10/11 desktop client for an existing Emby server hosted on a QNAP NAS. Prioritize reliable media playback, responsiveness, accessibility, security, and maintainability. The experience should take inspiration from Infuse without copying proprietary assets or layouts pixel-for-pixel. French is the default UI language.
+Build a production-quality Windows 10/11 desktop client for an existing Emby server hosted on a mini-PC (the media files live on a QNAP NAS). Prioritize reliable media playback, responsiveness, accessibility, security, and maintainability. The experience should take inspiration from Infuse without copying proprietary assets or layouts pixel-for-pixel. French is the default UI language.
 
 ## Source of truth and reading order
 
@@ -21,7 +21,7 @@ At the start of every task, read `PRODUCT.md`, `ARCHITECTURE.md`, `DESIGN.md`, `
 
 1. **Prove playback first.** Before broad UI implementation, build a Windows proof of concept for libmpv rendering, resizing, fullscreen, overlays/focus, keyboard handling, local MKV, HTTP stream, audio, subtitles, hardware decoding and clean teardown. If unavailable in the current environment, mark it BLOCKED/UNVERIFIED, not passed.
 2. **Use verified Emby API contracts.** Inspect current Emby API docs and actual server responses with user permission. Never invent endpoints or claim Direct Play solely from file extension. Negotiate playback using PlaybackInfo, MediaSources, device capabilities and server response.
-3. **Protect secrets.** Store user tokens in OS-backed secure storage; no credentials in git, logs, plain SQLite or URL query strings when a safer supported option exists. Validate TLS. Ask before connecting to the real NAS, altering server configuration, deleting data, or uploading telemetry.
+3. **Protect secrets.** Store user tokens in OS-backed secure storage; no credentials in git, logs, plain SQLite or URL query strings when a safer supported option exists. Validate TLS. Ask before connecting to the real Emby server or the NAS, altering server configuration, deleting data, or uploading telemetry.
 4. **Honest compatibility.** Codec/container/AV1/HEVC/HDR/Dolby Vision/bitstream audio/subtitle support varies by GPU, driver, output path, libmpv build and licensing. Document tested combinations; provide fallbacks and diagnostics.
 5. **Real results.** Do not claim working features, passing tests, measurements, or builds unless executed and evidenced. No dummy production data or empty placeholder modules passed off as complete.
 6. **Quality gates.** For each changed area, run relevant formatting, lint, type checks, tests, and build. Report commands and outcomes. If blocked, give exact reason.

@@ -15,7 +15,7 @@ use crate::player::ExternalSubtitle;
 pub const MAX_STREAMING_BITRATE: u64 = 400_000_000;
 
 /// Text formats a transcode can deliver as separate files instead of burning them
-/// into the picture (burn-in fails on the test NAS, ADR 0009).
+/// into the picture (burn-in fails on the test server, ADR 0009).
 const EXTERNAL_TEXT_SUBTITLES: [&str; 5] = ["ass", "ssa", "subrip", "srt", "vtt"];
 
 /// Query parameters that carry the token in server-built URLs (compared lowercase).

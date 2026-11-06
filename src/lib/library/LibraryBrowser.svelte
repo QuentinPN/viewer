@@ -54,7 +54,7 @@ interface Props {
   onOpenPlayer: () => void;
   /** Sets the session aside and shows the server form. */
   onChangeServer: () => void;
-  /** Every error is reported: a 401 or a lost NAS changes the screen. */
+  /** Every error is reported: a 401 or a lost server changes the screen. */
   onError: (error: EmbyError) => void;
   /** A film or episode started playing: show the player over this view. */
   onPlay: (start: PlaybackStart) => void;

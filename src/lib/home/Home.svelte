@@ -30,7 +30,7 @@ interface Props {
   refresh: number;
   /** Bumped when a favorite changed on a detail page: "Favoris" is read again. */
   favoritesVersion: number;
-  /** Reports the error upward (a lost NAS or a 401 changes the screen) and returns it. */
+  /** Reports the error upward (a lost server or a 401 changes the screen) and returns it. */
   onError: (e: unknown) => EmbyError;
 }
 

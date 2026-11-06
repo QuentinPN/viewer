@@ -10,7 +10,7 @@ ARCHITECTURE.md range `EmbyClient` parmi les services applicatifs sans préciser
 - l'UI ne construit jamais d'URL média.
 
 Serveur réel, vérifié avec l'autorisation de l'utilisateur (lecture seule, compte de test non administrateur) :
-- Emby Server **4.10.1.0** sous Linux (QNAP), joignable en **HTTP uniquement** sur le LAN : le port HTTPS 8920 refuse la connexion.
+- Emby Server **4.10.1.0** sous Linux, joignable en **HTTP uniquement** sur le LAN : le port HTTPS 8920 refuse la connexion.
 - La spec OpenAPI 3.0.1 servie par le serveur (`/emby/openapi.json`) sert de référence de contrat :
   - `POST /Users/AuthenticateByName` prend `{Username, Pw}` et renvoie `{User, SessionInfo, AccessToken, ServerId}` ;
   - l'en-tête `X-Emby-Authorization: Emby Client=…, Device=…, DeviceId=…, Version=…[, Token=…]` est accepté ;
@@ -25,7 +25,7 @@ Serveur réel, vérifié avec l'autorisation de l'utilisateur (lecture seule, co
    - Le même en-tête pourra être passé à mpv (`http-header-fields`, déjà en place depuis la Gate 1).
    - L'UI reçoit des modèles typés sans jeton.
 2. **TLS : `native-tls`** (SChannel). La validation suit le magasin de certificats Windows.
-   - Un certificat QNAP auto-signé n'est accepté que si l'utilisateur l'a approuvé dans Windows.
+   - Un certificat auto-signé n'est accepté que si l'utilisateur l'a approuvé dans Windows.
    - Jamais de désactivation de la vérification.
    - `rustls` a été écarté : le backend par défaut de reqwest 0.13 (aws-lc) exige CMake et NASM, absents du poste.
 3. **Jeton dans le Gestionnaire d'identification Windows** via `keyring` 3 (`windows-native`).
@@ -52,7 +52,7 @@ Serveur réel, vérifié avec l'autorisation de l'utilisateur (lecture seule, co
 
 ## Conséquences
 - Chaque nouvel appel Emby demande une commande Tauri typée. C'est plus de code, mais la surface est contrôlée.
-- Le serveur de l'utilisateur ne propose pas HTTPS. La connexion LAN fonctionne, mais le jeton y circule en clair. C'est un risque accepté sur un réseau domestique, signalé dans l'UI. Un accès distant exigera HTTPS (certificat Let's Encrypt via QNAP ou reverse proxy).
+- Le serveur de l'utilisateur ne propose pas HTTPS. La connexion LAN fonctionne, mais le jeton y circule en clair. C'est un risque accepté sur un réseau domestique, signalé dans l'UI. Un accès distant exigera HTTPS (certificat Let's Encrypt ou reverse proxy).
 - Chaque authentification crée ou met à jour un appareil côté serveur, identifié par le `DeviceId` : c'est un effet visible dans le tableau de bord Emby. La sonde de développement a enregistré l'appareil `viewer-dev-probe`.
 
 ## Validation

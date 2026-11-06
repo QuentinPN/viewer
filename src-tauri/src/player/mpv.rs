@@ -702,9 +702,9 @@ mod tests {
     fn redacts_tokens_in_logs() {
         assert_eq!(
             redact(
-                "Opening https://nas/emby/Videos/1/stream?static=true&api_key=abc123&x=1 failed"
+                "Opening https://emby/emby/Videos/1/stream?static=true&api_key=abc123&x=1 failed"
             ),
-            "Opening https://nas/emby/Videos/1/stream?static=true&api_key=<redacted>&x=1 failed"
+            "Opening https://emby/emby/Videos/1/stream?static=true&api_key=<redacted>&x=1 failed"
         );
         assert_eq!(redact("no secret here"), "no secret here");
         assert_eq!(redact("X-Emby-Token: abc"), "X-Emby-Token: <redacted>");

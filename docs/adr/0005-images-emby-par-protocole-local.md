@@ -18,7 +18,7 @@ Observé sur le serveur réel (Emby 4.10.1.0) :
 - Le gestionnaire du protocole :
   - n'accepte que `/{itemId}/{Primary|Backdrop|Thumb|Logo}` avec `tag` et `maxWidth` (borné à 32–1920) ;
   - relaie la requête vers le serveur de la session ouverte, avec l'en-tête `X-Emby-Authorization` ;
-  - limite à 6 téléchargements simultanés pour ménager le NAS ;
+  - limite à 6 téléchargements simultanés pour ménager le serveur ;
   - refuse les réponses qui ne sont pas des images ou qui dépassent 10 Mo ;
   - répond 401 sans session ouverte.
 - La CSP n'autorise que `http://emby-img.localhost` en plus de `'self'`, `data:` et `blob:` pour `img-src`.

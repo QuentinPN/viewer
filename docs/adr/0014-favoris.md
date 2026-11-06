@@ -16,7 +16,7 @@ La liste vient de `GET /Users/{UserId}/Items` avec `Filters=IsFavorite`.
   - Bascule `aria-pressed`, avec un libellé constant. L'étoile est vide ou pleine, et une infobulle dit « Ajouter aux favoris » ou « Retirer des favoris ».
   - Changement **optimiste** : l'état change au clic, puis prend celui que le serveur renvoie. Si la requête échoue, l'état précédent revient (`src/lib/detail/favorite.ts`).
   - Pendant l'aller-retour, d'autres clics sont ignorés (`aria-disabled`).
-  - Une erreur affiche « Favori non modifié » et remonte comme toutes les autres : un NAS perdu ouvre l'écran de reconnexion, un 401 termine la session.
+  - Une erreur affiche « Favori non modifié » et remonte comme toutes les autres : un serveur perdu ouvre l'écran de reconnexion, un 401 termine la session.
 - **Commandes Tauri** :
   - `emby_set_favorite(item_id, favorite) -> bool` ;
   - `emby_favorites() -> MediaItem[]`.

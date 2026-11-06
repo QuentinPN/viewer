@@ -3,7 +3,7 @@
 Statut : Accepté (2026-11-06). Complète l'ADR 0012.
 
 ## Contexte
-Le scénario `gate4-network` coupe 8 s la connexion de l'application au NAS pendant la lecture d'un film (par le relais local, sans toucher au réseau du PC). Avec le flux curl de mpv, le réseau revient, mais la lecture continue seulement sur ce que mpv avait déjà lu d'avance (≈ 90 s), puis l'application affiche « Lecture interrompue ».
+Le scénario `gate4-network` coupe 8 s la connexion de l'application au serveur pendant la lecture d'un film (par le relais local, sans toucher au réseau du PC). Avec le flux curl de mpv, le réseau revient, mais la lecture continue seulement sur ce que mpv avait déjà lu d'avance (≈ 90 s), puis l'application affiche « Lecture interrompue ».
 
 Deux causes successives :
 - le flux curl de mpv relance ses essais immédiatement et abandonne dans la même milliseconde : une coupure de quelques secondes suffit à arrêter la lecture une minute plus tard ;
@@ -27,7 +27,7 @@ Cette limite est dans le moteur, et non dans `PlayerView.svelte`, pour ne dépen
 
 ## Alternatives
 - **Relancer la lecture côté application** (nouveau `PlaybackInfo` à la position atteinte) : coupure visible, nouvelle session de lecture côté Emby, plus de code. Gardé pour les coupures longues, par « Reprendre ».
-- **Essais sans limite** : un NAS éteint laisserait l'utilisateur devant une image figée sans explication. Rejeté.
+- **Essais sans limite** : un serveur éteint laisserait l'utilisateur devant une image figée sans explication. Rejeté.
 - **Limite dans `PlayerView.svelte`** : perdue avec l'interface actuelle, et sans effet sur le rapport d'arrêt si la vue n'est pas montée. Rejeté.
 - **Compter le temps depuis la coupure** : le lecteur ne voit pas la coupure, seulement ses effets. Tant que le tampon se lit, il n'y a rien à interrompre.
 

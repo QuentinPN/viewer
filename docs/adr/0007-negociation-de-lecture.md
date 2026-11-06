@@ -17,13 +17,13 @@ Constats sur le serveur réel (Emby 4.10.1.0, compte de test, lecture seule ; co
 - Profil d'appareil libmpv : lecture directe des conteneurs et codecs que FFmpeg/libmpv décode, sous-titres intégrés (`Embed`) rendus par mpv. Un profil de transcodage HLS (ts, h264) reste déclaré pour que le serveur indique quand un transcodage serait nécessaire et pourquoi. Débit maximal : 400 Mbit/s, constante tant qu'il n'y a pas de réglage (réseau local).
 - Ordre de choix : Direct Play, puis Direct Stream, puis Transcode, d'après les drapeaux de la source renvoyée par le serveur. L'URL vient toujours du serveur.
 - URL de lecture : chemin relatif sous `/videos/` uniquement, préfixé par l'adresse du serveur (`/emby`). Une URL absolue ou un autre chemin est refusé. Les paramètres porteurs du jeton (`api_key`, `ApiKey`, `X-Emby-Token`, `AccessToken`) sont retirés ; le jeton part dans l'en-tête `X-Emby-Token` (option `http-header-fields` de mpv, déjà masquée dans les journaux).
-- **Le transcodage n'est pas lancé dans cette tranche.** Sans le rapport de fin de lecture (`/Sessions/Playing/Stopped`) et l'arrêt de l'encodage, un ffmpeg resterait actif sur le NAS. La fiche affiche alors « transcodage nécessaire » avec les raisons du serveur. Il arrivera avec le suivi de lecture.
+- **Le transcodage n'est pas lancé dans cette tranche.** Sans le rapport de fin de lecture (`/Sessions/Playing/Stopped`) et l'arrêt de l'encodage, un ffmpeg resterait actif sur le serveur. La fiche affiche alors « transcodage nécessaire » avec les raisons du serveur. Il arrivera avec le suivi de lecture.
 - Erreurs typées : `playbackRefused` (`NotAllowed`, `RateLimitExceeded`), `noCompatibleStream`, `transcodeRequired`.
 
 ## Alternatives
 - **Construire `/Videos/{Id}/stream?static=true` à la main** : marche, mais contourne la décision du serveur (droits de l'utilisateur, limite de débit, sources multiples). Écarté.
 - **Garder `api_key` dans l'URL** : plus simple, mais le jeton apparaîtrait dans les journaux de mpv, le cache HTTP et les diagnostics. Écarté, puisque l'en-tête est accepté.
-- **Profil minimal (h264/aac seulement)** : provoquerait des transcodages inutiles sur un NAS peu puissant alors que libmpv décode presque tout. Écarté.
+- **Profil minimal (h264/aac seulement)** : provoquerait des transcodages inutiles sur le serveur alors que libmpv décode presque tout. Écarté.
 
 ## Conséquences
 - La lecture directe couvre tout le catalogue actuel. Un média qui demande un transcodage n'est pas lisible tant que le suivi de lecture n'existe pas.

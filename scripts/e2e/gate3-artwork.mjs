@@ -2,7 +2,7 @@
 // CDP. Two launches on the same empty cache folder (`VIEWER_E2E_ARTWORK_DIR`, debug
 // builds only, never the user's cache):
 // - first launch: the posters of the films grid are downloaded and kept;
-// - second launch: the same posters come from the disk, the NAS is not asked again.
+// - second launch: the same posters come from the disk, the server is not asked again.
 // Read only on the server (image GETs).
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

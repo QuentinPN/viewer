@@ -21,7 +21,7 @@ export interface CoordinatorDeps {
   clearTimer?: (handle: unknown) => void;
 }
 
-/** Errors of a view that may mean the NAS went away: worth one check. */
+/** Errors of a view that may mean the server went away: worth one check. */
 export function isNetworkError(error: EmbyError): boolean {
   return error.kind === "unreachable" || error.kind === "timeout";
 }

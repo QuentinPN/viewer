@@ -32,7 +32,7 @@ describe("changeFavorite", () => {
 
   it("puts the previous state back and rethrows on failure", async () => {
     const shown: boolean[] = [];
-    const error = { kind: "network", message: "NAS injoignable" };
+    const error = { kind: "network", message: "Serveur injoignable" };
     await expect(
       changeFavorite(
         true,

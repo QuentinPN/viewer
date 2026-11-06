@@ -352,8 +352,8 @@ mod tests {
     #[test]
     fn accepts_http_and_https() {
         assert_eq!(
-            MediaSource::parse("https://nas.local:8920/emby/Videos/1/stream").unwrap(),
-            MediaSource::Http("https://nas.local:8920/emby/Videos/1/stream".into())
+            MediaSource::parse("https://emby.local:8920/emby/Videos/1/stream").unwrap(),
+            MediaSource::Http("https://emby.local:8920/emby/Videos/1/stream".into())
         );
         assert!(matches!(
             MediaSource::parse("HTTP://x/y"),

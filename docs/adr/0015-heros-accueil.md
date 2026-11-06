@@ -41,7 +41,7 @@ Le contrat a été vérifié dans `/emby/openapi.json` d'Emby 4.10.1.0 et sur le
   Le héros est relu à la fin d'une lecture (comme « Reprendre ») et au retour du réseau. Il garde le titre affiché s'il est encore dans la liste.
 
 ## Conséquences
-- Une requête de plus à l'accueil, plus une par série récente du héros. Mesuré sur le NAS : 1,9 s pour 5 titres, dont 3 séries. Le reste de l'accueil ne l'attend pas.
+- Une requête de plus à l'accueil, plus une par série récente du héros. Mesuré sur le serveur : 1,9 s pour 5 titres, dont 3 séries. Le reste de l'accueil ne l'attend pas.
 - `SortBy=DateCreated` date l'ajout de la série, pas celui de son dernier épisode. Une série ancienne qui reçoit un épisode ne remonte pas dans le héros ; elle remonte dans « Ajoutés récemment ».
 - Les épisodes spéciaux (saison 0) : leur place dans l'ordre de `/Shows/{Id}/Episodes` n'a pas été observée sur le serveur réel.
 - Le cache local ne garde pas le héros : Emby reste la source de vérité.

@@ -26,7 +26,7 @@ Le contrat a été vérifié dans `/emby/openapi.json` d'Emby 4.10.1.0 (lecture 
   - un état vide propre aux filtres (« Aucun film ne correspond à ces filtres ») avec « Réinitialiser les filtres ».
 
 ## Alternatives
-- **Trier ou filtrer côté client** : faux dès que toute la bibliothèque n'est pas chargée (707 films sur le NAS de test). Écarté.
+- **Trier ou filtrer côté client** : faux dès que toute la bibliothèque n'est pas chargée (707 films sur le serveur de test). Écarté.
 - **Plusieurs genres à la fois** : Emby les combine avec un « ou », ce qui surprend dans une interface de filtre. Reporté.
 - **Années, décennies, studios, résolution** : utiles mais pas demandés pour cette tranche. Reporté.
 - **Préférences dans SQLite ou côté serveur (`DisplayPreferences`)** : SQLite n'existe pas encore, et le serveur demanderait une écriture. Écarté pour l'instant.

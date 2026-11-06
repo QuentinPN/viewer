@@ -3,7 +3,7 @@
 Statut : Accepté (2026-11-01). Complète l'ADR 0005. Le vidage depuis l'écran Réglages est décrit par l'ADR 0021.
 
 ## Contexte
-Chaque grille, la page d'accueil, le héros et les fiches affichent des dizaines à des centaines d'images. Aujourd'hui, toutes passent par le protocole `emby-img` (ADR 0005), qui les redemande au NAS à chaque lancement de l'application : au plus 6 en parallèle, et rien sans le serveur.
+Chaque grille, la page d'accueil, le héros et les fiches affichent des dizaines à des centaines d'images. Aujourd'hui, toutes passent par le protocole `emby-img` (ADR 0005), qui les redemande au serveur à chaque lancement de l'application : au plus 6 en parallèle, et rien sans le serveur.
 
 L'architecture prévoit un cache local jetable, propre à chaque serveur et borné (ARCHITECTURE, CLAUDE.md). L'URL d'une image porte son `tag` Emby. Quand l'image change sur le serveur, son tag change : une adresse donnée renvoie donc toujours la même image (ADR 0005, `immutable`).
 
@@ -13,7 +13,7 @@ L'architecture prévoit un cache local jetable, propre à chaque serveur et born
   - Le type MIME se reconnaît aux premiers octets (JPEG, PNG, WebP, GIF). Un fichier non reconnu n'est ni servi ni gardé.
 - **Ordre de traitement d'une requête.**
   1. Le contrôle de la session et du serveur (ADR 0012) passe toujours en premier : sans session, ou avec l'image d'un autre serveur, il n'y a ni lecture du cache ni réponse.
-  2. Ensuite vient le cache. Une image trouvée est servie sans attendre une des 6 places réservées au NAS, et même si le NAS ne répond plus pendant une session ouverte.
+  2. Ensuite vient le cache. Une image trouvée est servie sans attendre une des 6 places réservées au serveur, et même si le serveur ne répond plus pendant une session ouverte.
   3. Sinon, l'image est téléchargée comme avant, puis écrite dans le cache.
 - **Écriture.**
   - Le fichier est écrit sous un nom temporaire, puis renommé : une lecture ne voit jamais un fichier à moitié écrit.
@@ -32,7 +32,7 @@ L'architecture prévoit un cache local jetable, propre à chaque serveur et born
 - **Nom de fichier haché** : la bibliothèque standard ne garantit pas la stabilité de son hachage d'une version à l'autre, et une collision servirait une mauvaise image. Les composants de la clé sont déjà validés (lettres, chiffres, `-`, `_`), on les garde tels quels.
 
 ## Conséquences
-- Au deuxième lancement, les images déjà vues ne sollicitent plus le NAS.
+- Au deuxième lancement, les images déjà vues ne sollicitent plus le serveur.
 - Pendant une coupure du serveur, la session restant ouverte, les images déjà vues restent affichées.
 - Jusqu'à 512 Mio sur le disque de l'utilisateur ; il n'y a pas encore de bouton pour vider le cache (écran Réglages, plus tard).
 - Une image remplacée sur le serveur arrive avec un nouveau tag, donc un nouveau fichier ; l'ancien finit supprimé par le quota.

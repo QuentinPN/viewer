@@ -64,7 +64,7 @@ const BACKOFF_SECONDS = [2, 4, 8, 16, 30, 30];
 
 /**
  * Delay before automatic attempt `attempt` (1-based): exponential up to 30 s,
- * with a jitter of 50 to 100 % so clients do not hit a rebooting NAS together.
+ * with a jitter of 50 to 100 % so clients do not hit a rebooting server together.
  */
 export function backoffDelay(attempt: number, random: number): number {
   const index = Math.min(Math.max(attempt, 1), BACKOFF_SECONDS.length) - 1;

@@ -5,7 +5,7 @@ Statut : Accepté (2026-10-28).
 ## Contexte
 La Gate 2 conserve déjà la session (ADR 0004) : jeton dans le Gestionnaire d'identification Windows, métadonnées dans `session.json`, restauration au démarrage, jeton oublié quand le serveur répond 401. Mais tout échec de restauration ramenait au formulaire de connexion, et un serveur éteint, une session révoquée ou une simple erreur 500 se présentaient de la même façon. La Gate 2.1 demande :
 - d'entrer automatiquement quand la session est valide, sans montrer le formulaire pendant la vérification ;
-- des états de connexion explicites, et un écran de récupération quand le NAS est injoignable, sans jamais déconnecter sur une panne passagère ;
+- des états de connexion explicites, et un écran de récupération quand le serveur est injoignable, sans jamais déconnecter sur une panne passagère ;
 - de ne redemander le mot de passe que si le serveur rejette vraiment la session ;
 - de changer de serveur sans détruire la session du précédent, et de pouvoir y revenir ;
 - de retrouver la vue, la sélection et le défilement après une coupure, et de proposer une reprise sûre d'une lecture interrompue.
@@ -50,7 +50,7 @@ En cours de session, seul un 401 met fin à la session. Un 403 ou un 404 sur un 
 
 ### Nouvelles tentatives
 - Délais par requête inchangés : connexion 5 s, requête 15 s.
-- Pas de nouvelle tentative par requête : avec un NAS éteint, chacune coûterait 5 s de plus et multiplierait le temps avant l'écran de récupération.
+- Pas de nouvelle tentative par requête : avec un serveur éteint, chacune coûterait 5 s de plus et multiplierait le temps avant l'écran de récupération.
 - Les nouvelles tentatives sont centralisées dans le coordinateur, sur la seule opération de validation (`GET /System/Info/Public` puis `GET /Users/{Id}`, toutes deux idempotentes) :
   - backoff exponentiel 2 s, 4 s, 8 s, 16 s, 30 s, 30 s, avec un jitter aléatoire de 50 à 100 % du délai ;
   - **6 tentatives automatiques au plus**, puis l'écran l'indique et attend « Réessayer » ;
@@ -82,7 +82,7 @@ En cours de session, seul un 401 met fin à la session. Un 403 ou un 404 sur un 
 - Le focus revient au dernier élément focalisé dans l'application quand un écran de récupération ou de reconnexion se retire.
 
 ## Alternatives
-- **Nouvelles tentatives dans `EmbyClient` pour chaque GET.** Écartée : elles retardent l'écran de récupération de plusieurs fois 5 s quand le NAS est éteint, et multiplient la charge sur un serveur déjà en difficulté.
+- **Nouvelles tentatives dans `EmbyClient` pour chaque GET.** Écartée : elles retardent l'écran de récupération de plusieurs fois 5 s quand le serveur est éteint, et multiplient la charge sur un serveur déjà en difficulté.
 - **Machine à états en Rust, poussée par événements.** Possible, mais les comptes à rebours, le focus et la navigation sont côté interface. Rust garde ce qui touche au jeton : le classement des erreurs, l'époque et le coffre. L'interface garde les transitions et les minuteries, testées par Vitest.
 - **Garder plusieurs sessions actives en même temps.** C'est du multi-serveur (P2 dans `PRODUCT.md`). Ici, une seule session est active, et les autres sont rangées.
 - **`no-store` sur les images au lieu de les préfixer par le serveur.** Écarté : on perdrait le cache HTTP de la WebView.

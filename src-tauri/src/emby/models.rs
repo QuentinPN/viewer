@@ -163,7 +163,7 @@ pub struct BaseItemDto {
     #[serde(default)]
     pub user_data: Option<UserItemData>,
     // Detail fields: `/Users/{Id}/Items/{Id}` returns them without `Fields`; list
-    // endpoints only when asked. `Path` is never read: it is the file path on the NAS.
+    // endpoints only when asked. `Path` is never read: it is the file path on the server.
     #[serde(default)]
     pub original_title: Option<String>,
     #[serde(default)]

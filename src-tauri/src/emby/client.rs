@@ -60,7 +60,7 @@ impl EmbyClient {
         Self::with_timeouts(server, device, CONNECT_TIMEOUT, REQUEST_TIMEOUT)
     }
 
-    /// Same as `new` with other bounds (tests use short ones to simulate a hung NAS).
+    /// Same as `new` with other bounds (tests use short ones to simulate a hung server).
     pub fn with_timeouts(
         server: ServerUrl,
         device: DeviceIdentity,

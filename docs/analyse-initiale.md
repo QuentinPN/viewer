@@ -24,10 +24,10 @@ Relecture de CLAUDE.md, PRODUCT.md, ARCHITECTURE.md, DESIGN.md, ROADMAP.md, TEST
    - servir les images via le `CacheRepository` Rust (protocole personnalisé), ce qui donne le cache disque borné demandé et évite d'élargir la CSP.
 
    Recommandation : la seconde. À valider en Gate 3.
-3. **TLS sur QNAP** : le PRODUCT impose de valider TLS, mais un NAS sert souvent un certificat auto-signé. Il faudra une politique explicite : certificat valide (Let's Encrypt via QNAP), ou épinglage d'empreinte confirmé par l'utilisateur. Jamais de désactivation silencieuse.
+3. **TLS sur le serveur** : le PRODUCT impose de valider TLS, mais un serveur domestique sert souvent un certificat auto-signé. Il faudra une politique explicite : certificat valide (Let's Encrypt), ou épinglage d'empreinte confirmé par l'utilisateur. Jamais de désactivation silencieuse.
 
 ## Informations manquantes (nécessaires pour la Gate 2)
-- Version d'Emby Server, modèle du QNAP, URL LAN et URL distante (HTTPS ? quel certificat ?).
+- Version d'Emby Server, machine hôte, URL LAN et URL distante (HTTPS ? quel certificat ?).
 - Un **compte Emby de test non administrateur** et quelques médias de test représentatifs, idéalement avec plusieurs pistes audio et sous-titres, du HEVC et des sous-titres PGS.
 - Ton autorisation explicite pour interroger le serveur : lecture seule d'abord, puis rapport de progression sur le compte de test.
 - **Licence du projet** : la DLL libmpv utilisée est GPL. Une distribution exigera GPL-3.0 ou une libmpv LGPL compilée par nos soins (ADR 0002).

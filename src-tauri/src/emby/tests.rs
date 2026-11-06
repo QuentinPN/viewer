@@ -325,7 +325,7 @@ const NOT_FOUND_TEXT: &str =
     "L'objet demandé ne peut pas être trouvé. Il a peut-être été récemment supprimé du serveur.";
 
 /// Trimmed `/Users/{Id}/Items/30207` answer: real field names and value shapes,
-/// including the NAS path, which must never reach the UI.
+/// including the server path, which must never reach the UI.
 fn movie_detail() -> String {
     r#"{"Name":"2 Coeurs","OriginalTitle":"2 Hearts","Id":"30207","Type":"Movie",
         "Path":"/share/Films/2 Coeurs (2020)/2 Coeurs.mkv","FileName":"2 Coeurs.mkv",
@@ -836,7 +836,7 @@ fn sign_out_revokes_on_server_and_forgets_locally_even_if_logout_fails() {
 
 #[test]
 fn malformed_or_foreign_server_responses_are_rejected() {
-    let server = FakeEmby::start(Box::new(|_| (200, "<html>NAS</html>".into())));
+    let server = FakeEmby::start(Box::new(|_| (200, "<html>Emby</html>".into())));
     let fx = fixture();
     let err = run(fx.service.probe(&server.url)).unwrap_err();
     assert!(matches!(err, EmbyError::InvalidResponse(_)), "{err:?}");
@@ -1391,14 +1391,14 @@ fn artwork_cache_spares_the_server_and_keeps_its_checks() {
 }
 
 #[test]
-fn movie_detail_maps_metadata_and_tech_info_without_the_nas_path() {
+fn movie_detail_maps_metadata_and_tech_info_without_the_server_path() {
     let (server, fx, _) = signed_in_browser();
     let d = run(fx.service.item_detail("30207")).unwrap();
 
     let req = server.requests().into_iter().last().unwrap();
     assert_eq!(req.path, format!("/emby/Users/{USER_ID}/Items/30207"));
     let json = serde_json::to_string(&d).unwrap();
-    assert!(!json.contains("/share"), "NAS path leaked: {json}");
+    assert!(!json.contains("/share"), "Server path leaked: {json}");
     assert!(!json.contains(&server.url), "server address leaked: {json}");
 
     assert_eq!(d.kind, super::models::DetailKind::Movie);
@@ -1515,7 +1515,7 @@ fn episode_detail_has_series_context_guests_and_neighbours_across_seasons() {
     assert_eq!(d.kind, DetailKind::Episode);
     assert_eq!(d.name, "La Nouvelle Recrue");
     let json = serde_json::to_string(&d).unwrap();
-    assert!(!json.contains("/share"), "NAS path leaked: {json}");
+    assert!(!json.contains("/share"), "Server path leaked: {json}");
 
     let ep = d.episode.as_ref().unwrap();
     assert_eq!(ep.series_id, "80473");
@@ -2781,7 +2781,7 @@ fn real_server_playback_reporting_and_resume() {
 /// Real server, on demand, **writes to the test account** (authorized 2026-10-28,
 /// short sessions): with a 3 Mbit/s limit the server must transcode to HLS. The
 /// playlist, first segment and external subtitles load with the header only, and
-/// the stop report must end the encoding on the NAS. Cleanup: stopped at 0.
+/// the stop report must end the encoding on the server. Cleanup: stopped at 0.
 #[test]
 #[ignore = "needs a real Emby server and credentials in environment variables"]
 fn real_server_transcoding() {
@@ -2856,7 +2856,7 @@ fn real_server_transcoding() {
         }
         sent
     };
-    let transcoding_on_nas = || {
+    let transcoding_on_server = || {
         let url = format!("{server_url}/emby/Sessions?DeviceId={REAL_DEVICE_ID}");
         let sessions: serde_json::Value = run(get(&url).json()).unwrap();
         sessions
@@ -2905,10 +2905,10 @@ fn real_server_transcoding() {
         assert_eq!(res.status().as_u16(), 200);
         let bytes = run(res.bytes()).unwrap();
         println!(
-            "segment 0: {} bytes after {:.1} s, transcoding on the NAS: {}",
+            "segment 0: {} bytes after {:.1} s, transcoding on the server: {}",
             bytes.len(),
             started.elapsed().as_secs_f64(),
-            transcoding_on_nas()
+            transcoding_on_server()
         );
         assert!(
             bytes.len() > 10_000 && bytes[0] == 0x47,
@@ -2932,10 +2932,10 @@ fn real_server_transcoding() {
     let sent = report(&[PlayerEvent::TimePos { seconds: 0.0 }, PlayerEvent::Shutdown]);
     println!("stop: {sent:?}");
     let deadline = Instant::now() + Duration::from_secs(15);
-    let mut still_encoding = transcoding_on_nas();
+    let mut still_encoding = transcoding_on_server();
     while still_encoding && Instant::now() < deadline {
         std::thread::sleep(Duration::from_millis(500));
-        still_encoding = transcoding_on_nas();
+        still_encoding = transcoding_on_server();
     }
     let state = run(service.playback_state(&film.id)).unwrap();
     println!("after stop: encoding {still_encoding}, {state:?}");
@@ -2945,7 +2945,7 @@ fn real_server_transcoding() {
     }
     assert!(
         !still_encoding,
-        "the NAS still transcodes after the stop report"
+        "the server still transcodes after the stop report"
     );
     assert!(!state.played && state.resume.is_none(), "cleanup failed");
 }
@@ -3487,7 +3487,7 @@ fn real_server_search() {
 // --- Gate 2.1: persistent session and reconnection (ADR 0012) ---
 
 /// Points the saved session at another address and restarts the service, e.g. a
-/// NAS that is off at startup.
+/// server that is off at startup.
 fn retarget(fx: Fixture, url: &str) -> Fixture {
     let mut file: SessionFile =
         serde_json::from_str(&std::fs::read_to_string(&fx.path).unwrap()).unwrap();
@@ -3532,7 +3532,7 @@ fn user_answer(status: u16, body: String) -> Route {
 }
 
 #[test]
-fn restore_with_nas_offline_keeps_the_session_and_recovers_later() {
+fn restore_with_server_offline_keeps_the_session_and_recovers_later() {
     let server = FakeEmby::start(emby_like(204));
     let fx = fixture();
     run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
@@ -3548,7 +3548,7 @@ fn restore_with_nas_offline_keeps_the_session_and_recovers_later() {
     assert!(session_file(&fx).reauth.is_none());
     assert!(fx.service.current_user().is_none());
 
-    // The NAS comes back: the same session opens without a password.
+    // The server comes back: the same session opens without a password.
     let fx = retarget(fx, &server.url);
     let user = authenticated(run(fx.service.restore()).unwrap());
     assert_eq!(user.user_id, USER_ID);

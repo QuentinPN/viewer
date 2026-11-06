@@ -146,7 +146,7 @@ pub struct EmbyService {
     device_name: String,
     version: String,
     current: Mutex<Option<Current>>,
-    /// Bounds concurrent artwork downloads to spare the NAS (ADR 0005).
+    /// Bounds concurrent artwork downloads to spare the server (ADR 0005).
     image_permits: tokio::sync::Semaphore,
     /// Sent to PlaybackInfo; the server transcodes files above it (ADR 0009).
     max_streaming_bitrate: u64,

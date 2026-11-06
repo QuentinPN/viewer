@@ -3,7 +3,7 @@
 Statut : Accepté (2026-10-28).
 
 ## Contexte
-PRODUCT.md demande de reprendre une lecture et d'envoyer au serveur le début, la progression et l'arrêt, avec Emby comme seule source de vérité pour la position et le statut « vu ». L'ADR 0007 a reporté le transcodage tant que l'arrêt n'était pas signalé (l'encodage du NAS doit être arrêté).
+PRODUCT.md demande de reprendre une lecture et d'envoyer au serveur le début, la progression et l'arrêt, avec Emby comme seule source de vérité pour la position et le statut « vu ». L'ADR 0007 a reporté le transcodage tant que l'arrêt n'était pas signalé (l'encodage du serveur doit être arrêté).
 
 Contrat lu dans `/emby/openapi.json` (Emby 4.10.1.0) :
 - `POST /Sessions/Playing` (`PlaybackStartInfo`), `POST /Sessions/Playing/Progress` (`PlaybackProgressInfo`), `POST /Sessions/Playing/Stopped` (`PlaybackStopInfo`) ;
@@ -34,4 +34,4 @@ Contrat lu dans `/emby/openapi.json` (Emby 4.10.1.0) :
 ## Conséquences
 - Un processus tué n'envoie pas d'arrêt : le serveur garde la dernière progression et ferme lui-même la session. Après une coupure, le rapport d'arrêt est renvoyé au retour du réseau (ADR 0024).
 - La fermeture de la fenêtre pendant une lecture peut prendre jusqu'à 3 s de plus si le serveur ne répond pas.
-- Le transcodage (ADR 0007) peut maintenant s'appuyer sur l'arrêt pour libérer l'encodage du NAS.
+- Le transcodage (ADR 0007) peut maintenant s'appuyer sur l'arrêt pour libérer l'encodage du serveur.

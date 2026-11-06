@@ -42,7 +42,7 @@ describe("transition", () => {
     ).toEqual({ kind: "signed_out", notice: null });
   });
 
-  it("NAS offline at startup: recovery screen with no app behind", () => {
+  it("Server offline at startup: recovery screen with no app behind", () => {
     const next = transition(
       { kind: "restoring" },
       {
@@ -63,7 +63,7 @@ describe("transition", () => {
     });
   });
 
-  it("NAS offline mid-session keeps the app mounted, refreshes it on return", () => {
+  it("Server offline mid-session keeps the app mounted, refreshes it on return", () => {
     const lost = transition(authenticated, {
       type: "status",
       status: { state: "serverUnreachable", server: saved, error: unreachable },

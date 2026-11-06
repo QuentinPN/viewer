@@ -1,11 +1,11 @@
 // Gate 3 favorites (ADR 0014) on the real Emby test account, driven over CDP. The
 // app signs in through the local proxy (net-proxy.mjs) so a failed change can be
-// simulated without touching the NAS.
+// simulated without touching the server.
 // Read only by default:
 // - the home row "Favoris" matches `emby_favorites` (hidden when empty);
 // - film and series detail pages show a "Favori" toggle with the server state;
-// - NAS cut while toggling: the toggle goes back, "Favori non modifié" is shown,
-//   nothing reaches the NAS; back online, the page shows the server state.
+// - Server cut while toggling: the toggle goes back, "Favori non modifié" is shown,
+//   nothing reaches the server; back online, the page shows the server state.
 // With VIEWER_E2E_FAVORITE_WRITES=1 (writes one favorite, then clears it):
 // - adding shows in the home row, survives a restart, opens from the row;
 // - Space on the toggle removes it, the row follows; the server list ends as before.
@@ -23,11 +23,15 @@ import {
 
 const account = testAccount();
 if (!account.url || /^http:\/\/(127\.0\.0\.1|localhost)/.test(account.url))
-  throw new Error(`VIEWER_EMBY_URL must be the NAS address, got ${account.url}`);
+  throw new Error(
+    `VIEWER_EMBY_URL must be the server address, got ${account.url}`,
+  );
 const writes = process.env.VIEWER_E2E_FAVORITE_WRITES === "1";
 const { check, shot, finish } = createReport("gate3-favorites");
 const proxy = await startProxy(account.url);
-console.log(`proxy ${proxy.url} → NAS; écritures : ${writes ? "oui" : "non"}`);
+console.log(
+  `proxy ${proxy.url} → server; écritures : ${writes ? "oui" : "non"}`,
+);
 
 const invoke = (page, cmd, args = {}) =>
   page.evaluate(
@@ -165,7 +169,7 @@ try {
   );
   await shot(page, "film-detail");
 
-  // 3. NAS cut while toggling: back to the previous state, nothing sent.
+  // 3. Server cut while toggling: back to the previous state, nothing sent.
   const forwarded = proxy.counts.forwarded;
   await proxy.set("down");
   await toggle(page).click();
@@ -176,7 +180,7 @@ try {
   check(
     "failed_change_rolls_back",
     (await pressed(page)) === wasFavorite,
-    `NAS coupé pendant le clic`,
+    `Serveur coupé pendant le clic`,
   );
   check("failed_change_not_sent", proxy.counts.forwarded === forwarded);
   await shot(page, "failed-change");

@@ -1,5 +1,5 @@
 <script lang="ts">
-// Recovery screen (ADR 0012, DESIGN.md "Connexion perdue"): the NAS does not
+// Recovery screen (ADR 0012, DESIGN.md "Connexion perdue"): the server does not
 // answer. The session is kept; automatic attempts follow the coordinator's
 // backoff and the user can retry now or switch server.
 import { onMount } from "svelte";

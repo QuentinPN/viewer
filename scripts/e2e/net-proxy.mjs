@@ -1,13 +1,13 @@
 // Local network proxy for the connection scenarios (ADR 0012): the app signs in
-// through http://127.0.0.1:<port>, and the scenario simulates NAS outages here
-// instead of touching the NAS. Modes:
+// through http://127.0.0.1:<port>, and the scenario simulates server outages here
+// instead of touching the server. Modes:
 // - "up": every connection is forwarded to the target;
 // - "down": the port is closed (connection refused) and open sockets are reset,
-//   like a NAS that is switched off or a cable pulled out;
+//   like a server that is switched off or a cable pulled out;
 // - "blackhole": connections are accepted but nothing is ever answered, like a
-//   NAS that hangs (the app's own timeouts must fire);
+//   server that hangs (the app's own timeouts must fire);
 // - "reject": authenticated requests get 401, like a token revoked on the server.
-//   The public probe still goes through. Nothing reaches the NAS in that mode;
+//   The public probe still goes through. Nothing reaches the server in that mode;
 // - "junk-direct": direct file requests get bytes no player can read, like a file
 //   mpv cannot open (ADR 0023). The rest is forwarded, transcodes included;
 // - "junk-all": HLS playlists too, so that a transcode cannot open either.
@@ -30,7 +30,7 @@ export async function startProxy(targetUrl, port = 0) {
     target.port || (target.protocol === "https:" ? 443 : 80),
   );
   if (target.protocol !== "http:")
-    throw new Error("the proxy only forwards plain HTTP (local NAS)");
+    throw new Error("the proxy only forwards plain HTTP (local server)");
   let mode = "up";
   const sockets = new Set();
   const counts = { forwarded: 0, refused: 0, held: 0, rejected: 0, junk: 0 };

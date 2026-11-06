@@ -1,6 +1,6 @@
 # Viewer
 
-Client Windows 10/11 natif pour un serveur Emby (hébergé sur QNAP). Stack : Tauri 2, Svelte 5 + TypeScript, Rust, libmpv.
+Client Windows 10/11 natif pour un serveur Emby (hébergé sur un mini-PC, médias sur un NAS QNAP). Stack : Tauri 2, Svelte 5 + TypeScript, Rust, libmpv.
 
 **État actuel** (voir `ROADMAP.md`) :
 - Gate 0 (outillage) : validée localement ; la CI n'a encore jamais tourné sur GitHub.

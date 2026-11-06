@@ -6,7 +6,7 @@
 // - "Lire depuis le début": the fallback keeps that choice;
 // - a transcode that cannot open either: an explanation, "Retour", no retry loop.
 // Short sessions; writes then clears one resume position. Starts in any state, ends
-// signed out with the direct NAS address as last server.
+// signed out with the direct server address as last server.
 import { launch } from "./app.mjs";
 import { startProxy } from "./net-proxy.mjs";
 import {
@@ -26,7 +26,9 @@ import {
 
 const account = testAccount();
 if (!account.url || /^http:\/\/(127\.0\.0\.1|localhost)/.test(account.url))
-  throw new Error(`VIEWER_EMBY_URL must be the NAS address, got ${account.url}`);
+  throw new Error(
+    `VIEWER_EMBY_URL must be the server address, got ${account.url}`,
+  );
 const { check, shot, finish } = createReport("gate4-fallback");
 const proxy = await startProxy(account.url);
 const RESUME_AT = 600;
@@ -211,7 +213,7 @@ try {
           detail.resume === null && !detail.played,
         );
       }
-      // Leave the direct NAS address as last server.
+      // Leave the direct server address as last server.
       await signOut(page);
       await signIn(
         page,

@@ -3,13 +3,13 @@
 Statut : Accepté (2026-10-28).
 
 ## Contexte
-L'ADR 0007 a reporté le transcodage : sans rapport d'arrêt, un ffmpeg serait resté actif sur le NAS. L'ADR 0008 a ajouté ce rapport. Il faut maintenant lire ce que le serveur refuse de servir tel quel, par exemple un débit au-delà du plafond, un conteneur ou un codec non pris en charge.
+L'ADR 0007 a reporté le transcodage : sans rapport d'arrêt, un ffmpeg serait resté actif sur le serveur. L'ADR 0008 a ajouté ce rapport. Il faut maintenant lire ce que le serveur refuse de servir tel quel, par exemple un débit au-delà du plafond, un conteneur ou un codec non pris en charge.
 
-Ce qui a été observé sur Emby 4.10.1.0 (QNAP), avec un compte de test, un débit plafonné à 3 Mbit/s et des sessions courtes autorisées le 2026-10-28 :
+Ce qui a été observé sur Emby 4.10.1.0, avec un compte de test, un débit plafonné à 3 Mbit/s et des sessions courtes autorisées le 2026-10-28 :
 - `PlaybackInfo` renvoie `SupportsDirectPlay` et `SupportsDirectStream` à faux. `TranscodingUrl` vaut `/videos/{Id}/master.m3u8?…&api_key=…&TranscodeReasons=ContainerBitrateExceedsLimit`, avec `TranscodingSubProtocol` `hls` et `TranscodingContainer` `ts`.
 - La liste principale renvoie vers une variante `main.m3u8` sans `api_key`. La liste VOD est complète, avec des segments `ts` de 3 s.
 - **Les segments sont servis sans authentification**. Seul le `PlaySessionId` les protège. C'est une propriété du serveur ; le client n'y peut rien.
-- Par défaut, le serveur choisit le sous-titre forcé et l'incruste dans l'image (`SubtitleMethod=Encode`). Sur ce NAS, l'incrustation échoue : libass et fontconfig ne trouvent pas de polices, et ffmpeg renvoie une erreur 500 après environ 15 s. Retirer `SubtitleStreamIndex` ne change rien.
+- Par défaut, le serveur choisit le sous-titre forcé et l'incruste dans l'image (`SubtitleMethod=Encode`). Sur ce serveur, l'incrustation échoue : libass et fontconfig ne trouvent pas de polices, et ffmpeg renvoie une erreur 500 après environ 15 s. Retirer `SubtitleStreamIndex` ne change rien.
 - Avec des `SubtitleProfiles` `External` pour les formats texte, l'incrustation disparaît. Chaque piste reçoit `DeliveryMethod: External` et une `DeliveryUrl` (`/Videos/{Id}/{MediaSourceId}/Subtitles/{Index}/0/Stream.subrip?api_key=…`). Le premier segment arrive en 4 à 6 s (x264 logiciel, 1280×533, AC3 copié).
 - Le **premier** accès à un sous-titre externe peut prendre jusqu'à environ une minute : Emby l'extrait du fichier. Les accès suivants sont immédiats.
 - `POST /Sessions/Playing/Stopped` avec le `PlaySessionId` arrête l'encodage. Ensuite `TranscodingInfo` disparaît de `/Sessions`, et un segment demandé renvoie 404.
@@ -31,13 +31,13 @@ Ce qui a été observé sur Emby 4.10.1.0 (QNAP), avec un compte de test, un dé
 - Pas d'appel à `DELETE /Videos/ActiveEncodings` : le rapport d'arrêt (ADR 0008) suffit, et c'est vérifié sur le serveur réel.
 
 ## Alternatives
-- **Laisser le serveur incruster les sous-titres** : échoue sur ce NAS (pas de polices), et coûte cher en CPU. Écarté pour le texte.
+- **Laisser le serveur incruster les sous-titres** : échoue sur ce serveur (pas de polices), et coûte cher en CPU. Écarté pour le texte.
 - **Désactiver les sous-titres en transcodage** : perd les sous-titres forcés choisis par le serveur. Écarté.
 - **`sub-add` synchrone** : plus simple, mais l'image se fige jusqu'à une minute lors de la première extraction. Écarté.
 - **Réglage de débit visible dans l'UI** : utile plus tard pour l'accès distant, mais il demande une page de réglages. Reporté.
 
 ## Conséquences
-- Les sous-titres image (PGS, VOBSUB) d'un média transcodé restent incrustés par le serveur. C'est non vérifié, et probablement en échec sur ce NAS si l'incrustation passe aussi par libass.
+- Les sous-titres image (PGS, VOBSUB) d'un média transcodé restent incrustés par le serveur. C'est non vérifié, et probablement en échec sur ce serveur si l'incrustation passe aussi par libass.
 - Un sous-titre externe peut apparaître dans le menu jusqu'à une minute après le début de la lecture, la première fois.
 - Les segments HLS sont accessibles sans jeton à qui connaît le `PlaySessionId` : propriété du serveur, sans effet tant que l'accès reste local.
 - Le saut dans un flux transcodé relance l'encodeur à la position demandée : 3,4 s mesurées pour un saut à 10 min.

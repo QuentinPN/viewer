@@ -3,8 +3,8 @@ import type { SavedServer, SignedInUser } from "../emby/types";
 
 export const user: SignedInUser = {
   server: {
-    url: "http://nas:8096",
-    name: "NAS",
+    url: "http://emby:8096",
+    name: "Emby",
     version: "4.10.1.0",
     id: "srv1",
     encrypted: false,
@@ -15,9 +15,9 @@ export const user: SignedInUser = {
 };
 
 export const saved: SavedServer = {
-  url: "http://nas:8096",
+  url: "http://emby:8096",
   id: "srv1",
-  name: "NAS",
+  name: "Emby",
   version: "4.10.1.0",
   encrypted: false,
   userId: "u1",

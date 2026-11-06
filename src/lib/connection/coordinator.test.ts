@@ -78,7 +78,7 @@ describe("ConnectionCoordinator", () => {
     expect(states.some((s) => s.kind === "signed_out")).toBe(false);
   });
 
-  it("NAS offline at startup: backoff, then recovery when it comes back", async () => {
+  it("Server offline at startup: backoff, then recovery when it comes back", async () => {
     const { c, timers, fire } = setup([offline, offline, online]);
     await c.start();
     expect(c.state).toMatchObject({

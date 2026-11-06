@@ -1,7 +1,7 @@
 import type { LibraryKind, MediaItem } from "../emby/types";
 import { formatMinutes } from "../format/duration";
 
-/** Items per request: a few rows on a large window, about 0.2–0.5 s on the NAS. */
+/** Items per request: a few rows on a large window, about 0.2–0.5 s on the server. */
 export const PAGE_SIZE = 60;
 
 /** A page as Rust returns it (`ItemPage`, `EpisodePage`). */

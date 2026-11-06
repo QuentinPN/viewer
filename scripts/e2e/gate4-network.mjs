@@ -1,11 +1,11 @@
 // Gate 4 network interruptions during playback, on the real Emby test account,
 // driven over CDP. The app signs in through the local proxy (net-proxy.mjs); only
-// the app's own connections to the NAS are cut, never the PC's network, and the
-// NAS is not touched.
+// the app's own connections to the server are cut, never the PC's network, and the
+// server is not touched.
 // - a short outage (8 s) while a film plays: the playback must go on, without
 //   "Lecture interrompue", well past what mpv had buffered;
 // Writes then clears one resume position on the test account. Starts in any state,
-// ends signed out with the direct NAS address as last server.
+// ends signed out with the direct server address as last server.
 import { launch } from "./app.mjs";
 import { startProxy } from "./net-proxy.mjs";
 import {
@@ -24,7 +24,9 @@ import {
 
 const account = testAccount();
 if (!account.url || /^http:\/\/(127\.0\.0\.1|localhost)/.test(account.url))
-  throw new Error(`VIEWER_EMBY_URL must be the NAS address, got ${account.url}`);
+  throw new Error(
+    `VIEWER_EMBY_URL must be the server address, got ${account.url}`,
+  );
 const { check, shot, finish } = createReport("gate4-network");
 const proxy = await startProxy(account.url);
 const BLIP_MS = 8000;
@@ -175,7 +177,7 @@ try {
           detail.resume === null && !detail.played,
         );
       }
-      // Leave the direct NAS address as last server.
+      // Leave the direct server address as last server.
       await signOut(page);
       await signIn(
         page,

@@ -1,17 +1,17 @@
 // Gate 2.1 session and reconnection scenario (ADR 0012), driven over CDP. The app
-// signs in through a local proxy (net-proxy.mjs) whose modes simulate the NAS
-// switched off, hanging, or revoking the token; the NAS itself is never touched.
+// signs in through a local proxy (net-proxy.mjs) whose modes simulate the server
+// switched off, hanging, or revoking the token; the server itself is never touched.
 // - restart: the session comes back without the sign-in form;
-// - NAS off at startup: recovery screen, token kept, "Réessayer", automatic return;
-// - NAS hanging at startup: the app's timeout fires, token kept;
-// - NAS lost while browsing: overlay over the app, automatic return, detail page
+// - Server off at startup: recovery screen, token kept, "Réessayer", automatic return;
+// - Server hanging at startup: the app's timeout fires, token kept;
+// - Server lost while browsing: overlay over the app, automatic return, detail page
 //   reloaded and grid scroll kept;
 // - token revoked (401 on every authenticated request): one reauthentication
 //   screen, server and user prefilled, the navigation kept after the password;
 // - "Changer de serveur", then "Revenir à …" without a password;
 // - stream cut during playback: "Lecture interrompue", no false "watched", resume
 //   from the server position, then the position is cleared again.
-// Starts in any state, ends signed out with the direct NAS address as last server.
+// Starts in any state, ends signed out with the direct server address as last server.
 import { spawnSync } from "node:child_process";
 import { launch } from "./app.mjs";
 import { startProxy } from "./net-proxy.mjs";
@@ -31,10 +31,12 @@ import {
 
 const account = testAccount();
 if (!account.url || /^http:\/\/(127\.0\.0\.1|localhost)/.test(account.url))
-  throw new Error(`VIEWER_EMBY_URL must be the NAS address, got ${account.url}`);
+  throw new Error(
+    `VIEWER_EMBY_URL must be the server address, got ${account.url}`,
+  );
 const { check, shot, finish } = createReport("gate21-session");
 const proxy = await startProxy(account.url);
-console.log(`proxy ${proxy.url} → NAS`);
+console.log(`proxy ${proxy.url} → server`);
 
 const lostTitle = (page) => page.locator("#lost-title");
 const invoke = (page, cmd, args = {}) =>
@@ -149,7 +151,7 @@ try {
   await shot(page, "restored");
   check("exit_code_2", (await app.close()) === 0);
 
-  // 2. NAS off at startup.
+  // 2. Server off at startup.
   await proxy.set("down");
   app = await launch();
   page = app.page;
@@ -190,7 +192,7 @@ try {
   check("token_still_kept", vaultEntries() === vaultSignedIn);
   check("exit_code_3", (await app.close()) === 0);
 
-  // 3. NAS hanging at startup: the request timeout must fire.
+  // 3. Server hanging at startup: the request timeout must fire.
   await proxy.set("blackhole");
   app = await launch();
   page = app.page;
@@ -208,7 +210,7 @@ try {
   await page.getByRole("button", { name: "Réessayer" }).click();
   check("hanging_manual_return", (await waitAppUsable(page, 20000)) !== null);
 
-  // 4. NAS lost while browsing.
+  // 4. Server lost while browsing.
   await openLibrary(page, "Films");
   const scroller = page.locator("main.content");
   await scroller.evaluate((el) =>
@@ -410,7 +412,7 @@ try {
   );
   await page.keyboard.press("Escape");
 
-  // 8. Sign out, then leave the direct NAS address as last server.
+  // 8. Sign out, then leave the direct server address as last server.
   await page.getByRole("button", { name: "Se déconnecter" }).click();
   await signInHeading(page).waitFor({ timeout: 15000 });
   check("signed_out_token_deleted", vaultEntries() === vaultBefore);
