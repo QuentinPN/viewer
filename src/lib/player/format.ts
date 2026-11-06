@@ -46,6 +46,26 @@ export function trackLabel(track: Track): string {
   return track.external ? `${base} (externe)` : base;
 }
 
+/**
+ * What the user reads when the player could not open the stream. mpv's own text is
+ * English and technical, so it only follows as a detail.
+ */
+export function openFailure(detail?: string | null): string {
+  const base = "Le lecteur n'a pas pu ouvrir ce fichier.";
+  return detail ? `${base} Détail technique : ${detail}.` : base;
+}
+
+/**
+ * A source that never played and was not already a transcode may be asked again as
+ * a transcode (ADR 0023); one that played, or a transcode, is not retried.
+ */
+export function canFallBack(
+  everPlayed: boolean,
+  method: PlaybackStart["method"],
+): boolean {
+  return !everPlayed && method !== "transcode";
+}
+
 const METHOD_LABELS: Record<PlaybackStart["method"], string> = {
   directPlay: "Lecture directe",
   directStream: "Flux direct",

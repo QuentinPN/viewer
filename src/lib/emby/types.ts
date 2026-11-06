@@ -301,6 +301,8 @@ export type PlayMethod = "directPlay" | "directStream" | "transcode";
 /** A started playback: the method only, never the stream URL or the token. */
 export interface PlaybackStart {
   itemId: string;
+  /** The start asked for: a fallback keeps "Reprendre" or "Lire depuis le début". */
+  resume: boolean;
   method: PlayMethod;
   container: string | null;
   /** Why the server transcodes, in French ("débit trop élevé"); null otherwise. */

@@ -731,6 +731,10 @@ pub struct PlaybackInfoRequest<'a> {
     /// The answer is used to start playback, not only to inspect the item.
     pub is_playback: bool,
     pub auto_open_live_stream: bool,
+    /// Both false asks for a transcode: the fallback when the player could not open
+    /// what the server offered for direct playback (ADR 0023).
+    pub enable_direct_play: bool,
+    pub enable_direct_stream: bool,
 }
 
 /// What the player can play, as Emby's `DeviceProfile` describes it. Comma
@@ -853,6 +857,8 @@ impl PlayMethod {
 #[serde(rename_all = "camelCase")]
 pub struct PlaybackStart {
     pub item_id: String,
+    /// The start asked for: a fallback keeps "Reprendre" or "Lire depuis le début".
+    pub resume: bool,
     pub method: PlayMethod,
     pub container: Option<String>,
     /// Why the server transcodes, in French.

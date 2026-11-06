@@ -1,12 +1,30 @@
 import { describe, expect, it } from "vitest";
 import {
+  canFallBack,
   formatRemaining,
   formatTime,
+  openFailure,
   playbackHeading,
   playMethodLabel,
   trackLabel,
 } from "./format";
 import type { Track } from "./types";
+
+describe("transcode fallback", () => {
+  it("only retries a direct source that never played", () => {
+    expect(canFallBack(false, "directPlay")).toBe(true);
+    expect(canFallBack(false, "directStream")).toBe(true);
+    expect(canFallBack(false, "transcode")).toBe(false);
+    expect(canFallBack(true, "directPlay")).toBe(false);
+  });
+
+  it("explains the failure in French, with the player's detail last", () => {
+    expect(openFailure()).toBe("Le lecteur n'a pas pu ouvrir ce fichier.");
+    expect(openFailure("loading failed")).toBe(
+      "Le lecteur n'a pas pu ouvrir ce fichier. Détail technique : loading failed.",
+    );
+  });
+});
 
 const track = (over: Partial<Track>): Track => ({
   id: 1,

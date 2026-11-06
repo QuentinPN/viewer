@@ -262,6 +262,12 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
                 (200, r#"{"Items":[],"TotalRecordCount":0}"#.into())
             }
             p if p.starts_with("/emby/Shows/") => (404, NOT_FOUND_TEXT.into()),
+            // 30207 honours a refusal of direct play (ADR 0023); 80475 ignores it.
+            "/emby/Items/30207/PlaybackInfo"
+                if r.method == "POST" && r.body.contains("\"EnableDirectPlay\":false") =>
+            {
+                (200, playback_transcode())
+            }
             "/emby/Items/30207/PlaybackInfo" | "/emby/Items/80475/PlaybackInfo"
                 if r.method == "POST" =>
             {
@@ -1720,6 +1726,53 @@ fn playback_transcodes_through_hls_under_the_bitrate_limit() {
     let body: serde_json::Value = serde_json::from_str(&info.body).unwrap();
     assert_eq!(body["MaxStreamingBitrate"], 3_000_000);
     assert_eq!(body["DeviceProfile"]["MaxStreamingBitrate"], 3_000_000);
+}
+
+#[test]
+fn playback_fallback_refuses_direct_play_and_names_the_reason() {
+    use super::models::PlayMethod;
+    let (server, fx, _) = signed_in_browser();
+
+    // A normal negotiation keeps both direct methods allowed.
+    run(fx.service.prepare_playback("30207", false)).unwrap();
+    let first: serde_json::Value = serde_json::from_str(
+        &server
+            .requests()
+            .into_iter()
+            .find(|r| r.path.contains("/PlaybackInfo"))
+            .unwrap()
+            .body,
+    )
+    .unwrap();
+    assert_eq!(first["EnableDirectPlay"], true);
+    assert_eq!(first["EnableDirectStream"], true);
+
+    let (plan, headers) = run(fx.service.prepare_transcode("30207", false)).unwrap();
+    assert_eq!(plan.method, PlayMethod::Transcode);
+    assert_eq!(
+        plan.transcode_reasons.as_deref(),
+        Some("échec de la lecture directe")
+    );
+    assert!(!format!("{plan:?}").contains(TOKEN));
+    assert_eq!(headers, vec![("X-Emby-Token".to_owned(), TOKEN.to_owned())]);
+    let forced: serde_json::Value = serde_json::from_str(
+        &server
+            .requests()
+            .into_iter()
+            .rfind(|r| r.path.contains("/PlaybackInfo"))
+            .unwrap()
+            .body,
+    )
+    .unwrap();
+    assert_eq!(forced["EnableDirectPlay"], false);
+    assert_eq!(forced["EnableDirectStream"], false);
+}
+
+#[test]
+fn playback_fallback_does_not_loop_when_the_server_still_offers_the_file() {
+    let (_server, fx, _) = signed_in_browser();
+    let err = run(fx.service.prepare_transcode("80475", false)).unwrap_err();
+    assert!(matches!(err, EmbyError::NoCompatibleStream), "{err:?}");
 }
 
 #[test]

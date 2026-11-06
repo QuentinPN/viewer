@@ -8,8 +8,10 @@ import { embyApi } from "../emby/api";
 import type { EpisodeLink, PlaybackStart } from "../emby/types";
 import { playerApi } from "./api";
 import {
+  canFallBack,
   formatRemaining,
   formatTime,
+  openFailure,
   playbackHeading,
   playMethodLabel,
   trackLabel,
@@ -51,9 +53,16 @@ interface Props {
    * when it could not start, `null` once the app shows the new playback.
    */
   onPlayNext: (itemId: string) => Promise<string | null>;
+  /**
+   * The direct source did not open (ADR 0023): asks the server for a transcode of
+   * the same item from the same start; resolves with an error message, `null`
+   * once the app shows it.
+   */
+  onFallback: (itemId: string, resume: boolean) => Promise<string | null>;
 }
 
-let { playback, onExit, onInterrupted, onPlayNext }: Props = $props();
+let { playback, onExit, onInterrupted, onPlayNext, onFallback }: Props =
+  $props();
 
 /** Same margin as Rust's early end of file (`EARLY_EOF_TICKS`). */
 const EARLY_EOF_SECONDS = 30;
@@ -64,6 +73,13 @@ const SKIP_SECONDS = 10;
 type Panel = "audio" | "subs" | "info";
 
 let active = $state(false);
+/**
+ * A position was seen, so the file really played: a later failure is an interruption.
+ * `fileLoaded` is not enough, it comes before anything is decoded.
+ */
+let everPlayed = false;
+/** Transcode being requested after the direct source failed to open. */
+let fallingBack = $state(false);
 let paused = $state(false);
 let buffering = $state(false);
 let position = $state(0);
@@ -169,6 +185,7 @@ function onEvent(ev: PlayerEvent) {
       wake();
       break;
     case "timePos":
+      everPlayed = true;
       if (!scrubbing) position = ev.seconds;
       break;
     case "duration":
@@ -186,9 +203,15 @@ function onEvent(ev: PlayerEvent) {
     case "endFile":
       if (interruptedBy(ev.reason)) {
         void close(() => onInterrupted(playback.itemId));
-      } else if (ev.reason === "error")
-        error = `Lecture impossible : ${ev.error ?? "erreur inconnue"}`;
-      else if (ev.reason === "eof") {
+      } else if (ev.reason === "error") {
+        if (canFallBack(everPlayed, playback.method) && !fallingBack)
+          void fallBack(ev.error);
+        else {
+          // Never played: back to the opening screen, which explains and has "Retour".
+          active = false;
+          error = openFailure(ev.error);
+        }
+      } else if (ev.reason === "eof") {
         if (active && nextEpisode) void offerNext();
         else void close();
       }
@@ -217,6 +240,7 @@ onMount(async () => {
     diag = await playerApi.diagnostics();
     if (diag.duration != null) duration = diag.duration;
     if (diag.timePos != null) position = diag.timePos;
+    if (diag.timePos != null) everPlayed = true;
     active = true;
     tracks = await playerApi.tracks();
     await applyVolume();
@@ -251,9 +275,26 @@ function changeVolume(next: VolumeSetting) {
   if (active) void applyVolume();
 }
 
+/** The direct source did not open: same item again, as a transcode (ADR 0023). */
+async function fallBack(detail?: string | null) {
+  fallingBack = true;
+  active = false;
+  everPlayed = false;
+  error = null;
+  position = 0;
+  duration = 0;
+  paused = false;
+  buffering = false;
+  tracks = [];
+  diag = null;
+  const failure = await onFallback(playback.itemId, playback.resume);
+  fallingBack = false;
+  if (failure) error = `${openFailure(detail)} ${failure}`;
+}
+
 /** An error once the file played, or an end of file far from the duration. */
 function interruptedBy(reason: EndReason): boolean {
-  if (!active) return false;
+  if (!everPlayed) return false;
   if (reason === "error") return true;
   return (
     reason === "eof" && duration > 0 && duration - position > EARLY_EOF_SECONDS
@@ -288,6 +329,7 @@ async function playNext() {
   dismissNext();
   launching = next;
   active = false;
+  everPlayed = false;
   error = null;
   position = 0;
   duration = 0;
@@ -471,6 +513,10 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
       <h1>{heading.name}</h1>
       {#if error}
         <p class="error" role="alert">{error}</p>
+      {:else if fallingBack}
+        <p class="muted" role="status">
+          Lecture directe impossible, passage au transcodage…
+        </p>
       {:else}
         <p class="muted" role="status">Ouverture du flux…</p>
       {/if}

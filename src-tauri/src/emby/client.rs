@@ -560,6 +560,7 @@ impl EmbyClient {
         user_id: &str,
         item_id: &str,
         profile: &DeviceProfile,
+        force_transcode: bool,
     ) -> Result<PlaybackInfoResponse, EmbyError> {
         self.require_token()?;
         let url = self
@@ -572,6 +573,8 @@ impl EmbyClient {
             device_profile: profile,
             is_playback: true,
             auto_open_live_stream: false,
+            enable_direct_play: !force_transcode,
+            enable_direct_stream: !force_transcode,
         };
         let res = self
             .request_url(Method::POST, &url, &[("UserId", user_id)])

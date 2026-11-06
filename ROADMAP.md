@@ -92,12 +92,13 @@ Home, film/series browsing, details, search, accessible player UI, responsive la
 - DROPPED (user decision, 2026-10-28): search of people.
 - Known input: the control bar hides subtitles at narrow widths (Gate 1 finding); views must provide an opaque background when no video plays (transparent window).
 
-## Gate 4 — End-to-end quality [IN PROGRESS · stream reconnection and stall limit VERIFIED]
+## Gate 4 — End-to-end quality [IN PROGRESS · stream reconnection, stall limit and transcode fallback VERIFIED]
 
 Verify real server resume/watched state, unsupported format fallback, network interruptions, performance and security reviews.
 
 - VERIFIED (2026-11-06): stream reconnection and stall limit (ADR 0022) through the local proxy, `docs/evidence/gate4-reseau-2026-11-06.md`.
-- NOT VERIFIED: a cut during an HLS transcode, a real network cut.
+- VERIFIED (2026-11-06): transcode fallback when the direct source does not open (ADR 0023), on the real server with unreadable bytes from the local proxy, `docs/evidence/gate4-repli-2026-11-06.md`.
+- NOT VERIFIED: a cut during an HLS transcode, a real network cut, a real file mpv cannot read, a file whose video alone is unreadable.
 - TODO: the other items above.
 
 ## Gate 5 — Packaging [TODO · BLOCKED on licence decision]
@@ -340,3 +341,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Not verified**: a cut during an HLS transcode, a real network cut (the local proxy only), a very slow transcode close to the limit.
 - **Decided**: stay on Tauri; a native egui rewrite was considered and dropped by the user (2026-11-06), no measured problem justifies it.
 - **Next**: Gate 4 remaining items.
+
+### 2026-11-06 — Transcode fallback
+
+- **Changed**: ADR 0023; `prepare_transcode` asks `PlaybackInfo` with `EnableDirectPlay` and `EnableDirectStream` false, and refuses a server that still offers the file; `emby_play` takes `transcodeFallback` and returns `resume`; `PlayerView` retries once as a transcode when a direct source ends in error before any position; French message for a failed open, mpv's text as a detail; scenario `scripts/e2e/gate4-fallback.mjs`, proxy modes `junk-direct` and `junk-all`.
+- **Tests**: `gate4-fallback` 14/14, `gate21-session` 44/44, `gate4-network` 4/4, `gate2-play` 13/13, `gate3-player` 34/34, `gate2-transcode` 10/10, `npm run verify` exit 0 (`cargo test` 100 passed, 14 ignored). Details in `docs/evidence/gate4-repli-2026-11-06.md`.
+- **Found**: `active` was true as soon as the engine answered, so a failed open could pass for an interruption; `fileLoaded` comes before decoding, so only a position proves the file played. The fallback must also keep "Lire depuis le début", hence `resume` in `PlaybackStart`.
+- **Not verified**: a real file mpv cannot read (unreadable bytes from the proxy only), a file whose video alone is unreadable (probably plays audio with no fallback), an error between `fileLoaded` and the first position, the next-episode path (`gate3-upnext` not rerun, it marks items played).
+- **Next**: Gate 4 remaining items: a cut during an HLS transcode, security review, performance measurements.

@@ -78,10 +78,13 @@ export const embyApi = {
     }),
   /**
    * Negotiates with the server and starts the player (ADR 0007). With `resume`,
-   * starts where the server says the user stopped (ADR 0008).
+   * starts where the server says the user stopped (ADR 0008). With
+   * `transcodeFallback`, direct play is refused to the server, which then
+   * transcodes: the way out when the player could not open the direct source
+   * (ADR 0023).
    */
-  play: (itemId: string, resume: boolean) =>
-    invoke<PlaybackStart>("emby_play", { itemId, resume }),
+  play: (itemId: string, resume: boolean, transcodeFallback = false) =>
+    invoke<PlaybackStart>("emby_play", { itemId, resume, transcodeFallback }),
   /** `null` when the app has no artwork cache directory. */
   artworkStats: () => invoke<ArtworkCacheStats | null>("artwork_cache_stats"),
   /** Empties the artwork cache of every server (ADR 0021). */

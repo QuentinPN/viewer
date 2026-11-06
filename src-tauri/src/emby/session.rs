@@ -16,7 +16,7 @@ use super::images::{self, ImageRequest, ImageType};
 use super::models::{
     BaseItemDto, CastMember, DetailKind, Episode, EpisodeContext, EpisodeLink, EpisodePage,
     HeroEpisode, HeroItem, HeroReason, ImageRef, ItemDetail, ItemPage, ItemsOptions, Library,
-    LibraryKind, MediaInfo, MediaItem, MediaSourceDto, MediaStreamDto, PlaybackStopped,
+    LibraryKind, MediaInfo, MediaItem, MediaSourceDto, MediaStreamDto, PlayMethod, PlaybackStopped,
     PlaybackTitle, ResumePoint, SavedServer, SearchResults, Season, ServerSummary, SessionStatus,
     SignedInUser, StreamInfo, UserItemData, VideoInfo, WatchItem, WatchKind, is_usable_genre,
 };
@@ -738,14 +738,42 @@ impl EmbyService {
         item_id: &str,
         resume: bool,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
+        self.negotiate(item_id, resume, false).await
+    }
+
+    /// Same as `prepare_playback`, for when the player could not open the direct
+    /// source: Direct Play and Direct Stream are refused to the server so it
+    /// transcodes (ADR 0023). A server that still offers the file as is gives
+    /// `NoCompatibleStream`, so the fallback never loops on the same source.
+    pub async fn prepare_transcode(
+        &self,
+        item_id: &str,
+        resume: bool,
+    ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
+        self.negotiate(item_id, resume, true).await
+    }
+
+    async fn negotiate(
+        &self,
+        item_id: &str,
+        resume: bool,
+        force_transcode: bool,
+    ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
         let (client, user_id) = self.session()?;
         let profile = playback::device_profile(self.max_streaming_bitrate);
         let (info, item) = tokio::join!(
-            client.playback_info(&user_id, item_id, &profile),
+            client.playback_info(&user_id, item_id, &profile, force_transcode),
             client.item(&user_id, item_id)
         );
         let response = self.expire_on_401(&client, info)?;
         let mut plan = playback::plan(client.server(), response)?;
+        if force_transcode && plan.method != PlayMethod::Transcode {
+            return Err(EmbyError::NoCompatibleStream);
+        }
+        if force_transcode {
+            // The server only knows we refused; the real reason is the player's.
+            plan.transcode_reasons = Some("échec de la lecture directe".into());
+        }
         let item = match self.expire_on_401(&client, item) {
             Ok(dto) if dto.id == item_id => Some(dto),
             Ok(_) if resume => {

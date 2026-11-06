@@ -293,8 +293,13 @@ pub async fn emby_play(
     emby: State<'_, EmbyService>,
     item_id: String,
     resume: bool,
+    transcode_fallback: Option<bool>,
 ) -> Result<PlaybackStart, EmbyError> {
-    let (plan, http_headers) = emby.prepare_playback(&item_id, resume).await?;
+    let (plan, http_headers) = if transcode_fallback == Some(true) {
+        emby.prepare_transcode(&item_id, resume).await?
+    } else {
+        emby.prepare_playback(&item_id, resume).await?
+    };
     let start_seconds = (plan.start_ticks > 0).then(|| plan.start_ticks as f64 / 10_000_000.0);
     state.reporter.begin(ActivePlayback::new(&item_id, &plan));
     let request = PlaybackRequest {
@@ -316,6 +321,7 @@ pub async fn emby_play(
         .map_err(player)?;
     Ok(PlaybackStart {
         item_id,
+        resume,
         method: plan.method,
         container: plan.container,
         transcode_reasons: plan.transcode_reasons,

@@ -103,6 +103,25 @@ async function playNext(itemId: string): Promise<string | null> {
   }
 }
 
+/**
+ * The player could not open the direct source (ADR 0023): the same item again, with
+ * direct play refused so the server transcodes. Like `playNext`, the player stays open.
+ */
+async function playTranscoded(
+  itemId: string,
+  resume: boolean,
+): Promise<string | null> {
+  if (!appActive) return "La session n'est pas disponible.";
+  try {
+    playing = await embyApi.play(itemId, resume, true);
+    return null;
+  } catch (e) {
+    const error = toEmbyError(e);
+    void coordinator.report(error);
+    return error.message;
+  }
+}
+
 async function resumeInterrupted() {
   if (!interrupted || resuming) return;
   resuming = true;
@@ -206,6 +225,7 @@ async function signOut() {
         onExit={stopPlaying}
         onInterrupted={playbackInterrupted}
         onPlayNext={playNext}
+        onFallback={playTranscoded}
       />
     {/if}
   {/if}

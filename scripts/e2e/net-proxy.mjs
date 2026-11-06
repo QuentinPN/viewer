@@ -7,8 +7,22 @@
 // - "blackhole": connections are accepted but nothing is ever answered, like a
 //   NAS that hangs (the app's own timeouts must fire);
 // - "reject": authenticated requests get 401, like a token revoked on the server.
-//   The public probe still goes through. Nothing reaches the NAS in that mode.
+//   The public probe still goes through. Nothing reaches the NAS in that mode;
+// - "junk-direct": direct file requests get bytes no player can read, like a file
+//   mpv cannot open (ADR 0023). The rest is forwarded, transcodes included;
+// - "junk-all": HLS playlists too, so that a transcode cannot open either.
+import { randomBytes } from "node:crypto";
 import net from "node:net";
+
+const DIRECT_FILE = /^GET \S*\/videos\/\S+\/original\.\S* HTTP/i;
+const HLS_PLAYLIST = /^GET \S*\/videos\/\S+\.m3u8\S* HTTP/i;
+const JUNK = randomBytes(256 * 1024);
+const JUNK_RESPONSE = Buffer.concat([
+  Buffer.from(
+    `HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: ${JUNK.length}\r\nConnection: close\r\n\r\n`,
+  ),
+  JUNK,
+]);
 
 export async function startProxy(targetUrl, port = 0) {
   const target = new URL(targetUrl);
@@ -19,7 +33,7 @@ export async function startProxy(targetUrl, port = 0) {
     throw new Error("the proxy only forwards plain HTTP (local NAS)");
   let mode = "up";
   const sockets = new Set();
-  const counts = { forwarded: 0, refused: 0, held: 0, rejected: 0 };
+  const counts = { forwarded: 0, refused: 0, held: 0, rejected: 0, junk: 0 };
 
   const server = net.createServer((client) => {
     sockets.add(client);
@@ -32,6 +46,10 @@ export async function startProxy(targetUrl, port = 0) {
     }
     if (mode === "reject") {
       rejectAuthenticated(client);
+      return;
+    }
+    if (mode === "junk-direct" || mode === "junk-all") {
+      serveJunk(client, mode === "junk-all");
       return;
     }
     counts.forwarded += 1;
@@ -62,6 +80,29 @@ export async function startProxy(targetUrl, port = 0) {
         client.end(
           "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         );
+        return;
+      }
+      if (!upstream) {
+        counts.forwarded += 1;
+        upstream = net.connect(targetPort, target.hostname);
+        sockets.add(upstream);
+        upstream.on("close", () => sockets.delete(upstream));
+        upstream.on("error", () => client.destroy());
+        upstream.pipe(client);
+      }
+      upstream.write(chunk);
+    });
+  }
+
+  /** Same inspection as `rejectAuthenticated`, on the request line. */
+  function serveJunk(client, playlistsToo) {
+    let upstream = null;
+    client.on("data", (chunk) => {
+      const line = chunk.toString("latin1").split("\r\n", 1)[0];
+      if (DIRECT_FILE.test(line) || (playlistsToo && HLS_PLAYLIST.test(line))) {
+        counts.junk += 1;
+        upstream?.destroy();
+        client.end(JUNK_RESPONSE);
         return;
       }
       if (!upstream) {
