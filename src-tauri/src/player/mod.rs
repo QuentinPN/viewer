@@ -4,6 +4,8 @@
 mod ffi;
 pub mod mpv;
 
+use std::time::{Duration, Instant};
+
 use serde::{Deserialize, Serialize};
 
 /// What to play. Built by the coordinator, never by the Svelte UI directly.
@@ -214,6 +216,64 @@ impl Serialize for PlayerError {
     }
 }
 
+/// How long a loaded file may stay unpaused with its position frozen before the
+/// playback counts as interrupted (ADR 0022).
+pub const STALL_LIMIT: Duration = Duration::from_secs(30);
+
+/// Pure watch over the player events: the position must move while playing. Time is
+/// passed in. FFmpeg retries at each read of the demuxer, so a stream that stays
+/// dead never reaches an end of file by itself (ADR 0022).
+#[derive(Debug)]
+pub struct StallWatch {
+    limit: Duration,
+    armed: bool,
+    paused: bool,
+    position: Option<f64>,
+    last_progress: Instant,
+}
+
+impl StallWatch {
+    pub fn new(limit: Duration, now: Instant) -> Self {
+        Self {
+            limit,
+            armed: false,
+            paused: false,
+            position: None,
+            last_progress: now,
+        }
+    }
+
+    pub fn on_event(&mut self, event: &PlayerEvent, now: Instant) {
+        match event {
+            PlayerEvent::FileLoaded => {
+                self.armed = true;
+                self.position = None;
+                self.last_progress = now;
+            }
+            PlayerEvent::TimePos { seconds } if self.position != Some(*seconds) => {
+                self.position = Some(*seconds);
+                self.last_progress = now;
+            }
+            PlayerEvent::Paused { paused } => {
+                self.paused = *paused;
+                self.last_progress = now;
+            }
+            PlayerEvent::EndFile { .. } | PlayerEvent::Shutdown => self.armed = false,
+            _ => {}
+        }
+    }
+
+    /// True once when the limit is reached; silent until the next file loads.
+    pub fn expired(&mut self, now: Instant) -> bool {
+        let expired =
+            self.armed && !self.paused && now.duration_since(self.last_progress) >= self.limit;
+        if expired {
+            self.armed = false;
+        }
+        expired
+    }
+}
+
 /// Native playback engine contract. Implementations must release every native
 /// resource on `shutdown` and on drop, including after errors.
 pub trait PlayerEngine: Send + Sync {
@@ -227,6 +287,67 @@ pub trait PlayerEngine: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const LIMIT: Duration = Duration::from_secs(30);
+
+    fn at(start: Instant, seconds: u64) -> Instant {
+        start + Duration::from_secs(seconds)
+    }
+
+    fn loaded(start: Instant) -> StallWatch {
+        let mut watch = StallWatch::new(LIMIT, start);
+        watch.on_event(&PlayerEvent::FileLoaded, start);
+        watch
+    }
+
+    #[test]
+    fn stall_expires_once_when_the_position_freezes() {
+        let start = Instant::now();
+        let mut watch = loaded(start);
+        watch.on_event(&PlayerEvent::TimePos { seconds: 1.0 }, at(start, 10));
+        assert!(!watch.expired(at(start, 39)));
+        assert!(watch.expired(at(start, 40)));
+        assert!(!watch.expired(at(start, 80)), "reported once");
+    }
+
+    #[test]
+    fn stall_ignores_a_repeated_position() {
+        let start = Instant::now();
+        let mut watch = loaded(start);
+        watch.on_event(&PlayerEvent::TimePos { seconds: 1.0 }, at(start, 10));
+        watch.on_event(&PlayerEvent::TimePos { seconds: 1.0 }, at(start, 35));
+        assert!(watch.expired(at(start, 40)));
+    }
+
+    #[test]
+    fn stall_waits_for_a_file_and_stops_with_it() {
+        let start = Instant::now();
+        let mut watch = StallWatch::new(LIMIT, start);
+        assert!(!watch.expired(at(start, 60)), "nothing loaded yet");
+        watch.on_event(&PlayerEvent::FileLoaded, at(start, 60));
+        assert!(!watch.expired(at(start, 89)), "loading does not count");
+        watch.on_event(
+            &PlayerEvent::EndFile {
+                reason: EndReason::Eof,
+                error: None,
+            },
+            at(start, 70),
+        );
+        assert!(!watch.expired(at(start, 200)), "end of file");
+        watch.on_event(&PlayerEvent::FileLoaded, at(start, 200));
+        assert!(watch.expired(at(start, 230)), "next file watched again");
+    }
+
+    #[test]
+    fn stall_does_not_count_a_user_pause() {
+        let start = Instant::now();
+        let mut watch = loaded(start);
+        watch.on_event(&PlayerEvent::Paused { paused: true }, at(start, 10));
+        assert!(!watch.expired(at(start, 500)));
+        watch.on_event(&PlayerEvent::Paused { paused: false }, at(start, 500));
+        assert!(!watch.expired(at(start, 529)), "counted from the unpause");
+        assert!(watch.expired(at(start, 530)));
+    }
 
     #[test]
     fn accepts_http_and_https() {

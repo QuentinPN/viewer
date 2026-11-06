@@ -10,11 +10,12 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
+use std::time::Instant;
 
 use super::ffi::{self, MpvApi, MpvHandle};
 use super::{
     EndReason, ExternalSubtitle, MediaSource, PlaybackRequest, PlayerCommand, PlayerDiagnostics,
-    PlayerEngine, PlayerError, PlayerEvent, Track, TrackKind,
+    PlayerEngine, PlayerError, PlayerEvent, STALL_LIMIT, StallWatch, Track, TrackKind,
 };
 
 pub type EventSink = Box<dyn Fn(PlayerEvent) + Send + Sync>;
@@ -50,6 +51,18 @@ struct RawHandle(*mut MpvHandle);
 unsafe impl Send for RawHandle {}
 // SAFETY: see above.
 unsafe impl Sync for RawHandle {}
+
+/// FFmpeg HTTP options: after a network error or an early end of stream, waits
+/// 0, 1, 3 then 7 s before each new try; the next delay (15 s) is past
+/// `reconnect_delay_max`, so it gives up there. HTTP errors such as 401 are not
+/// retried (ADR 0022).
+const STREAM_RECONNECT: &str =
+    "reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=7";
+
+/// Seconds a connection or a read may hang before FFmpeg counts it as failed. mpv
+/// reads again after a failure, so a stream that stays dead is ended by
+/// [`StallWatch`], not by these options (ADR 0022).
+const NETWORK_TIMEOUT: &str = "15";
 
 struct Inner {
     api: MpvApi,
@@ -159,6 +172,8 @@ const OBS_TRACKS: u64 = 5;
 const OBS_EOF: u64 = 6;
 /// Reply id of the asynchronous `sub-add` commands.
 const REPLY_SUBTITLE: u64 = 1;
+/// Reply id of the `stop` sent when a stream stalls.
+const REPLY_STALL_STOP: u64 = 2;
 
 impl MpvEngine {
     /// Loads libmpv, configures and initialises a player instance, and starts the
@@ -237,6 +252,12 @@ impl MpvEngine {
             ("idle", "yes"),
             ("keep-open", "yes"),
             ("hwdec", config.hwdec.as_str()),
+            // HTTP through FFmpeg rather than the curl stream, whose retries are
+            // immediate and give up within the same millisecond: FFmpeg reopens
+            // the stream after a short network outage (ADR 0022).
+            ("curl-enabled", "no"),
+            ("stream-lavf-o", STREAM_RECONNECT),
+            ("network-timeout", NETWORK_TIMEOUT),
         ] {
             inner.set_option(k, v)?;
         }
@@ -518,20 +539,47 @@ fn add_pending_subtitles(inner: &Inner) {
     }
 }
 
+/// Feeds the watch, then the sink.
+fn emit(stall: &mut StallWatch, sink: &EventSink, event: PlayerEvent) {
+    stall.on_event(&event, Instant::now());
+    sink(event);
+}
+
+/// The playback ends on an error, which follows the path of any failure (stop report
+/// with the last position, "Lecture interrompue"), and mpv stops its retries.
+fn end_stalled(inner: &Inner, sink: &EventSink) {
+    log::warn!(
+        "position figée depuis {} s : lecture interrompue",
+        STALL_LIMIT.as_secs()
+    );
+    sink(PlayerEvent::EndFile {
+        reason: EndReason::Error,
+        error: Some("le flux ne répond plus".into()),
+    });
+    // Asynchronous: this thread must keep draining events while mpv cancels the read.
+    if let Err(e) = inner.command_async(REPLY_STALL_STOP, &["stop"]) {
+        log::warn!("arrêt après blocage du flux : {e}");
+    }
+}
+
 fn event_loop(inner: &Inner, stop: &AtomicBool, sink: &EventSink) {
+    let mut stall = StallWatch::new(STALL_LIMIT, Instant::now());
     while !stop.load(Ordering::SeqCst) {
+        if stall.expired(Instant::now()) {
+            end_stalled(inner, sink);
+        }
         // SAFETY: only this thread calls mpv_wait_event; the returned event is
         // valid until the next call, and we copy everything out before looping.
         let event = unsafe { &*(inner.api.wait_event)(inner.h(), 0.5) };
         match event.event_id {
             ffi::MPV_EVENT_NONE => {}
             ffi::MPV_EVENT_SHUTDOWN => {
-                sink(PlayerEvent::Shutdown);
+                emit(&mut stall, sink, PlayerEvent::Shutdown);
                 break;
             }
             ffi::MPV_EVENT_FILE_LOADED => {
                 add_pending_subtitles(inner);
-                sink(PlayerEvent::FileLoaded);
+                emit(&mut stall, sink, PlayerEvent::FileLoaded);
             }
             ffi::MPV_EVENT_COMMAND_REPLY
                 if event.reply_userdata == REPLY_SUBTITLE && event.error < 0 =>
@@ -561,7 +609,7 @@ fn event_loop(inner: &Inner, stop: &AtomicBool, sink: &EventSink) {
                         .to_string_lossy()
                         .into_owned()
                 });
-                sink(PlayerEvent::EndFile { reason, error });
+                emit(&mut stall, sink, PlayerEvent::EndFile { reason, error });
             }
             ffi::MPV_EVENT_LOG_MESSAGE => {
                 // SAFETY: data points to mpv_event_log_message for this event id.
@@ -579,7 +627,7 @@ fn event_loop(inner: &Inner, stop: &AtomicBool, sink: &EventSink) {
                 // SAFETY: data points to mpv_event_property for this event id.
                 let prop = unsafe { &*event.data.cast::<ffi::MpvEventProperty>() };
                 if let Some(ev) = map_property(event.reply_userdata, prop) {
-                    sink(ev);
+                    emit(&mut stall, sink, ev);
                 }
             }
             _ => {}
@@ -715,6 +763,18 @@ mod tests {
             }),
         )
         .expect("engine");
+        assert_eq!(
+            engine.property("stream-lavf-o").as_deref(),
+            Some(STREAM_RECONNECT),
+            "reconnect options kept by mpv"
+        );
+        assert_eq!(engine.property("curl-enabled").as_deref(), Some("no"));
+        assert_eq!(
+            engine
+                .property("network-timeout")
+                .map(|t| t.parse::<f64>().ok()),
+            Some(NETWORK_TIMEOUT.parse::<f64>().ok())
+        );
 
         // External subtitle queued like `load` does, added on FILE_LOADED.
         let srt = std::env::temp_dir().join(format!("viewer-test-{}.srt", std::process::id()));

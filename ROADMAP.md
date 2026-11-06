@@ -327,3 +327,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Measured** (debug build, LAN): home complete ≈ 670 ms after process start, ≈ 440 ms of it before the page runs; commands 9–56 ms median. Details in `docs/evidence/mesure-demarrage-2026-11-01.md`.
 - **Decided**: no SQLite metadata cache for now — it could save only ≈ 100 ms on the LAN, for a dependency, a schema, migrations and invalidation. Reconsider for remote access or if offline metadata (post-MVP in PRODUCT.md) is asked for.
 - **Next**: Gate 4 — network interruptions and unsupported format fallback on the real server.
+
+### 2026-11-06 — Stream reconnection and stall limit
+
+- **Changed**: ADR 0022; `curl-enabled=no`, `stream-lavf-o` reconnect options and `network-timeout=15` in `MpvEngine`; pure `StallWatch` in `src-tauri/src/player/mod.rs`, fed by the event thread: a loaded, unpaused file whose position stays frozen 30 s ends as `EndFile { reason: Error }` and mpv stops retrying; scenario `scripts/e2e/gate4-network.mjs`.
+- **Tests**: `gate4-network` 4/4, `gate21-session` 44/44, `gate2-play` 13/13, `gate3-player` 34/34, `gate2-transcode` 10/10 (HLS still plays with `curl-enabled=no`), `npm run verify` exit 0 (`cargo test` 98 passed, 14 ignored). Details in `docs/evidence/gate4-reseau-2026-11-06.md`.
+- **Found**: with FFmpeg's reconnection, a dead stream never reaches an end of file, so the UI had no signal; the limit lives in the engine so it survives the native migration.
+- **Not verified**: a cut during an HLS transcode, a real network cut (the local proxy only), a very slow transcode close to the limit.
+- **Next**: native migration, steps 1 and 2 (`docs/migration/`).
