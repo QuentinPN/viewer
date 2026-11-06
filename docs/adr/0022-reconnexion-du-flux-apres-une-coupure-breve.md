@@ -19,11 +19,11 @@ Deux causes successives :
   - `reconnect_delay_max=7` : FFmpeg attend 0, 1, 3 puis 7 s entre les essais, puis rend la main (le délai suivant, 15 s, dépasse le seuil). mpv lit à nouveau, et le cycle recommence tant que le réseau est coupé.
 - `network-timeout=15` : au lieu de 60 s par défaut, pour qu'une connexion qui ne répond plus entre vite dans ce cycle.
 
-Une erreur HTTP (401, 404, 500) n'est pas relancée : `reconnect_on_http_error` reste vide. Un jeton révoqué suit donc toujours le chemin de réauthentification.
+Une erreur HTTP (401, 404, 500) n'est pas relancée : `reconnect_on_http_error` reste vide. Un jeton révoqué suit donc toujours le chemin de réauthentification. Cela vaut pour un fichier ; dans une liste HLS, FFmpeg saute le segment en erreur et passe au suivant (ADR 0027).
 
 **Limite d'attente, dans le moteur Rust** (`StallWatch`, `src-tauri/src/player/mod.rs`, alimenté par le fil d'événements de `MpvEngine`). Si un fichier chargé reste 30 s sans pause de l'utilisateur et sans que sa position bouge, le moteur émet `EndFile { reason: Error }` et demande à mpv d'arrêter ses essais. Cet événement suit le chemin existant de l'ADR 0012 : rapport d'arrêt à la dernière position, « Lecture interrompue », « Reprendre ».
 
-Cette limite est dans le moteur, et non dans `PlayerView.svelte`, pour ne dépendre d'aucune interface. Le critère est l'absence de progression, pas `paused-for-cache` : il couvre aussi un saut qui n'aboutit jamais.
+Elle ne couvre pas l'ouverture, bornée par l'ADR 0027. Cette limite est dans le moteur, et non dans `PlayerView.svelte`, pour ne dépendre d'aucune interface. Le critère est l'absence de progression, pas `paused-for-cache` : il couvre aussi un saut qui n'aboutit jamais.
 
 ## Alternatives
 - **Relancer la lecture côté application** (nouveau `PlaybackInfo` à la position atteinte) : coupure visible, nouvelle session de lecture côté Emby, plus de code. Gardé pour les coupures longues, par « Reprendre ».

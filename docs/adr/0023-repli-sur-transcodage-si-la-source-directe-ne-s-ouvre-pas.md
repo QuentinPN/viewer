@@ -5,7 +5,7 @@ Statut : Accepté (2026-11-06). Complète les ADR 0007 et 0009.
 ## Contexte
 Le profil de l'appareil déclare ce que libmpv sait lire « en général » (ADR 0007). Le serveur peut donc proposer le Direct Play d'un fichier que mpv n'arrive pas à ouvrir : conteneur abîmé, variante non gérée. Jusqu'ici, l'utilisateur restait devant `Lecture impossible : <message anglais de mpv>`, sans autre issue que de revenir en arrière, alors que le serveur aurait pu transcoder.
 
-Un second défaut masquait ce cas : `PlayerView` passe `active` à vrai dès que le moteur répond à ses diagnostics, même si rien n'est chargé. Un échec d'ouverture pouvait donc être pris pour une interruption, et « Reprendre » rouvrait la même source.
+Un second défaut masquait ce cas : `PlayerView` passe `active` à vrai dès que le moteur répond à ses diagnostics, même si rien n'est chargé. Un échec d'ouverture pouvait donc être pris pour une interruption, et « Reprendre » rouvrait la même source. Corrigé pour toute ouverture par l'ADR 0027.
 
 ## Décision
 **Un seul essai, décidé par le lecteur.** Si la lecture se termine en erreur alors qu'aucune position n'a été vue et que la source n'était pas déjà un transcodage, `PlayerView` demande le même élément en transcodage (`emby_play` avec `transcodeFallback`). Une position vue signifie que le fichier a vraiment été lu : l'échec suit alors le chemin d'interruption de l'ADR 0012. `FileLoaded` ne suffit pas, il arrive avant tout décodage.

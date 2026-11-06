@@ -104,7 +104,7 @@ Verify real server resume/watched state, unsupported format fallback, network in
 - VERIFIED (2026-11-06): HTTPS streams open with the Windows root certificates (ADR 0026), `docs/evidence/gate4-https-2026-11-06.md`. Probed with real libmpv on public and local servers and a fake token; NOT VERIFIED against a real HTTPS Emby server or from the app's UI, as none is available.
 - NOT VERIFIED: `cargo audit` (not run), release-only behaviors at run time, a real network cut, a real file mpv cannot read, a file whose video alone is unreadable, what happens to the server encoder when the stop report never arrives.
 - MEASURED (2026-11-06): performance baselines, debug build, `docs/evidence/gate4-performance-2026-11-06.md`: playback start median 1184 ms over 11 films, 0 dropped frames in 60 s off-screen, navigation under 100 ms at the median, 92 % artwork hits on the second launch, up to 994 MiB private memory with the whole grid.
-- TODO: a stream answered by HTTP 500 stays on "Ouverture du flux…" with no error or fallback for at least 180 s, found on a real film (`Stale file handle` from the server). No deadline covers the opening; `STALL_LIMIT` only starts once the file is loaded.
+- VERIFIED (2026-11-06): a stream that does not open ends after 45 s with a fallback or a message (ADR 0027), `docs/evidence/gate4-ouverture-2026-11-06.md`: through the local proxy with the final code; on the real film before the last two changes, as it has since left the library.
 
 ## Gate 5 — Packaging [TODO · BLOCKED on licence decision]
 
@@ -396,3 +396,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `measure-gate4` ran to its end on the real server (run `measure-gate4-20261106-183307`), after a first run stopped by that port. Temporary probes: 3 + 1 more tries of the film that fails, 15 play and close cycles for memory, direct reads of the stream outside the app. The scenario now fails when a film does not start; that one-word change was not rerun.
 - **Not verified**: release build, clean machine, visible window, long 4K or HDR sessions, access from outside the network. Why mpv ends no file on that HTTP 500 is not established.
 - **Next**: an opening deadline, so a stream in error shows a message. The film itself needs the server's mount looked at, by its owner.
+
+### 2026-11-06 — Opening limit
+
+- **Changed**: ADR 0027; `StallWatch` also bounds the time between `MPV_EVENT_START_FILE` and `FileLoaded` to 45 s; any end in error sends `stop` before the event, so mpv does not walk a failed HLS list as a playlist; `PlayerView` is active only once mpv has opened a container; proxy modes `hold-direct` and `error-files`; two more steps in `gate4-fallback`.
+- **Tests**: `npm run verify` exit 0 (Vitest 113, `cargo test` 117 passed, 14 ignored); the playlist test failed before its fix; `gate4-fallback` 20/20, `gate4-network`, `gate3-player`, `gate2-play` all passed. Details in `docs/evidence/gate4-ouverture-2026-11-06.md`.
+- **Found**: the performance evidence blamed Direct Play for that endless wait. A trace shows the direct 500 ends in 20 ms and the fallback starts; the wait came from the transcode, whose segments all failed.
+- **Not verified**: the final code on the real failing film: it left the library during this work (id 404, not found by search), cause not established. Release build, visible window, a 4K transcode slower than 45 s, a NAS waking up, a segment failing after playback started.
+- **Next**: Gate 4's remaining NOT VERIFIED items, or the licence decision that blocks Gate 5.
