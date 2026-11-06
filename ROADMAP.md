@@ -92,13 +92,15 @@ Home, film/series browsing, details, search, accessible player UI, responsive la
 - DROPPED (user decision, 2026-10-28): search of people.
 - Known input: the control bar hides subtitles at narrow widths (Gate 1 finding); views must provide an opaque background when no video plays (transparent window).
 
-## Gate 4 — End-to-end quality [IN PROGRESS · stream reconnection, stall limit and transcode fallback VERIFIED]
+## Gate 4 — End-to-end quality [IN PROGRESS · stream reconnection, stall limit, cuts during a transcode and transcode fallback VERIFIED]
 
 Verify real server resume/watched state, unsupported format fallback, network interruptions, performance and security reviews.
 
 - VERIFIED (2026-11-06): stream reconnection and stall limit (ADR 0022) through the local proxy, `docs/evidence/gate4-reseau-2026-11-06.md`.
 - VERIFIED (2026-11-06): transcode fallback when the direct source does not open (ADR 0023), on the real server with unreadable bytes from the local proxy, `docs/evidence/gate4-repli-2026-11-06.md`.
-- NOT VERIFIED: a cut during an HLS transcode, a real network cut, a real file mpv cannot read, a file whose video alone is unreadable.
+- VERIFIED (2026-11-06): short and long cuts during an HLS transcode through the local proxy, `docs/evidence/gate4-coupure-hls-2026-11-06.md`.
+- KNOWN DEFECT: after a long cut, "Reprendre" goes back to the last progress received before the cut (measured 610.0 s saved, 758.3 s played), not fixed.
+- NOT VERIFIED: a real network cut, a real file mpv cannot read, a file whose video alone is unreadable, what happens to the NAS encoder when the stop report never arrives.
 - TODO: the other items above.
 
 ## Gate 5 — Packaging [TODO · BLOCKED on licence decision]
@@ -349,3 +351,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Found**: `active` was true as soon as the engine answered, so a failed open could pass for an interruption; `fileLoaded` comes before decoding, so only a position proves the file played. The fallback must also keep "Lire depuis le début", hence `resume` in `PlaybackStart`.
 - **Not verified**: a real file mpv cannot read (unreadable bytes from the proxy only), a file whose video alone is unreadable (probably plays audio with no fallback), an error between `fileLoaded` and the first position, the next-episode path (`gate3-upnext` not rerun, it marks items played).
 - **Next**: Gate 4 remaining items: a cut during an HLS transcode, security review, performance measurements.
+
+### 2026-11-06 — Cuts during an HLS transcode
+
+- **Changed**: scenario `scripts/e2e/gate4-hls-cut.mjs`; ADR 0022 consequences. No application code.
+- **Tests**: `gate4-hls-cut` 11/11 (run `gate4-hls-cut-20261106-122730`), Biome on the scenario. Details in `docs/evidence/gate4-coupure-hls-2026-11-06.md`.
+- **Found**: nothing is skipped after an 8 s cut (largest position step 0.5 s). A long cut is announced late because mpv reads ahead of a transcode: 385.7 s of reserve, announced after 419.5 s. Resume goes back to the last progress received: 610.0 s saved for 758.3 s played; the stop report is lost during the cut. Not fixed. No resume point at about 100 s; a server threshold is likely, not checked.
+- **Not verified**: the NAS encoder when the stop report never arrives, a real network cut, `blackhole` during a transcode, a very slow transcode close to the limit.
+- **Next**: send the last position once the connection is back, then the security review and performance measurements.
