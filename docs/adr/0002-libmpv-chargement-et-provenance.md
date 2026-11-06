@@ -13,8 +13,8 @@ Le moteur de lecture est libmpv (CLAUDE.md). Il faut une DLL Windows reproductib
   `scripts/fetch-libmpv.ps1` télécharge l'archive, vérifie les deux hachages et refuse toute divergence. `vendor/` est ignoré par git.
 - **Chargement dynamique** (`libloading`) plutôt que lien statique avec `mpv.lib` : pas de bibliothèque d'import à générer, et l'application peut démarrer puis afficher un diagnostic clair si la DLL manque (`PlayerError::LibraryUnavailable`). La version majeure de l'API (2) est vérifiée au chargement.
 - **Binding minimal maison** (`src-tauri/src/player/ffi.rs`, 14 fonctions) plutôt que la crate `libmpv2` : surface réduite, auditable, sans dépendance au linker.
-- **Durcissement des options mpv** : `config=no`, `load-scripts=no`, `ytdl=no`, `osc=no`, bindings clavier/souris désactivés, `hwdec=auto-safe`. Côté IPC, seuls les chemins locaux absolus et `http(s)` sont acceptés : `av://`, `edl://`, `file://`, etc. sont refusés (`MediaSource::parse`).
-- **Authentification HTTP par en-tête** (`http-header-fields`), jamais dans l'URL. Les logs mpv passent par un filtre qui masque `api_key=`, `X-Emby-Token` et `X-Emby-Authorization`.
+- **Durcissement des options mpv** : `config=no`, `load-scripts=no`, `ytdl=no`, `osc=no`, bindings clavier/souris désactivés, `hwdec=auto-safe` ; pas de redirection, liste de protocoles et `tls-verify=yes` depuis l'ADR 0025. Côté IPC, seuls les chemins locaux absolus et `http(s)` sont acceptés : `av://`, `edl://`, `file://`, etc. sont refusés (`MediaSource::parse`).
+- **Authentification HTTP par en-tête** (`http-header-fields`), jamais dans l'URL. Les logs mpv passent par un filtre qui masque `api_key=`, `apikey=`, `X-Emby-Token` et `X-Emby-Authorization`.
 
 ## Alternatives
 - Crate `libmpv2` : rejetée (lien à l'import lib, abstraction plus large que nécessaire).

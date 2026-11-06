@@ -55,9 +55,13 @@ unsafe impl Sync for RawHandle {}
 /// FFmpeg HTTP options: after a network error or an early end of stream, waits
 /// 0, 1, 3 then 7 s before each new try; the next delay (15 s) is past
 /// `reconnect_delay_max`, so it gives up there. HTTP errors such as 401 are not
-/// retried (ADR 0022).
-const STREAM_RECONNECT: &str =
-    "reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=7";
+/// retried (ADR 0022). No redirects: they would carry the auth header to another
+/// host (ADR 0025).
+const STREAM_LAVF_OPTIONS: &str = "reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=7,max_redirects=0";
+
+/// What FFmpeg may open by itself, such as HLS segments: a playlist from the server
+/// must not reach local files (ADR 0025).
+const DEMUXER_LAVF_OPTIONS: &str = "protocol_whitelist=[http,https,tcp,tls]";
 
 /// Seconds a connection or a read may hang before FFmpeg counts it as failed. mpv
 /// reads again after a failure, so a stream that stays dead is ended by
@@ -256,8 +260,10 @@ impl MpvEngine {
             // immediate and give up within the same millisecond: FFmpeg reopens
             // the stream after a short network outage (ADR 0022).
             ("curl-enabled", "no"),
-            ("stream-lavf-o", STREAM_RECONNECT),
+            ("stream-lavf-o", STREAM_LAVF_OPTIONS),
             ("network-timeout", NETWORK_TIMEOUT),
+            ("demuxer-lavf-o", DEMUXER_LAVF_OPTIONS),
+            ("tls-verify", "yes"),
         ] {
             inner.set_option(k, v)?;
         }
@@ -503,6 +509,7 @@ fn find_secret_key(s: &str) -> Option<(usize, usize)> {
     let lower = s.to_ascii_lowercase();
     [
         "api_key=",
+        "apikey=",
         "x-emby-token=",
         "accesstoken=",
         "x-emby-token: ",
@@ -701,6 +708,7 @@ mod tests {
         );
         assert_eq!(redact("no secret here"), "no secret here");
         assert_eq!(redact("X-Emby-Token: abc"), "X-Emby-Token: <redacted>");
+        assert_eq!(redact("x?ApiKey=abc&y=1"), "x?ApiKey=<redacted>&y=1");
     }
 
     #[test]
@@ -737,6 +745,151 @@ mod tests {
         false
     }
 
+    /// Local HTTP server for engine tests: answers with `route(path)` and records
+    /// each request as "<path> <token>".
+    fn serve(
+        route: impl Fn(&str) -> String + Send + 'static,
+    ) -> (u16, std::sync::Arc<Mutex<Vec<String>>>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let log = seen.clone();
+        std::thread::spawn(move || {
+            for mut stream in listener.incoming().flatten() {
+                let mut head = Vec::new();
+                let mut buf = [0u8; 1024];
+                while !head.windows(4).any(|w| w == b"\r\n\r\n") {
+                    match std::io::Read::read(&mut stream, &mut buf) {
+                        Ok(n) if n > 0 => head.extend_from_slice(&buf[..n]),
+                        _ => break,
+                    }
+                }
+                let head = String::from_utf8_lossy(&head).into_owned();
+                let path = head.split(' ').nth(1).unwrap_or_default().to_owned();
+                let token = head
+                    .lines()
+                    .find_map(|l| l.strip_prefix("X-Emby-Token: "))
+                    .unwrap_or("-");
+                log.lock().unwrap().push(format!("{path} {token}"));
+                let _ = std::io::Write::write_all(&mut stream, route(&path).as_bytes());
+            }
+        });
+        (port, seen)
+    }
+
+    fn http_response(status: &str, extra_header: &str, body: &str) -> String {
+        format!(
+            "HTTP/1.1 {status}\r\n{extra_header}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )
+    }
+
+    /// Loads `url` with a token in a headless engine; returns every event up to the
+    /// final end of file. `None` when libmpv is not available.
+    fn play_with_token(url: &str) -> Option<Vec<PlayerEvent>> {
+        let Some(lib) = libmpv_path() else {
+            eprintln!("SKIPPED: libmpv not found (set VIEWER_LIBMPV)");
+            return None;
+        };
+        let (tx, rx) = mpsc::channel();
+        let tx = Mutex::new(tx);
+        let engine = MpvEngine::new(
+            &lib,
+            &MpvConfig {
+                headless: true,
+                ..MpvConfig::default()
+            },
+            Box::new(move |ev| {
+                let _ = tx.lock().unwrap().send(ev);
+            }),
+        )
+        .expect("engine");
+        let request = PlaybackRequest {
+            source: url.to_owned(),
+            http_headers: vec![("X-Emby-Token".to_owned(), "TEST-TOKEN".to_owned())],
+            start_seconds: None,
+            subtitles: Vec::new(),
+        };
+        engine
+            .load(&request, &MediaSource::parse(url).unwrap())
+            .expect("load");
+        let mut events = Vec::new();
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while let Some(left) = deadline.checked_duration_since(Instant::now()) {
+            let Ok(ev) = rx.recv_timeout(left) else { break };
+            let end = matches!(
+                ev,
+                PlayerEvent::EndFile {
+                    reason: EndReason::Error | EndReason::Eof,
+                    ..
+                }
+            );
+            events.push(ev);
+            if end {
+                return Some(events);
+            }
+        }
+        panic!("no end of file: {events:?}");
+    }
+
+    /// ADR 0025: the token stops at the server the request was meant for.
+    #[test]
+    fn redirect_does_not_carry_the_token_to_another_host() {
+        let (other, other_seen) = serve(|_| http_response("404 Not Found", "", ""));
+        let (port, seen) = serve(move |_| {
+            let location = format!("Location: http://127.0.0.1:{other}/leak\r\n");
+            http_response("302 Found", &location, "")
+        });
+        let url = format!("http://127.0.0.1:{port}/stream");
+        let Some(events) = play_with_token(&url) else {
+            return;
+        };
+        assert!(!events.contains(&PlayerEvent::FileLoaded), "{events:?}");
+        assert_eq!(*seen.lock().unwrap(), ["/stream TEST-TOKEN"]);
+        assert!(other_seen.lock().unwrap().is_empty());
+    }
+
+    /// ADR 0025: a playlist from the server does not open local files. Without the
+    /// protocol whitelist, FFmpeg reads and plays this one.
+    #[test]
+    fn hls_playlist_cannot_open_a_local_file() {
+        let wav = std::env::temp_dir().join(format!("viewer-test-{}.wav", std::process::id()));
+        let samples = vec![128u8; 8000];
+        let mut bytes = b"RIFF".to_vec();
+        bytes.extend_from_slice(&(36u32 + 8000).to_le_bytes());
+        bytes.extend_from_slice(b"WAVEfmt ");
+        bytes.extend_from_slice(&16u32.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&8000u32.to_le_bytes());
+        bytes.extend_from_slice(&8000u32.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&8u16.to_le_bytes());
+        bytes.extend_from_slice(b"data");
+        bytes.extend_from_slice(&8000u32.to_le_bytes());
+        bytes.extend_from_slice(&samples);
+        std::fs::write(&wav, bytes).unwrap();
+
+        let segment = format!("file:{}", wav.to_string_lossy().replace('\\', "/"));
+        let (port, _) = serve(move |path| {
+            if path != "/index.m3u8" {
+                return http_response("404 Not Found", "", "");
+            }
+            let playlist = format!(
+                "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:1,\n{segment}\n#EXT-X-ENDLIST\n"
+            );
+            http_response(
+                "200 OK",
+                "Content-Type: application/vnd.apple.mpegurl\r\n",
+                &playlist,
+            )
+        });
+        let events = play_with_token(&format!("http://127.0.0.1:{port}/index.m3u8"));
+        let _ = std::fs::remove_file(&wav);
+        let Some(events) = events else { return };
+        assert!(!events.contains(&PlayerEvent::FileLoaded), "{events:?}");
+    }
+
     /// Real libmpv, headless: load, tracks, seek, external subtitle, pause, teardown.
     /// Skipped (with a message) when libmpv is not available, e.g. on non-Windows CI.
     #[test]
@@ -765,9 +918,16 @@ mod tests {
         .expect("engine");
         assert_eq!(
             engine.property("stream-lavf-o").as_deref(),
-            Some(STREAM_RECONNECT),
+            Some(STREAM_LAVF_OPTIONS),
             "reconnect options kept by mpv"
         );
+        assert!(
+            engine
+                .property("demuxer-lavf-o")
+                .is_some_and(|o| o.contains("protocol_whitelist")),
+            "protocol whitelist kept by mpv"
+        );
+        assert_eq!(engine.property("tls-verify").as_deref(), Some("yes"));
         assert_eq!(engine.property("curl-enabled").as_deref(), Some("no"));
         assert_eq!(
             engine
