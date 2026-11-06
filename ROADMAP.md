@@ -332,6 +332,7 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 
 - **Changed**: ADR 0022; `curl-enabled=no`, `stream-lavf-o` reconnect options and `network-timeout=15` in `MpvEngine`; pure `StallWatch` in `src-tauri/src/player/mod.rs`, fed by the event thread: a loaded, unpaused file whose position stays frozen 30 s ends as `EndFile { reason: Error }` and mpv stops retrying; scenario `scripts/e2e/gate4-network.mjs`.
 - **Tests**: `gate4-network` 4/4, `gate21-session` 44/44, `gate2-play` 13/13, `gate3-player` 34/34, `gate2-transcode` 10/10 (HLS still plays with `curl-enabled=no`), `npm run verify` exit 0 (`cargo test` 98 passed, 14 ignored). Details in `docs/evidence/gate4-reseau-2026-11-06.md`.
-- **Found**: with FFmpeg's reconnection, a dead stream never reaches an end of file, so the UI had no signal; the limit lives in the engine so it survives the native migration.
+- **Found**: with FFmpeg's reconnection, a dead stream never reaches an end of file, so the UI had no signal; the limit lives in the engine, independently of any UI.
 - **Not verified**: a cut during an HLS transcode, a real network cut (the local proxy only), a very slow transcode close to the limit.
-- **Next**: native migration, steps 1 and 2 (`docs/migration/`).
+- **Decided**: stay on Tauri; a native egui rewrite was considered and dropped by the user (2026-11-06), no measured problem justifies it.
+- **Next**: Gate 4 remaining items.
