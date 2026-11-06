@@ -108,7 +108,7 @@ Verify real server resume/watched state, unsupported format fallback, network in
 
 ## Gate 5 — Packaging [TODO · BLOCKED on licence decision]
 
-Redistribution/license audit, release build, Windows installer, clean-machine smoke test, documentation. The current libmpv build is GPL (ADR 0002): choose a GPL-3.0 project licence or an in-house LGPL libmpv before any distribution.
+Redistribution/license audit, release build, Windows installer, clean-machine smoke test, documentation. The current libmpv build is GPL (ADR 0002): choose a GPL-3.0 project licence or an in-house LGPL libmpv before any distribution. Audit and options: `docs/evidence/gate5-licences-2026-11-06.md`; the owner's decision is pending.
 
 ## Work log
 
