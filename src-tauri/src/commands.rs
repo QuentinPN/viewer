@@ -295,6 +295,7 @@ pub async fn emby_play(
     resume: bool,
     transcode_fallback: Option<bool>,
 ) -> Result<PlaybackStart, EmbyError> {
+    state.reporter.resend_stop().await;
     let (plan, http_headers) = if transcode_fallback == Some(true) {
         emby.prepare_transcode(&item_id, resume).await?
     } else {

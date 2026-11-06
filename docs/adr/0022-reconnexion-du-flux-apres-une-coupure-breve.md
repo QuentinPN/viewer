@@ -33,7 +33,7 @@ Cette limite est dans le moteur, et non dans `PlayerView.svelte`, pour ne dépen
 
 ## Conséquences
 - Une coupure franche est annoncée après la lecture du tampon, plus 30 s. La durée exacte dépend de ce que mpv a lu d'avance. Pendant un transcodage à 3 Mbit/s, la réserve a atteint 385,7 s et l'annonce 419,5 s (`docs/evidence/gate4-coupure-hls-2026-11-06.md`).
-- Tant que le réseau est coupé, le serveur ne reçoit plus de position : « Reprendre » repart de la dernière progression reçue avant la coupure, pas de ce qui a été vu ensuite. Mesuré : 610,0 s enregistrées pour 758,3 s lues. Non corrigé.
+- Tant que le réseau est coupé, le serveur ne reçoit plus de position : « Reprendre » repart de la dernière progression reçue avant la coupure, pas de ce qui a été vu ensuite. Mesuré : 610,0 s enregistrées pour 758,3 s lues. Corrigé au retour du réseau par l'ADR 0024.
 - Une image figée plus de 30 s sans aucune progression est traitée comme une interruption, même si le serveur finirait par répondre (transcodage très lent après un saut) ; « Reprendre » reste proposé. Mesuré jusqu'ici : premier segment ≈ 6 s, saut à 10 min en 3,4 s (ADR 0009).
 - Un utilisateur en pause n'est jamais interrompu : le décompte repart de la reprise.
 - Ces options dépendent de la version de FFmpeg de la libmpv (ADR 0002). Une option inconnue d'une autre build est signalée par mpv dans le journal et ignorée.

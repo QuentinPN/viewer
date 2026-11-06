@@ -810,6 +810,18 @@ impl EmbyService {
         )
     }
 
+    /// Sends a lost stop report again, only while `owner` is still the open session:
+    /// it must never reach another account or server (ADR 0024).
+    pub async fn resend_stop(&self, owner: &EmbyClient, report: &Report) -> Result<(), EmbyError> {
+        if !self.client()?.same_token(owner) {
+            return Err(EmbyError::Cancelled);
+        }
+        // The server ignores the position of a stop once it closed the playback itself,
+        // or with `Failed`; a progress report carries it and reopens the playback.
+        self.report_playback(&report.late_progress()).await?;
+        self.report_playback(report).await
+    }
+
     /// Watched status and resume point the server holds for an item.
     pub async fn playback_state(&self, item_id: &str) -> Result<PlaybackStopped, EmbyError> {
         let (client, user_id) = self.session()?;

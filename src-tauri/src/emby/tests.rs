@@ -1852,6 +1852,62 @@ fn playback_starts_without_a_title_when_the_item_cannot_be_read() {
 }
 
 #[test]
+fn a_lost_stop_report_only_goes_to_the_session_it_belongs_to() {
+    use super::models::PlaybackReportBody;
+    use super::reporting::{Report, ReportKind};
+    let (server, fx, _revoked) = signed_in_browser();
+    let report = Report {
+        kind: ReportKind::Stopped,
+        body: PlaybackReportBody {
+            item_id: "30207".into(),
+            media_source_id: "mediasource_30207".into(),
+            play_session_id: Some("ps1".into()),
+            position_ticks: 7_583_000_000,
+            run_time_ticks: Some(60_000_000_000),
+            is_paused: None,
+            can_seek: None,
+            play_method: Some("Transcode"),
+            event_name: None,
+            failed: Some(true),
+        },
+    };
+    let sent = || -> Vec<String> {
+        server
+            .requests()
+            .into_iter()
+            .filter(|r| r.path.starts_with("/emby/Sessions/Playing"))
+            .map(|r| r.path)
+            .collect()
+    };
+    let owner = fx.service.client().unwrap();
+    run(fx.service.resend_stop(&owner, &report)).unwrap();
+    let in_order = [
+        "/emby/Sessions/Playing/Progress",
+        "/emby/Sessions/Playing/Stopped",
+    ];
+    assert_eq!(sent(), in_order, "the progress carries the position");
+
+    let other = super::client::EmbyClient::new(
+        super::server_url::ServerUrl::parse(&server.url).unwrap(),
+        super::client::DeviceIdentity {
+            name: "test".into(),
+            id: "other-device".into(),
+            version: "0.1.0".into(),
+        },
+    )
+    .unwrap()
+    .with_token(AccessToken::new("another-token".into()));
+    let err = run(fx.service.resend_stop(&other, &report)).unwrap_err();
+    assert!(matches!(err, EmbyError::Cancelled), "{err:?}");
+    assert_eq!(sent(), in_order, "no request for another session");
+
+    run(fx.service.sign_out()).unwrap();
+    let err = run(fx.service.resend_stop(&owner, &report)).unwrap_err();
+    assert!(matches!(err, EmbyError::NotSignedIn), "{err:?}");
+    assert_eq!(sent(), in_order, "no request once signed out");
+}
+
+#[test]
 fn playback_reports_post_typed_bodies_with_auth_in_the_header() {
     use super::models::PlaybackReportBody;
     use super::reporting::{Report, ReportKind};

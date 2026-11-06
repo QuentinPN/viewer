@@ -32,6 +32,6 @@ Contrat lu dans `/emby/openapi.json` (Emby 4.10.1.0) :
 - **Position de reprise fournie par l'UI** : risque d'une valeur périmée après une autre lecture sur un autre appareil. Écarté.
 
 ## Conséquences
-- Un arrêt brutal (processus tué, coupure) n'envoie pas d'arrêt : le serveur garde la dernière progression (10 s au plus de retard) et ferme lui-même la session.
+- Un processus tué n'envoie pas d'arrêt : le serveur garde la dernière progression et ferme lui-même la session. Après une coupure, le rapport d'arrêt est renvoyé au retour du réseau (ADR 0024).
 - La fermeture de la fenêtre pendant une lecture peut prendre jusqu'à 3 s de plus si le serveur ne répond pas.
 - Le transcodage (ADR 0007) peut maintenant s'appuyer sur l'arrêt pour libérer l'encodage du NAS.

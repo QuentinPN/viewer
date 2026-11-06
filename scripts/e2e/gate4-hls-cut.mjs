@@ -4,8 +4,8 @@
 // network and the NAS are not touched.
 // - a short cut (8 s): the playback goes on past what mpv had read ahead, and no part
 //   of the film is skipped (a lost HLS segment would show as a jump in the position);
-// - a long cut: "Lecture interrompue", no false "watched", the position is saved, and
-//   "Reprendre" starts a new transcode there.
+// - a long cut: "Lecture interrompue", no false "watched", the position played reaches
+//   the server once it is back (ADR 0024), and "Reprendre" starts a new transcode there.
 // Short transcodes; writes then clears one resume position. Starts in any state, ends
 // signed out with the direct NAS address as last server.
 import { launch } from "./app.mjs";
@@ -36,6 +36,11 @@ const JUMP_S = 2.5;
 const RESUME_AT = 600;
 // mpv's 150 MiB cache at the capped 3 Mbit/s is ~400 s, plus the 30 s stall limit.
 const LONG_CUT_LIMIT_MS = 480000;
+// How long the cut lasts once announced; HOLD_S tests a late stop on the server.
+const HOLD_MS = Number(process.env.HOLD_S ?? 60) * 1000;
+const RESEND_LIMIT_MS = 45000;
+// The saved position is what was played, not the last progress before the cut.
+const SAVED_MARGIN_S = 5;
 
 const command = (page, cmd) =>
   page.evaluate(
@@ -191,18 +196,31 @@ try {
     );
     await page.locator("#lost-title").waitFor({ timeout: 25000 });
     await shot(page, "long-cut");
+    // The cut lasts on: the stop report waits in memory (ADR 0024).
+    await page.waitForTimeout(HOLD_MS);
     await proxy.set("up");
     await page.locator("#lost-title").waitFor({
       state: "detached",
       timeout: 40000,
     });
-    const after = await itemDetail(page, itemId);
+    // The lost stop report comes back within its 15 s cycle, no UI action needed.
+    const backAt = Date.now();
+    let after = await itemDetail(page, itemId);
+    while (
+      Math.abs((after.resume?.positionSeconds ?? 0) - lastPos) >
+        SAVED_MARGIN_S &&
+      Date.now() - backAt < RESEND_LIMIT_MS
+    ) {
+      await page.waitForTimeout(1000);
+      after = await itemDetail(page, itemId);
+    }
+    const resentIn = Date.now() - backAt;
     check("long_cut_not_watched", after.played === false);
     const saved = after.resume?.positionSeconds ?? null;
     check(
       "long_cut_position_saved",
-      saved !== null && saved >= RESUME_AT,
-      `serveur ${saved?.toFixed?.(1)} s, coupure à ${before.timePos?.toFixed(1)} s, lu jusqu'à ${lastPos?.toFixed?.(1)} s`,
+      saved !== null && Math.abs(saved - lastPos) <= SAVED_MARGIN_S,
+      `serveur ${saved?.toFixed?.(1)} s, coupure à ${before.timePos?.toFixed(1)} s, lu jusqu'à ${lastPos?.toFixed?.(1)} s, reçu ${(resentIn / 1000).toFixed(1)} s après le retour (coupure prolongée de ${HOLD_MS / 1000} s)`,
     );
 
     // 3. "Reprendre": a new transcode at the saved position.

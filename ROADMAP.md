@@ -99,7 +99,7 @@ Verify real server resume/watched state, unsupported format fallback, network in
 - VERIFIED (2026-11-06): stream reconnection and stall limit (ADR 0022) through the local proxy, `docs/evidence/gate4-reseau-2026-11-06.md`.
 - VERIFIED (2026-11-06): transcode fallback when the direct source does not open (ADR 0023), on the real server with unreadable bytes from the local proxy, `docs/evidence/gate4-repli-2026-11-06.md`.
 - VERIFIED (2026-11-06): short and long cuts during an HLS transcode through the local proxy, `docs/evidence/gate4-coupure-hls-2026-11-06.md`.
-- KNOWN DEFECT: after a long cut, "Reprendre" goes back to the last progress received before the cut (measured 610.0 s saved, 758.3 s played), not fixed.
+- VERIFIED (2026-11-06): the position played reaches the server when the network comes back after a long cut (ADR 0024), on the real server through the local proxy, `docs/evidence/gate4-renvoi-arret-2026-11-06.md`. Application closed during the cut: the position is still lost.
 - NOT VERIFIED: a real network cut, a real file mpv cannot read, a file whose video alone is unreadable, what happens to the NAS encoder when the stop report never arrives.
 - TODO: the other items above.
 
@@ -359,3 +359,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Found**: nothing is skipped after an 8 s cut (largest position step 0.5 s). A long cut is announced late because mpv reads ahead of a transcode: 385.7 s of reserve, announced after 419.5 s. Resume goes back to the last progress received: 610.0 s saved for 758.3 s played; the stop report is lost during the cut. Not fixed. No resume point at about 100 s; a server threshold is likely, not checked.
 - **Not verified**: the NAS encoder when the stop report never arrives, a real network cut, `blackhole` during a transcode, a very slow transcode close to the limit.
 - **Next**: send the last position once the connection is back, then the security review and performance measurements.
+
+### 2026-11-06 — Lost stop report sent again after a cut
+
+- **Changed**: ADR 0024; `reporting.rs` keeps a stop report lost to a passing failure and sends it again after 5 s, 10 s, then every 15 s, for at most 1 h, as a progress report then the stop; `session.rs` sends nothing if the session changed; `emby_play` asks for a resend first and waits at most 5 s, and a new playback drops what is left. The stop body now carries `PlayMethod`. Scenario `gate4-hls-cut` requires the position played.
+- **Tests**: `gate4-hls-cut` 11/11 (run `gate4-hls-cut-20261106-130845`), `gate21-session` 44/44, `gate4-network` 4/4, `gate2-play` 13/13, `npm run verify` exit 0 (Vitest 113, `cargo test` 104 passed, 14 ignored), Biome on the scenario. Details in `docs/evidence/gate4-renvoi-arret-2026-11-06.md`.
+- **Found**: Emby ignores the position of a stop with `Failed=true`, and any stop once it closed the playback itself, after about 60 s of silence. A late progress report saves the position and reopens the playback; the stop closes it. Measured: 820.0 s saved for 820.6 s played, 2.1 s after the network came back. A progress report at 97% marks the item watched.
+- **Not verified**: on the real server, the resend before a new playback, the last try when the window closes, giving up after 1 h. Why real runs kept 610.0 s when direct requests show an extrapolated 670 s. A playback on another device during the cut. A real network cut.
+- **Next**: security review, then performance measurements.

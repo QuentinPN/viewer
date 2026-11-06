@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use tauri::{Emitter, Manager};
 
 use super::EmbyError;
+use super::client::EmbyClient;
 use super::models::{PlayMethod, PlaybackReportBody};
 use super::playback::PlaybackPlan;
 use super::session::EmbyService;
@@ -17,6 +18,13 @@ pub const PROGRESS_INTERVAL: Duration = Duration::from_secs(10);
 pub const PLAYBACK_STOPPED_EVENT: &str = "emby://playback-stopped";
 const TICKS_PER_SECOND: f64 = 10_000_000.0;
 const STOP_RETRY_DELAY: Duration = Duration::from_secs(1);
+/// A lost stop report (ADR 0024): waits between tries, doubled up to the cap.
+const STOP_RESEND_FIRST: Duration = Duration::from_secs(5);
+const STOP_RESEND_CAP: Duration = Duration::from_secs(15);
+/// An older report could overwrite a playback made elsewhere in the meantime.
+const STOP_RESEND_GIVE_UP: Duration = Duration::from_secs(3600);
+/// How long `emby_play` waits for the resend before asking the server's position.
+const STOP_RESEND_WAIT: Duration = Duration::from_secs(5);
 
 /// A playback announced by `emby_play`, reported once the file is loaded.
 #[derive(Debug, Clone, PartialEq)]
@@ -68,6 +76,22 @@ pub struct Report {
     pub body: PlaybackReportBody,
 }
 
+impl Report {
+    /// The progress report sent ahead of a lost stop report (ADR 0024).
+    pub fn late_progress(&self) -> Self {
+        Self {
+            kind: ReportKind::Progress,
+            body: PlaybackReportBody {
+                is_paused: Some(false),
+                can_seek: Some(true),
+                event_name: Some("TimeUpdate"),
+                failed: None,
+                ..self.body.clone()
+            },
+        }
+    }
+}
+
 /// Pure state machine from player events to reports; time is passed in.
 #[derive(Debug, Default)]
 pub struct Tracker {
@@ -116,7 +140,8 @@ impl Playing {
                 run_time_ticks: p.run_time_ticks,
                 is_paused: live.then_some(self.paused),
                 can_seek: live.then_some(true),
-                play_method: live.then_some(p.method.as_emby()),
+                // Also on a stop: `late_progress` needs it (ADR 0024).
+                play_method: Some(p.method.as_emby()),
                 event_name: event,
                 failed: None,
             },
@@ -125,6 +150,10 @@ impl Playing {
 }
 
 impl Tracker {
+    fn is_idle(&self) -> bool {
+        matches!(self.phase, Phase::Idle)
+    }
+
     /// Announces a new playback; one still playing is reported stopped first.
     pub fn begin(&mut self, playback: ActivePlayback, now: Instant) -> Vec<Report> {
         let out = self.stop(false, now);
@@ -230,10 +259,58 @@ fn ticks(seconds: f64) -> Option<i64> {
     (seconds.is_finite() && seconds >= 0.0).then(|| (seconds * TICKS_PER_SECOND).round() as i64)
 }
 
+/// When a lost stop report is sent again, and when it is given up (ADR 0024).
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ResendSchedule {
+    give_up_at: Instant,
+    next_at: Instant,
+    delay: Duration,
+}
+
+impl ResendSchedule {
+    fn new(now: Instant) -> Self {
+        Self {
+            give_up_at: now + STOP_RESEND_GIVE_UP,
+            next_at: now + STOP_RESEND_FIRST,
+            delay: STOP_RESEND_FIRST,
+        }
+    }
+
+    fn due(&self, now: Instant) -> bool {
+        now >= self.next_at
+    }
+
+    fn expired(&self, now: Instant) -> bool {
+        now >= self.give_up_at
+    }
+
+    /// The try at `now` failed.
+    fn postpone(&mut self, now: Instant) {
+        self.delay = (self.delay * 2).min(STOP_RESEND_CAP);
+        self.next_at = now + self.delay;
+    }
+}
+
+/// A stop report the server did not get, and the session it belongs to.
+struct LostStop {
+    report: Report,
+    owner: EmbyClient,
+    schedule: ResendSchedule,
+}
+
+/// A failure that may pass, unlike a refused token or a bad request.
+fn is_transient(error: &EmbyError) -> bool {
+    matches!(
+        error,
+        EmbyError::Unreachable(_) | EmbyError::Timeout | EmbyError::Server(_)
+    )
+}
+
 enum Message {
     Begin(ActivePlayback),
     Player(PlayerEvent),
     Flush(std::sync::mpsc::Sender<()>),
+    ResendStop(tokio::sync::oneshot::Sender<()>),
 }
 
 /// Handle to the reporting task. Cheap to clone; sending never blocks.
@@ -269,10 +346,20 @@ impl Reporter {
         let (ack, done) = std::sync::mpsc::channel();
         self.tx.send(Message::Flush(ack)).is_ok() && done.recv_timeout(timeout).is_ok()
     }
+
+    /// Sends a lost stop report now, so that the server's position is the right one
+    /// before a new playback asks for it (ADR 0024). Waits a bounded time.
+    pub async fn resend_stop(&self) {
+        let (ack, done) = tokio::sync::oneshot::channel();
+        if self.tx.send(Message::ResendStop(ack)).is_ok() {
+            let _ = tokio::time::timeout(STOP_RESEND_WAIT, done).await;
+        }
+    }
 }
 
 async fn run(app: tauri::AppHandle, mut rx: tokio::sync::mpsc::UnboundedReceiver<Message>) {
     let mut tracker = Tracker::default();
+    let mut lost: Option<LostStop> = None;
     loop {
         // Wake up every second at most, so periodic progress is sent while paused.
         let message = match tokio::time::timeout(Duration::from_secs(1), rx.recv()).await {
@@ -282,10 +369,20 @@ async fn run(app: tauri::AppHandle, mut rx: tokio::sync::mpsc::UnboundedReceiver
         };
         let now = Instant::now();
         let mut reports = match message {
-            Some(Message::Begin(p)) => tracker.begin(p, now),
+            // A late stop must never overwrite the position of a newer playback.
+            Some(Message::Begin(p)) => {
+                lost = None;
+                tracker.begin(p, now)
+            }
             Some(Message::Player(e)) => tracker.on_event(&e, now),
             // Earlier messages were fully handled: their reports are sent.
             Some(Message::Flush(ack)) => {
+                resend(&app, &mut lost).await;
+                let _ = ack.send(());
+                Vec::new()
+            }
+            Some(Message::ResendStop(ack)) => {
+                resend(&app, &mut lost).await;
                 let _ = ack.send(());
                 Vec::new()
             }
@@ -293,33 +390,78 @@ async fn run(app: tauri::AppHandle, mut rx: tokio::sync::mpsc::UnboundedReceiver
         };
         reports.extend(tracker.tick(now));
         for report in reports {
-            deliver(&app, &report).await;
+            // The stop of a playback replaced by a new one stays lost, same rule as Begin.
+            if let Some(stop) = deliver(&app, report).await
+                && tracker.is_idle()
+            {
+                lost = Some(stop);
+            }
+        }
+        if lost
+            .as_ref()
+            .is_some_and(|l| l.schedule.due(Instant::now()))
+        {
+            resend(&app, &mut lost).await;
         }
     }
 }
 
-async fn deliver(app: &tauri::AppHandle, report: &Report) {
+/// Sends a report; returns a stop report the server did not get.
+async fn deliver(app: &tauri::AppHandle, report: Report) -> Option<LostStop> {
     let emby = app.state::<EmbyService>();
-    let mut result = emby.report_playback(report).await;
-    if report.kind == ReportKind::Stopped
-        && matches!(
-            result,
-            Err(EmbyError::Unreachable(_) | EmbyError::Timeout | EmbyError::Server(_))
-        )
-    {
+    let owner = emby.client().ok();
+    let mut result = emby.report_playback(&report).await;
+    if report.kind == ReportKind::Stopped && result.as_ref().is_err_and(is_transient) {
         tokio::time::sleep(STOP_RETRY_DELAY).await;
-        result = emby.report_playback(report).await;
+        result = emby.report_playback(&report).await;
     }
     if let Err(e) = &result {
         log::warn!("playback report {:?} not sent: {}", report.kind, e.kind());
     }
-    if report.kind == ReportKind::Stopped {
-        match emby.playback_state(&report.body.item_id).await {
-            Ok(state) => {
-                let _ = app.emit(PLAYBACK_STOPPED_EVENT, &state);
-            }
-            Err(e) => log::warn!("state after playback not read: {}", e.kind()),
+    if report.kind != ReportKind::Stopped {
+        return None;
+    }
+    announce_state(app, &report.body.item_id).await;
+    match (result, owner) {
+        (Err(e), Some(owner)) if is_transient(&e) => Some(LostStop {
+            report,
+            owner,
+            schedule: ResendSchedule::new(Instant::now()),
+        }),
+        _ => None,
+    }
+}
+
+/// Tries a lost stop report again; it stays lost only if the failure may pass.
+async fn resend(app: &tauri::AppHandle, lost: &mut Option<LostStop>) {
+    let Some(mut stop) = lost.take() else {
+        return;
+    };
+    if stop.schedule.expired(Instant::now()) {
+        log::warn!("stop report given up");
+        return;
+    }
+    let emby = app.state::<EmbyService>();
+    match emby.resend_stop(&stop.owner, &stop.report).await {
+        Ok(()) => {
+            log::info!("stop report sent after the cut");
+            announce_state(app, &stop.report.body.item_id).await;
         }
+        Err(e) if is_transient(&e) => {
+            stop.schedule.postpone(Instant::now());
+            *lost = Some(stop);
+        }
+        Err(e) => log::warn!("stop report given up: {}", e.kind()),
+    }
+}
+
+/// Tells the UI what the server now holds for the item.
+async fn announce_state(app: &tauri::AppHandle, item_id: &str) {
+    match app.state::<EmbyService>().playback_state(item_id).await {
+        Ok(state) => {
+            let _ = app.emit(PLAYBACK_STOPPED_EVENT, &state);
+        }
+        Err(e) => log::warn!("state after playback not read: {}", e.kind()),
     }
 }
 
@@ -501,6 +643,66 @@ mod tests {
         let mut idle = Tracker::default();
         assert!(idle.on_event(&PlayerEvent::FileLoaded, t0).is_empty());
         assert!(idle.on_event(&PlayerEvent::Shutdown, t0).is_empty());
+    }
+
+    #[test]
+    fn a_lost_stop_report_is_resent_with_a_growing_delay_then_given_up() {
+        let t0 = Instant::now();
+        let mut s = ResendSchedule::new(t0);
+        assert!(!s.due(t0 + Duration::from_secs(4)));
+        assert!(s.due(t0 + STOP_RESEND_FIRST));
+
+        let t1 = t0 + STOP_RESEND_FIRST;
+        s.postpone(t1);
+        assert!(!s.due(t1 + Duration::from_secs(9)));
+        assert!(s.due(t1 + Duration::from_secs(10)));
+
+        let t2 = t1 + Duration::from_secs(10);
+        s.postpone(t2);
+        assert!(s.due(t2 + STOP_RESEND_CAP));
+        s.postpone(t2);
+        assert!(s.due(t2 + STOP_RESEND_CAP), "capped");
+
+        assert!(!s.expired(t0 + STOP_RESEND_GIVE_UP - Duration::from_secs(1)));
+        assert!(s.expired(t0 + STOP_RESEND_GIVE_UP));
+    }
+
+    #[test]
+    fn a_late_progress_carries_the_position_of_the_lost_stop() {
+        let stop = Report {
+            kind: ReportKind::Stopped,
+            body: PlaybackReportBody {
+                item_id: "30207".into(),
+                media_source_id: "ms".into(),
+                play_session_id: Some("ps1".into()),
+                position_ticks: 7_583_000_000,
+                run_time_ticks: Some(60_000_000_000),
+                is_paused: None,
+                can_seek: None,
+                play_method: Some("Transcode"),
+                event_name: None,
+                failed: Some(true),
+            },
+        };
+        let late = stop.late_progress();
+        assert_eq!(late.kind, ReportKind::Progress);
+        assert_eq!(late.body.position_ticks, 7_583_000_000);
+        assert_eq!(late.body.play_session_id.as_deref(), Some("ps1"));
+        assert_eq!(late.body.play_method, Some("Transcode"));
+        assert_eq!(late.body.is_paused, Some(false));
+        assert_eq!(late.body.can_seek, Some(true));
+        assert_eq!(late.body.event_name, Some("TimeUpdate"));
+        assert_eq!(late.body.failed, None);
+    }
+
+    #[test]
+    fn only_a_passing_failure_keeps_the_stop_report() {
+        assert!(is_transient(&EmbyError::Timeout));
+        assert!(is_transient(&EmbyError::Unreachable("x".into())));
+        assert!(is_transient(&EmbyError::Server(503)));
+        assert!(!is_transient(&EmbyError::SessionExpired));
+        assert!(!is_transient(&EmbyError::NotSignedIn));
+        assert!(!is_transient(&EmbyError::Cancelled));
     }
 
     #[test]
