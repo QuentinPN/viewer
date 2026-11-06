@@ -92,7 +92,7 @@ Home, film/series browsing, details, search, accessible player UI, responsive la
 - DROPPED (user decision, 2026-10-28): search of people.
 - Known input: the control bar hides subtitles at narrow widths (Gate 1 finding); views must provide an opaque background when no video plays (transparent window).
 
-## Gate 4 — End-to-end quality [IN PROGRESS · stream reconnection, stall limit, cuts during a transcode and transcode fallback VERIFIED]
+## Gate 4 — End-to-end quality [IN PROGRESS · stream reconnection, stall limit, cuts during a transcode, transcode fallback and security review VERIFIED]
 
 Verify real server resume/watched state, unsupported format fallback, network interruptions, performance and security reviews.
 
@@ -100,8 +100,9 @@ Verify real server resume/watched state, unsupported format fallback, network in
 - VERIFIED (2026-11-06): transcode fallback when the direct source does not open (ADR 0023), on the real server with unreadable bytes from the local proxy, `docs/evidence/gate4-repli-2026-11-06.md`.
 - VERIFIED (2026-11-06): short and long cuts during an HLS transcode through the local proxy, `docs/evidence/gate4-coupure-hls-2026-11-06.md`.
 - VERIFIED (2026-11-06): the position played reaches the server when the network comes back after a long cut (ADR 0024), on the real server through the local proxy, `docs/evidence/gate4-renvoi-arret-2026-11-06.md`. Application closed during the cut: the position is still lost.
-- NOT VERIFIED: a real network cut, a real file mpv cannot read, a file whose video alone is unreadable, what happens to the NAS encoder when the stop report never arrives.
-- TODO: the other items above.
+- VERIFIED (2026-11-06): security review, with player hardening (ADR 0025), `docs/evidence/gate4-securite-2026-11-06.md`. HTTPS streams do not play yet: FFmpeg has no certificate store, so they fail closed.
+- NOT VERIFIED: `cargo audit` (not run), release-only behaviors at run time, a real network cut, a real file mpv cannot read, a file whose video alone is unreadable, what happens to the NAS encoder when the stop report never arrives.
+- TODO: performance measurements; give the player the Windows certificate store so HTTPS servers can play.
 
 ## Gate 5 — Packaging [TODO · BLOCKED on licence decision]
 
@@ -367,3 +368,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Found**: Emby ignores the position of a stop with `Failed=true`, and any stop once it closed the playback itself, after about 60 s of silence. A late progress report saves the position and reopens the playback; the stop closes it. Measured: 820.0 s saved for 820.6 s played, 2.1 s after the network came back. A progress report at 97% marks the item watched.
 - **Not verified**: on the real server, the resend before a new playback, the last try when the window closes, giving up after 1 h. Why real runs kept 610.0 s when direct requests show an extrapolated 670 s. A playback on another device during the cut. A real network cut.
 - **Next**: security review, then performance measurements.
+
+### 2026-11-06 — Security review
+
+- **Changed**: ADR 0025; `mpv.rs` adds `max_redirects=0`, a protocol whitelist for FFmpeg's own opens and an explicit `tls-verify=yes`, and redacts `apikey=`; `player_open` refuses outside development builds and the prototype button is hidden there; libmpv loads only from beside the executable in release; `VIEWER_VIDEO_MODE` is ignored in release; the CSP gains `object-src`, `base-uri` and `form-action`.
+- **Tests**: two new tests against real libmpv, both failing without the options; `gate2-play` 13/13, `gate2-transcode` 10/10, `gate3-player` 34/34 (first run failed 1/2, second run unchanged passed; the scenario read the library list without waiting is the probable cause, not proven), `gate4-fallback` 14/14, `gate4-network` 4/4, `gate21-session` 44/44, `npm run verify` exit 0 (Vitest 113, `cargo test` 106 passed, 14 ignored), `cargo clippy --release --all-targets` no warning. Details in `docs/evidence/gate4-securite-2026-11-06.md`.
+- **Found**: a server HLS playlist could read and play a local file; the token followed a redirect to another host; a segment on another host still receives the token (accepted, ADR 0025); `access-references=no` blocks HLS; HTTPS streams are refused even with a valid public certificate; no logger is installed, so mpv and `log` messages are lost.
+- **Not verified**: `cargo audit` (not installed, installing it was refused by the session's protection); mpv/FFmpeg licensing (ADR 0002, blocks Gate 5); release-only behaviors at run time; HTTPS against a real Emby server; an item Emby serves through a redirect.
+- **Next**: HTTPS playback through the Windows certificate store, then performance measurements.

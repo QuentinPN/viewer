@@ -65,6 +65,12 @@ Mock Emby API for auth failures, pagination, permissions, missing fields, playba
   - `… cargo test … real_server_search '--' --ignored --nocapture` (read only): same results with or without case and accents, word-prefix matching, more than 24 results flagged on a common word, one letter sends nothing.
 - Windows Credential Manager, opt-in: `cargo test … windows_store_round_trip '--' --ignored`, then check `cmdkey /list` shows no `Viewer` entry.
 
+## Security
+
+- `cargo test player::mpv`: against real libmpv and a local server, a redirect does not carry the token to another host, and an HLS playlist does not open a local file (ADR 0025).
+- `cargo audit` is not part of `npm run verify` and has not run yet: run it before a release.
+- Review results: `docs/evidence/gate4-securite-2026-11-06.md`.
+
 ## Release gate
 
 No release claims without: reproducible build, successful tests, Windows player smoke test, clean-machine installer test, dependency/license audit and documented known limitations.

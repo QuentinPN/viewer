@@ -49,7 +49,7 @@ Tauri WebView2 and libmpv rendering/overlay composition can conflict. Prototype 
 
 ## Data and security
 
-Secure OS credential store, TLS validation, user-scoped permissions, sanitized logs, narrow Tauri capabilities, no arbitrary shell commands, no credentials in cache. User must authorize real NAS access and any server-side change.
+Secure OS credential store, TLS validation, user-scoped permissions, sanitized logs, narrow Tauri capabilities, no arbitrary shell commands, no credentials in cache. User must authorize real NAS access and any server-side change. The player follows no redirects and FFmpeg's own opens are limited to network protocols; a segment on another host named by an HLS playlist still receives the token, an accepted risk (ADR 0025). The token stays out of the WebView, and `player_open`, which takes a URL from the WebView, is refused outside development builds.
 
 ## Error handling
 
