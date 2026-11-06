@@ -20,7 +20,11 @@ pub enum SurfaceMode {
 }
 
 impl SurfaceMode {
+    /// `VIEWER_VIDEO_MODE` compares modes during development; release builds ignore it.
     pub fn from_env() -> Self {
+        if !cfg!(debug_assertions) {
+            return Self::Parent;
+        }
         match std::env::var("VIEWER_VIDEO_MODE").as_deref() {
             Ok("child") => Self::Child,
             Ok("separate") => Self::Separate,

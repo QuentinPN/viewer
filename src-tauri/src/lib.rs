@@ -81,13 +81,14 @@ fn resolve_libmpv() -> PathBuf {
     }
     let beside_exe = std::env::current_exe()
         .ok()
-        .and_then(|e| e.parent().map(|d| d.join("libmpv-2.dll")))
-        .filter(|p| p.is_file());
+        .and_then(|e| e.parent().map(|d| d.join("libmpv-2.dll")));
     #[cfg(debug_assertions)]
-    let fallback = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../vendor/mpv/libmpv-2.dll");
-    #[cfg(not(debug_assertions))]
-    let fallback = PathBuf::from("libmpv-2.dll");
-    beside_exe.unwrap_or(fallback)
+    if !beside_exe.as_ref().is_some_and(|p| p.is_file()) {
+        return PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../vendor/mpv/libmpv-2.dll");
+    }
+    // Never a bare name: Windows would search the current directory and PATH for a
+    // DLL to load. A missing file ends in `PlayerError::LibraryUnavailable`.
+    beside_exe.unwrap_or_default()
 }
 
 /// Emby session service: token in the OS credential store, metadata in the app
