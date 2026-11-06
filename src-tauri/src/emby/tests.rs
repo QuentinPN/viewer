@@ -2950,6 +2950,192 @@ fn real_server_transcoding() {
     assert!(!state.played && state.resume.is_none(), "cleanup failed");
 }
 
+/// Real server, on demand, **writes to the test account** (authorized 2026-11-06):
+/// a transcode started, then abandoned like a killed process, with no more request
+/// and no stop report. A second device watches `/Sessions`, so that polling does not
+/// count as activity of the abandoned session. Cleanup: stopped at 0.
+#[test]
+#[ignore = "needs a real Emby server and credentials in environment variables"]
+fn real_server_encoder_without_stop_report() {
+    use super::models::{LibraryKind, PlayMethod};
+    use super::reporting::{ActivePlayback, Tracker};
+    use crate::player::PlayerEvent;
+    use std::time::{Duration, Instant};
+
+    let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} manquant"));
+    let open = |device: &str| {
+        let path = std::env::temp_dir()
+            .join(format!("viewer-emby-real-{}", uuid::Uuid::new_v4()))
+            .join("session.json");
+        SessionFile {
+            device_id: device.into(),
+            ..SessionFile::default()
+        }
+        .save(&path)
+        .unwrap();
+        reopen(Arc::new(MemoryCredentialStore::default()), path)
+            .service
+            .with_max_streaming_bitrate(3_000_000)
+    };
+    let server_url = var("VIEWER_EMBY_URL");
+    let (user, password) = (var("VIEWER_EMBY_USER"), var("VIEWER_EMBY_PASSWORD"));
+    let service = open(REAL_DEVICE_ID);
+    let observer = open("viewer-real-server-observer");
+    run(service.sign_in(&server_url, &user, &password)).unwrap();
+    run(observer.sign_in(&server_url, &user, &password)).unwrap();
+
+    let film = run(service.libraries())
+        .unwrap()
+        .into_iter()
+        .filter(|l| l.kind == LibraryKind::Movies)
+        .flat_map(|l| {
+            run(service.items(&l.id, 0, 60, &Default::default()))
+                .unwrap()
+                .items
+        })
+        .filter(|i| !i.played)
+        .find(|i| {
+            run(service.item_detail(&i.id))
+                .map(|d| d.resume.is_none())
+                .unwrap_or(false)
+        })
+        .expect("a film never started on the test account");
+    println!("film: {} ({})", film.name, film.id);
+
+    let http = reqwest::Client::new();
+    let (plan, headers) = run(service.prepare_playback(&film.id, false)).unwrap();
+    let (_, observer_headers) = run(observer.prepare_playback(&film.id, false)).unwrap();
+    let get = |url: &str, headers: &[(String, String)]| {
+        let mut req = http.get(url);
+        for (k, v) in headers {
+            req = req.header(k, v);
+        }
+        run(async { req.send().await.unwrap() })
+    };
+    let abandoned_session = || {
+        let url = format!("{server_url}/emby/Sessions?DeviceId={REAL_DEVICE_ID}");
+        let sessions: serde_json::Value = run(get(&url, &observer_headers).json()).unwrap();
+        sessions[0].clone()
+    };
+    let tracker = std::cell::RefCell::new(Tracker::default());
+    tracker
+        .borrow_mut()
+        .begin(ActivePlayback::new(&film.id, &plan), Instant::now());
+    let report = |events: &[PlayerEvent]| {
+        for e in events {
+            for r in tracker.borrow_mut().on_event(e, Instant::now()) {
+                run(service.report_playback(&r)).unwrap_or_else(|e| panic!("{:?}: {e}", r.kind));
+            }
+        }
+    };
+
+    let mut segment_url = None;
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        assert_eq!(plan.method, PlayMethod::Transcode);
+        report(&[PlayerEvent::FileLoaded]);
+        let master = run(get(&plan.url, &headers).text()).unwrap();
+        let variant = url::Url::parse(&plan.url)
+            .unwrap()
+            .join(
+                master
+                    .lines()
+                    .find(|l| !l.is_empty() && !l.starts_with('#'))
+                    .unwrap(),
+            )
+            .unwrap();
+        let playlist = run(get(variant.as_str(), &headers).text()).unwrap();
+        let segment = variant
+            .join(
+                playlist
+                    .lines()
+                    .find(|l| !l.is_empty() && !l.starts_with('#'))
+                    .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(get(segment.as_str(), &headers).status().as_u16(), 200);
+        segment_url = Some(segment);
+
+        let info = abandoned_session();
+        assert!(
+            !info["TranscodingInfo"].is_null(),
+            "the observer must see the encoding, or this test proves nothing"
+        );
+        let fields: Vec<_> = info["TranscodingInfo"]
+            .as_object()
+            .map(|o| o.keys().cloned().collect())
+            .unwrap_or_default();
+        println!("TranscodingInfo fields: {fields:?}");
+
+        // From here on, the abandoned device sends nothing.
+        let abandoned_at = Instant::now();
+        let limit = Duration::from_secs(
+            std::env::var("VIEWER_ENCODER_WATCH_MINUTES")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(20)
+                * 60,
+        );
+        let mut last_state = None;
+        let mut last_print = Instant::now();
+        let mut encoding_ended = None;
+        loop {
+            let s = abandoned_session();
+            let encoding = !s["TranscodingInfo"].is_null();
+            let state = (!s.is_null(), !s["NowPlayingItem"].is_null(), encoding);
+            let elapsed = abandoned_at.elapsed().as_secs();
+            if last_state != Some(state) || last_print.elapsed() >= Duration::from_secs(60) {
+                println!(
+                    "{elapsed} s: session {}, now playing {}, encoding {}, completion {}",
+                    state.0, state.1, state.2, s["TranscodingInfo"]["CompletionPercentage"]
+                );
+                last_state = Some(state);
+                last_print = Instant::now();
+            }
+            // `TranscodingInfo` can vanish for one poll while the encoding goes on.
+            encoding_ended = if encoding {
+                None
+            } else {
+                encoding_ended.or(Some(elapsed))
+            };
+            let settled = encoding_ended.is_some_and(|ended| elapsed >= ended + 120);
+            if (!state.0 || !state.1) && settled || abandoned_at.elapsed() >= limit {
+                break;
+            }
+            std::thread::sleep(Duration::from_secs(10));
+        }
+        println!("encoding ended after: {encoding_ended:?} s");
+        assert!(
+            encoding_ended.is_some(),
+            "the server still transcodes {} s after the client went silent",
+            limit.as_secs()
+        );
+    }));
+
+    // Stop report at 0, also after a failed check: ends what is left, keeps no resume.
+    report(&[PlayerEvent::TimePos { seconds: 0.0 }, PlayerEvent::Shutdown]);
+    let deadline = Instant::now() + Duration::from_secs(15);
+    let mut still_encoding = !abandoned_session()["TranscodingInfo"].is_null();
+    while still_encoding && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(500));
+        still_encoding = !abandoned_session()["TranscodingInfo"].is_null();
+    }
+    let state = run(service.playback_state(&film.id)).unwrap();
+    let segment_after = segment_url
+        .as_ref()
+        .map(|s| get(s.as_str(), &[]).status().as_u16());
+    println!("after stop: encoding {still_encoding}, segment {segment_after:?}, {state:?}");
+    run(service.sign_out()).unwrap();
+    run(observer.sign_out()).unwrap();
+    if let Err(e) = result {
+        std::panic::resume_unwind(e);
+    }
+    assert!(
+        !still_encoding,
+        "the server still transcodes after the stop report"
+    );
+    assert!(!state.played && state.resume.is_none(), "cleanup failed");
+}
+
 /// Real server, on demand, **writes to the test account** (authorized 2026-10-28):
 /// the home rows load, every library has latest additions, and a film stopped
 /// mid-way comes first in "Reprendre" at that position. Cleanup: stopped at 0.

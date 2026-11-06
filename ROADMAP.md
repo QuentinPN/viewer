@@ -103,7 +103,8 @@ Verify real server resume/watched state, unsupported format fallback, network in
 - VERIFIED (2026-11-06): security review, with player hardening (ADR 0025), `docs/evidence/gate4-securite-2026-11-06.md`.
 - VERIFIED (2026-11-06): HTTPS streams open with the Windows root certificates (ADR 0026), `docs/evidence/gate4-https-2026-11-06.md`. Probed with real libmpv on public and local servers and a fake token; NOT VERIFIED against a real HTTPS Emby server or from the app's UI, as none is available.
 - VERIFIED (2026-11-06): `cargo audit` reports no vulnerability after updating `quick-xml` and `time`; 7 warnings remain, none a known vulnerability, `docs/evidence/gate4-audit-dependances-2026-11-06.md`.
-- NOT VERIFIED: release-only behaviors at run time, a real network cut, a real file mpv cannot read, a file whose video alone is unreadable, what happens to the server encoder when the stop report never arrives.
+- VERIFIED (2026-11-06): with no stop report, the encoding leaves `/Sessions` by itself 50 to 70 s after the client goes silent, over 4 tries on the real server, `docs/evidence/gate4-encodeur-sans-rapport-2026-11-06.md`. The ffmpeg process itself was not observed.
+- NOT VERIFIED: release-only behaviors at run time, a real network cut, a real file mpv cannot read, a file whose video alone is unreadable, the encoder and the restart during a long pause.
 - MEASURED (2026-11-06): performance baselines, debug build, `docs/evidence/gate4-performance-2026-11-06.md`: playback start median 1184 ms over 11 films, 0 dropped frames in 60 s off-screen, navigation under 100 ms at the median, 92 % artwork hits on the second launch, up to 994 MiB private memory with the whole grid.
 - VERIFIED (2026-11-06): a stream that does not open ends after 45 s with a fallback or a message (ADR 0027), `docs/evidence/gate4-ouverture-2026-11-06.md`: through the local proxy with the final code; on the real film before the last two changes, as it has since left the library.
 
@@ -413,3 +414,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Found**: 5 unmaintained `unic-*` crates remain in the Windows build, pinned through `urlpattern` by `tauri-utils`, so they wait for a Tauri update.
 - **Not verified**: the release build; `npm audit`; the libmpv DLL, which RustSec does not cover. The audit is not in `npm run verify` or CI, so a new advisory is seen only by rerunning it.
 - **Next**: what the server encoder does when the stop report never arrives.
+
+### 2026-11-06 — Server encoder without a stop report
+
+- **Changed**: new on-demand test `real_server_encoder_without_stop_report`. No app code: the server cleans up by itself.
+- **Tests**: 4 tries on the real server (film "2 Coeurs", 3 Mbit/s, test account): `TranscodingInfo` gone for good after 50, 60, 70 and 70 s, within 10 s, and "now playing" gone at 60 to 70 s; tries 3 and 4 watched 120 s more with no return. `npm run verify` exit 0 (Vitest 113, `cargo test` 117 passed, 15 ignored).
+- **Found**: `TranscodingInfo` can vanish then return, from 20 s on, cause not established, so the first absence does not mean the end. The test's first version reported 20 s for that reason; it now waits for a stable absence.
+- **Not verified**: the ffmpeg process itself, a client that played for long before going silent, a long pause, a real network cut, another film or Emby version.
+- **Next**: a long pause during a transcode, or the real network cut with the owner at the PC.
