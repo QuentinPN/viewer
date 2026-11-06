@@ -1,6 +1,6 @@
 # ADR 0002 — libmpv : chargement dynamique, provenance et licence
 
-Statut : Accepté pour le développement. La licence de redistribution reste **ouverte** (bloque la Gate 5).
+Statut : Accepté. Licence tranchée le 2026-11-06 : **usage personnel, aucune distribution**.
 
 ## Contexte
 Le moteur de lecture est libmpv (CLAUDE.md). Il faut une DLL Windows reproductible, une intégration Rust maintenable, et une stratégie de licence compatible avec la distribution future.
@@ -22,7 +22,8 @@ Le moteur de lecture est libmpv (CLAUDE.md). Il faut une DLL Windows reproductib
 - Processus `mpv.exe` séparé piloté par IPC JSON : isolation des crashs, mais intégration fenêtre et latence moins bonnes. Gardé en repli si l'embarquement devient instable.
 
 ## Conséquences
-- **Licence** : les builds shinchiro incluent des composants GPL. Redistribuer Viewer avec cette DLL impose une distribution compatible GPL. L'utilisateur a choisi « usage perso, à trancher ». Avant toute distribution : choisir entre GPL-3.0 pour Viewer et une libmpv LGPL compilée par nos soins, puis auditer les licences FFmpeg et des codecs (Gate 5).
+- **Licence** : cette DLL se distribue sous GPL-3.0 (`docs/evidence/gate5-licences-2026-11-06.md`). Le propriétaire est le seul destinataire d'Viewer, qu'il installe sur ses propres PC : sans transmission à un tiers, la GPL-3.0 n'impose rien, et la DLL est conservée. Le projet ne déclare donc aucune licence.
+- **Cette décision ne couvre que ce cas.** Remettre l'application à quelqu'un d'autre, même un proche, est une distribution. Il faudrait d'abord choisir entre GPL-3.0 pour Viewer et une libmpv LGPL compilée par nos soins, avec les sources correspondantes, puis auditer les licences de la DLL et les brevets des codecs.
 - Mettre à jour libmpv implique de changer la release, le nom de l'archive et les deux hachages ensemble, puis de rejouer la Gate 1.
 
 ## Validation

@@ -106,9 +106,9 @@ Verify real server resume/watched state, unsupported format fallback, network in
 - MEASURED (2026-11-06): performance baselines, debug build, `docs/evidence/gate4-performance-2026-11-06.md`: playback start median 1184 ms over 11 films, 0 dropped frames in 60 s off-screen, navigation under 100 ms at the median, 92 % artwork hits on the second launch, up to 994 MiB private memory with the whole grid.
 - VERIFIED (2026-11-06): a stream that does not open ends after 45 s with a fallback or a message (ADR 0027), `docs/evidence/gate4-ouverture-2026-11-06.md`: through the local proxy with the final code; on the real film before the last two changes, as it has since left the library.
 
-## Gate 5 — Packaging [TODO · BLOCKED on licence decision]
+## Gate 5 — Packaging [TODO]
 
-Redistribution/license audit, release build, Windows installer, clean-machine smoke test, documentation. The current libmpv build is GPL (ADR 0002): choose a GPL-3.0 project licence or an in-house LGPL libmpv before any distribution. Audit and options: `docs/evidence/gate5-licences-2026-11-06.md`; the owner's decision is pending.
+Redistribution/license audit, release build, Windows installer, clean-machine smoke test, documentation. Licence decided (2026-11-06, ADR 0002): personal use on the owner's own PCs, no distribution, so the current GPL-3.0 libmpv stays. Giving the app to anyone else reopens the choice between a GPL-3.0 project licence and an in-house LGPL libmpv; audit and options in `docs/evidence/gate5-licences-2026-11-06.md`.
 
 ## Work log
 
