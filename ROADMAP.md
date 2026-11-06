@@ -92,7 +92,7 @@ Home, film/series browsing, details, search, accessible player UI, responsive la
 - DROPPED (user decision, 2026-10-28): search of people.
 - Known input: the control bar hides subtitles at narrow widths (Gate 1 finding); views must provide an opaque background when no video plays (transparent window).
 
-## Gate 4 — End-to-end quality [IN PROGRESS · stream reconnection, stall limit, cuts during a transcode, transcode fallback, security review and HTTPS in the player VERIFIED]
+## Gate 4 — End-to-end quality [IN PROGRESS · stream reconnection, stall limit, cuts during a transcode, transcode fallback, security review and HTTPS in the player VERIFIED · performance baselines MEASURED]
 
 Verify real server resume/watched state, unsupported format fallback, network interruptions, performance and security reviews.
 
@@ -103,7 +103,8 @@ Verify real server resume/watched state, unsupported format fallback, network in
 - VERIFIED (2026-11-06): security review, with player hardening (ADR 0025), `docs/evidence/gate4-securite-2026-11-06.md`.
 - VERIFIED (2026-11-06): HTTPS streams open with the Windows root certificates (ADR 0026), `docs/evidence/gate4-https-2026-11-06.md`. Probed with real libmpv on public and local servers and a fake token; NOT VERIFIED against a real HTTPS Emby server or from the app's UI, as none is available.
 - NOT VERIFIED: `cargo audit` (not run), release-only behaviors at run time, a real network cut, a real file mpv cannot read, a file whose video alone is unreadable, what happens to the server encoder when the stop report never arrives.
-- TODO: performance measurements.
+- MEASURED (2026-11-06): performance baselines, debug build, `docs/evidence/gate4-performance-2026-11-06.md`: playback start median 1184 ms over 11 films, 0 dropped frames in 60 s off-screen, navigation under 100 ms at the median, 92 % artwork hits on the second launch, up to 994 MiB private memory with the whole grid.
+- TODO: a stream answered by HTTP 500 stays on "Ouverture du flux…" with no error or fallback for at least 180 s, found on a real film (`Stale file handle` from the server). No deadline covers the opening; `STALL_LIMIT` only starts once the file is loaded.
 
 ## Gate 5 — Packaging [TODO · BLOCKED on licence decision]
 
@@ -388,3 +389,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: 5 new (Vitest 113, `cargo test` 111 passed, 14 ignored), `npm run verify` and `cargo clippy --release --all-targets` clean; probes with real libmpv: public certificate accepted; untrusted, wrong name, expired, self-signed and no roots refused; media and HLS over HTTPS with a test authority; accented folder. `gate2-play` 13/13; `gate2-transcode` failed once on the "Sous-titres" click (cause not established), then 10/10 unchanged.
 - **Not verified**: a real HTTPS Emby server, so the whole path from the UI; a root Windows downloads on demand; a root in `Disallowed`; revocation is not checked by the player.
 - **Next**: performance measurements, the last Gate 4 item.
+
+### 2026-11-06 — Performance baselines
+
+- **Changed**: scenario `scripts/e2e/measure-gate4.mjs`; `launch()` waits for the CDP port of the previous WebView2 to close. No app code.
+- **Tests**: `measure-gate4` ran to its end on the real server (run `measure-gate4-20261106-183307`), after a first run stopped by that port. Temporary probes: 3 + 1 more tries of the film that fails, 15 play and close cycles for memory, direct reads of the stream outside the app. The scenario now fails when a film does not start; that one-word change was not rerun.
+- **Not verified**: release build, clean machine, visible window, long 4K or HDR sessions, access from outside the network. Why mpv ends no file on that HTTP 500 is not established.
+- **Next**: an opening deadline, so a stream in error shows a message. The film itself needs the server's mount looked at, by its owner.

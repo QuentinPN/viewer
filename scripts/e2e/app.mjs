@@ -29,6 +29,20 @@ async function waitForCdp(port, proc, timeoutMs) {
   throw new Error(`CDP port ${port} not open after ${timeoutMs} ms`);
 }
 
+/** A previous WebView2 may outlive its app by a moment, still holding the port. */
+async function waitForCdpClosed(port, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      await fetch(`http://127.0.0.1:${port}/json/version`);
+    } catch {
+      return;
+    }
+    await sleep(250);
+  }
+  throw new Error(`CDP port ${port} still open after ${timeoutMs} ms`);
+}
+
 /** Output folder `artifacts/<group>/<name>-<timestamp>`. */
 export function runDir(group, name) {
   const stamp = new Date()
@@ -53,6 +67,7 @@ export async function launch({
 } = {}) {
   // The test account is for the scenario only, never for the app process.
   const { VIEWER_EMBY_USER, VIEWER_EMBY_PASSWORD, ...inherited } = process.env;
+  await waitForCdpClosed(port, timeoutMs);
   const proc = spawn(exe, [], {
     env: {
       ...inherited,
