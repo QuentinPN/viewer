@@ -102,7 +102,8 @@ Verify real server resume/watched state, unsupported format fallback, network in
 - VERIFIED (2026-11-06): the position played reaches the server when the network comes back after a long cut (ADR 0024), on the real server through the local proxy, `docs/evidence/gate4-renvoi-arret-2026-11-06.md`. Application closed during the cut: the position is still lost.
 - VERIFIED (2026-11-06): security review, with player hardening (ADR 0025), `docs/evidence/gate4-securite-2026-11-06.md`.
 - VERIFIED (2026-11-06): HTTPS streams open with the Windows root certificates (ADR 0026), `docs/evidence/gate4-https-2026-11-06.md`. Probed with real libmpv on public and local servers and a fake token; NOT VERIFIED against a real HTTPS Emby server or from the app's UI, as none is available.
-- NOT VERIFIED: `cargo audit` (not run), release-only behaviors at run time, a real network cut, a real file mpv cannot read, a file whose video alone is unreadable, what happens to the server encoder when the stop report never arrives.
+- VERIFIED (2026-11-06): `cargo audit` reports no vulnerability after updating `quick-xml` and `time`; 7 warnings remain, none a known vulnerability, `docs/evidence/gate4-audit-dependances-2026-11-06.md`.
+- NOT VERIFIED: release-only behaviors at run time, a real network cut, a real file mpv cannot read, a file whose video alone is unreadable, what happens to the server encoder when the stop report never arrives.
 - MEASURED (2026-11-06): performance baselines, debug build, `docs/evidence/gate4-performance-2026-11-06.md`: playback start median 1184 ms over 11 films, 0 dropped frames in 60 s off-screen, navigation under 100 ms at the median, 92 % artwork hits on the second launch, up to 994 MiB private memory with the whole grid.
 - VERIFIED (2026-11-06): a stream that does not open ends after 45 s with a fallback or a message (ADR 0027), `docs/evidence/gate4-ouverture-2026-11-06.md`: through the local proxy with the final code; on the real film before the last two changes, as it has since left the library.
 
@@ -404,3 +405,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Found**: the performance evidence blamed Direct Play for that endless wait. A trace shows the direct 500 ends in 20 ms and the fallback starts; the wait came from the transcode, whose segments all failed.
 - **Not verified**: the final code on the real failing film: it left the library during this work (id 404, not found by search), cause not established. Release build, visible window, a 4K transcode slower than 45 s, a NAS waking up, a segment failing after playback started.
 - **Next**: Gate 4's remaining NOT VERIFIED items, or the licence decision that blocks Gate 5.
+
+### 2026-11-06 — Dependency audit
+
+- **Changed**: `plist` 1.10.3 brings `quick-xml` 0.42.0 and `time` 0.3.55, which fix 3 advisories; `rust-version` goes from 1.85 to 1.88 because they require it; clippy then asks for let chains, so two nested `if` were collapsed, with no behavior change.
+- **Tests**: `cargo audit` 3 vulnerabilities before, 0 after, 7 warnings; `npm run verify` exit 0 (Vitest 113, `cargo test` 117 passed, 14 ignored); debug build; `gate2-play` passed on the real server. Details in `docs/evidence/gate4-audit-dependances-2026-11-06.md`.
+- **Found**: 5 unmaintained `unic-*` crates remain in the Windows build, pinned through `urlpattern` by `tauri-utils`, so they wait for a Tauri update.
+- **Not verified**: the release build; `npm audit`; the libmpv DLL, which RustSec does not cover. The audit is not in `npm run verify` or CI, so a new advisory is seen only by rerunning it.
+- **Next**: what the server encoder does when the stop report never arrives.

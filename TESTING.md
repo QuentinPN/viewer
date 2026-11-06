@@ -70,7 +70,7 @@ Mock Emby API for auth failures, pagination, permissions, missing fields, playba
 
 - `cargo test player::mpv`: against real libmpv and a local server, a redirect does not carry the token to another host, and an HLS playlist does not open a local file (ADR 0025).
 - `cargo test tls_roots` and `cargo test https_sources`: the Windows root export, and what the player does with it, including a failed export (ADR 0026). Refusals by the TLS layer were probed by hand: `docs/evidence/gate4-https-2026-11-06.md`.
-- `cargo audit` is not part of `npm run verify` and has not run yet: run it before a release.
+- `cargo audit` is not part of `npm run verify`: run it from `src-tauri` before a release. Last result: `docs/evidence/gate4-audit-dependances-2026-11-06.md`.
 - Review results: `docs/evidence/gate4-securite-2026-11-06.md`.
 
 ## Release gate

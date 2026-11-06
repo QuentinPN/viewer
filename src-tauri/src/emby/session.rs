@@ -1131,10 +1131,10 @@ impl EmbyService {
             guard.take()
         };
         let record = self.file().session;
-        if let Some(c) = &current {
-            if let Err(e) = c.client.logout().await {
-                log::warn!("Emby logout not confirmed by the server: {}", e.kind());
-            }
+        if let Some(c) = &current
+            && let Err(e) = c.client.logout().await
+        {
+            log::warn!("Emby logout not confirmed by the server: {}", e.kind());
         }
         if let Some(r) = record {
             self.store

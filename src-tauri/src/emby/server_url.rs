@@ -51,10 +51,10 @@ impl ServerUrl {
         // Keep a reverse-proxy prefix, drop a trailing slash and a typed "/emby" or
         // "/web/..." suffix copied from the browser address bar.
         let mut path = url.path().trim_end_matches('/').to_owned();
-        if let Some(i) = path.find("/web") {
-            if path[i..] == *"/web" || path[i..].starts_with("/web/") {
-                path.truncate(i);
-            }
+        if let Some(i) = path.find("/web")
+            && (path[i..] == *"/web" || path[i..].starts_with("/web/"))
+        {
+            path.truncate(i);
         }
         if path.ends_with("/emby") {
             path.truncate(path.len() - "/emby".len());
