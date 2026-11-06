@@ -24,7 +24,7 @@ L'API Emby refuse déjà les redirections et les URL de flux hors du serveur (`P
 
 ## Conséquences
 - Un élément dont Emby sert le flux par redirection (`.strm`, source distante) ne peut plus être lu en direct. Aucun élément de ce type n'a été testé.
-- **HTTPS ne lit pas encore.** FFmpeg utilise ici OpenSSL sans magasin de certificats (`tls-ca-file` vide) : un flux HTTPS est refusé, y compris avec un certificat public valide (`https://www.example.com`, erreur TLS avant tout envoi d'en-tête). L'échec est du bon côté, le jeton ne part pas, mais un serveur HTTPS ne peut pas lire. Mesuré avec une autorité fournie à `tls-ca-file` : le certificat valable se connecte, le mauvais nom d'hôte est refusé. Il reste à fournir le magasin Windows au lecteur, dans une décision séparée.
+- **HTTPS ne lit pas encore.** FFmpeg utilise ici OpenSSL sans magasin de certificats (`tls-ca-file` vide) : un flux HTTPS est refusé, y compris avec un certificat public valide (`https://www.example.com`, erreur TLS avant tout envoi d'en-tête). L'échec est du bon côté, le jeton ne part pas, mais un serveur HTTPS ne peut pas lire. Mesuré avec une autorité fournie à `tls-ca-file` : le certificat valable se connecte, le mauvais nom d'hôte est refusé. Le magasin Windows est fourni au lecteur par l'ADR 0026.
 
 ## Validation
 Tests contre la vraie libmpv et un serveur local : la redirection ne porte pas le jeton ailleurs, et une playlist HLS n'ouvre pas de fichier local. Scénarios `gate2-play`, `gate2-transcode`, `gate3-player`, `gate4-fallback` sur le serveur réel. Résultats : `docs/evidence/gate4-securite-2026-11-06.md`.

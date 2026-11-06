@@ -3,6 +3,7 @@
 
 mod ffi;
 pub mod mpv;
+mod tls_roots;
 
 use std::time::{Duration, Instant};
 
@@ -74,6 +75,10 @@ impl MediaSource {
             return Err(PlayerError::InvalidSource("fichier introuvable".into()));
         }
         Ok(Self::LocalFile(path))
+    }
+
+    pub fn is_https(&self) -> bool {
+        matches!(self, Self::Http(u) if u.to_ascii_lowercase().starts_with("https://"))
     }
 
     pub fn as_mpv_arg(&self) -> String {
@@ -204,6 +209,8 @@ pub enum PlayerError {
     UnsupportedApi(String),
     #[error("source invalide : {0}")]
     InvalidSource(String),
+    #[error("certificats Windows illisibles : {0}")]
+    CertificateStore(String),
     #[error("erreur libmpv ({context}) : {message}")]
     Mpv { context: String, message: String },
     #[error("aucune lecture en cours")]

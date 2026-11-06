@@ -42,6 +42,11 @@ impl AppState {
             wid: self.wid,
             // Debug builds only: scripted UI tests (scripts/e2e) stay silent.
             silent: cfg!(debug_assertions) && std::env::var_os("VIEWER_E2E_SILENT").is_some(),
+            tls_roots: app
+                .path()
+                .app_cache_dir()
+                .ok()
+                .map(|dir| dir.join("tls-roots.pem")),
             ..MpvConfig::default()
         };
         let emitter = app.clone();

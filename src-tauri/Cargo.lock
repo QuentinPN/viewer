@@ -3902,10 +3902,12 @@ dependencies = [
 name = "viewer"
 version = "0.1.0"
 dependencies = [
+ "base64 0.23.1",
  "keyring",
  "libloading 0.9.0",
  "log",
  "reqwest",
+ "schannel",
  "serde",
  "serde_json",
  "tauri",

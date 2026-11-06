@@ -6,7 +6,7 @@
 //! handle is never destroyed while the event loop still uses it.
 
 use std::ffi::{CStr, CString, c_char, c_int};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -15,7 +15,7 @@ use std::time::Instant;
 use super::ffi::{self, MpvApi, MpvHandle};
 use super::{
     EndReason, ExternalSubtitle, MediaSource, PlaybackRequest, PlayerCommand, PlayerDiagnostics,
-    PlayerEngine, PlayerError, PlayerEvent, STALL_LIMIT, StallWatch, Track, TrackKind,
+    PlayerEngine, PlayerError, PlayerEvent, STALL_LIMIT, StallWatch, Track, TrackKind, tls_roots,
 };
 
 pub type EventSink = Box<dyn Fn(PlayerEvent) + Send + Sync>;
@@ -32,6 +32,9 @@ pub struct MpvConfig {
     /// `ao=null` with video still shown: scripted UI tests must not play sound on
     /// the user's speakers (ADR 0006).
     pub silent: bool,
+    /// Where to export the Windows root certificates for HTTPS sources. Without it,
+    /// `tls-ca-file` stays empty and every HTTPS source is refused (ADR 0026).
+    pub tls_roots: Option<PathBuf>,
 }
 
 impl Default for MpvConfig {
@@ -41,6 +44,7 @@ impl Default for MpvConfig {
             headless: false,
             hwdec: "auto-safe".into(),
             silent: false,
+            tls_roots: None,
         }
     }
 }
@@ -164,6 +168,7 @@ fn cstring(s: &str) -> Result<CString, PlayerError> {
 pub struct MpvEngine {
     inner: Arc<Inner>,
     stop: Arc<AtomicBool>,
+    tls_roots: Option<PathBuf>,
     event_thread: Mutex<Option<JoinHandle<()>>>,
     destroyed: AtomicBool,
 }
@@ -235,6 +240,7 @@ impl MpvEngine {
         Ok(Self {
             inner,
             stop,
+            tls_roots: config.tls_roots.clone(),
             event_thread: Mutex::new(Some(thread)),
             destroyed: AtomicBool::new(false),
         })
@@ -313,6 +319,12 @@ impl MpvEngine {
 impl PlayerEngine for MpvEngine {
     fn load(&self, request: &PlaybackRequest, source: &MediaSource) -> Result<(), PlayerError> {
         let inner = &self.inner;
+        if source.is_https()
+            && let Some(path) = &self.tls_roots
+        {
+            tls_roots::refresh(path).map_err(|e| PlayerError::CertificateStore(e.to_string()))?;
+            inner.set_property("tls-ca-file", &path.to_string_lossy())?;
+        }
         inner.command(&["change-list", "http-header-fields", "clr", ""])?;
         for (name, value) in &request.http_headers {
             if name.contains([':', '\r', '\n']) || value.contains(['\r', '\n']) {
@@ -782,6 +794,66 @@ mod tests {
             "HTTP/1.1 {status}\r\n{extra_header}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
             body.len()
         )
+    }
+
+    #[test]
+    fn https_sources_get_the_windows_roots_and_fail_closed() {
+        let Some(lib) = libmpv_path() else {
+            eprintln!("SKIPPED: libmpv not found (set VIEWER_LIBMPV)");
+            return;
+        };
+        let dir = std::env::temp_dir().join(format!("viewer-roots-é-{}", std::process::id()));
+        let path = dir.join("tls-roots.pem");
+        let engine_with = |tls_roots: Option<PathBuf>| {
+            MpvEngine::new(
+                &lib,
+                &MpvConfig {
+                    headless: true,
+                    tls_roots,
+                    ..MpvConfig::default()
+                },
+                Box::new(|_| {}),
+            )
+            .expect("engine")
+        };
+        let load = |engine: &MpvEngine, url: &str| {
+            let request = PlaybackRequest {
+                source: url.to_owned(),
+                http_headers: Vec::new(),
+                start_seconds: None,
+                subtitles: Vec::new(),
+            };
+            engine.load(&request, &MediaSource::parse(url).unwrap())
+        };
+
+        let engine = engine_with(Some(path.clone()));
+        load(&engine, "http://127.0.0.1:1/video").expect("http");
+        assert!(!path.exists(), "no export for a plain HTTP source");
+        assert_eq!(engine.property("tls-ca-file").as_deref(), Some(""));
+
+        load(&engine, "HTTPS://127.0.0.1:1/video").expect("https");
+        let pem = std::fs::read_to_string(&path).unwrap();
+        assert!(pem.starts_with("-----BEGIN CERTIFICATE-----\n"));
+        assert_eq!(
+            engine.property("tls-ca-file").as_deref(),
+            Some(path.to_str().unwrap())
+        );
+        engine.shutdown();
+
+        // No path configured: nothing to trust, OpenSSL refuses.
+        let engine = engine_with(None);
+        load(&engine, "https://127.0.0.1:1/video").expect("https");
+        assert_eq!(engine.property("tls-ca-file").as_deref(), Some(""));
+        engine.shutdown();
+
+        // The export fails: nothing is loaded.
+        let engine = engine_with(Some(path.join("not-a-directory").join("roots.pem")));
+        let error = load(&engine, "https://127.0.0.1:1/video").expect_err("export failure");
+        assert!(matches!(error, PlayerError::CertificateStore(_)));
+        assert_eq!(engine.property("path"), None);
+        engine.shutdown();
+
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     /// Loads `url` with a token in a headless engine; returns every event up to the

@@ -92,7 +92,7 @@ Home, film/series browsing, details, search, accessible player UI, responsive la
 - DROPPED (user decision, 2026-10-28): search of people.
 - Known input: the control bar hides subtitles at narrow widths (Gate 1 finding); views must provide an opaque background when no video plays (transparent window).
 
-## Gate 4 — End-to-end quality [IN PROGRESS · stream reconnection, stall limit, cuts during a transcode, transcode fallback and security review VERIFIED]
+## Gate 4 — End-to-end quality [IN PROGRESS · stream reconnection, stall limit, cuts during a transcode, transcode fallback, security review and HTTPS in the player VERIFIED]
 
 Verify real server resume/watched state, unsupported format fallback, network interruptions, performance and security reviews.
 
@@ -100,9 +100,10 @@ Verify real server resume/watched state, unsupported format fallback, network in
 - VERIFIED (2026-11-06): transcode fallback when the direct source does not open (ADR 0023), on the real server with unreadable bytes from the local proxy, `docs/evidence/gate4-repli-2026-11-06.md`.
 - VERIFIED (2026-11-06): short and long cuts during an HLS transcode through the local proxy, `docs/evidence/gate4-coupure-hls-2026-11-06.md`.
 - VERIFIED (2026-11-06): the position played reaches the server when the network comes back after a long cut (ADR 0024), on the real server through the local proxy, `docs/evidence/gate4-renvoi-arret-2026-11-06.md`. Application closed during the cut: the position is still lost.
-- VERIFIED (2026-11-06): security review, with player hardening (ADR 0025), `docs/evidence/gate4-securite-2026-11-06.md`. HTTPS streams do not play yet: FFmpeg has no certificate store, so they fail closed.
+- VERIFIED (2026-11-06): security review, with player hardening (ADR 0025), `docs/evidence/gate4-securite-2026-11-06.md`.
+- VERIFIED (2026-11-06): HTTPS streams open with the Windows root certificates (ADR 0026), `docs/evidence/gate4-https-2026-11-06.md`. Probed with real libmpv on public and local servers and a fake token; NOT VERIFIED against a real HTTPS Emby server or from the app's UI, as none is available.
 - NOT VERIFIED: `cargo audit` (not run), release-only behaviors at run time, a real network cut, a real file mpv cannot read, a file whose video alone is unreadable, what happens to the server encoder when the stop report never arrives.
-- TODO: performance measurements; give the player the Windows certificate store so HTTPS servers can play.
+- TODO: performance measurements.
 
 ## Gate 5 — Packaging [TODO · BLOCKED on licence decision]
 
@@ -380,3 +381,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 ### 2026-11-06 — Emby runs on a mini-PC
 
 - **Changed**: documents, comments and test names said "the NAS" for the Emby server. Emby runs on a mini-PC, which the app connects to; the QNAP NAS only stores the media files. Measurements recorded as "on the NAS" (encoding, poster times) were taken against the mini-PC. No behavior change.
+
+### 2026-11-06 — HTTPS in the player
+
+- **Changed**: ADR 0026; `player/tls_roots.rs` exports the Windows ROOT store (server authentication, not expired, not in `Disallowed`) to a PEM file in the cache folder before each HTTPS load, and `MpvEngine::load` gives it to `tls-ca-file`. A failed export loads nothing. `schannel` and `base64` become direct dependencies; both were already compiled.
+- **Tests**: 5 new (Vitest 113, `cargo test` 111 passed, 14 ignored), `npm run verify` and `cargo clippy --release --all-targets` clean; probes with real libmpv: public certificate accepted; untrusted, wrong name, expired, self-signed and no roots refused; media and HLS over HTTPS with a test authority; accented folder. `gate2-play` 13/13; `gate2-transcode` failed once on the "Sous-titres" click (cause not established), then 10/10 unchanged.
+- **Not verified**: a real HTTPS Emby server, so the whole path from the UI; a root Windows downloads on demand; a root in `Disallowed`; revocation is not checked by the player.
+- **Next**: performance measurements, the last Gate 4 item.
