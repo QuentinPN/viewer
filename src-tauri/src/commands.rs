@@ -24,6 +24,13 @@ pub async fn player_open(
     state: State<'_, AppState>,
     request: PlaybackRequest,
 ) -> Result<(), PlayerError> {
+    // Test bench of the Gate 1 prototype: the WebView picks any URL and headers.
+    // Emby playback goes through `emby_play`, which picks them in Rust.
+    if !cfg!(debug_assertions) {
+        return Err(PlayerError::InvalidSource(
+            "prototype indisponible dans cette version".into(),
+        ));
+    }
     let source = MediaSource::parse(&request.source)?;
     state.engine()?.load(&request, &source)
 }

@@ -491,9 +491,11 @@ $effect(() => {
       <button type="button" class="quiet" onclick={onChangeServer}>
         Changer de serveur
       </button>
-      <button type="button" class="quiet" onclick={onOpenPlayer}>
-        Prototype de lecture
-      </button>
+      {#if import.meta.env.DEV}
+        <button type="button" class="quiet" onclick={onOpenPlayer}>
+          Prototype de lecture
+        </button>
+      {/if}
       <button type="button" class="quiet" onclick={onSignOut} disabled={signingOut}>
         {signingOut ? "Déconnexion…" : "Se déconnecter"}
       </button>

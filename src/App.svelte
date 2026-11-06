@@ -14,8 +14,8 @@ import PlayerView from "./lib/player/PlayerView.svelte";
 // Session first (ADR 0012): the saved Emby session is restored behind a branded
 // screen, never the sign-in form. The signed-in app stays mounted (inert) under
 // the recovery and reauthentication screens, so view, selection and scroll
-// survive a lost connection. The Gate 1 player prototype stays reachable until
-// the Gate 3 player replaces it. Playback from Emby shows the player over the
+// survive a lost connection. The Gate 1 player prototype stays reachable in
+// development builds only (ADR 0025). Playback from Emby shows the player over the
 // library, which stays mounted (hidden) for the same reason.
 
 let conn = $state<ConnectionState>({ kind: "restoring" });
