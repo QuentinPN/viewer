@@ -1149,7 +1149,8 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     right: var(--side);
     bottom: calc(100% - 96px);
     width: min(340px, calc(100vw - 32px));
-    max-height: min(60vh, 420px);
+    /* Stays below the title bar in short windows (150 % scaling). */
+    max-height: min(60vh, 420px, calc(100vh - 240px));
     overflow-y: auto;
     padding: 18px;
     background: rgb(36 36 42 / 72%);

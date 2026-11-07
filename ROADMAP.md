@@ -528,4 +528,12 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Added**: `scripts/e2e/gate3-scaling.mjs`, the redesigned screens at the CSS sizes of 125 % and 150 % scaling (window resized, device scale factor set over CDP).
 - **Tests**: `gate3-scaling` all passed (no horizontal overflow on 21 screens). Screenshots checked: at 853 × 480 the navigation pill, the toolbar, the detail heroes, the episode grid (two columns), the settings and the sign-in card all fit; nothing needed changing.
 - **Not verified**: a real 125 % or 150 % Windows setting (font rasterization, native frame); the player and the connection-lost screens at those sizes; a library list long enough to overflow the navigation pill at 853 px.
+- **Next**: the player and connection-lost screens at those sizes.
+
+### 2026-11-07 — Redesign: player and connection lost at 150 % scaling (ADR 0031)
+
+- **Changed**: `gate3-scaling` also covers the player with its subtitles panel (one short playback per size, rewound to 0) and the connection-lost overlay (network cut through `net-proxy.mjs`), with checks for the panel below the title bar and the actions on screen.
+- **Fixed**: at 853 × 480 the subtitles panel went under the title bar (`max-height` now also bounded by `100vh − 240px`); the connection-lost card overflowed so its buttons were off screen (37 px at 125 %, 133 px at 150 %): compact layout below 600 px of height, and `place-items: safe center` on the sign-in and connection-lost screens so a tall card scrolls instead of being cut at the top.
+- **Tests**: `gate3-scaling` all passed (panel top 120 / 63 / 264 px, actions 121 / 25 / 99 px above the bottom); screenshots checked. `npm run verify:web` exit 0 (123 tests).
+- **Not verified**: a real 125 % or 150 % Windows setting; a library list long enough to overflow the navigation pill at 853 px.
 - **Next**: to be chosen.

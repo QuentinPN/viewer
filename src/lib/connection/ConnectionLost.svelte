@@ -100,7 +100,7 @@ onMount(() => {
     height: 100%;
     overflow-y: auto;
     display: grid;
-    place-items: center;
+    place-items: safe center;
     padding: var(--space-4);
     background:
       radial-gradient(60% 60% at 50% 45%, rgb(42 50 66 / 55%) 0%, rgb(0 0 0 / 0%) 100%),
@@ -268,6 +268,33 @@ onMount(() => {
     }
     .lead {
       margin-bottom: var(--space-4);
+    }
+  }
+  /* 150 % scaling of a 720 px window: the actions stay on screen. */
+  @media (max-height: 600px) {
+    .card {
+      padding: 20px 28px;
+    }
+    .logo {
+      display: none;
+    }
+    h1 {
+      font-size: 24px;
+    }
+    .lead {
+      margin: 4px 0 var(--space-3);
+      font-size: 14px;
+    }
+    .status {
+      margin-top: var(--space-3);
+    }
+    .actions {
+      grid-template-columns: 1fr 1fr;
+      margin-top: var(--space-3);
+    }
+    button {
+      height: 44px;
+      font-size: 15px;
     }
   }
 </style>

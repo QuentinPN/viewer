@@ -225,7 +225,7 @@ function changeServer() {
     height: 100%;
     overflow-y: auto;
     display: grid;
-    place-items: center;
+    place-items: safe center;
     padding: var(--space-4);
     background:
       radial-gradient(60% 60% at 50% 45%, rgb(42 50 66 / 55%) 0%, rgb(0 0 0 / 0%) 100%),
