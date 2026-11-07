@@ -6,7 +6,8 @@ export type PlayerAction =
   | { kind: "exitFullscreen" }
   | { kind: "toggleMute" }
   | { kind: "volume"; delta: number }
-  | { kind: "toggleInfo" };
+  | { kind: "toggleInfo" }
+  | { kind: "chapter"; delta: -1 | 1 };
 
 /** Volume step of the arrow keys, in percent. */
 export const VOLUME_STEP = 5;
@@ -48,6 +49,11 @@ export function mapPlayerKey(
       return { kind: "toggleFullscreen" };
     case "Escape":
       return { kind: "exitFullscreen" };
+    // Previous and next chapter (ADR 0034), as in mpv.
+    case "PageUp":
+      return { kind: "chapter", delta: -1 };
+    case "PageDown":
+      return { kind: "chapter", delta: 1 };
     default:
       return null;
   }

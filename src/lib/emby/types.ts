@@ -343,6 +343,13 @@ export interface ArtworkCacheCleared {
   bytes: number;
 }
 
+/** A chapter of the file, from Emby's `Chapters` (ADR 0034). */
+export interface Chapter {
+  /** Seconds from the start of the file. */
+  start: number;
+  name: string;
+}
+
 /** A range the player offers to skip, in seconds of the file (ADR 0030). */
 export interface Segment {
   kind: "intro" | "credits";

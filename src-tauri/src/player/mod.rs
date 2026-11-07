@@ -199,6 +199,8 @@ pub struct PlayerDiagnostics {
     pub volume: Option<f64>,
     pub frame_drop_count: Option<i64>,
     pub decoder_frame_drop_count: Option<i64>,
+    /// Chapters mpv found in the file (`chapters`), compared with Emby's (ADR 0034).
+    pub chapter_count: Option<i64>,
 }
 
 #[derive(Debug, thiserror::Error)]

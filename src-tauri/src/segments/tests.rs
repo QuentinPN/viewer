@@ -215,6 +215,7 @@ fn urls_carry_one_id_and_the_episode() {
 fn emby_markers_from_chapters() {
     let chapter = |ticks: i64, marker: &str| ChapterDto {
         start_position_ticks: ticks,
+        name: None,
         marker_type: Some(marker.into()),
     };
     let chapters = [

@@ -232,12 +232,14 @@ pub struct BaseItemDto {
 }
 
 /// `ChapterInfo`: `MarkerType` is `Chapter`, `IntroStart`, `IntroEnd` or
-/// `CreditsStart` (ADR 0030).
+/// `CreditsStart` (ADR 0030). `Chapter` ones are the player's chapters (ADR 0034).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ChapterDto {
     #[serde(default)]
     pub start_position_ticks: i64,
+    #[serde(default)]
+    pub name: Option<String>,
     #[serde(default)]
     pub marker_type: Option<String>,
 }

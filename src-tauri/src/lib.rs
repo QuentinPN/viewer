@@ -348,6 +348,7 @@ pub fn run() {
             commands::emby_episodes,
             commands::emby_play,
             commands::emby_segments,
+            commands::emby_chapters,
             diagnostics::diagnostics_open_log_dir,
         ])
         .build(context())
