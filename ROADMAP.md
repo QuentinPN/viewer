@@ -522,3 +522,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `npm run verify:web` exit 0 (123 tests).
 - **Not verified**: the prototype by eye (`run-gate1.ps1` needs a local media file; not run).
 - **Next**: check every redesigned screen at 125 % and 150 % scaling.
+
+### 2026-11-07 — Redesign: display scaling check (ADR 0031)
+
+- **Added**: `scripts/e2e/gate3-scaling.mjs`, the redesigned screens at the CSS sizes of 125 % and 150 % scaling (window resized, device scale factor set over CDP).
+- **Tests**: `gate3-scaling` all passed (no horizontal overflow on 21 screens). Screenshots checked: at 853 × 480 the navigation pill, the toolbar, the detail heroes, the episode grid (two columns), the settings and the sign-in card all fit; nothing needed changing.
+- **Not verified**: a real 125 % or 150 % Windows setting (font rasterization, native frame); the player and the connection-lost screens at those sizes; a library list long enough to overflow the navigation pill at 853 px.
+- **Next**: to be chosen.
