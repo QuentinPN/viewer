@@ -80,6 +80,7 @@ Mock Emby API for auth failures, pagination, permissions, missing fields, playba
 - `cargo test tls_roots` and `cargo test https_sources`: the Windows root export, and what the player does with it, including a failed export (ADR 0026). Refusals by the TLS layer were probed by hand: `docs/evidence/gate4-https-2026-11-06.md`.
 - `cargo audit` is not part of `npm run verify`: run it from `src-tauri` before a release. Last result: `docs/evidence/gate4-audit-dependances-2026-11-06.md`.
 - Review results: `docs/evidence/gate4-securite-2026-11-06.md`.
+- `cargo test diagnostics` (ADR 0033): redaction of query, header, JSON and URL credentials, ordinary text left alone, record cut, levels, UTC dates, size rotation over 3 files, append to an existing file. `./scripts/e2e/run.ps1 gate3-settings` also checks Réglages › « Diagnostics » and the log of the run (`VIEWER_E2E_LOG_DIR`): start line, a panic raised on purpose (`VIEWER_E2E_PANIC`, debug builds only) with location and backtrace, no unredacted secret and not the test password. The button that opens the explorer is not clicked.
 
 ## Release gate
 

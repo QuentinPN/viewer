@@ -4,8 +4,12 @@
 // - the home fills the cache; « Réglages » shows its size and image count, and
 //   « À propos » the version of package.json;
 // - « Vider le cache des images » removes every image file and announces it;
-// - the home and search still work afterwards, and a library closes the settings.
-// Read only on the server (image GETs); only the temporary folder is emptied.
+// - the home and search still work afterwards, and a library closes the settings;
+// - « Diagnostics » offers « Ouvrir le dossier des journaux » (not clicked: it opens
+//   the file explorer on the desktop); the log, in a temporary folder
+//   (`VIEWER_E2E_LOG_DIR`), records the start and a panic raised on purpose
+//   (`VIEWER_E2E_PANIC`) with its backtrace, and holds no secret (ADR 0033).
+// Read only on the server (image GETs); only the temporary folders are emptied.
 import {
   mkdtempSync,
   readdirSync,
@@ -31,6 +35,7 @@ import {
 const account = testAccount();
 const { check, shot, finish } = createReport("gate3-settings");
 const cacheDir = mkdtempSync(join(tmpdir(), "viewer-e2e-settings-"));
+const logDir = mkdtempSync(join(tmpdir(), "viewer-e2e-logs-"));
 const FOREIGN = "notes.txt";
 
 const stats = (page) =>
@@ -50,7 +55,13 @@ const clearButton = (page) =>
 
 let app = null;
 try {
-  app = await launch({ env: { VIEWER_E2E_ARTWORK_DIR: cacheDir } });
+  app = await launch({
+    env: {
+      VIEWER_E2E_ARTWORK_DIR: cacheDir,
+      VIEWER_E2E_LOG_DIR: logDir,
+      VIEWER_E2E_PANIC: "1",
+    },
+  });
   const page = app.page;
   if ((await startScreen(page)) === "signedOut") {
     await signIn(page, account, account.password);
@@ -104,6 +115,20 @@ try {
       .textContent(),
   );
   check("version_shown", about === `Viewer version ${version}`, about);
+  // ADR 0033: the diagnostics section and its button, reachable from the keyboard.
+  const diagnostics = page.getByRole("region", { name: "Diagnostics" });
+  const openLogs = diagnostics.getByRole("button", {
+    name: "Ouvrir le dossier des journaux",
+  });
+  check(
+    "diagnostics_shown",
+    (await diagnostics.count()) === 1 && (await openLogs.isVisible()),
+  );
+  await openLogs.focus();
+  check(
+    "open_logs_focus_visible",
+    await openLogs.evaluate((b) => getComputedStyle(b).outlineStyle !== "none"),
+  );
   await shot(page, "settings-before");
 
   // Empty the cache.
@@ -215,6 +240,29 @@ try {
   await signOut(page);
   check("exit_code", (await app.close()) === 0);
   app = null;
+
+  // The log written during the run, after the app has closed.
+  const log = readFileSync(join(logDir, "viewer.log"), "utf8");
+  check(
+    "log_started",
+    log.includes(`Viewer ${version} started (debug build)`),
+  );
+  check(
+    "log_panic_recorded",
+    /ERROR panic: thread 'e2e-panic' panicked at src[\\/]lib\.rs:\d+:\d+: e2e panic, api_key=<redacted>/.test(
+      log,
+    ) && /\n\s+\d+: /.test(log),
+  );
+  const leaked = log.match(
+    /(api_key|apikey|x-emby-token|accesstoken|"pw"|password)["']?\s*[:=]\s*["']?(?!<redacted>)[^\s&"',]+/gi,
+  );
+  check(
+    "log_has_no_secret",
+    !log.includes("e2e-secret-value") &&
+      (account.password.length < 4 || !log.includes(account.password)) &&
+      leaked === null,
+    leaked ? `${leaked.length} unredacted value(s)` : "",
+  );
 } catch (e) {
   check(
     "scenario_error",
@@ -225,5 +273,6 @@ try {
 } finally {
   if (app) await app.close().catch(() => {});
   rmSync(cacheDir, { recursive: true, force: true });
+  rmSync(logDir, { recursive: true, force: true });
   finish();
 }
