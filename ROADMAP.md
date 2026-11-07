@@ -544,4 +544,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Added**: proxy mode "many-views" in `net-proxy.mjs` (library list answered with each library four times, server only read) and `scripts/e2e/gate3-nav-many.mjs`; `setScaledSize` moved to `scenario.mjs`, shared with `gate3-scaling`.
 - **Tests**: `gate3-nav-many` failed before the fix (Réglages, account and last library out of reach at both sizes) and all passed after it, 16 libraries; screenshots checked. `gate3-scaling` all passed again. `npm run verify:web` exit 0 (123 tests).
 - **Not verified**: a touchpad's horizontal swipe on the list (native, not driven); a real 125 % or 150 % Windows setting.
+- **Next**: the Svelte dev warning in `Home.svelte`.
+
+### 2026-11-07 — Home: Svelte dev warning on the "Ajoutés récemment" rows
+
+- **Fixed**: `Home.svelte` stored each library's latest row with an arrow returning the assignment to a `$state` property, which Svelte flags in dev (`assignment_value_stale`, once per library on each home load). The callback has a block body now; behavior unchanged.
+- **Tests**: `gate3-nav-many` all passed, the rows show; the Vite log has no new warning (the previous run of the same scenario logged 16). `npm run verify:web` exit 0 (123 tests).
 - **Next**: to be chosen.

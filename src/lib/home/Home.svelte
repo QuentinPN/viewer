@@ -121,7 +121,10 @@ function loadLatest(library: Library) {
   latest[library.id] = loadingRow();
   void loadRow(
     () => embyApi.latest(library.id),
-    (r) => (latest[library.id] = r),
+    // A block body: an assignment to a proxy property is not its value.
+    (r) => {
+      latest[library.id] = r;
+    },
   );
 }
 
