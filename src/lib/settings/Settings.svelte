@@ -4,6 +4,7 @@ import { embyApi, toEmbyError } from "../emby/api";
 import type { ArtworkCacheStats, EmbyError } from "../emby/types";
 import { playerApi } from "../player/api";
 import { readSkip, type SkipSetting, saveSkip } from "../player/segments";
+import Diagnostics from "./Diagnostics.svelte";
 import {
   cacheUsage,
   clearedLabel,
@@ -165,6 +166,8 @@ onMount(() => {
     </p>
   {/if}
 </section>
+
+<Diagnostics />
 
 <section class="panel" aria-labelledby="settings-about">
   <h2 id="settings-about">À propos</h2>

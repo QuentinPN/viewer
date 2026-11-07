@@ -1,4 +1,5 @@
 mod commands;
+mod diagnostics;
 pub mod emby;
 pub mod player;
 pub mod segments;
@@ -186,6 +187,15 @@ async fn emby_image(
     }
 }
 
+/// Log folder (ADR 0033). Debug builds only: scripted UI tests (scripts/e2e) use
+/// their own folder through `VIEWER_E2E_LOG_DIR`.
+fn log_dir(app: &tauri::App) -> Option<PathBuf> {
+    std::env::var_os("VIEWER_E2E_LOG_DIR")
+        .filter(|_| cfg!(debug_assertions))
+        .map(PathBuf::from)
+        .or_else(|| app.path().app_log_dir().ok())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// Debug builds only: `VIEWER_E2E_OFFSCREEN` opens the main window off-screen and
 /// without activating it, so scripted UI tests (`scripts/e2e`) do not take the
@@ -216,6 +226,18 @@ pub fn run() {
             },
         )
         .setup(|app| {
+            // First, so everything after it is logged (ADR 0033).
+            let log_dir = log_dir(app);
+            diagnostics::init(log_dir.as_deref());
+            app.manage(diagnostics::LogDir(log_dir));
+            // Debug builds only: scripted UI tests (scripts/e2e) check that a panic
+            // reaches the log, redacted.
+            #[cfg(debug_assertions)]
+            if std::env::var_os("VIEWER_E2E_PANIC").is_some() {
+                std::thread::Builder::new()
+                    .name("e2e-panic".into())
+                    .spawn(|| panic!("e2e panic, api_key=e2e-secret-value"))?;
+            }
             let window = app
                 .get_webview_window("main")
                 .ok_or("main window missing")?;
@@ -326,6 +348,7 @@ pub fn run() {
             commands::emby_episodes,
             commands::emby_play,
             commands::emby_segments,
+            diagnostics::diagnostics_open_log_dir,
         ])
         .build(context())
         .expect("error while building Viewer");

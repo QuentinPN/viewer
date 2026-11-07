@@ -89,7 +89,7 @@ Home, film/series browsing, details, search, accessible player UI, responsive la
 - DONE: artwork disk cache (ADR 0019) — behind `emby-img`, per server, 512 MiB with least-recently-used eviction, files only (no SQLite for artwork); served after the session and server checks, before the server download slots; `artwork_cache_stats`.
 - DONE: search of episodes (ADR 0020) — a third parallel query (`Episode`, 100 asked) filtered in Rust on the episode's own title, because Emby also matches the series name; "Épisodes" section of 16:9 cards opening the episode page, previous/next in place, Escape back to the card.
 - DONE: settings screen, artwork cache section (ADR 0021) — « Réglages » in the sidebar; size against the quota, image count, reads since launch; « Vider le cache des images » (`artwork_cache_clear`) removes the `.img` files of every server and the empty folders, keeps other files, announces what was freed; no confirmation.
-- TODO: other settings sections (connection, playback, UI, diagnostics) once they have real behavior; adjustable cache quota.
+- TODO: other settings sections (connection, playback, UI) once they have real behavior; adjustable cache quota.
 - DROPPED (user decision, 2026-10-28): search of people.
 - Known input: the control bar hides subtitles at narrow widths (Gate 1 finding); views must provide an opaque background when no video plays (transparent window).
 
@@ -577,4 +577,12 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **History**: tags set afterwards on the builds already installed: `v0.1.0` (6d3450d), `v0.2.0` (c844da3), `v0.3.0` (0c0b004); the fullscreen fix ships as `v0.3.1`. `CHANGELOG.md` sums up 0.1.0 to 0.3.0 by hand.
 - **Tests**: `src/release/version.test.ts` (9 tests: bumps, explicit versions, numeric compare, Cargo.toml, Cargo.lock with CRLF, package-lock root only, changelog order, the four files equal, Tauri reading package.json); `npm run verify:web` exit 0 (132 tests); `verify:rust` exit 0 (127 tests); debug build with the new `tauri.conf.json`; `gate3-settings` all passed with `version_shown`.
 - **Not verified**: the NSIS upgrade from 0.1.0 to 0.3.1 over the installed build (the owner runs it).
+- **Next**: to be chosen.
+
+### 2026-11-07 — Crash diagnostics without secrets (ADR 0033)
+
+- **Problem**: `log::` calls existed but no logger was installed, in debug or release; a panic left no trace outside the console.
+- **Added**: `src-tauri/src/diagnostics.rs`, a `log` backend with no new dependency. It writes `viewer.log` in `app_log_dir` (`%LOCALAPPDATA%\io.github.quentinpn.viewer\logs`), rotated at 2 MiB over 3 files, with a record cut at 64 KiB. It logs info in release and debug in debug builds (plus stderr); dependencies log warnings only. Every line is redacted: `api_key`, tokens, passwords, `Pw`, `Authorization`/`X-Emby-Authorization` to the end of the line, URL `user:password@`. `mpv.rs` now uses the same function. A panic hook writes the message, location, thread and backtrace before the previous hook. Réglages › « Diagnostics » has « Ouvrir le dossier des journaux » (`diagnostics_open_log_dir`, no argument, `%SystemRoot%\explorer.exe`, no capability added). Debug-only `VIEWER_E2E_LOG_DIR` and `VIEWER_E2E_PANIC` serve the scenario.
+- **Tests**: `cargo test diagnostics` 11 tests; `npm run verify:web` exit 0 (134 tests, `diagnostics.test.ts`); `verify:rust` exit 0 (138 passed). `gate3-settings` all passed against the real server, with `diagnostics_shown`, `open_logs_focus_visible`, `log_started`, `log_panic_recorded` and `log_has_no_secret`.
+- **Not verified**: the button opening the explorer (not clicked, it opens a window on the desktop); the release build's log level and its backtrace without symbols (`strip = true`).
 - **Next**: to be chosen.

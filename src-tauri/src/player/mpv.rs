@@ -13,11 +13,13 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use super::ffi::{self, MpvApi, MpvHandle};
+// Also applied by the log file itself; kept here so stderr echoes are clean too.
 use super::{
     EndReason, ExternalSubtitle, MediaSource, OPEN_LIMIT, PlaybackRequest, PlayerCommand,
     PlayerDiagnostics, PlayerEngine, PlayerError, PlayerEvent, STALL_LIMIT, Stall, StallWatch,
     Track, TrackKind, tls_roots,
 };
+use crate::diagnostics::redact;
 
 pub type EventSink = Box<dyn Fn(PlayerEvent) + Send + Sync>;
 
@@ -494,47 +496,6 @@ fn parse_tracks(json: &str) -> Result<Vec<Track>, PlayerError> {
             })
         })
         .collect())
-}
-
-/// Strips credentials mpv may echo in log lines (query-string tokens).
-fn redact(line: &str) -> String {
-    let mut out = String::with_capacity(line.len());
-    let mut rest = line;
-    while let Some((pos, key_len)) = find_secret_key(rest) {
-        let value_start = pos + key_len;
-        out.push_str(&rest[..value_start]);
-        out.push_str("<redacted>");
-        let tail = &rest[value_start..];
-        // Authorization headers hold spaces/commas: redact to end of line.
-        let whole_line = rest[pos..]
-            .to_ascii_lowercase()
-            .starts_with("x-emby-authorization");
-        let end = if whole_line {
-            tail.len()
-        } else {
-            tail.find(['&', ' ', '"', '\'', ',']).unwrap_or(tail.len())
-        };
-        rest = &tail[end..];
-    }
-    out.push_str(rest);
-    out
-}
-
-/// Returns (byte offset, key length) of the first secret-bearing key. Keys are ASCII,
-/// so offsets in the lowercased copy are valid in the original string.
-fn find_secret_key(s: &str) -> Option<(usize, usize)> {
-    let lower = s.to_ascii_lowercase();
-    [
-        "api_key=",
-        "apikey=",
-        "x-emby-token=",
-        "accesstoken=",
-        "x-emby-token: ",
-        "x-emby-authorization: ",
-    ]
-    .iter()
-    .filter_map(|k| lower.find(k).map(|p| (p, k.len())))
-    .min()
 }
 
 /// `sub-add` for the subtitles of the file that just loaded. A failure leaves the
