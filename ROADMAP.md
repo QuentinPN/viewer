@@ -457,3 +457,4 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Not verified**: dragging, double-click, resizing from the edges and snapping with a real mouse; the icon in the taskbar and installer (release not rebuilt).
 - **Next**: Apple TV style mockups.
 - **Reinstalled** (2026-11-07): release rebuilt with the new icon and title bar, installed over the old one; `gate5-release` all passed; icon of the installed exe checked; title bar in the installed window not checked by eye.
+- **Correction** (2026-11-07): those installs ran inside Claude Desktop's MSIX container and landed in its LocalCache; that copy is uninstalled and the owner installs the release themself.
