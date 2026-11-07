@@ -487,3 +487,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `npm run verify:web` exit 0; `gate3-episode`, `gate3-favorites` and `gate4-fallback` all passed (the first fallback run lost the server transcode once, the rerun passed); `gate2-ui` passed except the known `no_app_credential_left` (credential of the installed app). Screenshots checked: film, series, episode, narrow film.
 - **Not verified**: 125 % and 150 % scaling.
 - **Next**: series page and episode list.
+
+### 2026-11-07 — Redesign: series episode list (ADR 0031)
+
+- **Changed**: `EpisodeList.svelte` styles: seasons as pills (white with black text when selected, transparent otherwise), episodes as a grid of 16:9 cards (thumbnail above "Épisode N · durée · date", title and three lines of overview), thumbnail lift on hover and focus (×1.04, none under reduced motion), white progress bar inside the thumbnail, dark translucent "vu" check, glass "Afficher plus d'épisodes".
+- **Tests**: `npm run verify:web` exit 0; `gate3-episode` all passed; `gate2-ui` passed except the known `no_app_credential_left`. Screenshots checked: second season, back from an episode (focus ring on the card).
+- **Not verified**: 125 % and 150 % scaling.
+- **Next**: player.

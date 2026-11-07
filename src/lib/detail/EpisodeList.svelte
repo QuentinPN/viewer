@@ -210,7 +210,7 @@ onMount(() => {
               <img
                 src={e.thumb.src}
                 srcset={e.thumb.srcset}
-                sizes="(max-width: 800px) 40vw, 280px"
+                sizes="(max-width: 640px) 90vw, 340px"
                 alt=""
                 loading="lazy"
                 decoding="async"
@@ -287,7 +287,8 @@ onMount(() => {
   }
   h2 {
     margin: 0 0 var(--space-4);
-    font-size: 20px;
+    font-size: 22px;
+    font-weight: 600;
   }
   .note,
   .season-name {
@@ -296,30 +297,34 @@ onMount(() => {
   .seasons {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
-    margin-bottom: var(--space-4);
+    gap: 6px;
+    margin-bottom: var(--space-6);
   }
   .seasons button {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-4);
-    border-radius: 999px;
-    border: 1px solid var(--color-elevated);
+    height: 36px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: var(--radius-pill);
     background: transparent;
     color: var(--color-text-secondary);
     font: inherit;
+    font-size: 15px;
+    font-weight: 500;
     cursor: pointer;
-    transition: background var(--motion-fast);
+    transition:
+      background var(--motion-fast),
+      color var(--motion-fast);
   }
   .seasons button:hover {
-    background: var(--color-elevated);
+    background: var(--fill-glass);
     color: var(--color-text);
   }
   .seasons button[aria-pressed="true"] {
-    background: var(--color-text);
-    border-color: var(--color-text);
-    color: var(--color-bg);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
     font-weight: 600;
   }
   .unplayed {
@@ -337,18 +342,19 @@ onMount(() => {
     margin: 0;
     padding: 0;
     display: grid;
-    gap: var(--space-4);
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 32px 28px;
   }
   .episode {
-    display: grid;
-    grid-template-columns: minmax(160px, 280px) 1fr;
-    gap: var(--space-4);
-    align-items: start;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
   }
   .thumb {
     position: relative;
     aspect-ratio: 16 / 9;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     overflow: hidden;
     background: linear-gradient(160deg, var(--color-elevated), var(--color-surface));
   }
@@ -361,12 +367,33 @@ onMount(() => {
     font: inherit;
     cursor: pointer;
   }
+  button.thumb {
+    transition:
+      transform var(--motion-lift) var(--ease-spring),
+      box-shadow var(--motion-lift) var(--ease-spring);
+  }
   button.thumb[aria-disabled="true"] {
     cursor: progress;
   }
+  button.thumb:hover,
+  button.thumb:focus-visible {
+    transform: scale(1.04);
+    box-shadow:
+      0 20px 40px rgb(0 0 0 / 65%),
+      0 0 0 1px rgb(255 255 255 / 28%);
+  }
   button.thumb:focus-visible {
     outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
+    outline-offset: 3px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    button.thumb {
+      transition: none;
+    }
+    button.thumb:hover,
+    button.thumb:focus-visible {
+      transform: none;
+    }
   }
   .play {
     position: absolute;
@@ -377,7 +404,8 @@ onMount(() => {
     border-radius: 22px;
     display: grid;
     place-items: center;
-    background: rgb(11 13 17 / 70%);
+    background: var(--material);
+    backdrop-filter: var(--material-blur);
     color: var(--color-text);
     opacity: 0;
     transition: opacity var(--motion-fast);
@@ -421,13 +449,14 @@ onMount(() => {
     position: absolute;
     top: var(--space-2);
     right: var(--space-2);
-    width: 22px;
-    height: 22px;
-    border-radius: 11px;
+    width: 24px;
+    height: 24px;
+    border-radius: 12px;
     display: grid;
     place-items: center;
-    background: var(--color-success);
-    color: #062014;
+    background: rgb(0 0 0 / 55%);
+    backdrop-filter: blur(12px);
+    color: #fff;
   }
   .badge svg {
     width: 13px;
@@ -440,16 +469,18 @@ onMount(() => {
   }
   .progress {
     position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    left: 12px;
+    right: 12px;
+    bottom: 10px;
     height: 4px;
-    background: rgb(11 13 17 / 70%);
+    border-radius: 2px;
+    background: rgb(255 255 255 / 30%);
+    overflow: hidden;
   }
   .progress span {
     display: block;
     height: 100%;
-    background: var(--color-accent);
+    background: #fff;
   }
   .body {
     position: relative;
@@ -462,12 +493,13 @@ onMount(() => {
   }
   .kicker {
     margin: 0;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--color-text-muted);
   }
   h3 {
     margin: 2px 0 var(--space-1);
-    font-size: 15px;
+    font-size: 16px;
+    font-weight: 600;
   }
   /* The whole text opens the page; the thumbnail keeps playing. */
   .open {
@@ -492,8 +524,8 @@ onMount(() => {
   }
   .overview {
     margin: 0;
-    font-size: 13px;
-    line-height: 1.5;
+    font-size: 14px;
+    line-height: 1.45;
     color: var(--color-text-secondary);
     display: -webkit-box;
     -webkit-line-clamp: 3;
@@ -540,8 +572,8 @@ onMount(() => {
   }
   button.primary {
     margin-top: var(--space-2);
-    background: var(--color-accent);
-    color: #04121b;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
     border: 0;
     border-radius: var(--radius-sm);
     padding: var(--space-2) var(--space-4);
@@ -550,8 +582,8 @@ onMount(() => {
     cursor: pointer;
   }
   .more {
-    margin-top: var(--space-4);
-    background: var(--color-elevated);
+    margin-top: var(--space-6);
+    background: var(--fill-glass);
     color: var(--color-text);
     border: 0;
     border-radius: var(--radius-sm);
@@ -570,11 +602,5 @@ onMount(() => {
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-  @media (max-width: 800px) {
-    .episode {
-      grid-template-columns: 40% 1fr;
-      gap: var(--space-3);
-    }
   }
 </style>
