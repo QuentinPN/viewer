@@ -21,6 +21,7 @@ use super::models::{
     SignedInUser, StreamInfo, UserItemData, VideoInfo, WatchItem, WatchKind, is_usable_genre,
 };
 use super::playback::{self, PlaybackPlan};
+use super::quality::{BITRATE_CHOICES, PlaybackQuality, QualityCaps, QualityStore, StreamingLimit};
 use super::reporting::Report;
 use super::server_url::ServerUrl;
 use crate::segments::{MediaIds, Segment, SegmentQuery, emby_markers};
@@ -149,8 +150,10 @@ pub struct EmbyService {
     current: Mutex<Option<Current>>,
     /// Bounds concurrent artwork downloads to spare the server (ADR 0005).
     image_permits: tokio::sync::Semaphore,
-    /// Sent to PlaybackInfo; the server transcodes files above it (ADR 0009).
-    max_streaming_bitrate: u64,
+    /// Debug limit of the scenarios (ADR 0009); wins over the setting.
+    bitrate_override: Option<u64>,
+    /// Bitrate caps per server (ADR 0037).
+    quality: QualityStore,
     /// Bumped (under the `current` lock) by every sign-in, sign-out, server change
     /// and resume: a restore started before commits nothing (ADR 0012).
     epoch: AtomicU64,
@@ -171,6 +174,7 @@ impl EmbyService {
         version: String,
     ) -> Self {
         let file = SessionFile::load_or_init(&path);
+        let quality = QualityStore::load(path.with_file_name("playback-quality.json"));
         Self {
             store,
             path,
@@ -179,7 +183,8 @@ impl EmbyService {
             version,
             current: Mutex::new(None),
             image_permits: tokio::sync::Semaphore::new(IMAGE_CONCURRENCY),
-            max_streaming_bitrate: playback::MAX_STREAMING_BITRATE,
+            bitrate_override: None,
+            quality,
             epoch: AtomicU64::new(0),
             timeouts: None,
             expired: Mutex::new(None),
@@ -234,8 +239,48 @@ impl EmbyService {
 
     /// Lower streaming limit, e.g. to make the server transcode in tests.
     pub fn with_max_streaming_bitrate(mut self, bitrate: u64) -> Self {
-        self.max_streaming_bitrate = bitrate;
+        self.bitrate_override = Some(bitrate);
         self
+    }
+
+    /// Bitrate caps of the current server (ADR 0037).
+    pub fn playback_quality(&self) -> Result<PlaybackQuality, EmbyError> {
+        let (server_id, local_address) = self.quality_scope()?;
+        let caps = self.quality.get(&server_id);
+        Ok(PlaybackQuality {
+            local: caps.local,
+            remote: caps.remote,
+            local_address,
+            choices: BITRATE_CHOICES.to_vec(),
+        })
+    }
+
+    /// Keeps the caps of the current server; a value off the list is refused.
+    pub fn set_playback_quality(&self, caps: QualityCaps) -> Result<PlaybackQuality, EmbyError> {
+        let (server_id, _) = self.quality_scope()?;
+        self.quality.set(&server_id, caps)?;
+        self.playback_quality()
+    }
+
+    fn quality_scope(&self) -> Result<(String, bool), EmbyError> {
+        self.lock_current()
+            .as_ref()
+            .map(|c| (c.user.server.id.clone(), c.client.server().is_local()))
+            .ok_or(EmbyError::NotSignedIn)
+    }
+
+    /// The debug override, then the server's cap for the kind of address of the
+    /// session, then the default limit (ADR 0037).
+    fn streaming_limit(&self, client: &EmbyClient) -> StreamingLimit {
+        let local_address = client.server().is_local();
+        let cap = self
+            .bitrate_override
+            .or_else(|| self.quality.get(&self.scope()).for_address(local_address));
+        StreamingLimit {
+            bitrate: cap.unwrap_or(playback::MAX_STREAMING_BITRATE),
+            cap,
+            local_address,
+        }
     }
 
     fn device(&self) -> DeviceIdentity {
@@ -823,7 +868,8 @@ impl EmbyService {
         force_transcode: bool,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
         let (client, user_id) = self.session()?;
-        let profile = playback::device_profile(self.max_streaming_bitrate);
+        let limit = self.streaming_limit(&client);
+        let profile = playback::device_profile(limit.bitrate);
         let (info, item) = tokio::join!(
             client.playback_info(&user_id, item_id, &profile, force_transcode),
             client.item(&user_id, item_id)
@@ -848,6 +894,7 @@ impl EmbyService {
             _ => None,
         };
         plan.title = item.as_ref().and_then(playback_title);
+        plan.bitrate_limit = Some(limit);
         if let Some(dto) = item.filter(|_| resume) {
             let runtime = plan.run_time_ticks.or(dto.run_time_ticks);
             plan.start_ticks = dto

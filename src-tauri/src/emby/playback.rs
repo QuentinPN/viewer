@@ -8,10 +8,11 @@ use super::models::{
     DeviceProfile, DirectPlayProfile, MediaSourceInfo, PlayMethod, PlaybackInfoResponse,
     PlaybackTitle, SubtitleProfile, TranscodingProfile,
 };
+use super::quality::StreamingLimit;
 use super::server_url::ServerUrl;
 use crate::player::ExternalSubtitle;
 
-/// Local network only for now; becomes a setting with remote access.
+/// Sent when no cap is chosen ("Maximale", ADR 0037).
 pub const MAX_STREAMING_BITRATE: u64 = 400_000_000;
 
 /// Text formats a transcode can deliver as separate files instead of burning them
@@ -81,6 +82,8 @@ pub struct PlaybackPlan {
     pub subtitles: Vec<ExternalSubtitle>,
     /// Set by the session from the item, not by PlaybackInfo (ADR 0017).
     pub title: Option<PlaybackTitle>,
+    /// Set by the session from the bitrate setting (ADR 0037).
+    pub bitrate_limit: Option<StreamingLimit>,
 }
 
 /// Picks the first source the server offers and the best way to play it.
@@ -150,6 +153,7 @@ pub fn plan(server: &ServerUrl, response: PlaybackInfoResponse) -> Result<Playba
         transcode_reasons: transcode.then(|| transcode_reasons(&raw)),
         subtitles,
         title: None,
+        bitrate_limit: None,
     })
 }
 

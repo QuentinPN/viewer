@@ -1728,6 +1728,112 @@ fn playback_transcodes_through_hls_under_the_bitrate_limit() {
     assert_eq!(body["DeviceProfile"]["MaxStreamingBitrate"], 3_000_000);
 }
 
+/// `MaxStreamingBitrate` of the last PlaybackInfo, in the request and the profile.
+fn last_bitrate(server: &FakeEmby) -> (u64, u64) {
+    let info = server
+        .requests()
+        .into_iter()
+        .rfind(|r| r.path.contains("/PlaybackInfo"))
+        .unwrap();
+    let body: serde_json::Value = serde_json::from_str(&info.body).unwrap();
+    (
+        body["MaxStreamingBitrate"].as_u64().unwrap(),
+        body["DeviceProfile"]["MaxStreamingBitrate"]
+            .as_u64()
+            .unwrap(),
+    )
+}
+
+#[test]
+fn playback_quality_caps_the_bitrate_of_a_local_address() {
+    use super::quality::{QualityCaps, StreamingLimit};
+    let (server, fx, _) = signed_in_browser();
+    let quality = fx.service.playback_quality().unwrap();
+    assert_eq!(
+        (quality.local, quality.remote, quality.local_address),
+        (None, None, true)
+    );
+    assert_eq!(quality.choices.len(), 7);
+
+    // The fake server is on 127.0.0.1: a remote cap does not apply.
+    fx.service
+        .set_playback_quality(QualityCaps {
+            local: None,
+            remote: Some(1_500_000),
+        })
+        .unwrap();
+    let (plan, _) = run(fx.service.prepare_playback("30207", false)).unwrap();
+    assert_eq!(
+        plan.bitrate_limit,
+        Some(StreamingLimit {
+            bitrate: 400_000_000,
+            cap: None,
+            local_address: true,
+        })
+    );
+    assert_eq!(last_bitrate(&server), (400_000_000, 400_000_000));
+
+    let saved = fx
+        .service
+        .set_playback_quality(QualityCaps {
+            local: Some(4_000_000),
+            remote: Some(1_500_000),
+        })
+        .unwrap();
+    assert_eq!(
+        (saved.local, saved.remote),
+        (Some(4_000_000), Some(1_500_000))
+    );
+    let (plan, _) = run(fx.service.prepare_playback("30207", false)).unwrap();
+    assert_eq!(plan.bitrate_limit.unwrap().cap, Some(4_000_000));
+    assert_eq!(last_bitrate(&server), (4_000_000, 4_000_000));
+
+    // A value off the list is refused and changes nothing.
+    let err = fx
+        .service
+        .set_playback_quality(QualityCaps {
+            local: Some(5_000_000),
+            remote: None,
+        })
+        .unwrap_err();
+    assert_eq!(err.kind(), "settings");
+
+    // Kept across a restart, for the same server.
+    let again = reopen(Arc::clone(&fx.store), fx.path.clone());
+    run(again.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    let quality = again.service.playback_quality().unwrap();
+    assert_eq!(
+        (quality.local, quality.remote),
+        (Some(4_000_000), Some(1_500_000))
+    );
+    run(again.service.prepare_playback("30207", false)).unwrap();
+    assert_eq!(last_bitrate(&server), (4_000_000, 4_000_000));
+
+    // Signed out: nothing to read or write.
+    run(again.service.sign_out()).unwrap();
+    assert_eq!(
+        again.service.playback_quality().unwrap_err().kind(),
+        "notSignedIn"
+    );
+}
+
+#[test]
+fn playback_quality_yields_to_the_debug_override() {
+    use super::quality::QualityCaps;
+    let server = FakeEmby::start(browse_like(Arc::new(AtomicBool::new(false))));
+    let service = fixture().service.with_max_streaming_bitrate(3_000_000);
+    run(service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    service
+        .set_playback_quality(QualityCaps {
+            local: Some(40_000_000),
+            remote: None,
+        })
+        .unwrap();
+    let (plan, _) = run(service.prepare_playback("30207", false)).unwrap();
+    assert_eq!(plan.bitrate_limit.unwrap().cap, Some(3_000_000));
+    assert_eq!(last_bitrate(&server), (3_000_000, 3_000_000));
+}
+
 #[test]
 fn playback_fallback_refuses_direct_play_and_names_the_reason() {
     use super::models::PlayMethod;

@@ -11,6 +11,7 @@ import {
   sessionReads,
   usageRatio,
 } from "./format";
+import PlaybackQuality from "./PlaybackQuality.svelte";
 
 // `undefined` while loading, `null` when the app has no artwork cache.
 let stats = $state<ArtworkCacheStats | null | undefined>(undefined);
@@ -117,6 +118,8 @@ onMount(() => {
   <p class="muted note">S'applique à la prochaine lecture.</p>
 </section>
 
+<PlaybackQuality />
+
 <section class="panel" aria-labelledby="settings-artwork">
   <h2 id="settings-artwork">Cache des images</h2>
   <p class="lead">
@@ -189,7 +192,8 @@ onMount(() => {
     gap: var(--space-3);
     justify-items: start;
   }
-  .panel + .panel {
+  .panel + .panel,
+  :global(.panel) + .panel {
     margin-top: var(--space-6);
   }
   h2 {

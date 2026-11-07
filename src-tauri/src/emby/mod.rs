@@ -7,6 +7,7 @@ pub mod credentials;
 pub mod images;
 pub mod models;
 pub mod playback;
+pub mod quality;
 pub mod reporting;
 pub mod server_url;
 pub mod session;
@@ -61,6 +62,9 @@ pub enum EmbyError {
     /// The player could not start the stream chosen by the server.
     #[error("lecteur indisponible : {0}")]
     Player(String),
+    /// A setting refused or not written (ADR 0037).
+    #[error("réglage non enregistré : {0}")]
+    Settings(String),
 }
 
 impl EmbyError {
@@ -84,6 +88,7 @@ impl EmbyError {
             Self::PlaybackRefused(_) => "playbackRefused",
             Self::NoCompatibleStream => "noCompatibleStream",
             Self::Player(_) => "player",
+            Self::Settings(_) => "settings",
         }
     }
 }
