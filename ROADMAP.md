@@ -456,3 +456,4 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `npm run verify:web` exit 0 (Vitest 113); debug build; `gate2-play` all passed, the bar shows over the video; `gate2-ui` passed except `no_app_credential_left`: an app credential that this run did not create remains, probably from the 30 min pause run stopped yesterday, left as is.
 - **Not verified**: dragging, double-click, resizing from the edges and snapping with a real mouse; the icon in the taskbar and installer (release not rebuilt).
 - **Next**: Apple TV style mockups.
+- **Reinstalled** (2026-11-07): release rebuilt with the new icon and title bar, installed over the old one; `gate5-release` all passed; icon of the installed exe checked; title bar in the installed window not checked by eye.
