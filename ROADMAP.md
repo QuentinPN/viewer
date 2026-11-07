@@ -559,4 +559,13 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Added**: `scripts/e2e/dev-styles.mjs`, called by `launch()` for the debug build: the page fetches each component's style module and every one-line declaration of the source `<style>` must be in it (`animation` left out, Svelte renames scoped keyframes). Otherwise the launch stops and names the components.
 - **Tests**: no false positive on the current tree (launch 523 ms including the check); a style module served with one declaration removed (Playwright route) is reported; `gate3-nav-many` all passed through it. `npm run verify:web` exit 0 (123 tests).
 - **Not verified**: the check on a real occurrence (not reproduced). Multi-line declarations and `animation` are not compared.
+- **Next**: fullscreen from a maximized window (below).
+
+### 2026-11-07 — Fix: fullscreen from a maximized window left the taskbar visible
+
+- **Reported** by the user on the installed build: fullscreen showed the Windows taskbar.
+- **Cause** (measured, 2560×1440 monitor, work area 1400 px high): from a maximized window, tao kept `WS_MAXIMIZE` in fullscreen. The window covered the monitor, but the client area stayed 2560×1400 (`innerHeight` 1400). The 40 px strip at the bottom of the transparent window showed the taskbar. From a restored window the client area was already 2560×1440.
+- **Changed**: `window_set_fullscreen` restores a maximized window before going fullscreen, and maximizes it again on the way out.
+- **Tests**: `gate3-player` now checks that fullscreen covers the screen (`innerWidth/innerHeight` = `screen`) from a restored and from a maximized window, and that the window is maximized again afterwards: all passed against the real server. `npm run verify:web` exit 0; `verify:rust` 127 tests passed.
+- **Not verified**: the installed release by eye. Windows hides the taskbar only while the fullscreen window is in the foreground; a background fullscreen window stays under it, as expected.
 - **Next**: to be chosen.

@@ -1,6 +1,8 @@
 //! Typed IPC surface. Commands are `async` so they run off the UI thread: libmpv
 //! teardown with an embedded window must never block the window's message loop.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use serde::Serialize;
 use tauri::{State, WebviewWindow};
 
@@ -85,10 +87,24 @@ pub async fn window_set_fullscreen(
     window: WebviewWindow,
     fullscreen: bool,
 ) -> Result<bool, String> {
-    window
-        .set_fullscreen(fullscreen)
-        .map_err(|e| e.to_string())?;
-    window.is_fullscreen().map_err(|e| e.to_string())
+    // tao keeps WS_MAXIMIZE when a maximized window goes fullscreen: the client
+    // area stays at the work area, and the transparent strip left at the bottom
+    // shows the taskbar. Fullscreen starts from a restored window, and leaving
+    // it maximizes the window again.
+    static WAS_MAXIMIZED: AtomicBool = AtomicBool::new(false);
+    let err = |e: tauri::Error| e.to_string();
+    if fullscreen && !window.is_fullscreen().map_err(err)? {
+        let maximized = window.is_maximized().map_err(err)?;
+        WAS_MAXIMIZED.store(maximized, Ordering::Relaxed);
+        if maximized {
+            window.unmaximize().map_err(err)?;
+        }
+    }
+    window.set_fullscreen(fullscreen).map_err(err)?;
+    if !fullscreen && WAS_MAXIMIZED.swap(false, Ordering::Relaxed) {
+        window.maximize().map_err(err)?;
+    }
+    window.is_fullscreen().map_err(err)
 }
 
 #[derive(Serialize)]

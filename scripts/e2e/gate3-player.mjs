@@ -312,12 +312,48 @@ try {
   await page.keyboard.press("i");
   await info.waitFor({ state: "detached", timeout: 3000 });
 
-  // 7. Fullscreen back and forth.
+  // 7. Fullscreen back and forth, covering the whole monitor, from a restored
+  // and from a maximized window (tao kept the work area there, leaving the
+  // taskbar visible), which is maximized again on the way out.
+  const coversScreen = () =>
+    page.evaluate(async () => {
+      await new Promise((r) => setTimeout(r, 800));
+      return {
+        ok: innerWidth === screen.width && innerHeight === screen.height,
+        size: `${innerWidth}x${innerHeight} / ${screen.width}x${screen.height}`,
+      };
+    });
+  const windowCall = (cmd) =>
+    page.evaluate(
+      (cmd) =>
+        window.__TAURI_INTERNALS__.invoke(`plugin:window|${cmd}`, {
+          label: "main",
+        }),
+      cmd,
+    );
   await page.keyboard.press("f");
   await button(page, "Quitter le plein écran").waitFor({ timeout: 5000 });
+  const restoredFull = await coversScreen();
+  check("fullscreen_covers_screen", restoredFull.ok, restoredFull.size);
   await page.keyboard.press("f");
   await button(page, "Plein écran").waitFor({ timeout: 5000 });
   check("fullscreen_toggles", true);
+  await windowCall("toggle_maximize");
+  await page.waitForTimeout(800);
+  await page.keyboard.press("f");
+  await button(page, "Quitter le plein écran").waitFor({ timeout: 5000 });
+  const maximizedFull = await coversScreen();
+  check(
+    "fullscreen_from_maximized_covers_screen",
+    maximizedFull.ok,
+    maximizedFull.size,
+  );
+  await page.keyboard.press("f");
+  await button(page, "Plein écran").waitFor({ timeout: 5000 });
+  await page.waitForTimeout(800);
+  check("maximized_after_fullscreen", await windowCall("is_maximized"));
+  await windowCall("toggle_maximize");
+  await page.waitForTimeout(800);
 
   // 8. Escape closes an open panel, then leaves; back on the film page.
   await button(page, "Audio").click();
