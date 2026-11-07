@@ -1,11 +1,18 @@
 // Gate 3 settings screen (ADR 0021) on the real Emby test account, driven over
 // CDP, with an empty temporary artwork cache (`VIEWER_E2E_ARTWORK_DIR`, debug builds
 // only, never the user's cache):
-// - the home fills the cache; « Réglages » shows its size and image count;
+// - the home fills the cache; « Réglages » shows its size and image count, and
+//   « À propos » the version of package.json;
 // - « Vider le cache des images » removes every image file and announces it;
 // - the home and search still work afterwards, and a library closes the settings.
 // Read only on the server (image GETs); only the temporary folder is emptied.
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { launch } from "./app.mjs";
@@ -86,6 +93,17 @@ try {
     shown,
   );
   check("reads_since_launch", /Depuis le lancement : /.test(shown));
+  // ADR 0032: the version of the build, the one in package.json.
+  const { version } = JSON.parse(
+    readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+  );
+  const about = text(
+    await page
+      .getByRole("region", { name: "À propos" })
+      .locator(".lead")
+      .textContent(),
+  );
+  check("version_shown", about === `Viewer version ${version}`, about);
   await shot(page, "settings-before");
 
   // Empty the cache.

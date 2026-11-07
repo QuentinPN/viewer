@@ -568,4 +568,13 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Changed**: `window_set_fullscreen` restores a maximized window before going fullscreen, and maximizes it again on the way out.
 - **Tests**: `gate3-player` now checks that fullscreen covers the screen (`innerWidth/innerHeight` = `screen`) from a restored and from a maximized window, and that the window is maximized again afterwards: all passed against the real server. `npm run verify:web` exit 0; `verify:rust` 127 tests passed.
 - **Not verified**: the installed release by eye. Windows hides the taskbar only while the fullscreen window is in the foreground; a background fullscreen window stays under it, as expected.
+- **Next**: version numbers (below).
+
+### 2026-11-07 — Version numbers and bumps (ADR 0032)
+
+- **Asked** by the user: every build stayed 0.1.0.
+- **Added**: SemVer in 0.x until the `PRODUCT.md` scope is complete and verified. `package.json` is the single source; `tauri.conf.json` reads it (`"version": "../package.json"`). `npm run release -- <patch|minor|major|X.Y.Z>` (`scripts/release.ts`, logic in `src/release/version.ts`) refuses a dirty tree or a version that does not go up, writes the four version files, adds a dated `CHANGELOG.md` section from the commits since the last tag, commits « Release vX.Y.Z » and tags it, without pushing. Réglages › « À propos » shows the version from `app_info`.
+- **History**: tags set afterwards on the builds already installed: `v0.1.0` (6d3450d), `v0.2.0` (c844da3), `v0.3.0` (0c0b004); the fullscreen fix ships as `v0.3.1`. `CHANGELOG.md` sums up 0.1.0 to 0.3.0 by hand.
+- **Tests**: `src/release/version.test.ts` (9 tests: bumps, explicit versions, numeric compare, Cargo.toml, Cargo.lock with CRLF, package-lock root only, changelog order, the four files equal, Tauri reading package.json); `npm run verify:web` exit 0 (132 tests); `verify:rust` exit 0 (127 tests); debug build with the new `tauri.conf.json`; `gate3-settings` all passed with `version_shown`.
+- **Not verified**: the NSIS upgrade from 0.1.0 to 0.3.1 over the installed build (the owner runs it).
 - **Next**: to be chosen.
