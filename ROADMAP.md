@@ -473,3 +473,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `npm run verify:web` exit 0 (Vitest 123); scenarios on the debug build: `gate3-home` (one run of five lost the focus on the card after the detail closed, the next ones passed), `gate3-hero`, `gate3-search`, `gate3-settings`, `gate21-session`, `gate3-sort-filter`, `gate3-favorites` all passed; `gate2-ui` passed except `no_app_credential_left` (an app credential this run did not create, probably the owner's installed app, left as is). A screenshot run checked the lift (×1.06, none with reduced motion), the hidden nav and Ctrl+F on a detail page, Ctrl+1, and no overflow of the page or the pill at 684 px, search focused or not. It found two defects, fixed: the account menu let clicks through (it inherited `pointer-events: none`), and the hero logo slid under the nav in a 720 px high window.
 - **Not verified**: Ctrl+2… by a scenario; the nav and the lift by the owner's eye; the account menu with a screen reader. The grid toolbar, the detail pages, the player and the sign-in keep their old layout with the new tokens.
 - **Next**: library grid toolbar, then film detail.
+
+### 2026-11-07 — Redesign: library grid toolbar (ADR 0031)
+
+- **Changed**: `LibraryBrowser.svelte` styles only: 44 px title, glass native selects with a chevron, glass "Favoris" toggle (white when pressed), white "Réinitialiser les filtres", grid gaps 30/24 px.
+- **Tests**: `npm run verify:web` exit 0 (Vitest 123); `gate3-sort-filter` all passed, its screenshots checked (defaults, no match, genre and favorites, keyboard focus on "Trier par").
+- **Not verified**: the open native list (drawn by Windows, dark through `color-scheme`) by eye; a narrow window.
+- **Next**: film detail.

@@ -1043,65 +1043,81 @@ $effect(() => {
   .heading {
     display: flex;
     align-items: baseline;
-    gap: var(--space-3);
-    margin-bottom: var(--space-6);
+    gap: 14px;
+    margin-bottom: 20px;
   }
   h1 {
     margin: 0;
-    font-size: 28px;
-    letter-spacing: -0.01em;
+    font-size: clamp(32px, 3vw, 44px);
+    font-weight: 700;
+    line-height: 1.05;
   }
   .count {
     margin: 0;
-    color: var(--color-text-muted);
-  }
-  .heading {
-    margin-bottom: var(--space-4);
+    font-size: 15px;
+    color: var(--color-text-secondary);
   }
   .toolbar {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: var(--space-3) var(--space-4);
+    gap: var(--space-3);
     margin-bottom: var(--space-6);
   }
   .field {
     display: grid;
-    gap: var(--space-1);
+    gap: 6px;
     font-size: 12px;
     color: var(--color-text-muted);
   }
+  /* Glass controls; the native list keeps the keyboard and screen readers. */
   .field select {
+    appearance: none;
     min-width: 140px;
     max-width: 220px;
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--color-elevated);
+    height: 38px;
+    padding: 0 36px 0 14px;
+    border: 0;
     border-radius: var(--radius-sm);
-    background: var(--color-surface);
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23f5f5f7' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")
+        no-repeat right 14px center,
+      var(--fill-glass);
     color: var(--color-text);
     font: inherit;
     font-size: 14px;
+    font-weight: 500;
     cursor: pointer;
+    transition: background-color var(--motion-fast);
   }
   .field select:hover {
-    border-color: var(--color-text-muted);
+    background-color: var(--fill-glass-hover);
+  }
+  .field select option {
+    background: var(--color-elevated);
+    color: var(--color-text);
   }
   .field select:focus-visible {
     outline: 2px solid var(--color-accent);
-    outline-offset: 1px;
+    outline-offset: 2px;
   }
   .toggle {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--color-elevated);
+    height: 38px;
+    padding: 0 14px;
+    border: 0;
     border-radius: var(--radius-sm);
-    background: var(--color-surface);
-    color: var(--color-text-secondary);
+    background: var(--fill-glass);
+    color: var(--color-text);
     font: inherit;
     font-size: 14px;
+    font-weight: 500;
     cursor: pointer;
+    transition:
+      background var(--motion-fast),
+      color var(--motion-fast);
   }
   .toggle svg {
     width: 14px;
@@ -1111,18 +1127,22 @@ $effect(() => {
     stroke-width: 1.4;
     stroke-linejoin: round;
   }
+  .toggle:hover {
+    background: var(--fill-glass-hover);
+  }
   .toggle[aria-pressed="true"] {
-    border-color: var(--color-accent);
-    color: var(--color-text);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
   }
   .toggle[aria-pressed="true"] svg {
-    fill: var(--color-accent);
-    stroke: var(--color-accent);
+    fill: currentColor;
   }
-  .toggle:hover {
-    color: var(--color-text);
+  .toggle:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
   }
   button.reset {
+    height: 38px;
     font-size: 14px;
   }
   .grid {
@@ -1131,7 +1151,7 @@ $effect(() => {
     padding: 0;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: var(--space-6) var(--space-4);
+    gap: 30px 24px;
   }
   @media (min-width: 1600px) {
     .grid {
@@ -1189,8 +1209,8 @@ $effect(() => {
   }
   .state button:not(.quiet) {
     margin-top: var(--space-4);
-    background: var(--color-accent);
-    color: #04121b;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
     border: 0;
     border-radius: var(--radius-sm);
     padding: var(--space-2) var(--space-4);
