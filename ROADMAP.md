@@ -501,3 +501,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `npm run verify:web` exit 0; `gate3-player`, `gate3-upnext` and `gate3-skip` all passed. Screenshots checked: film and episode controls, subtitles panel, intro button, next-episode card (the capture shows the WebView only, so the video area is white).
 - **Not verified**: the frosted panels over real video by eye (blur over the native surface), fullscreen, 125 % and 150 % scaling.
 - **Next**: sign-in and connection lost.
+
+### 2026-11-07 — Redesign: sign-in and connection lost (ADR 0031)
+
+- **Changed**: new `Logo.svelte` (inline app logo, unique gradient ids); `SignIn.svelte` and `ConnectionLost.svelte` are frosted cards with the logo, centered title ("Bienvenue" / "Connexion à Emby"), white primary and glass secondary buttons, tinted error box; compact layout below 860 px of height; the overlays (reauthentication, connection lost mid-session) clear the title bar and blur the app underneath.
+- **Tests**: `npm run verify:web` exit 0 (123 tests); `gate21-session` all passed; `gate2-ui` passed everything except the known `no_app_credential_left` (leftover credential of the installed app, not touched). Screenshots checked at 1280 × 720: address step, saved sessions, reauthentication overlay (fits, "Changer de serveur" on one line).
+- **Not verified**: 125 % and 150 % scaling.
+- **Next**: splash and interrupted-playback banner.

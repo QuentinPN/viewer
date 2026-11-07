@@ -5,6 +5,7 @@
 import { onMount } from "svelte";
 import { errorHint } from "../emby/api";
 import type { EmbyError, SavedServer } from "../emby/types";
+import Logo from "../window/Logo.svelte";
 
 interface Props {
   server: SavedServer;
@@ -60,7 +61,7 @@ onMount(() => {
     aria-labelledby="lost-title"
     aria-describedby="lost-desc"
   >
-    <p class="brand">Viewer</p>
+    <div class="logo"><Logo size={56} /></div>
     <h1 id="lost-title">Serveur injoignable</h1>
     <p id="lost-desc" class="lead">
       {server.name} ne répond pas. Votre session est conservée : rien n'est perdu.
@@ -95,51 +96,51 @@ onMount(() => {
 
 <style>
   .screen {
+    box-sizing: border-box;
     height: 100%;
+    overflow-y: auto;
     display: grid;
     place-items: center;
     padding: var(--space-4);
     background:
-      radial-gradient(ellipse at 30% 10%, rgb(85 182 232 / 12%), transparent 60%),
+      radial-gradient(60% 60% at 50% 45%, rgb(42 50 66 / 55%) 0%, rgb(0 0 0 / 0%) 100%),
       var(--color-bg);
   }
-  .screen.over {
-    position: fixed;
-    inset: 0;
-    z-index: 20;
-    height: auto;
-    background: rgb(5 8 12 / 78%);
-    backdrop-filter: blur(6px);
-  }
   .card {
-    width: min(480px, 100%);
-    background: var(--color-surface);
-    border-radius: var(--radius-lg);
-    padding: var(--space-6);
-    box-shadow: 0 24px 60px rgb(0 0 0 / 45%);
+    box-sizing: border-box;
+    padding: 40px;
+    border-radius: 28px;
+    background: rgb(36 36 42 / 68%);
+    backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgb(255 255 255 / 10%);
+    box-shadow: 0 40px 80px rgb(0 0 0 / 60%);
   }
-  .brand {
-    margin: 0 0 var(--space-4);
-    color: var(--color-text-muted);
-    font-size: 13px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+  .logo {
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--space-4);
   }
   h1 {
     margin: 0;
-    font-size: 24px;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-align: center;
   }
   .lead {
+    margin: 6px 0 var(--space-6);
+    font-size: 15px;
+    line-height: 1.5;
     color: var(--color-text-secondary);
-    margin: var(--space-1) 0 var(--space-4);
+    text-align: center;
   }
   .server {
-    background: var(--color-elevated);
+    background: rgb(0 0 0 / 30%);
+    border: 1px solid var(--separator);
     border-radius: var(--radius-md);
     padding: var(--space-3) var(--space-4);
   }
-  .server p,
-  .error p {
+  .server p {
     margin: 0;
   }
   .server-name {
@@ -151,11 +152,13 @@ onMount(() => {
     overflow-wrap: anywhere;
   }
   .error {
-    margin-top: var(--space-3);
-    border-left: 3px solid var(--color-danger);
-    background: rgb(240 125 130 / 10%);
     border-radius: var(--radius-sm);
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: rgb(255 105 97 / 14%);
+    border: 1px solid rgb(255 105 97 / 30%);
+  }
+  .error p {
+    margin: 0;
     color: var(--color-danger);
   }
   /* Rust messages start lowercase so they can be embedded in sentences. */
@@ -167,6 +170,55 @@ onMount(() => {
     color: var(--color-text-secondary);
     font-size: 13px;
   }
+  button {
+    height: 50px;
+    padding: 0 var(--space-6);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font: inherit;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--motion-fast);
+  }
+  button:hover:not(:disabled) {
+    background: #fff;
+  }
+  button:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+  button.secondary {
+    background: var(--fill-glass);
+    color: var(--color-text);
+  }
+  button.secondary:hover:not(:disabled) {
+    background: var(--fill-glass-hover);
+  }
+  button:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  .screen.over {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    height: auto;
+    padding-top: calc(var(--titlebar-height) + var(--space-4));
+    background: rgb(0 0 0 / 60%);
+    backdrop-filter: blur(12px);
+  }
+  .card {
+    width: min(480px, 100%);
+  }
+  .lead {
+    margin-bottom: var(--space-4);
+  }
+  .error {
+    margin-top: var(--space-3);
+  }
   .status {
     min-height: 1.5em;
     margin: var(--space-4) 0 0;
@@ -174,6 +226,7 @@ onMount(() => {
     font-size: 14px;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: var(--space-2);
   }
   .spinner {
@@ -181,8 +234,8 @@ onMount(() => {
     height: 14px;
     flex: none;
     border-radius: 50%;
-    border: 2px solid var(--color-elevated);
-    border-top-color: var(--color-accent);
+    border: 2px solid rgb(255 255 255 / 20%);
+    border-top-color: var(--color-text);
     animation: spin 0.9s linear infinite;
   }
   @keyframes spin {
@@ -193,35 +246,28 @@ onMount(() => {
   @media (prefers-reduced-motion: reduce) {
     .spinner {
       animation: none;
-      border-color: var(--color-accent);
+      border-color: var(--color-text);
     }
   }
   .actions {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
     gap: var(--space-2);
-    margin-top: var(--space-4);
+    margin-top: var(--space-6);
   }
-  button {
-    background: var(--color-accent);
-    color: #04121b;
-    border: 0;
-    border-radius: var(--radius-sm);
-    padding: var(--space-2) var(--space-4);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    transition: filter var(--motion-fast);
-  }
-  button.secondary {
-    background: var(--color-elevated);
-    color: var(--color-text);
-  }
-  button:hover:not(:disabled) {
-    filter: brightness(1.1);
-  }
-  button:disabled {
-    opacity: 0.55;
-    cursor: default;
+  /* Short windows: the card stays whole. */
+  @media (max-height: 860px) {
+    .card {
+      padding: 28px 32px;
+    }
+    .logo {
+      margin-bottom: var(--space-2);
+    }
+    .logo :global(svg) {
+      width: 48px;
+      height: 48px;
+    }
+    .lead {
+      margin-bottom: var(--space-4);
+    }
   }
 </style>

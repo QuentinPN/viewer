@@ -297,8 +297,9 @@ async function signOut() {
     height: auto;
   }
   .overlay :global(.screen) {
-    background: rgb(5 8 12 / 78%);
-    backdrop-filter: blur(6px);
+    padding-top: calc(var(--titlebar-height) + var(--space-4));
+    background: rgb(0 0 0 / 60%);
+    backdrop-filter: blur(12px);
   }
   .splash {
     display: grid;

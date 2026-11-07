@@ -3,6 +3,7 @@
 // `reauth`, the server answered but refused the saved token (ADR 0012): server
 // and user are prefilled and only the password is asked.
 import { onMount, tick, untrack } from "svelte";
+import Logo from "../window/Logo.svelte";
 import { embyApi, errorHint, toEmbyError } from "./api";
 import type {
   EmbyError,
@@ -121,7 +122,8 @@ function changeServer() {
 
 <main class="screen">
   <section class="card" aria-labelledby="signin-title">
-    <h1 id="signin-title">Viewer</h1>
+    <div class="logo"><Logo /></div>
+    <h1 id="signin-title">{server ? "Connexion à Emby" : "Bienvenue"}</h1>
     <p class="lead">
       {#if initial}
         Votre session sur {initial.name} doit être confirmée : saisissez votre mot de passe.
@@ -219,82 +221,47 @@ function changeServer() {
 
 <style>
   .screen {
+    box-sizing: border-box;
     height: 100%;
+    overflow-y: auto;
     display: grid;
     place-items: center;
     padding: var(--space-4);
     background:
-      radial-gradient(ellipse at 30% 10%, rgb(85 182 232 / 12%), transparent 60%),
+      radial-gradient(60% 60% at 50% 45%, rgb(42 50 66 / 55%) 0%, rgb(0 0 0 / 0%) 100%),
       var(--color-bg);
   }
   .card {
-    width: min(440px, 100%);
-    background: var(--color-surface);
-    border-radius: var(--radius-lg);
-    padding: var(--space-6);
-    box-shadow: 0 24px 60px rgb(0 0 0 / 45%);
+    box-sizing: border-box;
+    padding: 40px;
+    border-radius: 28px;
+    background: rgb(36 36 42 / 68%);
+    backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgb(255 255 255 / 10%);
+    box-shadow: 0 40px 80px rgb(0 0 0 / 60%);
+  }
+  .logo {
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--space-4);
   }
   h1 {
     margin: 0;
     font-size: 28px;
-    letter-spacing: -0.01em;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-align: center;
   }
   .lead {
+    margin: 6px 0 var(--space-6);
+    font-size: 15px;
+    line-height: 1.5;
     color: var(--color-text-secondary);
-    margin: var(--space-1) 0 var(--space-6);
-  }
-  form {
-    display: grid;
-    gap: var(--space-2);
-  }
-  label {
-    color: var(--color-text-secondary);
-    font-size: 13px;
-    margin-top: var(--space-2);
-  }
-  input {
-    background: var(--color-elevated);
-    color: var(--color-text);
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    padding: var(--space-2) var(--space-3);
-    font: inherit;
-  }
-  input:focus-visible {
-    border-color: var(--color-accent);
-    outline: none;
-  }
-  button {
-    margin-top: var(--space-4);
-    background: var(--color-accent);
-    color: #04121b;
-    border: 0;
-    border-radius: var(--radius-sm);
-    padding: var(--space-2) var(--space-4);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    transition: filter var(--motion-fast);
-  }
-  button:hover:not(:disabled) {
-    filter: brightness(1.1);
-  }
-  button:disabled {
-    opacity: 0.55;
-    cursor: default;
-  }
-  button.link {
-    margin: 0;
-    background: transparent;
-    color: var(--color-accent);
-    padding: var(--space-1) var(--space-2);
+    text-align: center;
   }
   .server {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--space-3);
-    background: var(--color-elevated);
+    background: rgb(0 0 0 / 30%);
+    border: 1px solid var(--separator);
     border-radius: var(--radius-md);
     padding: var(--space-3) var(--space-4);
   }
@@ -309,10 +276,111 @@ function changeServer() {
     font-size: 13px;
     overflow-wrap: anywhere;
   }
-  .warning {
+  .error {
+    border-radius: var(--radius-sm);
+    padding: var(--space-3) var(--space-4);
+    background: rgb(255 105 97 / 14%);
+    border: 1px solid rgb(255 105 97 / 30%);
+  }
+  .error p {
+    margin: 0;
+    color: var(--color-danger);
+  }
+  /* Rust messages start lowercase so they can be embedded in sentences. */
+  .error p:first-child::first-letter {
+    text-transform: uppercase;
+  }
+  .error .hint {
+    margin-top: var(--space-1);
     color: var(--color-text-secondary);
     font-size: 13px;
-    margin: var(--space-3) 0 0;
+  }
+  button {
+    height: 50px;
+    padding: 0 var(--space-6);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font: inherit;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--motion-fast);
+  }
+  button:hover:not(:disabled) {
+    background: #fff;
+  }
+  button:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+  button:focus-visible,
+  input:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  .card {
+    width: min(440px, 100%);
+  }
+  form {
+    display: grid;
+    gap: 6px;
+  }
+  label {
+    margin-top: var(--space-3);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+  }
+  label:first-child {
+    margin-top: 0;
+  }
+  input {
+    height: 44px;
+    box-sizing: border-box;
+    padding: 0 14px;
+    border: 1px solid rgb(255 255 255 / 12%);
+    border-radius: 12px;
+    background: rgb(0 0 0 / 35%);
+    color: var(--color-text);
+    font: inherit;
+    font-size: 15px;
+  }
+  input:focus-visible {
+    border-color: var(--color-accent);
+    outline-offset: 0;
+    outline-width: 1px;
+  }
+  form button {
+    margin-top: var(--space-6);
+  }
+  button.link {
+    flex: none;
+    white-space: nowrap;
+    height: auto;
+    padding: var(--space-1) var(--space-2);
+    background: transparent;
+    color: var(--color-accent);
+    font-size: 15px;
+  }
+  button.link:hover:not(:disabled) {
+    background: var(--fill-glass);
+  }
+  .server {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+  .warning {
+    margin: calc(-1 * var(--space-2)) 0 var(--space-4);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+  }
+  .error {
+    margin-bottom: var(--space-4);
   }
   .saved {
     margin-top: var(--space-6);
@@ -321,6 +389,7 @@ function changeServer() {
     margin: 0 0 var(--space-2);
     color: var(--color-text-secondary);
     font-size: 13px;
+    font-weight: 600;
   }
   .saved ul {
     list-style: none;
@@ -331,32 +400,39 @@ function changeServer() {
   }
   button.saved-entry {
     width: 100%;
-    margin: 0;
+    height: auto;
+    padding: var(--space-3) var(--space-4);
     display: grid;
     justify-items: start;
     gap: 2px;
     text-align: left;
-    background: var(--color-elevated);
+    background: var(--fill-glass);
     color: var(--color-text);
+    font-size: 15px;
   }
-  .error {
-    border-left: 3px solid var(--color-danger);
-    background: rgb(240 125 130 / 10%);
-    border-radius: var(--radius-sm);
-    padding: var(--space-2) var(--space-3);
-    margin-bottom: var(--space-4);
+  button.saved-entry:hover:not(:disabled) {
+    background: var(--fill-glass-hover);
   }
-  .error p {
-    margin: 0;
-    color: var(--color-danger);
-  }
-  /* Rust messages start lowercase so they can be embedded in sentences. */
-  .error p::first-letter {
-    text-transform: uppercase;
-  }
-  .error .hint {
-    margin-top: var(--space-1);
-    color: var(--color-text-secondary);
-    font-size: 13px;
+  /* Short windows: the card stays whole. */
+  @media (max-height: 860px) {
+    form button {
+      margin-top: var(--space-4);
+    }
+    label {
+      margin-top: var(--space-2);
+    }
+    .card {
+      padding: 28px 32px;
+    }
+    .logo {
+      margin-bottom: var(--space-2);
+    }
+    .logo :global(svg) {
+      width: 48px;
+      height: 48px;
+    }
+    .lead {
+      margin-bottom: var(--space-4);
+    }
   }
 </style>
