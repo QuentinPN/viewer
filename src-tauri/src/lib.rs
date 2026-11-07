@@ -336,6 +336,8 @@ pub fn run() {
             commands::emby_genres,
             commands::artwork_cache_stats,
             commands::artwork_cache_clear,
+            commands::emby_playback_quality,
+            commands::emby_set_playback_quality,
             commands::emby_continue_watching,
             commands::emby_next_up,
             commands::emby_latest,

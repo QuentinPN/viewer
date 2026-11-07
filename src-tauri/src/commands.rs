@@ -14,6 +14,7 @@ use crate::emby::models::{
     EpisodePage, HeroItem, ItemDetail, ItemPage, ItemsOptions, Library, MediaItem, PlaybackStart,
     SavedServer, SearchResults, Season, ServerSummary, SessionStatus, SignedInUser, WatchItem,
 };
+use crate::emby::quality::{PlaybackQuality, QualityCaps};
 use crate::emby::reporting::ActivePlayback;
 use crate::emby::session::EmbyService;
 use crate::player::{
@@ -224,6 +225,23 @@ pub async fn artwork_cache_clear(
     Ok(emby.clear_artwork().await)
 }
 
+/// Bitrate caps of the current server (ADR 0037).
+#[tauri::command]
+pub fn emby_playback_quality(emby: State<'_, EmbyService>) -> Result<PlaybackQuality, EmbyError> {
+    emby.playback_quality()
+}
+
+/// Sets both caps of the current server; `null` is "Maximale". A value off the
+/// list is refused. Applies from the next negotiation.
+#[tauri::command]
+pub fn emby_set_playback_quality(
+    emby: State<'_, EmbyService>,
+    local: Option<u64>,
+    remote: Option<u64>,
+) -> Result<PlaybackQuality, EmbyError> {
+    emby.set_playback_quality(QualityCaps { local, remote })
+}
+
 #[tauri::command]
 pub async fn emby_genres(
     emby: State<'_, EmbyService>,
@@ -359,6 +377,7 @@ pub async fn emby_play(
             transcode_fallback == Some(true),
         )
         .await?;
+    let limit = plan.bitrate_limit;
     let start_seconds = (plan.start_ticks > 0).then(|| plan.start_ticks as f64 / 10_000_000.0);
     state.reporter.begin(ActivePlayback::new(&item_id, &plan));
     let request = PlaybackRequest {
@@ -386,5 +405,7 @@ pub async fn emby_play(
         container: plan.container,
         transcode_reasons: plan.transcode_reasons,
         title: plan.title,
+        bitrate_cap: limit.and_then(|l| l.cap),
+        local_address: limit.is_none_or(|l| l.local_address),
     })
 }

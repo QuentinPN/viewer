@@ -896,6 +896,10 @@ pub struct PlaybackStart {
     pub transcode_reasons: Option<String>,
     /// What the player shows at the top (ADR 0017); `None` when the item could not be read.
     pub title: Option<PlaybackTitle>,
+    /// Bitrate cap sent to the server (ADR 0037); `None` for "Maximale".
+    pub bitrate_cap: Option<u64>,
+    /// Whether the session's address counts as local, so which cap applied.
+    pub local_address: bool,
 }
 
 /// Name of what plays and, for an episode, where it sits in its series (ADR 0017).

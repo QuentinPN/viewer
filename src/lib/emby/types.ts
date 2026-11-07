@@ -35,7 +35,8 @@ export type EmbyErrorKind =
   | "credentialStore"
   | "playbackRefused"
   | "noCompatibleStream"
-  | "player";
+  | "player"
+  | "settings";
 
 export interface EmbyError {
   kind: EmbyErrorKind;
@@ -313,6 +314,20 @@ export interface PlaybackStart {
   transcodeReasons: string | null;
   /** What the player shows at the top (ADR 0017); null when the item could not be read. */
   title: PlaybackTitle | null;
+  /** Bitrate cap sent to the server, in bit/s (ADR 0037); null for "Maximale". */
+  bitrateCap: number | null;
+  /** Whether the server address counts as local, so which cap applied. */
+  localAddress: boolean;
+}
+
+/** Streaming bitrate caps of the current server, in bit/s; null is "Maximale". */
+export interface PlaybackQuality {
+  local: number | null;
+  remote: number | null;
+  /** Whether the session's address counts as local, so which cap applies. */
+  localAddress: boolean;
+  /** Caps offered, highest first. */
+  choices: number[];
 }
 
 /** Name of what plays and, for an episode, where it sits in its series. */

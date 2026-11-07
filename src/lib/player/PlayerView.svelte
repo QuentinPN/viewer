@@ -13,6 +13,7 @@ import type {
   PlaybackStart,
   Segment,
 } from "../emby/types";
+import { capInEffect } from "../settings/quality";
 import TitleBar from "../window/TitleBar.svelte";
 import { playerApi } from "./api";
 import ChaptersPanel from "./ChaptersPanel.svelte";
@@ -769,6 +770,8 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
             <dl>
               <dt>Serveur</dt>
               <dd>{decision}</dd>
+              <dt>Débit maximal</dt>
+              <dd>{capInEffect(playback.bitrateCap, playback.localAddress)}</dd>
               {#if diag}
                 <dt>Décodage</dt>
                 <dd>{decoding(diag)}</dd>

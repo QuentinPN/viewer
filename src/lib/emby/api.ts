@@ -12,6 +12,7 @@ import type {
   ItemsOptions,
   Library,
   MediaItem,
+  PlaybackQuality,
   PlaybackStart,
   PlaybackStopped,
   SavedServer,
@@ -110,6 +111,11 @@ export const embyApi = {
   artworkStats: () => invoke<ArtworkCacheStats | null>("artwork_cache_stats"),
   /** Empties the artwork cache of every server (ADR 0021). */
   clearArtwork: () => invoke<ArtworkCacheCleared | null>("artwork_cache_clear"),
+  /** Bitrate caps of the current server (ADR 0037). */
+  playbackQuality: () => invoke<PlaybackQuality>("emby_playback_quality"),
+  /** Keeps both caps; a value not offered is refused. */
+  setPlaybackQuality: (local: number | null, remote: number | null) =>
+    invoke<PlaybackQuality>("emby_set_playback_quality", { local, remote }),
   /** The item's new state, once a playback stopped and was reported. */
   onPlaybackStopped: (
     handler: (state: PlaybackStopped) => void,
