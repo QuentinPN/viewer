@@ -252,6 +252,49 @@ function fromMenu(action: () => void) {
   action();
 }
 
+// Many libraries: only their list scrolls, so search, Accueil, Réglages and the
+// account stay in the pill. Its edges fade where libraries are hidden.
+let libraryList = $state<HTMLElement | null>(null);
+let hiddenBefore = $state(false);
+let hiddenAfter = $state(false);
+
+function updateListEdges() {
+  if (!libraryList) return;
+  const { scrollLeft, scrollWidth, clientWidth } = libraryList;
+  hiddenBefore = scrollLeft > 1;
+  hiddenAfter = scrollLeft + clientWidth < scrollWidth - 1;
+}
+
+$effect(() => {
+  const list = libraryList;
+  if (!list) return;
+  // A mouse wheel only scrolls vertically: it scrolls the list sideways.
+  const onWheel = (e: WheelEvent) => {
+    if (list.scrollWidth <= list.clientWidth) return;
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    e.preventDefault();
+    list.scrollLeft += e.deltaY;
+  };
+  const resize = new ResizeObserver(updateListEdges);
+  resize.observe(list);
+  list.addEventListener("wheel", onWheel, { passive: false });
+  return () => {
+    resize.disconnect();
+    list.removeEventListener("wheel", onWheel);
+  };
+});
+
+// The current library stays in view (Ctrl+number, return from a detail page).
+$effect(() => {
+  const id = selected?.id;
+  if (!libraryList || !id || !libraries) return;
+  void tick().then(() =>
+    libraryList
+      ?.querySelector<HTMLElement>(`[data-library-id="${CSS.escape(id)}"]`)
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" }),
+  );
+});
+
 /** `Ctrl+1` shows the home page, `Ctrl+2`… the libraries in the order shown. */
 function onNumberShortcut(e: KeyboardEvent): boolean {
   if (!e.ctrlKey || e.altKey || e.shiftKey || !libraries) return false;
@@ -494,11 +537,18 @@ $effect(() => {
         >
           Accueil
         </button>
-        <ul class="libraries">
+        <ul
+          class="libraries"
+          class:fade-start={hiddenBefore}
+          class:fade-end={hiddenAfter}
+          bind:this={libraryList}
+          onscroll={updateListEdges}
+        >
           {#each libraries as library, i (library.id)}
             <li>
               <button
                 type="button"
+                data-library-id={library.id}
                 aria-current={selected?.id === library.id &&
                 !searching &&
                 !settingsOpen
@@ -789,8 +839,6 @@ $effect(() => {
     backdrop-filter: var(--material-blur);
     border: 1px solid var(--separator);
     box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
-    overflow-x: auto;
-    scrollbar-width: none;
   }
   .search-box {
     position: relative;
@@ -886,12 +934,34 @@ $effect(() => {
     color: var(--color-text-secondary);
     white-space: nowrap;
   }
+  /* The only part of the pill that scrolls. The 4 px padding, taken back by the
+     margin, keeps the focus ring inside the scroll box. */
   .libraries {
     list-style: none;
-    margin: 0;
-    padding: 0;
+    min-width: 0;
+    margin: -4px;
+    padding: 4px;
     display: flex;
     gap: var(--space-1);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    scroll-padding-inline: 40px;
+  }
+  .libraries.fade-end {
+    mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+  }
+  .libraries.fade-start {
+    mask-image: linear-gradient(to left, #000 calc(100% - 40px), transparent);
+  }
+  .libraries.fade-start.fade-end {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 40px,
+      #000 calc(100% - 40px),
+      transparent
+    );
   }
   .libraries button,
   .home-link {

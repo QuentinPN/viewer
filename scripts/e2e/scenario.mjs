@@ -141,3 +141,30 @@ if (-not [U.P]::SetWindowPos($h, [System.IntPtr]::Zero, 0, 0, ${width}, ${height
   if (r.status !== 0)
     throw new Error(`resize failed (${r.status}) ${r.stderr}`);
 }
+
+/**
+ * Windows display scaling without the system setting: the real window gets the
+ * CSS size, then CDP sets the device scale factor. `cdp` is a CDP session of the page.
+ */
+export async function setScaledSize(app, cdp, { width, height, scale }) {
+  await cdp.send("Emulation.clearDeviceMetricsOverride");
+  resizeWindow(app.proc.pid, width, height);
+  await app.page
+    .waitForFunction((w) => Math.abs(innerWidth - w) <= 24, width, {
+      timeout: 10000,
+    })
+    .catch(async () => {
+      const got = await app.page.evaluate(() => `${innerWidth}×${innerHeight}`);
+      throw new Error(`window is ${got}, wanted ${width}×${height}`);
+    });
+  await cdp.send("Emulation.setDeviceMetricsOverride", {
+    width: 0,
+    height: 0,
+    deviceScaleFactor: scale,
+    mobile: false,
+  });
+  await app.page.waitForFunction((s) => devicePixelRatio === s, scale, {
+    timeout: 10000,
+  });
+  await app.page.waitForTimeout(500);
+}

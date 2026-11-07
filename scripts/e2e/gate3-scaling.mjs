@@ -19,7 +19,7 @@ import {
   homeHeading,
   libraryNav,
   playerBadge,
-  resizeWindow,
+  setScaledSize,
   signIn,
   signInHeading,
   signOut,
@@ -53,29 +53,6 @@ const SIZES = [
 
 const libraryButton = (page, kind) =>
   libraryNav(page).locator("ul.libraries button", { hasText: kind }).first();
-
-async function setSize(app, cdp, { width, height, scale }) {
-  await cdp.send("Emulation.clearDeviceMetricsOverride");
-  resizeWindow(app.proc.pid, width, height);
-  await app.page
-    .waitForFunction((w) => Math.abs(innerWidth - w) <= 24, width, {
-      timeout: 10000,
-    })
-    .catch(async () => {
-      const got = await app.page.evaluate(() => `${innerWidth}×${innerHeight}`);
-      throw new Error(`window is ${got}, wanted ${width}×${height}`);
-    });
-  await cdp.send("Emulation.setDeviceMetricsOverride", {
-    width: 0,
-    height: 0,
-    deviceScaleFactor: scale,
-    mobile: false,
-  });
-  await app.page.waitForFunction((s) => devicePixelRatio === s, scale, {
-    timeout: 10000,
-  });
-  await app.page.waitForTimeout(500);
-}
 
 async function settled(page) {
   await page.waitForFunction(
@@ -224,7 +201,7 @@ try {
   await homeHeading(page).waitFor({ timeout: 20000 });
 
   for (const size of SIZES) {
-    await setSize(app, cdp, size);
+    await setScaledSize(app, cdp, size);
     const home = libraryNav(page).locator(".home-link");
     await home.click();
     await homeHeading(page).waitFor({ timeout: 15000 });
@@ -262,7 +239,7 @@ try {
 
   await signOut(page);
   for (const size of SIZES) {
-    await setSize(app, cdp, size);
+    await setScaledSize(app, cdp, size);
     await signInHeading(page).waitFor();
     await capture(page, `${size.name}-signin`);
   }

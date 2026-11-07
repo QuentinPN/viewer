@@ -536,4 +536,12 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Fixed**: at 853 × 480 the subtitles panel went under the title bar (`max-height` now also bounded by `100vh − 240px`); the connection-lost card overflowed so its buttons were off screen (37 px at 125 %, 133 px at 150 %): compact layout below 600 px of height, and `place-items: safe center` on the sign-in and connection-lost screens so a tall card scrolls instead of being cut at the top.
 - **Tests**: `gate3-scaling` all passed (panel top 120 / 63 / 264 px, actions 121 / 25 / 99 px above the bottom); screenshots checked. `npm run verify:web` exit 0 (123 tests).
 - **Not verified**: a real 125 % or 150 % Windows setting; a library list long enough to overflow the navigation pill at 853 px.
+- **Next**: the navigation pill with many libraries.
+
+### 2026-11-07 — Redesign: navigation pill with many libraries (ADR 0031)
+
+- **Fixed**: with more libraries than fit, the whole pill scrolled with a hidden scrollbar: "Réglages" and the account went out of view and the mouse wheel could not bring them back. Only the library list scrolls now; the wheel scrolls it sideways, its edges fade where libraries are hidden, and the current library is scrolled into view (`LibraryBrowser.svelte`).
+- **Added**: proxy mode "many-views" in `net-proxy.mjs` (library list answered with each library four times, server only read) and `scripts/e2e/gate3-nav-many.mjs`; `setScaledSize` moved to `scenario.mjs`, shared with `gate3-scaling`.
+- **Tests**: `gate3-nav-many` failed before the fix (Réglages, account and last library out of reach at both sizes) and all passed after it, 16 libraries; screenshots checked. `gate3-scaling` all passed again. `npm run verify:web` exit 0 (123 tests).
+- **Not verified**: a touchpad's horizontal swipe on the list (native, not driven); a real 125 % or 150 % Windows setting.
 - **Next**: to be chosen.

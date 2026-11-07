@@ -17,13 +17,20 @@
 //   server can no longer read. Playlists are forwarded: FFmpeg skips segment after
 //   segment (ADR 0027);
 // - "log-segments": every request is forwarded; each HLS segment is noted in `segments`
-//   with its number, time and HTTP status. No URL is kept.
+//   with its number, time and HTTP status. No URL is kept;
+// - "many-views": the library list (`/Users/{Id}/Views`) is answered with each
+//   library repeated under numbered names and made-up ids, like a server with many
+//   libraries (ADR 0031). The rest is forwarded. The server is only read.
 import { randomBytes } from "node:crypto";
+import http from "node:http";
 import net from "node:net";
 
 const DIRECT_FILE = /^GET \S*\/videos\/\S+\/original\.\S* HTTP/i;
 const HLS_PLAYLIST = /^GET \S*\/videos\/\S+\.m3u8\S* HTTP/i;
 const HLS_SEGMENT = /^GET \S*\/videos\/\S+\.ts\S* HTTP/i;
+const VIEWS = /^GET \S*\/Users\/[^/\s]+\/Views(\?\S*)? HTTP/i;
+/** Copies of each library in "many-views", the original included. */
+const VIEW_COPIES = 4;
 const ERROR_RESPONSE =
   "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 17\r\nConnection: close\r\n\r\nStale file handle";
 const JUNK = randomBytes(256 * 1024);
@@ -98,6 +105,14 @@ export async function startProxy(targetUrl, port = 0) {
       });
       return;
     }
+    if (mode === "many-views") {
+      filterRequests(client, (line, chunk) => {
+        if (!VIEWS.test(line)) return false;
+        manyViews(client, chunk);
+        return true;
+      });
+      return;
+    }
     counts.forwarded += 1;
     const upstream = net.connect(targetPort, target.hostname);
     sockets.add(upstream);
@@ -163,6 +178,66 @@ export async function startProxy(targetUrl, port = 0) {
   }
 
   /**
+   * Fetches the library list itself (same headers, token included, never kept)
+   * and answers it with every library repeated.
+   */
+  function manyViews(client, chunk) {
+    const [head] = chunk.toString("latin1").split("\r\n\r\n", 1);
+    const [line, ...rows] = head.split("\r\n");
+    const headers = {};
+    for (const row of rows) {
+      const i = row.indexOf(":");
+      const name = row.slice(0, i).trim().toLowerCase();
+      if (!["host", "connection", "accept-encoding"].includes(name))
+        headers[name] = row.slice(i + 1).trim();
+    }
+    counts.forwarded += 1;
+    const req = http.request(
+      {
+        host: target.hostname,
+        port: targetPort,
+        path: line.split(" ")[1],
+        headers,
+      },
+      (res) => {
+        const body = [];
+        res.on("data", (c) => body.push(c));
+        res.on("end", () => {
+          let out = Buffer.concat(body);
+          if (res.statusCode === 200) {
+            const views = JSON.parse(out.toString("utf8"));
+            const items = [];
+            for (let n = 0; n < VIEW_COPIES; n++)
+              for (const v of views.Items)
+                items.push(
+                  n === 0
+                    ? v
+                    : { ...v, Id: `${v.Id}${n}`, Name: `${v.Name} ${n + 1}` },
+                );
+            out = Buffer.from(
+              JSON.stringify({
+                ...views,
+                Items: items,
+                TotalRecordCount: items.length,
+              }),
+            );
+          }
+          client.end(
+            Buffer.concat([
+              Buffer.from(
+                `HTTP/1.1 ${res.statusCode} ${res.statusMessage}\r\nContent-Type: application/json\r\nContent-Length: ${out.length}\r\nConnection: close\r\n\r\n`,
+              ),
+              out,
+            ]),
+          );
+        });
+      },
+    );
+    req.on("error", () => client.destroy());
+    req.end();
+  }
+
+  /**
    * Same inspection as `rejectAuthenticated`, on the request line: `answer` returns
    * true when it took the request, which then does not reach the server.
    */
@@ -170,7 +245,7 @@ export async function startProxy(targetUrl, port = 0) {
     let upstream = null;
     client.on("data", (chunk) => {
       const line = chunk.toString("latin1").split("\r\n", 1)[0];
-      if (answer(line)) {
+      if (answer(line, chunk)) {
         upstream?.destroy();
         return;
       }
