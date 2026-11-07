@@ -236,6 +236,7 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
             p if p == sections => (200, home_sections()),
             p if p == section_items => (200, resume_section()),
             p if p == format!("{items}/30207") => (200, movie_detail()),
+            p if p == format!("{items}/30500") => (200, two_versions_detail()),
             p if p == format!("{items}/80473") => (200, series_detail()),
             p if p == format!("{items}/80475") => (200, episode_detail()),
             p if p == format!("{items}/80476") => (200, bare_episode_detail()),
@@ -274,6 +275,9 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
                 (200, playback_direct())
             }
             "/emby/Items/40000/PlaybackInfo" if r.method == "POST" => (200, playback_transcode()),
+            "/emby/Items/30500/PlaybackInfo" if r.method == "POST" => {
+                (200, playback_two_versions(&r.body))
+            }
             p if p.ends_with("/PlaybackInfo") => (404, NOT_FOUND_TEXT.into()),
             "/emby/Sessions/Playing"
             | "/emby/Sessions/Playing/Progress"
@@ -318,6 +322,45 @@ fn playback_transcode() -> String {
         "DeliveryUrl":"/Videos/40000/mediasource_40000/Subtitles/2/0/Stream.subrip?api_key={TOKEN}"}}]}}],
         "PlaySessionId":"ps2"}}"#
     )
+}
+
+/// A film with two versions (ADR 0036). No item of the real server has two (scan of
+/// 11 954 films and episodes, Emby 4.10.2.0), so the second version's id follows the
+/// merged-version shape (the other item's id); its own file keeps `mediasource_…`.
+fn two_versions_detail() -> String {
+    r#"{"Name":"Deux Versions","Id":"30500","Type":"Movie","RunTimeTicks":60000000000,
+        "UserData":{"PlaybackPositionTicks":0,"Played":false},
+        "MediaSources":[
+          {"Protocol":"File","Id":"mediasource_30500","Path":"/share/Films/Deux/Deux - 1080p.mkv",
+           "Name":"1080p","Container":"mkv","Size":4000000000,"Bitrate":8000000,
+           "MediaStreams":[{"Codec":"h264","Type":"Video","Width":1920,"Height":1080,"VideoRange":"SDR"}]},
+          {"Protocol":"File","Id":"30501","Path":"/share/Films/Deux/Deux - 2160p.mkv",
+           "Name":"2160p","Container":"mkv","Size":30000000000,"Bitrate":60000000,
+           "MediaStreams":[{"Codec":"hevc","Type":"Video","Width":3840,"Height":2160,"BitDepth":10,"VideoRange":"HDR 10"}]},
+          {"Protocol":"File","Id":"../bad","Name":"sans identifiant utilisable"}]}"#
+        .into()
+}
+
+/// PlaybackInfo of `two_versions_detail`, as Emby 4.10.2.0 treats `MediaSourceId`
+/// (checked on a one-version film): that source only, `NoCompatibleStream` for an id
+/// it does not know, every source without it.
+fn playback_two_versions(body: &str) -> String {
+    let first = format!(
+        r#"{{"Id":"mediasource_30500","Container":"mkv","SupportsDirectPlay":true,
+        "DirectStreamUrl":"/videos/30500/original.mkv?MediaSourceId=mediasource_30500&PlaySessionId=ps5&api_key={TOKEN}"}}"#
+    );
+    let second = format!(
+        r#"{{"Id":"30501","Container":"mkv","SupportsDirectPlay":true,
+        "DirectStreamUrl":"/videos/30500/original.mkv?MediaSourceId=30501&PlaySessionId=ps5&api_key={TOKEN}"}}"#
+    );
+    let sources =
+        match serde_json::from_str::<serde_json::Value>(body).unwrap()["MediaSourceId"].as_str() {
+            None => format!("{first},{second}"),
+            Some("mediasource_30500") => first,
+            Some("30501") => second,
+            Some(_) => return r#"{"MediaSources":[],"ErrorCode":"NoCompatibleStream"}"#.into(),
+        };
+    format!(r#"{{"MediaSources":[{sources}],"PlaySessionId":"ps5"}}"#)
 }
 
 /// 404 body of Emby 4.10.1.0 for an unknown item: French text, not JSON.
@@ -1682,6 +1725,69 @@ fn playback_negotiates_direct_play_with_the_token_in_a_header_only() {
         "Video"
     );
     assert!(!req.body.contains(TOKEN));
+}
+
+#[test]
+fn playback_of_one_version_names_it_to_the_server_and_in_reports() {
+    use super::reporting::ActivePlayback;
+    let (server, fx, _) = signed_in_browser();
+    let info_body = |server: &FakeEmby| -> serde_json::Value {
+        let req = server
+            .requests()
+            .into_iter()
+            .rfind(|r| r.path.contains("/PlaybackInfo"))
+            .unwrap();
+        serde_json::from_str(&req.body).unwrap()
+    };
+
+    // The detail lists each version with the id to play it; an unsafe id is dropped.
+    let d = run(fx.service.item_detail("30500")).unwrap();
+    let ids: Vec<_> = d.media.iter().map(|m| m.id.as_deref()).collect();
+    assert_eq!(ids, [Some("mediasource_30500"), Some("30501"), None]);
+    assert_eq!(d.media[1].name.as_deref(), Some("2160p"));
+
+    // No choice: no `MediaSourceId`, the server's first source, as before.
+    let (plan, _) = run(fx.service.prepare_version("30500", None, false, false)).unwrap();
+    assert_eq!(plan.media_source_id, "mediasource_30500");
+    assert!(info_body(&server).get("MediaSourceId").is_none());
+
+    let (plan, _) = run(fx
+        .service
+        .prepare_version("30500", Some("30501"), false, false))
+    .unwrap();
+    assert_eq!(plan.media_source_id, "30501");
+    assert!(plan.url.contains("MediaSourceId=30501") && !plan.url.contains(TOKEN));
+    assert_eq!(info_body(&server)["MediaSourceId"], "30501");
+    assert_eq!(
+        ActivePlayback::new("30500", &plan).media_source_id,
+        "30501",
+        "start, progress and stop reports name the version played"
+    );
+
+    // The transcode fallback keeps the version (ADR 0023).
+    let _ = run(fx
+        .service
+        .prepare_version("30500", Some("30501"), false, true));
+    let forced = info_body(&server);
+    assert_eq!(forced["MediaSourceId"], "30501");
+    assert_eq!(forced["EnableDirectPlay"], false);
+
+    // A version the server no longer has is not swapped for another one.
+    let err = run(fx
+        .service
+        .prepare_version("30500", Some("30502"), false, false))
+    .unwrap_err();
+    assert!(matches!(err, EmbyError::NoCompatibleStream), "{err:?}");
+
+    let before = server.requests().len();
+    for bad in ["../x", "a b", "a\"x", ""] {
+        assert!(run(fx.service.prepare_version("30500", Some(bad), false, false)).is_err());
+    }
+    assert_eq!(
+        server.requests().len(),
+        before,
+        "unsafe ids never reach the server"
+    );
 }
 
 #[test]

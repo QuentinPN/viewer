@@ -278,6 +278,9 @@ pub struct PersonDto {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct MediaSourceDto {
+    /// What PlaybackInfo's `MediaSourceId` names (ADR 0036).
+    #[serde(default)]
+    pub id: Option<String>,
     #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
@@ -644,6 +647,9 @@ pub struct StreamInfo {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaInfo {
+    /// Passed back to `emby_play` to play this version (ADR 0036); `None` when the
+    /// server gave no usable id.
+    pub id: Option<String>,
     pub name: Option<String>,
     pub container: Option<String>,
     pub size_bytes: Option<u64>,
@@ -752,6 +758,10 @@ pub struct PlaybackInfoRequest<'a> {
     /// what the server offered for direct playback (ADR 0023).
     pub enable_direct_play: bool,
     pub enable_direct_stream: bool,
+    /// One version of an item with several (ADR 0036): the server answers with that
+    /// source only, or `NoCompatibleStream` for an id it does not know.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_source_id: Option<&'a str>,
 }
 
 /// What the player can play, as Emby's `DeviceProfile` describes it. Comma
@@ -874,6 +884,8 @@ impl PlayMethod {
 #[serde(rename_all = "camelCase")]
 pub struct PlaybackStart {
     pub item_id: String,
+    /// The version played (ADR 0036): a fallback or a resume plays the same one.
+    pub media_source_id: String,
     /// The start asked for: a fallback keeps "Reprendre" or "Lire depuis le début".
     pub resume: bool,
     pub method: PlayMethod,

@@ -83,8 +83,13 @@ pub struct PlaybackPlan {
     pub title: Option<PlaybackTitle>,
 }
 
-/// Picks the first source the server offers and the best way to play it.
-pub fn plan(server: &ServerUrl, response: PlaybackInfoResponse) -> Result<PlaybackPlan, EmbyError> {
+/// Picks the source asked for (ADR 0036), else the first the server offers, and the
+/// best way to play it. A version the server did not offer is not replaced by another.
+pub fn plan(
+    server: &ServerUrl,
+    response: PlaybackInfoResponse,
+    media_source_id: Option<&str>,
+) -> Result<PlaybackPlan, EmbyError> {
     match response.error_code.as_deref() {
         None => {}
         Some("NotAllowed") => {
@@ -103,7 +108,7 @@ pub fn plan(server: &ServerUrl, response: PlaybackInfoResponse) -> Result<Playba
     let source = response
         .media_sources
         .into_iter()
-        .next()
+        .find(|s| media_source_id.is_none_or(|id| s.id == id))
         .ok_or(EmbyError::NoCompatibleStream)?;
     let MediaSourceInfo {
         id,
@@ -278,7 +283,7 @@ mod tests {
 
     #[test]
     fn direct_play_without_token_in_url() {
-        let plan = plan(&server(), source(DIRECT)).unwrap();
+        let plan = plan(&server(), source(DIRECT), None).unwrap();
         assert_eq!(plan.method, PlayMethod::DirectPlay);
         assert_eq!(
             plan.url,
@@ -298,7 +303,7 @@ mod tests {
             r#""SupportsDirectPlay":false"#,
         );
         assert_eq!(
-            plan(&server(), source(&json)).unwrap().method,
+            plan(&server(), source(&json), None).unwrap().method,
             PlayMethod::DirectStream
         );
     }
@@ -321,7 +326,7 @@ mod tests {
 
     #[test]
     fn transcode_plays_hls_with_external_text_subtitles() {
-        let plan = plan(&server(), source(TRANSCODE)).unwrap();
+        let plan = plan(&server(), source(TRANSCODE), None).unwrap();
         assert_eq!(plan.method, PlayMethod::Transcode);
         assert_eq!(
             plan.url,
@@ -368,7 +373,7 @@ mod tests {
             "VideoCodecNotSupported,AudioCodecNotSupported",
         );
         assert_eq!(
-            plan(&server(), source(&json))
+            plan(&server(), source(&json), None)
                 .unwrap()
                 .transcode_reasons
                 .as_deref(),
@@ -378,10 +383,40 @@ mod tests {
             r#""SupportsDirectPlay":false"#,
             r#""SupportsDirectPlay":true"#,
         );
-        let plan = plan(&server(), source(&direct)).unwrap();
+        let plan = plan(&server(), source(&direct), None).unwrap();
         assert_eq!(plan.method, PlayMethod::DirectPlay);
         assert!(plan.subtitles.is_empty() && plan.transcode_reasons.is_none());
         assert_eq!(plan.container.as_deref(), Some("mkv"));
+    }
+
+    // Two versions in one answer, as a server that ignores `MediaSourceId` would
+    // send them (ADR 0036).
+    const TWO_VERSIONS: &str = r#"{"MediaSources":[
+        {"Id":"mediasource_30500","Container":"mkv","SupportsDirectPlay":true,
+         "DirectStreamUrl":"/videos/30500/original.mkv?MediaSourceId=mediasource_30500&api_key=SECRET"},
+        {"Id":"30501","Container":"mp4","SupportsDirectPlay":false,"SupportsTranscoding":true,
+         "TranscodingUrl":"/videos/30500/master.m3u8?MediaSourceId=30501&api_key=SECRET&TranscodeReasons=VideoBitrateNotSupported"}],
+        "PlaySessionId":"p"}"#;
+
+    #[test]
+    fn the_version_asked_for_is_played_with_the_servers_decision_for_it() {
+        let first = plan(&server(), source(TWO_VERSIONS), None).unwrap();
+        assert_eq!(first.media_source_id, "mediasource_30500");
+        assert_eq!(first.method, PlayMethod::DirectPlay);
+
+        let second = plan(&server(), source(TWO_VERSIONS), Some("30501")).unwrap();
+        assert_eq!(second.media_source_id, "30501");
+        assert_eq!(second.method, PlayMethod::Transcode);
+        assert_eq!(second.container, None);
+        assert_eq!(
+            second.transcode_reasons.as_deref(),
+            Some("débit trop élevé")
+        );
+        assert!(second.url.contains("MediaSourceId=30501") && !second.url.contains("SECRET"));
+
+        // Never another version in place of the one chosen.
+        let err = plan(&server(), source(TWO_VERSIONS), Some("30502")).unwrap_err();
+        assert_eq!(err.kind(), "noCompatibleStream");
     }
 
     #[test]
@@ -390,14 +425,19 @@ mod tests {
             "/Videos/30207/mediasource_30207/Subtitles/4/0/Stream.subrip",
             "http://evil.example/sub.srt",
         );
-        assert!(plan(&server(), source(&json)).is_err());
+        assert!(plan(&server(), source(&json), None).is_err());
     }
 
     #[test]
     fn server_error_codes_and_empty_answers() {
-        let refused = plan(&server(), source(r#"{"ErrorCode":"NotAllowed"}"#)).unwrap_err();
+        let refused = plan(&server(), source(r#"{"ErrorCode":"NotAllowed"}"#), None).unwrap_err();
         assert_eq!(refused.kind(), "playbackRefused");
-        let limit = plan(&server(), source(r#"{"ErrorCode":"RateLimitExceeded"}"#)).unwrap_err();
+        let limit = plan(
+            &server(),
+            source(r#"{"ErrorCode":"RateLimitExceeded"}"#),
+            None,
+        )
+        .unwrap_err();
         assert_eq!(limit.kind(), "playbackRefused");
         for json in [
             r#"{"ErrorCode":"NoCompatibleStream"}"#,
@@ -406,7 +446,7 @@ mod tests {
             r#"{"MediaSources":[{"Id":"m","SupportsDirectPlay":false,"SupportsDirectStream":false,
                 "SupportsTranscoding":false,"DirectStreamUrl":"/videos/1/original.mkv"}]}"#,
         ] {
-            let err = plan(&server(), source(json)).unwrap_err();
+            let err = plan(&server(), source(json), None).unwrap_err();
             assert_eq!(err.kind(), "noCompatibleStream", "{json}");
         }
     }

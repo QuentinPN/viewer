@@ -329,7 +329,8 @@ pub async fn emby_episodes(
 /// Plays a film or episode from the server (ADR 0007): PlaybackInfo, choice of the
 /// source, then the player. The UI gets the method only, never the URL or token.
 /// With `resume`, starts where the server says the user stopped; the playback is
-/// then reported to the server (ADR 0008).
+/// then reported to the server (ADR 0008). `media_source_id` plays one version of an
+/// item with several (ADR 0036).
 #[tauri::command]
 pub async fn emby_play(
     state: State<'_, AppState>,
@@ -337,13 +338,17 @@ pub async fn emby_play(
     item_id: String,
     resume: bool,
     transcode_fallback: Option<bool>,
+    media_source_id: Option<String>,
 ) -> Result<PlaybackStart, EmbyError> {
     state.reporter.resend_stop().await;
-    let (plan, http_headers) = if transcode_fallback == Some(true) {
-        emby.prepare_transcode(&item_id, resume).await?
-    } else {
-        emby.prepare_playback(&item_id, resume).await?
-    };
+    let (plan, http_headers) = emby
+        .prepare_version(
+            &item_id,
+            media_source_id.as_deref(),
+            resume,
+            transcode_fallback == Some(true),
+        )
+        .await?;
     let start_seconds = (plan.start_ticks > 0).then(|| plan.start_ticks as f64 / 10_000_000.0);
     state.reporter.begin(ActivePlayback::new(&item_id, &plan));
     let request = PlaybackRequest {
@@ -364,6 +369,7 @@ pub async fn emby_play(
         .load(&request, &source)
         .map_err(player)?;
     Ok(PlaybackStart {
+        media_source_id: plan.media_source_id,
         item_id,
         resume,
         method: plan.method,

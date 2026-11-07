@@ -30,6 +30,12 @@ import {
   videoLabel,
 } from "./format";
 import EpisodePage from "./ItemDetail.svelte";
+import {
+  loadVersion,
+  saveVersion,
+  versionChoices,
+  versionKey,
+} from "./versions";
 
 interface Props {
   /** Grid card: title and poster are shown at once while the detail loads. */
@@ -51,6 +57,8 @@ interface Props {
   onLoaded?: (detail: ItemDetail) => void;
   /** Error state: where the return button goes, when not the default. */
   backLabel?: string | undefined;
+  /** Server and user the chosen version is remembered for (ADR 0036); none: not kept. */
+  versionScope?: string | undefined;
 }
 
 type Direction = "previous" | "next";
@@ -66,6 +74,7 @@ let {
   focusOnLoad = null,
   onLoaded,
   backLabel,
+  versionScope,
 }: Props = $props();
 
 // Only an episode page is nested over another page: ids stay unique.
@@ -106,6 +115,25 @@ const premiere = $derived(formatDate(detail?.premiereDate ?? null));
 const position = $derived(
   detail?.episode ? episodePosition(detail.episode) : null,
 );
+/** Several versions of this film or episode (ADR 0036); empty otherwise. */
+const versions = $derived(detail ? versionChoices(detail.media) : []);
+/** `MediaSourceId` played from this page; null lets the server pick. */
+let version = $state<string | null>(null);
+const versionId = isEpisodePage ? "episode-version" : "detail-version";
+
+function storage(): Storage | null {
+  try {
+    return versionScope ? window.localStorage : null;
+  } catch {
+    return null;
+  }
+}
+
+function chooseVersion(id: string) {
+  version = id;
+  if (detail && versionScope)
+    saveVersion(storage(), versionKey(versionScope, detail.id), versions, id);
+}
 
 // Back online: read the page again in place (watched state may have changed).
 let seenRefresh = untrack(() => refresh);
@@ -124,6 +152,10 @@ async function load() {
     const d = await embyApi.itemDetail(item.id);
     if (d.id !== item.id) return;
     detail = d;
+    const choices = versionChoices(d.media);
+    version = versionScope
+      ? loadVersion(storage(), versionKey(versionScope, d.id), choices)
+      : (choices.find((c) => c.id === version)?.id ?? choices[0]?.id ?? null);
     onLoaded?.(d);
     if (pendingFocus) {
       const via = pendingFocus;
@@ -144,7 +176,9 @@ async function play(id: string, resume: boolean) {
   fromStart = !resume;
   playError = null;
   try {
-    onPlay(await embyApi.play(id, resume));
+    // The version chosen here is for this page's item, not for a listed episode.
+    const source = id === detail?.id && versions.length > 0 ? version : null;
+    onPlay(await embyApi.play(id, resume, false, source));
   } catch (e) {
     playError = onError(toEmbyError(e));
   } finally {
@@ -413,6 +447,20 @@ onMount(() => {
             </button>
             {/if}
           </div>
+          {#if versions.length > 0 && version}
+            <div class="version">
+              <label for={versionId}>Version</label>
+              <select
+                id={versionId}
+                value={version}
+                onchange={(e) => chooseVersion(e.currentTarget.value)}
+              >
+                {#each versions as v (v.id)}
+                  <option value={v.id}>{v.label}</option>
+                {/each}
+              </select>
+            </div>
+          {/if}
         {:else if !error}
           <div class="sk-meta" aria-hidden="true"></div>
           <p class="sr-only">Chargement de la fiche…</p>
@@ -502,7 +550,11 @@ onMount(() => {
           {#each detail.media as media, i (i)}
             <div class="media">
               {#if detail.media.length > 1}
-                <h3>{media.name ?? `Version ${i + 1}`}</h3>
+                <h3>
+                  {media.name ?? `Version ${i + 1}`}{#if versions.length > 0 && media.id === version}<span
+                      class="tag">choisie</span
+                    >{/if}
+                </h3>
               {/if}
               <dl>
                 {#if media.video}
@@ -631,6 +683,7 @@ onMount(() => {
       onNavigate={navigate}
       focusOnLoad={opened.via}
       onLoaded={(d) => (openedSeason = d.episode?.seasonId ?? null)}
+      {versionScope}
     />
   {/key}
 {/if}
@@ -1020,6 +1073,47 @@ onMount(() => {
     display: inline-flex;
     align-items: center;
     gap: 10px;
+  }
+  /* Glass native select, as in the grid toolbar: keyboard and screen readers kept. */
+  .version {
+    margin-top: var(--space-4);
+    display: grid;
+    gap: 6px;
+    max-width: 100%;
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+  .version select {
+    appearance: none;
+    width: fit-content;
+    max-width: min(560px, 100%);
+    height: 38px;
+    padding: 0 36px 0 14px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23f5f5f7' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")
+        no-repeat right 14px center,
+      var(--fill-glass);
+    backdrop-filter: var(--material-blur);
+    color: var(--color-text);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition: background-color var(--motion-fast);
+  }
+  .version select:hover {
+    background-color: var(--fill-glass-hover);
+  }
+  .version select option {
+    background: var(--color-elevated);
+    color: var(--color-text);
+  }
+  .version select:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
   }
   .play-actions .play {
     padding: 0 26px;

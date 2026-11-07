@@ -578,3 +578,12 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `src/release/version.test.ts` (9 tests: bumps, explicit versions, numeric compare, Cargo.toml, Cargo.lock with CRLF, package-lock root only, changelog order, the four files equal, Tauri reading package.json); `npm run verify:web` exit 0 (132 tests); `verify:rust` exit 0 (127 tests); debug build with the new `tauri.conf.json`; `gate3-settings` all passed with `version_shown`.
 - **Not verified**: the NSIS upgrade from 0.1.0 to 0.3.1 over the installed build (the owner runs it).
 - **Next**: to be chosen.
+
+### 2026-11-07 — Choice between versions of a film or episode (ADR 0036)
+
+- **Asked**: `PRODUCT.md` P1 "multi-version selection".
+- **Measured** (real server, read only, Emby 4.10.2.0): 11 954 films and episodes scanned, none with more than one `MediaSource`. `openapi.json` gives `MediaSourceId` in the `PlaybackInfoRequest` body; on a single-source film its own id returns that source and an unknown id returns HTTP 200 with no source and `NoCompatibleStream`.
+- **Added**: « Version » select on film and episode detail pages when there are two versions or more (server name, resolution, codec, HDR, size or bitrate); `emby_play` takes an optional `media_source_id`, validated in Rust and sent in the PlaybackInfo body; the plan keeps only that source, never another one; reports, the transcode fallback and « Reprendre » follow it. The choice is kept per server, user and item in WebView `localStorage`.
+- **Tests**: Rust `playback_of_one_version_names_it_to_the_server_and_in_reports` (fake server) and `the_version_asked_for_is_played_with_the_servers_decision_for_it`; Vitest `src/lib/detail/versions.test.ts` (5 tests). `npm run verify:web` exit 0 (137 tests); `./scripts/with-msvc.ps1 npm run verify:rust` exit 0 (129 passed).
+- **Not verified**: no e2e scenario or real playback of a chosen version, since the test server has no multi-version item. Home, hero, Continue Watching and next episode play the server's default version.
+- **Next**: an e2e check once a multi-version item exists on the server.

@@ -24,7 +24,10 @@ let conn = $state<ConnectionState>({ kind: "restoring" });
 let spike = $state<"none" | "scenario" | "prototype">("none");
 let playing = $state<PlaybackStart | null>(null);
 /** Playback that ended on an error or too early: offered again (ADR 0012). */
-let interrupted = $state<{ itemId: string } | null>(null);
+let interrupted = $state<{
+  itemId: string;
+  mediaSourceId: string | null;
+} | null>(null);
 let resuming = $state(false);
 let resumeError = $state<EmbyError | null>(null);
 let signingOut = $state(false);
@@ -80,10 +83,15 @@ async function stopPlaying() {
   returnFocus = null;
 }
 
+/** The version playing, kept by a fallback or a resume of the same item (ADR 0036). */
+function versionOf(itemId: string): string | null {
+  return playing?.itemId === itemId ? playing.mediaSourceId : null;
+}
+
 /** The stream broke: back to the app, which checks the server, then offers to resume. */
 async function playbackInterrupted(itemId: string) {
+  interrupted = { itemId, mediaSourceId: versionOf(itemId) };
   playing = null;
-  interrupted = { itemId };
   await tick();
   resumeButton?.focus({ preventScroll: true });
   void coordinator.verify();
@@ -115,7 +123,7 @@ async function playTranscoded(
 ): Promise<string | null> {
   if (!appActive) return "La session n'est pas disponible.";
   try {
-    playing = await embyApi.play(itemId, resume, true);
+    playing = await embyApi.play(itemId, resume, true, versionOf(itemId));
     return null;
   } catch (e) {
     const error = toEmbyError(e);
@@ -129,7 +137,14 @@ async function resumeInterrupted() {
   resuming = true;
   resumeError = null;
   try {
-    startPlaying(await embyApi.play(interrupted.itemId, true));
+    startPlaying(
+      await embyApi.play(
+        interrupted.itemId,
+        true,
+        false,
+        interrupted.mediaSourceId,
+      ),
+    );
   } catch (e) {
     resumeError = toEmbyError(e);
     void coordinator.report(resumeError);
