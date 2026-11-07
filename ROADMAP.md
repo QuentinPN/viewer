@@ -449,3 +449,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: silent install and uninstall, exit 0; `gate5-release` all passed on the installed build: frontend from `tauri.localhost`, window on screen, prototype refused, bitrate cap ignored ("Lecture directe · MKV"), "2 Coeurs" played (first picture after 5.1 s), seek to 600 s in 1.3 s, no resume left, exit 0 with no process left. Uninstall removed the folder, the entry and both shortcuts; reinstalled. Details in `docs/evidence/gate5-installation-2026-11-07.md`.
 - **Not verified**: a clean machine (WebView2 present, data shared with the debug build); picture, sound and subtitles by eye and ear; SmartScreen; transcoding, cuts and series with the release build.
 - **Next**: the owner uses the installed app; a clean-machine test if one is available.
+
+### 2026-11-07 — App icon and custom title bar
+
+- **Changed**: own icon (`src-tauri/icons/source/logo.svg`, every Windows icon regenerated with `npx tauri icon`) in place of Tauri's. ADR 0029: no Windows title bar; `TitleBar.svelte` with drag area and Windows' caption buttons, inside the player's top gradient while playing, none in fullscreen; six window permissions for the main window.
+- **Tests**: `npm run verify:web` exit 0 (Vitest 113); debug build; `gate2-play` all passed, the bar shows over the video; `gate2-ui` passed except `no_app_credential_left`: an app credential that this run did not create remains, probably from the 30 min pause run stopped yesterday, left as is.
+- **Not verified**: dragging, double-click, resizing from the edges and snapping with a real mouse; the icon in the taskbar and installer (release not rebuilt).
+- **Next**: Apple TV style mockups.

@@ -6,6 +6,7 @@
 import { onDestroy, onMount, tick } from "svelte";
 import { embyApi } from "../emby/api";
 import type { EpisodeLink, PlaybackStart } from "../emby/types";
+import TitleBar from "../window/TitleBar.svelte";
 import { playerApi } from "./api";
 import {
   canFallBack,
@@ -532,7 +533,8 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
       onclick={onSurfaceClick}
     ></button>
 
-    <header class="top chrome">
+    <header class="top chrome" class:windowed={!fullscreen}>
+      {#if !fullscreen}<TitleBar overVideo />{/if}
       <button type="button" class="round" aria-label="Revenir" title="Revenir (Échap)" onclick={() => close()}>
         {@render icon("back")}
       </button>
@@ -845,6 +847,9 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     gap: var(--space-3);
     padding: var(--space-4) var(--space-6) 56px var(--space-4);
     background: linear-gradient(rgb(0 0 0 / 70%), rgb(0 0 0 / 0%));
+  }
+  .top.windowed {
+    padding-top: calc(var(--space-4) + var(--titlebar-height));
   }
   .heading {
     flex: 1;

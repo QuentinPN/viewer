@@ -14,6 +14,9 @@ Premium cinematic desktop media browser inspired by Infuse's clarity. Original V
 
 ## Main screens
 
+- Window (ADR 0029): no Windows title bar. A 32 px bar of the app's background holds Windows' three caption buttons on the right (close turns red on hover); its empty area drags the window, double-click maximizes. In the player it sits in the top gradient with no background and fades with the controls; none in fullscreen.
+- Icon: a white "U" holding a blue play triangle on a dark rounded tile, source `src-tauri/icons/source/logo.svg`.
+
 - Onboarding: server URL, connection test, sign-in, informative errors.
 - Home: cinematic hero, Continue Watching, Next Up, Recently Added, Favorites.
 - Home hero (ADR 0015): above the rows, one title at a time over its backdrop (left and bottom scrim), logo or title, episode or year, overview on three lines, "Lecture"/"Reprendre" (white) and "Plus d'infos" (translucent), progress bar when started. Arrows (on hover or focus) and dots only with several titles; ← → inside the hero, the focus follows. No automatic rotation; 200 ms fade, none with reduced motion. Skeleton of the same height while loading, "Réessayer" on error, hidden when empty.

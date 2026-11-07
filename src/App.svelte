@@ -10,6 +10,7 @@ import LibraryBrowser from "./lib/library/LibraryBrowser.svelte";
 import { playerApi } from "./lib/player/api";
 import PlayerSpike from "./lib/player/PlayerSpike.svelte";
 import PlayerView from "./lib/player/PlayerView.svelte";
+import TitleBar from "./lib/window/TitleBar.svelte";
 
 // Session first (ADR 0012): the saved Emby session is restored behind a branded
 // screen, never the sign-in form. The signed-in app stays mounted (inert) under
@@ -160,6 +161,8 @@ async function signOut() {
 </script>
 
 <svelte:window ononline={() => void coordinator.online()} />
+
+{#if playing === null}<TitleBar />{/if}
 
 {#if spike !== "none"}
   {#if spike === "prototype"}

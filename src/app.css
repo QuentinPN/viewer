@@ -20,6 +20,8 @@
   --motion-fast: 120ms;
   --motion-base: 200ms;
   --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  /* Custom title bar (ADR 0029); the player puts its own over the video. */
+  --titlebar-height: 32px;
   color-scheme: dark;
 }
 
@@ -51,6 +53,7 @@ body {
 
 #app {
   height: 100%;
+  padding-top: var(--titlebar-height);
 }
 
 :focus-visible {
