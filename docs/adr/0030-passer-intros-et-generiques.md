@@ -49,4 +49,5 @@ Les sources vérifiées le 2026-11-07 (`docs/evidence/intros-generiques-2026-11-
 ## Validation
 - Tests Rust sur les réponses réelles enregistrées le 2026-11-07 : analyse des trois sources, bornes nulles, `no_*`, 404, validation des identifiants, ordre et fusion, cache, et un faux serveur local pour les statuts HTTP.
 - Tests Vitest : segment actif, cible du saut, action du bouton, réglages lus et enregistrés.
-- Non vérifié : le bouton dans le vrai lecteur sur un épisode avec des données. Le serveur de test n'a aucun marqueur, et aucun épisode de sa bibliothèque n'a été vérifié chez IntroDB ou TheIntroDB.
+- Scénario `gate3-skip` sur le compte de test (2026-11-07) : un épisode de la bibliothèque a une intro et un générique chez IntroDB ; bouton « Passer l'intro », toujours là quand les commandes s'effacent, Entrée saute à la fin de l'intro, « Passer le générique » avec « Épisode suivant », saut automatique une seule fois, rien sans les sources externes.
+- Non vérifié : TheIntroDB dans le vrai lecteur (aucun épisode cherché n'y avait de données), le bouton « Épisode suivant » seul et le générique sauté jusqu'à la fin (ils marqueraient l'épisode comme vu), l'image vidéo à l'œil.

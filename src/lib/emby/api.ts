@@ -16,6 +16,7 @@ import type {
   SavedServer,
   SearchResults,
   Season,
+  Segment,
   ServerSummary,
   SessionStatus,
   SignedInUser,
@@ -85,6 +86,12 @@ export const embyApi = {
    */
   play: (itemId: string, resume: boolean, transcodeFallback = false) =>
     invoke<PlaybackStart>("emby_play", { itemId, resume, transcodeFallback }),
+  /**
+   * Intro and credits to offer skipping (ADR 0030). `external: false` asks the
+   * Emby server only. Never fails for an unreachable external source.
+   */
+  segments: (itemId: string, external: boolean) =>
+    invoke<Segment[]>("emby_segments", { itemId, external }),
   /** `null` when the app has no artwork cache directory. */
   artworkStats: () => invoke<ArtworkCacheStats | null>("artwork_cache_stats"),
   /** Empties the artwork cache of every server (ADR 0021). */

@@ -73,7 +73,7 @@ Goal: sign in once, then reopen Viewer without entering credentials again, while
 - Acceptance criteria: a user authenticates once; subsequent launches connect automatically while credentials remain valid; a server outage shows a recovery screen instead of login; retry recovers the existing session; only a confirmed invalid session requests credentials; server switching is safe and explicit.
 - TODO: episode detail, search, sorting and filters come with Gate 3.
 
-## Gate 3 — Core experience [IN PROGRESS · home page with hero, search, sorting, filters, favorites, episode page, final player UI, next-episode card, artwork cache, episode search and settings screen (artwork cache) VERIFIED]
+## Gate 3 — Core experience [IN PROGRESS · home page with hero, search, sorting, filters, favorites, episode page, final player UI, next-episode card, skip intro and credits, artwork cache, episode search and settings screen (artwork cache, playback) VERIFIED]
 
 Home, film/series browsing, details, search, accessible player UI, responsive layouts and artwork cache.
 
@@ -85,6 +85,7 @@ Home, film/series browsing, details, search, accessible player UI, responsive la
 - DONE: episode page (ADR 0016) — in a series the title opens the episode page and the thumbnail plays; series logo or name, "Saison N · Épisode M", episode image (else the series backdrop), air date, runtime, overview, directors, writers, guest stars, technical info, "Lecture"/"Reprendre"; previous/next across seasons with the focus kept; Escape back to the series on that episode, in its season. Home cards and the hero keep playing directly.
 - DONE: final player UI (ADR 0017) — `PlayerView.svelte` for Emby playback: title (series, season and episode for an episode), controls fading after 3 s (kept while paused, buffering, scrubbing, over the bar or with a panel open), seek bar with remaining time, ±10 s, volume and mute kept per PC, "Audio", "Sous-titres" and "Informations de lecture" panels, fullscreen, keys M, ↑/↓, I, Escape. Tracks stay chosen by the server. `PlayerSpike` remains for the Gate 1 prototype.
 - DONE: next-episode card (ADR 0018) — at the natural end of an episode with a next one (across seasons, from the server), a card "Épisode suivant" with a 10 s countdown, "Lire maintenant" and "Annuler"; the next episode plays in the same player, fullscreen kept. Films, last episodes and early ends close as before.
+- DONE: skip intro and credits (ADR 0030) — segments from Emby's chapter markers, then IntroDB, then TheIntroDB (anonymous, series ids with season and episode); « Passer l'intro » / « Passer le générique » / « Épisode suivant » at the bottom right, kept when the controls fade, Entrée; « Passer automatiquement » once per playback; Réglages › Lecture with the external sources on by default. The test server has no marker today.
 - DONE: artwork disk cache (ADR 0019) — behind `emby-img`, per server, 512 MiB with least-recently-used eviction, files only (no SQLite for artwork); served after the session and server checks, before the server download slots; `artwork_cache_stats`.
 - DONE: search of episodes (ADR 0020) — a third parallel query (`Episode`, 100 asked) filtered in Rust on the episode's own title, because Emby also matches the series name; "Épisodes" section of 16:9 cards opening the episode page, previous/next in place, Escape back to the card.
 - DONE: settings screen, artwork cache section (ADR 0021) — « Réglages » in the sidebar; size against the quota, image count, reads since launch; « Vider le cache des images » (`artwork_cache_clear`) removes the `.img` files of every server and the empty folders, keeps other files, announces what was freed; no confirmation.
@@ -456,3 +457,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `npm run verify:web` exit 0 (Vitest 113); debug build; `gate2-play` all passed, the bar shows over the video; `gate2-ui` passed except `no_app_credential_left`: an app credential that this run did not create remains, probably from the 30 min pause run stopped yesterday, left as is.
 - **Not verified**: dragging, double-click, resizing from the edges and snapping with a real mouse; the icon in the taskbar and installer (release not rebuilt).
 - **Next**: Apple TV style mockups.
+
+### 2026-11-07 — Skip intro and credits
+
+- **Changed**: ADR 0030; `src-tauri/src/segments/` (`SegmentService`, `SegmentProvider` for IntroDB and TheIntroDB, Emby markers) and tests; `BaseItemDto` reads `ProviderIds` and `Chapters`; `EmbyService::segment_query`; command `emby_segments`; `src/lib/player/segments.ts` and tests; button and Entrée in `PlayerView.svelte`; Réglages › Lecture; scenario `scripts/e2e/gate3-skip.mjs`. No new dependency or capability.
+- **Tests**: cargo fmt, clippy `-D warnings`, cargo test 127 passed / 15 ignored; `npm run verify:web` exit 0 (Vitest 123); debug build; `gate3-skip` 12/12 on an episode with IntroDB data. Details in `docs/evidence/intros-generiques-2026-11-07.md`.
+- **Not verified**: TheIntroDB in the real player (no looked up episode had data there); the « Épisode suivant » skip and credits skipped to the end (they would mark the episode played); Emby markers on a real server (none on the test server); the video by eye.
+- **Next**: the owner tries it on a few series; submitting segments to the services is out of scope.

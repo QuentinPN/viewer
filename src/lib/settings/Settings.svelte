@@ -2,6 +2,7 @@
 import { onMount } from "svelte";
 import { embyApi, toEmbyError } from "../emby/api";
 import type { ArtworkCacheStats, EmbyError } from "../emby/types";
+import { readSkip, type SkipSetting, saveSkip } from "../player/segments";
 import {
   cacheUsage,
   clearedLabel,
@@ -16,6 +17,21 @@ let loadError = $state<EmbyError | null>(null);
 let clearing = $state(false);
 let clearError = $state<EmbyError | null>(null);
 let announce = $state("");
+let skip = $state<SkipSetting>(readSkip(storage()));
+
+/** `localStorage` may be missing or refused: the setting is then not kept. */
+function storage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function changeSkip(next: SkipSetting) {
+  skip = next;
+  saveSkip(storage(), next);
+}
 
 async function load() {
   loadError = null;
@@ -52,6 +68,48 @@ onMount(() => {
 <header class="heading">
   <h1>Réglages</h1>
 </header>
+
+<section class="panel" aria-labelledby="settings-playback">
+  <h2 id="settings-playback">Lecture</h2>
+  <p class="lead">
+    Pendant une intro ou un générique, un bouton propose de les passer. Les repères
+    viennent d'abord du serveur Emby, puis des bases communautaires IntroDB et
+    TheIntroDB.
+  </p>
+  <label class="check">
+    <input
+      type="checkbox"
+      checked={skip.external}
+      onchange={(e) => changeSkip({ ...skip, external: e.currentTarget.checked })}
+    />
+    <span>
+      Chercher les intros et génériques sur IntroDB et TheIntroDB
+      <small class="muted">
+        Seuls les identifiants IMDb, TMDB ou TVDB du film ou de la série, la saison,
+        l'épisode et la durée sont envoyés. Jamais votre compte ni l'adresse du
+        serveur.
+      </small>
+    </span>
+  </label>
+  <label class="check">
+    <input
+      type="checkbox"
+      checked={skip.auto}
+      onchange={(e) => changeSkip({ ...skip, auto: e.currentTarget.checked })}
+    />
+    <span>
+      Passer automatiquement
+      <small class="muted">
+        Une seule fois par lecture : revenir en arrière affiche de nouveau le bouton.
+      </small>
+    </span>
+  </label>
+  <p class="credit muted">
+    Données d'intros fournies par IntroDB (introdb.app) et TheIntroDB
+    (theintrodb.org).
+  </p>
+  <p class="muted note">S'applique à la prochaine lecture.</p>
+</section>
 
 <section class="panel" aria-labelledby="settings-artwork">
   <h2 id="settings-artwork">Cache des images</h2>
@@ -120,9 +178,39 @@ onMount(() => {
     gap: var(--space-3);
     justify-items: start;
   }
+  .panel + .panel {
+    margin-top: var(--space-6);
+  }
   h2 {
     margin: 0;
     font-size: 18px;
+  }
+  .check {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    cursor: pointer;
+  }
+  .check input {
+    margin: 3px 0 0;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--color-accent);
+    flex: none;
+  }
+  .check input:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  .check small {
+    display: block;
+    margin-top: 2px;
+    font-size: 13px;
+    max-width: 58ch;
+  }
+  .credit,
+  .note {
+    font-size: 13px;
   }
   p {
     margin: 0;
