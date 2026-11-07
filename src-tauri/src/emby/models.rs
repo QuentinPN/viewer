@@ -223,6 +223,23 @@ pub struct BaseItemDto {
     pub series_primary_image_tag: Option<String>,
     #[serde(default)]
     pub media_sources: Vec<MediaSourceDto>,
+    /// `Imdb`, `Tmdb`, `Tvdb`…; the key case varies (`IMDB` on a series, Emby
+    /// 4.10.2.0). Sent to the intro services only (ADR 0030).
+    #[serde(default)]
+    pub provider_ids: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    pub chapters: Vec<ChapterDto>,
+}
+
+/// `ChapterInfo`: `MarkerType` is `Chapter`, `IntroStart`, `IntroEnd` or
+/// `CreditsStart` (ADR 0030).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct ChapterDto {
+    #[serde(default)]
+    pub start_position_ticks: i64,
+    #[serde(default)]
+    pub marker_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
