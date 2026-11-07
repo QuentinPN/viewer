@@ -744,7 +744,6 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
       {/if}
 
       <div class="timeline">
-        <span class="time">{formatTime(position)}</span>
         <input
           class="seek"
           type="range"
@@ -758,11 +757,40 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
           aria-label="Position de lecture"
           aria-valuetext={`${formatTime(position)} sur ${formatTime(duration)}`}
         />
-        <span class="time" title="Temps restant">{formatRemaining(position, duration)}</span>
+        <div class="times">
+          <span class="time">{formatTime(position)}</span>
+          <span class="time" title="Temps restant">{formatRemaining(position, duration)}</span>
+        </div>
       </div>
 
       <div class="buttons">
-        <div class="group">
+        <div class="group start">
+          <div class="volume">
+            <button
+              type="button"
+              class="round"
+              aria-label={volume.muted ? "Rétablir le son" : "Couper le son"}
+              aria-pressed={volume.muted}
+              title={volume.muted ? "Rétablir le son (M)" : "Couper le son (M)"}
+              onclick={() => changeVolume(toggleMute(volume))}
+            >
+              {@render icon(shownVolume === 0 ? "muted" : "volume")}
+            </button>
+            <input
+              class="level"
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={shownVolume}
+              style:--progress={`${shownVolume}%`}
+              oninput={(e) => changeVolume(setLevel(Number(e.currentTarget.value)))}
+              aria-label="Volume"
+              aria-valuetext={`${shownVolume} %`}
+            />
+          </div>
+        </div>
+        <div class="group transport">
           <button
             type="button"
             class="round"
@@ -790,32 +818,8 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
           >
             {@render icon("forward")}
           </button>
-          <div class="volume">
-            <button
-              type="button"
-              class="round"
-              aria-label={volume.muted ? "Rétablir le son" : "Couper le son"}
-              aria-pressed={volume.muted}
-              title={volume.muted ? "Rétablir le son (M)" : "Couper le son (M)"}
-              onclick={() => changeVolume(toggleMute(volume))}
-            >
-              {@render icon(shownVolume === 0 ? "muted" : "volume")}
-            </button>
-            <input
-              class="level"
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value={shownVolume}
-              style:--progress={`${shownVolume}%`}
-              oninput={(e) => changeVolume(setLevel(Number(e.currentTarget.value)))}
-              aria-label="Volume"
-              aria-valuetext={`${shownVolume} %`}
-            />
-          </div>
         </div>
-        <div class="group">
+        <div class="group end">
           <button
             type="button"
             class="round"
@@ -930,8 +934,19 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     display: flex;
     align-items: flex-start;
     gap: var(--space-3);
-    padding: var(--space-4) var(--space-6) 56px var(--space-4);
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4) 32px 80px;
     background: linear-gradient(rgb(0 0 0 / 70%), rgb(0 0 0 / 0%));
+  }
+  .top > .round {
+    flex: none;
+    border: 1px solid var(--separator);
+    background: var(--material);
+    backdrop-filter: var(--material-blur);
+  }
+  .top > .round:hover {
+    background: var(--material-thick);
   }
   .top.windowed {
     padding-top: calc(var(--space-4) + var(--titlebar-height));
@@ -943,9 +958,10 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   }
   .heading h1 {
     margin: 0;
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 600;
     line-height: 1.25;
+    letter-spacing: -0.01em;
     text-shadow: 0 1px 3px rgb(0 0 0 / 60%);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -962,9 +978,8 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   .decision {
     flex: none;
     max-width: 40%;
-    margin-top: 6px;
-    color: var(--color-text);
-    font-size: 12px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
     text-shadow: 0 1px 3px rgb(0 0 0 / 80%);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -972,37 +987,41 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   }
 
   .bottom {
+    --side: clamp(var(--space-4), 5vw, 80px);
     display: grid;
     gap: var(--space-2);
-    padding: 56px var(--space-6) var(--space-4);
+    padding: 120px var(--side) 32px;
     background: linear-gradient(rgb(0 0 0 / 0%), rgb(0 0 0 / 75%));
   }
   .timeline {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
+    display: grid;
   }
-  .time {
-    min-width: 6ch;
-    font-size: 13px;
-    font-variant-numeric: tabular-nums;
-    color: var(--color-text);
-    text-shadow: 0 1px 3px rgb(0 0 0 / 80%);
-  }
-  .time:last-child {
-    text-align: right;
-  }
-  .buttons {
+  .times {
     display: flex;
     justify-content: space-between;
+  }
+  .time {
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: rgb(235 235 245 / 80%);
+    text-shadow: 0 1px 3px rgb(0 0 0 / 80%);
+  }
+  .buttons {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    flex-wrap: wrap;
     gap: var(--space-2);
   }
   .group {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
+    gap: var(--space-2);
+  }
+  .group.transport {
+    gap: 28px;
+  }
+  .group.end {
+    justify-content: flex-end;
   }
 
   .round {
@@ -1017,17 +1036,25 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     cursor: pointer;
     transition: background var(--motion-fast);
   }
-  .round:hover,
-  .round.on {
+  .round:hover {
     background: rgb(255 255 255 / 14%);
   }
-  .round.main {
+  .round.on {
+    background: rgb(255 255 255 / 20%);
+  }
+  .transport .round:not(.main) {
     width: 52px;
     height: 52px;
-    background: rgb(255 255 255 / 16%);
+  }
+  .round.main {
+    width: 72px;
+    height: 72px;
+    background: rgb(255 255 255 / 92%);
+    color: #000;
+    box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
   }
   .round.main:hover {
-    background: rgb(255 255 255 / 26%);
+    background: #fff;
   }
   .icon {
     width: 24px;
@@ -1050,8 +1077,12 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     font-family: var(--font-ui);
   }
   .round.main .icon {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
+  }
+  .round:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
   }
 
   input[type="range"] {
@@ -1063,55 +1094,69 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   }
   input[type="range"]::-webkit-slider-runnable-track {
     height: 4px;
-    border-radius: 2px;
+    border-radius: 3px;
     background: linear-gradient(
       to right,
-      var(--color-accent) var(--progress, 0%),
-      rgb(255 255 255 / 28%) var(--progress, 0%)
+      #fff var(--progress, 0%),
+      rgb(255 255 255 / 25%) var(--progress, 0%)
     );
     transition: height var(--motion-fast);
   }
   input[type="range"]::-webkit-slider-thumb {
     appearance: none;
-    width: 14px;
-    height: 14px;
-    margin-top: -5px;
+    width: 16px;
+    height: 16px;
+    margin-top: -6px;
     border-radius: 50%;
     background: var(--color-text);
     box-shadow: 0 1px 4px rgb(0 0 0 / 50%);
   }
   .seek {
-    flex: 1;
+    width: 100%;
+  }
+  .seek::-webkit-slider-runnable-track {
+    height: 6px;
+  }
+  .seek::-webkit-slider-thumb {
+    margin-top: -5px;
   }
   .seek:hover::-webkit-slider-runnable-track,
   .seek:focus-visible::-webkit-slider-runnable-track {
-    height: 6px;
+    height: 8px;
   }
   .seek:hover::-webkit-slider-thumb,
   .seek:focus-visible::-webkit-slider-thumb {
-    margin-top: -4px;
+    width: 18px;
+    height: 18px;
+    margin-top: -5px;
+  }
+  .seek:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 4px;
+    border-radius: 4px;
   }
   .volume {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
-    margin-left: var(--space-3);
+    gap: var(--space-2);
   }
   .level {
-    width: 96px;
+    width: 120px;
   }
 
   .panel {
     position: absolute;
-    right: var(--space-6);
-    bottom: calc(100% - 40px);
+    right: var(--side);
+    bottom: calc(100% - 96px);
     width: min(340px, calc(100vw - 32px));
     max-height: min(60vh, 420px);
     overflow-y: auto;
-    padding: var(--space-3);
-    background: rgb(21 25 34 / 94%);
-    border-radius: var(--radius-md);
-    box-shadow: 0 8px 32px rgb(0 0 0 / 45%);
+    padding: 18px;
+    background: rgb(36 36 42 / 72%);
+    backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgb(255 255 255 / 10%);
+    border-radius: 20px;
+    box-shadow: 0 30px 60px rgb(0 0 0 / 50%);
   }
   .panel.info {
     width: min(420px, calc(100vw - 32px));
@@ -1130,8 +1175,6 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     font-size: 13px;
     font-weight: 600;
     color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
   }
   .panel h2:focus {
     outline: none;
@@ -1140,12 +1183,17 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-2);
+    min-height: 40px;
+    padding: 0 10px;
     border-radius: var(--radius-sm);
+    font-size: 15px;
     cursor: pointer;
   }
   .choice:hover {
     background: rgb(255 255 255 / 8%);
+  }
+  .choice:has(input:checked) {
+    background: rgb(235 235 245 / 14%);
   }
   .choice input {
     accent-color: var(--color-accent);
@@ -1176,8 +1224,9 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-sm);
-    background: rgb(11 13 17 / 70%);
+    border-radius: var(--radius-pill);
+    background: var(--material);
+    backdrop-filter: var(--material-blur);
     color: var(--color-text-secondary);
     font-size: 13px;
     pointer-events: none;
@@ -1214,13 +1263,14 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     top: 50%;
     left: 50%;
     translate: -50% -50%;
-    background: rgb(11 13 17 / 85%);
+    background: var(--material);
+    backdrop-filter: var(--material-blur);
     padding: var(--space-2) var(--space-4);
     border-radius: var(--radius-sm);
   }
   .text-button {
     margin-top: var(--space-2);
-    background: var(--color-elevated);
+    background: var(--fill-glass);
     color: var(--color-text);
     border: 0;
     border-radius: var(--radius-sm);
@@ -1230,15 +1280,13 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     cursor: pointer;
   }
   .text-button:hover {
-    filter: brightness(1.15);
+    background: var(--fill-glass-hover);
   }
 
   /* End of an episode (ADR 0018): no video under the page any more, so the
      player paints its own background. */
   .player.ended {
-    background:
-      radial-gradient(ellipse at 80% 100%, rgb(85 182 232 / 14%), transparent 60%),
-      var(--color-bg);
+    background: var(--color-bg);
   }
   .up-next {
     position: relative;
@@ -1248,9 +1296,11 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     padding: var(--space-4) var(--space-6) var(--space-6);
     display: grid;
     gap: var(--space-1);
-    background: var(--color-surface);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 24px 60px rgb(0 0 0 / 50%);
+    background: rgb(36 36 42 / 72%);
+    backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgb(255 255 255 / 10%);
+    border-radius: 20px;
+    box-shadow: 0 30px 60px rgb(0 0 0 / 50%);
   }
   .up-next .label {
     margin: 0 0 var(--space-2);
@@ -1272,15 +1322,15 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   }
   .gauge {
     display: block;
-    height: 3px;
+    height: 4px;
     border-radius: 2px;
-    background: rgb(255 255 255 / 14%);
+    background: rgb(255 255 255 / 25%);
     overflow: hidden;
   }
   .gauge span {
     display: block;
     height: 100%;
-    background: var(--color-accent);
+    background: #fff;
     transition: width 1s linear;
   }
   @media (prefers-reduced-motion: reduce) {
@@ -1308,8 +1358,8 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-6) var(--space-2) var(--space-4);
-    background: #fff;
-    color: #0b0d11;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
     border: 0;
     border-radius: var(--radius-sm);
     font: inherit;
@@ -1317,7 +1367,7 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     cursor: pointer;
   }
   .play-now:hover {
-    background: #e6e8ec;
+    background: #fff;
   }
   .play-now .icon {
     width: 18px;
@@ -1328,34 +1378,37 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
      they fade. */
   .skip {
     position: absolute;
-    right: var(--space-6);
-    bottom: 120px;
+    right: clamp(var(--space-4), 5vw, 80px);
+    bottom: 190px;
     z-index: 1;
     display: flex;
     gap: var(--space-2);
   }
   .skip button {
-    padding: var(--space-2) var(--space-4);
+    height: 44px;
+    padding: 0 22px;
     border: 0;
     border-radius: var(--radius-sm);
+    font-size: 15px;
     font: inherit;
     font-weight: 650;
     cursor: pointer;
     box-shadow: 0 4px 16px rgb(0 0 0 / 40%);
   }
   .skip-main {
-    background: #fff;
-    color: #0b0d11;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
   }
   .skip-main:hover {
-    background: #e6e8ec;
+    background: #fff;
   }
   .skip-next {
-    background: rgb(21 25 34 / 86%);
+    background: var(--material);
+    backdrop-filter: var(--material-blur);
     color: var(--color-text);
   }
   .skip-next:hover {
-    background: rgb(45 51 64 / 92%);
+    background: var(--material-thick);
   }
   .skip button:focus-visible {
     outline: 2px solid var(--color-accent);
@@ -1366,16 +1419,15 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     .skip {
       right: var(--space-4);
     }
-    .top,
-    .bottom {
+    .top {
       padding-left: var(--space-4);
       padding-right: var(--space-4);
     }
+    .group.transport {
+      gap: var(--space-2);
+    }
     .level {
       display: none;
-    }
-    .panel {
-      right: var(--space-4);
     }
   }
 </style>

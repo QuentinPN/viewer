@@ -494,3 +494,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `npm run verify:web` exit 0; `gate3-episode` all passed; `gate2-ui` passed except the known `no_app_credential_left`. Screenshots checked: second season, back from an episode (focus ring on the card).
 - **Not verified**: 125 % and 150 % scaling.
 - **Next**: player.
+
+### 2026-11-07 — Redesign: player controls (ADR 0031)
+
+- **Changed**: `PlayerView.svelte`: the buttons are three groups (volume on the left, ±10 s around a 72 px white play/pause in the middle, panels on the right), the seek bar runs alone with the times below; white tracks, glass back button, frosted panels with the selected row tinted, white "Passer l'intro" and "Lire maintenant", frosted next-episode card and "Épisode suivant" skip button.
+- **Tests**: `npm run verify:web` exit 0; `gate3-player`, `gate3-upnext` and `gate3-skip` all passed. Screenshots checked: film and episode controls, subtitles panel, intro button, next-episode card (the capture shows the WebView only, so the video area is white).
+- **Not verified**: the frosted panels over real video by eye (blur over the native surface), fullscreen, 125 % and 150 % scaling.
+- **Next**: sign-in and connection lost.
