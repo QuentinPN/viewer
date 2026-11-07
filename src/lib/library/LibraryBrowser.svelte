@@ -1,5 +1,6 @@
 <script lang="ts">
-// Signed-in shell: the sidebar with the search field, then the home page
+// Signed-in shell: the floating navigation pill (ADR 0031) with the search field,
+// then the home page
 // (ADR 0010), the paged poster grid of a library (DESIGN.md, Films/Series) or the
 // search results (ADR 0011), and the detail page of the opened item over them.
 import { onMount, tick, untrack } from "svelte";
@@ -242,9 +243,36 @@ function onSearchKeydown(e: KeyboardEvent) {
   }
 }
 
-/** `Ctrl+F`, or `/` outside a text field, puts the focus in the search field. */
+let accountMenu = $state<HTMLElement | null>(null);
+let browser = $state<HTMLElement | null>(null);
+
+/** Closes the account menu, then runs its action. */
+function fromMenu(action: () => void) {
+  accountMenu?.hidePopover();
+  action();
+}
+
+/** `Ctrl+1` shows the home page, `Ctrl+2`… the libraries in the order shown. */
+function onNumberShortcut(e: KeyboardEvent): boolean {
+  if (!e.ctrlKey || e.altKey || e.shiftKey || !libraries) return false;
+  const n = Number.parseInt(e.key, 10);
+  if (!(n >= 1 && n <= libraries.length + 1)) return false;
+  const library = n === 1 ? null : libraries[n - 2];
+  if (library) select(library);
+  else showHome();
+  return true;
+}
+
+/**
+ * `Ctrl+F`, or `/` outside a text field, puts the focus in the search field. A
+ * detail page hides the navigation (ADR 0031): it closes first.
+ */
 function onWindowKeydown(e: KeyboardEvent) {
-  if (e.defaultPrevented || !searchField?.checkVisibility()) return;
+  if (e.defaultPrevented || !browser?.checkVisibility()) return;
+  if (onNumberShortcut(e)) {
+    e.preventDefault();
+    return;
+  }
   const target = e.target as HTMLElement | null;
   const typing =
     target instanceof HTMLInputElement ||
@@ -255,8 +283,17 @@ function onWindowKeydown(e: KeyboardEvent) {
   const slash = e.key === "/" && !e.ctrlKey && !e.altKey && !typing;
   if (!ctrlF && !slash) return;
   e.preventDefault();
-  searchField.focus();
-  searchField.select();
+  void focusSearch();
+}
+
+async function focusSearch() {
+  if (opened) {
+    opened = null;
+    openerId = null;
+    await tick();
+  }
+  searchField?.focus();
+  searchField?.select();
 }
 
 function openSettings() {
@@ -411,92 +448,119 @@ $effect(() => {
 
 <svelte:window onkeydown={onWindowKeydown} />
 
-<div class="browser">
-  <nav class="sidebar" aria-label="Bibliothèques">
-    <p class="brand">Viewer</p>
-    <form
-      class="search-box"
-      role="search"
-      onsubmit={(e) => {
-        e.preventDefault();
-        void runSearch();
-      }}
-    >
-      <label class="sr-only" for="search-field">Rechercher un film, une série ou un épisode</label>
-      <svg viewBox="0 0 16 16" aria-hidden="true"
-        ><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3 3" /></svg
+<div class="browser" bind:this={browser}>
+  <nav class="topnav" aria-label="Bibliothèques" hidden={opened !== null}>
+    <div class="pill">
+      <form
+        class="search-box"
+        role="search"
+        onsubmit={(e) => {
+          e.preventDefault();
+          void runSearch();
+        }}
       >
-      <input
-        id="search-field"
-        type="search"
-        placeholder="Rechercher"
-        autocomplete="off"
-        spellcheck="false"
-        enterkeyhint="search"
-        maxlength={SEARCH_MAX_CHARS * 2}
-        aria-keyshortcuts="Control+F /"
-        bind:this={searchField}
-        value={query}
-        oninput={onSearchInput}
-        onkeydown={onSearchKeydown}
-      />
-    </form>
-    {#if libraries === null && !librariesError}
-      <p class="side-note" aria-busy="true">Chargement…</p>
-    {:else if libraries}
+        <label class="sr-only" for="search-field">Rechercher un film, une série ou un épisode</label>
+        <svg viewBox="0 0 16 16" aria-hidden="true"
+          ><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3 3" /></svg
+        >
+        <input
+          id="search-field"
+          type="search"
+          placeholder="Rechercher"
+          title="Rechercher (Ctrl+F)"
+          autocomplete="off"
+          spellcheck="false"
+          enterkeyhint="search"
+          maxlength={SEARCH_MAX_CHARS * 2}
+          aria-keyshortcuts="Control+F /"
+          bind:this={searchField}
+          value={query}
+          oninput={onSearchInput}
+          onkeydown={onSearchKeydown}
+        />
+      </form>
+      {#if libraries === null && !librariesError}
+        <span class="nav-note" aria-busy="true">Chargement…</span>
+      {:else if libraries}
+        <button
+          type="button"
+          class="home-link"
+          aria-current={selected === null && !searching && !settingsOpen
+            ? "page"
+            : undefined}
+          aria-keyshortcuts="Control+1"
+          title="Accueil (Ctrl+1)"
+          onclick={showHome}
+        >
+          Accueil
+        </button>
+        <ul class="libraries">
+          {#each libraries as library, i (library.id)}
+            <li>
+              <button
+                type="button"
+                aria-current={selected?.id === library.id &&
+                !searching &&
+                !settingsOpen
+                  ? "page"
+                  : undefined}
+                aria-keyshortcuts={i < 8 ? `Control+${i + 2}` : undefined}
+                title={i < 8 ? `${library.name} (Ctrl+${i + 2})` : library.name}
+                onclick={() => select(library)}
+              >
+                <!-- Kind of library, read by the CDP scenarios; not shown. -->
+                <span class="kind" hidden
+                  >{library.kind === "movies" ? "Films" : "Séries"}</span
+                >
+                {library.name}
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
       <button
         type="button"
-        class="home-link"
-        aria-current={selected === null && !searching && !settingsOpen
-          ? "page"
-          : undefined}
-        onclick={showHome}
+        class="icon"
+        aria-label="Réglages"
+        title="Réglages"
+        aria-current={settingsOpen && !searching ? "page" : undefined}
+        onclick={openSettings}
       >
-        Accueil
+        <svg viewBox="0 0 24 24" aria-hidden="true"
+          ><circle cx="12" cy="12" r="3" /><path
+            d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
+          /></svg
+        >
       </button>
-      <ul class="libraries">
-        {#each libraries as library (library.id)}
-          <li>
-            <button
-              type="button"
-              aria-current={selected?.id === library.id &&
-              !searching &&
-              !settingsOpen
-                ? "page"
-                : undefined}
-              onclick={() => select(library)}
-            >
-              <span class="kind" aria-hidden="true"
-                >{library.kind === "movies" ? "Films" : "Séries"}</span
-              >
-              {library.name}
-            </button>
-          </li>
-        {/each}
-      </ul>
-    {/if}
-    <div class="account">
+      <button
+        type="button"
+        class="icon avatar"
+        popovertarget="account-menu"
+        aria-label="Compte : {user.userName}"
+        title="{user.userName} · {user.server.name}"
+      >
+        <span aria-hidden="true">{user.userName.slice(0, 1).toUpperCase()}</span>
+      </button>
+    </div>
+    <div id="account-menu" class="account-menu" popover bind:this={accountMenu}>
       <p class="who">
         {user.userName}
         <span>{user.server.name}{user.server.encrypted ? "" : " · non chiffré"}</span>
       </p>
-      <button
-        type="button"
-        class="quiet"
-        aria-current={settingsOpen && !searching ? "page" : undefined}
-        onclick={openSettings}
-      >
-        Réglages
-      </button>
-      <button type="button" class="quiet" onclick={onChangeServer}>
+      <button type="button" class="menu-item" onclick={() => fromMenu(onChangeServer)}>
         Changer de serveur
       </button>
       {#if import.meta.env.DEV}
-        <button type="button" class="quiet" onclick={onOpenPlayer}>
+        <button type="button" class="menu-item" onclick={() => fromMenu(onOpenPlayer)}>
           Prototype de lecture
         </button>
       {/if}
-      <button type="button" class="quiet" onclick={onSignOut} disabled={signingOut}>
+      <button
+        type="button"
+        class="menu-item"
+        onclick={() => fromMenu(onSignOut)}
+        disabled={signingOut}
+      >
         {signingOut ? "Déconnexion…" : "Se déconnecter"}
       </button>
     </div>
@@ -696,53 +760,115 @@ $effect(() => {
 
 <style>
   .browser {
+    position: relative;
     height: 100%;
-    display: grid;
-    grid-template-columns: 240px 1fr;
     background: var(--color-bg);
   }
-  .sidebar {
+  /* Floats over the content, which scrolls underneath (ADR 0031). */
+  .topnav {
+    position: absolute;
+    inset: var(--space-2) 0 auto;
+    z-index: 5;
     display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    padding: var(--space-6) var(--space-3);
-    background: var(--color-surface);
-    min-height: 0;
-    overflow-y: auto;
+    justify-content: center;
+    padding: 0 var(--space-4);
+    pointer-events: none;
+  }
+  .topnav[hidden] {
+    display: none;
+  }
+  .pill {
+    pointer-events: auto;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 6px;
+    border-radius: var(--radius-pill);
+    background: var(--material);
+    backdrop-filter: var(--material-blur);
+    border: 1px solid var(--separator);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+    overflow-x: auto;
+    scrollbar-width: none;
   }
   .search-box {
     position: relative;
-    margin: 0 var(--space-1);
+    flex: 0 0 auto;
   }
   .search-box svg {
     position: absolute;
-    left: 10px;
+    left: 12px;
     top: 50%;
     width: 16px;
     height: 16px;
     transform: translateY(-50%);
     fill: none;
-    stroke: var(--color-text-muted);
+    stroke: var(--color-text-secondary);
     stroke-width: 1.6;
     stroke-linecap: round;
     pointer-events: none;
   }
   .search-box input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: var(--space-2) var(--space-2) var(--space-2) 32px;
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    background: var(--color-bg);
+    width: 132px;
+    height: 36px;
+    padding: 0 var(--space-3) 0 34px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: transparent;
     color: var(--color-text);
     font: inherit;
+    transition:
+      width var(--motion-base) ease-out,
+      background var(--motion-fast);
+  }
+  .search-box input:hover {
+    background: rgb(255 255 255 / 0.08);
+  }
+  .search-box input:focus,
+  .search-box input:not(:placeholder-shown) {
+    width: 220px;
+    background: rgb(0 0 0 / 0.35);
   }
   .search-box input::placeholder {
-    color: var(--color-text-muted);
+    color: var(--color-text-secondary);
+  }
+  /* Narrow window: the search shrinks to its icon so the whole pill fits, and
+     covers the pill while it has the focus. */
+  @media (max-width: 900px) {
+    .pill {
+      position: relative;
+    }
+    .search-box input,
+    .search-box input:not(:placeholder-shown) {
+      width: 36px;
+      padding-right: 0;
+    }
+    .search-box input:not(:focus)::placeholder {
+      color: transparent;
+    }
+    .search-box input:not(:focus):not(:placeholder-shown) {
+      color: transparent;
+      background: rgb(143 211 245 / 0.22);
+    }
+    .search-box:focus-within {
+      position: absolute;
+      inset: 6px;
+      z-index: 1;
+    }
+    .search-box input:focus {
+      width: 100%;
+      padding-right: var(--space-3);
+      background: var(--color-elevated);
+    }
+    .libraries button,
+    .home-link {
+      padding: 0 12px;
+    }
   }
   .search-box input:focus-visible {
     outline: 2px solid var(--color-accent);
-    outline-offset: 1px;
+    outline-offset: 0;
   }
   .sr-only {
     position: absolute;
@@ -755,75 +881,135 @@ $effect(() => {
     white-space: nowrap;
     border: 0;
   }
-  .brand {
-    margin: 0 var(--space-3);
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-  }
-  .side-note {
-    margin: 0 var(--space-3);
-    color: var(--color-text-muted);
+  .nav-note {
+    padding: 0 var(--space-4);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
   }
   .libraries {
     list-style: none;
     margin: 0;
     padding: 0;
-    display: grid;
-    gap: 2px;
+    display: flex;
+    gap: var(--space-1);
   }
   .libraries button,
   .home-link {
-    width: 100%;
-    text-align: left;
-    background: transparent;
-    color: var(--color-text-secondary);
+    height: 36px;
+    padding: 0 20px;
     border: 0;
-    border-radius: var(--radius-sm);
-    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-text);
     font: inherit;
+    font-weight: 500;
+    white-space: nowrap;
     cursor: pointer;
-    display: grid;
-    transition: background var(--motion-fast);
+    transition:
+      background var(--motion-fast),
+      color var(--motion-fast);
   }
   .libraries button:hover,
-  .home-link:hover {
-    background: var(--color-elevated);
-    color: var(--color-text);
+  .home-link:hover,
+  .icon:hover {
+    background: rgb(255 255 255 / 0.12);
   }
   .libraries button[aria-current="page"],
-  .home-link[aria-current="page"] {
-    background: var(--color-elevated);
-    color: var(--color-text);
-    box-shadow: inset 3px 0 0 var(--color-accent);
+  .home-link[aria-current="page"],
+  .icon[aria-current="page"] {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font-weight: 600;
   }
-  .kind {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--color-text-muted);
-  }
-  .account {
-    margin-top: auto;
+  .icon {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 36px;
     display: grid;
-    gap: var(--space-1);
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .icon svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .avatar {
+    anchor-name: --account;
+  }
+  .avatar span {
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: linear-gradient(160deg, #8fd3f5, #3d9bd0);
+    color: #04121b;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  /* Top layer: light dismiss and Escape come with the popover. */
+  .account-menu {
+    /* Child of .topnav, which lets clicks through. */
+    pointer-events: auto;
+    position-anchor: --account;
+    inset: auto;
+    top: anchor(bottom);
+    right: anchor(right);
+    margin: var(--space-2) 0 0;
+    min-width: 240px;
+    padding: var(--space-2);
+    border: 1px solid var(--separator);
+    border-radius: var(--radius-md);
+    background: var(--material-thick);
+    backdrop-filter: var(--material-blur);
+    color: var(--color-text);
+    box-shadow: 0 24px 48px rgb(0 0 0 / 0.55);
+  }
+  .account-menu:popover-open {
+    display: grid;
+    gap: 2px;
   }
   .who {
-    margin: 0 var(--space-3) var(--space-2);
+    margin: 0 0 var(--space-1);
+    padding: var(--space-2) var(--space-3) var(--space-3);
+    border-bottom: 1px solid var(--separator);
     font-weight: 600;
     display: grid;
   }
   .who span {
     font-weight: 400;
-    font-size: 12px;
-    color: var(--color-text-muted);
+    font-size: 13px;
+    color: var(--color-text-secondary);
+  }
+  .menu-item {
+    text-align: left;
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .menu-item:hover:not(:disabled) {
+    background: rgb(255 255 255 / 0.1);
   }
   button:focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
   button.quiet {
-    text-align: left;
     background: transparent;
     color: var(--color-text-secondary);
     border: 0;
@@ -832,13 +1018,8 @@ $effect(() => {
     font: inherit;
     cursor: pointer;
   }
-  button.quiet[aria-current="page"] {
-    background: var(--color-elevated);
-    color: var(--color-text);
-    box-shadow: inset 3px 0 0 var(--color-accent);
-  }
   button.quiet:hover:not(:disabled) {
-    background: var(--color-elevated);
+    background: rgb(255 255 255 / 0.1);
     color: var(--color-text);
   }
   button:disabled {
@@ -847,6 +1028,7 @@ $effect(() => {
   }
   .pane {
     position: relative;
+    height: 100%;
     min-height: 0;
     min-width: 0;
   }
@@ -854,7 +1036,9 @@ $effect(() => {
     height: 100%;
     min-height: 0;
     overflow-y: auto;
-    padding: var(--space-6) clamp(var(--space-4), 3vw, 48px) 48px;
+    /* Clears the navigation pill floating above. */
+    --gutter: clamp(var(--space-4), 5vw, 80px);
+    padding: 76px var(--gutter) 48px;
   }
   .heading {
     display: flex;
@@ -1021,42 +1205,5 @@ $effect(() => {
   }
   .sentinel {
     height: 1px;
-  }
-  @media (max-width: 800px) {
-    .browser {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
-    }
-    .sidebar {
-      flex-direction: row;
-      align-items: center;
-      padding: var(--space-2) var(--space-3);
-      overflow-x: auto;
-      overflow-y: hidden;
-    }
-    .brand,
-    .kind,
-    .who {
-      display: none;
-    }
-    .libraries {
-      display: flex;
-    }
-    .search-box {
-      flex: 0 0 180px;
-      margin: 0;
-    }
-    .libraries button,
-    .home-link {
-      white-space: nowrap;
-      width: auto;
-    }
-    .account {
-      margin: 0 0 0 auto;
-      display: flex;
-    }
-    button.quiet {
-      white-space: nowrap;
-    }
   }
 </style>

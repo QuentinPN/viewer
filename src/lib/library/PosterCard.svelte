@@ -69,14 +69,18 @@ const initials = $derived(
     cursor: pointer;
     border-radius: var(--radius-md);
   }
+  /* Focus lifts the artwork (ADR 0031); the accent ring marks the keyboard focus. */
   .card:focus-visible {
+    outline: none;
+  }
+  .card:focus-visible .poster {
     outline: 2px solid var(--color-accent);
-    outline-offset: 4px;
+    outline-offset: 3px;
   }
   .card:hover .poster,
   .card:focus-visible .poster {
-    transform: translateY(-3px);
-    box-shadow: 0 14px 32px rgb(0 0 0 / 45%);
+    transform: scale(var(--lift-scale));
+    box-shadow: var(--shadow-lift);
   }
   .poster {
     position: relative;
@@ -84,10 +88,11 @@ const initials = $derived(
     border-radius: var(--radius-md);
     overflow: hidden;
     background: linear-gradient(160deg, var(--color-elevated), var(--color-surface));
-    box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+    box-shadow: 0 6px 18px rgb(0 0 0 / 0.4);
+    transform-origin: center bottom;
     transition:
-      transform var(--motion-base) ease-out,
-      box-shadow var(--motion-base) ease-out;
+      transform var(--motion-lift) var(--ease-spring),
+      box-shadow var(--motion-lift) ease-out;
   }
   img {
     width: 100%;
@@ -116,12 +121,9 @@ const initials = $derived(
     place-items: center;
     font-size: 12px;
     font-weight: 700;
-    background: rgb(11 13 17 / 80%);
-    color: var(--color-text);
-  }
-  .badge.played {
-    background: var(--color-success);
-    color: #062014;
+    background: rgb(0 0 0 / 0.55);
+    backdrop-filter: blur(12px);
+    color: #fff;
   }
   .badge svg {
     width: 14px;
@@ -133,8 +135,8 @@ const initials = $derived(
     stroke-linejoin: round;
   }
   .title {
-    margin: var(--space-2) 0 0;
-    font-size: 14px;
+    margin: 10px 0 0;
+    font-size: 15px;
     font-weight: 600;
     line-height: 1.3;
     display: -webkit-box;
@@ -146,7 +148,7 @@ const initials = $derived(
   .meta {
     display: block;
     margin: 2px 0 0;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--color-text-muted);
   }
   .sr-only {

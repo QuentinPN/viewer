@@ -105,19 +105,21 @@ $effect(() => {
 </section>
 
 <style>
+  /* Over the hero's fade; the cards scroll to the window's edges (ADR 0031). */
   .row {
-    margin-bottom: 32px;
+    position: relative;
+    margin-bottom: 20px;
   }
   header {
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-1);
   }
   h2 {
     margin: 0;
-    font-size: 20px;
-    letter-spacing: -0.01em;
+    font-size: 22px;
+    font-weight: 600;
   }
   .arrows {
     margin-left: auto;
@@ -132,12 +134,12 @@ $effect(() => {
     padding: 0;
     border: 0;
     border-radius: 50%;
-    background: var(--color-surface);
+    background: var(--fill-glass);
     color: var(--color-text);
     cursor: pointer;
   }
   .arrow:hover:not(:disabled) {
-    background: var(--color-elevated);
+    background: var(--fill-glass-hover);
   }
   .arrow:disabled {
     opacity: 0.35;
@@ -158,29 +160,29 @@ $effect(() => {
   }
   .cards {
     list-style: none;
-    /* Room for the focus outline and the lift of the hovered card. */
-    margin: 0 -8px;
-    padding: 8px 8px 12px;
+    /* Edge to edge of the window; room above and below for the lifted card. */
+    margin: 0 calc(-1 * var(--gutter, 8px));
+    padding: 14px var(--gutter, 8px) 24px;
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: 150px;
-    gap: var(--space-4);
+    grid-auto-columns: 160px;
+    gap: 28px 24px;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-snap-type: x proximity;
-    scroll-padding-inline: 8px;
+    scroll-padding-inline: var(--gutter, 8px);
     /* The arrow buttons, the keys and Maj + molette scroll the row. */
     scrollbar-width: none;
   }
   .cards.wide {
-    grid-auto-columns: 280px;
+    grid-auto-columns: 300px;
   }
   @media (min-width: 1600px) {
     .cards {
-      grid-auto-columns: 180px;
+      grid-auto-columns: 190px;
     }
     .cards.wide {
-      grid-auto-columns: 340px;
+      grid-auto-columns: 360px;
     }
   }
   .cards > :global(li) {

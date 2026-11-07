@@ -16,6 +16,7 @@ import { spawnSync } from "node:child_process";
 import { launch } from "./app.mjs";
 import { startProxy } from "./net-proxy.mjs";
 import {
+  accountAction,
   cards,
   createReport,
   detailTitle,
@@ -119,7 +120,7 @@ try {
   let page = app.page;
   let first = await firstScreen(page);
   if (first.screen === "app") {
-    await page.getByRole("button", { name: "Se déconnecter" }).click();
+    await accountAction(page, "Se déconnecter");
     await signInHeading(page).waitFor({ timeout: 15000 });
   } else if (first.screen === "lost" || first.screen === "reauth") {
     // Left by an interrupted run (proxy gone): the same account signs in again
@@ -296,7 +297,7 @@ try {
   await homeHeading(page).waitFor({ timeout: 20000 });
 
   // 6. Change server, then come back without a password.
-  await page.getByRole("button", { name: "Changer de serveur" }).click();
+  await accountAction(page, "Changer de serveur");
   await page.locator("#server-url").waitFor({ timeout: 10000 });
   const comeBack = page.getByRole("button", { name: /Revenir à/ });
   await comeBack.waitFor({ timeout: 10000 });
@@ -413,7 +414,7 @@ try {
   await page.keyboard.press("Escape");
 
   // 8. Sign out, then leave the direct server address as last server.
-  await page.getByRole("button", { name: "Se déconnecter" }).click();
+  await accountAction(page, "Se déconnecter");
   await signInHeading(page).waitFor({ timeout: 15000 });
   check("signed_out_token_deleted", vaultEntries() === vaultBefore);
   await signIn(
@@ -422,7 +423,7 @@ try {
     account.password,
   );
   await libraryNav(page).waitFor({ timeout: 20000 });
-  await page.getByRole("button", { name: "Se déconnecter" }).click();
+  await accountAction(page, "Se déconnecter");
   await signInHeading(page).waitFor({ timeout: 15000 });
   check("exit_code_end", (await app.close()) === 0);
   app = null;

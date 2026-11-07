@@ -175,13 +175,14 @@ function onkeydown(e: KeyboardEvent) {
 {/if}
 
 <style>
+  /* Full bleed under the navigation pill and the title bar's row (ADR 0031); the
+     first row comes up over its fade to black. */
   .hero {
     position: relative;
-    height: clamp(300px, 40vw, 540px);
-    margin-bottom: 32px;
-    border-radius: var(--radius-lg);
+    height: clamp(420px, 68vh, 760px);
+    margin: -76px calc(-1 * var(--gutter, 0px)) -48px;
     overflow: hidden;
-    background: var(--color-surface);
+    background: var(--color-bg);
   }
   .slides,
   .slide {
@@ -208,38 +209,39 @@ function onkeydown(e: KeyboardEvent) {
     position: absolute;
     inset: 0;
     background:
-      linear-gradient(90deg, rgb(11 13 17 / 0.88) 0%, rgb(11 13 17 / 0.55) 40%, transparent 72%),
-      linear-gradient(0deg, rgb(11 13 17 / 0.8) 0%, transparent 45%);
+      linear-gradient(90deg, rgb(0 0 0 / 0.85) 0%, rgb(0 0 0 / 0.35) 45%, transparent 70%),
+      linear-gradient(0deg, var(--color-bg) 0%, rgb(0 0 0 / 0.6) 22%, transparent 50%),
+      linear-gradient(180deg, rgb(0 0 0 / 0.45) 0%, transparent 18%);
   }
   .content {
     position: absolute;
-    left: clamp(24px, 4vw, 56px);
-    right: 30%;
-    bottom: clamp(28px, 4vw, 52px);
+    left: var(--gutter, 24px);
+    right: 38%;
+    bottom: clamp(88px, 12vh, 132px);
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--space-2);
+    gap: var(--space-3);
   }
   .eyebrow {
     margin: 0;
     font-size: 13px;
     font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-accent);
+    letter-spacing: 0.02em;
+    color: var(--color-text-secondary);
   }
   .title {
     margin: 0;
-    font-size: clamp(26px, 3.4vw, 44px);
-    line-height: 1.1;
-    letter-spacing: -0.01em;
-    text-shadow: 0 2px 12px rgb(0 0 0 / 0.5);
+    font-size: clamp(36px, 4.6vw, 72px);
+    font-weight: 700;
+    line-height: 1.05;
+    text-shadow: 0 2px 16px rgb(0 0 0 / 0.45);
   }
   .logo {
     display: block;
-    max-width: min(360px, 100%);
-    max-height: clamp(64px, 9vw, 130px);
+    max-width: min(420px, 100%);
+    /* Bounded by the height too: a short window keeps it clear of the nav. */
+    max-height: clamp(56px, min(11vw, 14vh), 160px);
     object-fit: contain;
     object-position: left bottom;
   }
@@ -251,9 +253,9 @@ function onkeydown(e: KeyboardEvent) {
   .overview {
     margin: 0;
     max-width: 560px;
-    color: var(--color-text);
-    opacity: 0.9;
-    line-height: 1.45;
+    color: rgb(235 235 245 / 0.8);
+    font-size: 17px;
+    line-height: 1.5;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     line-clamp: 3;
@@ -270,18 +272,27 @@ function onkeydown(e: KeyboardEvent) {
   .actions button {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: 10px;
+    height: 48px;
     border: 0;
-    border-radius: var(--radius-sm);
-    padding: 10px 20px;
+    border-radius: 12px;
+    padding: 0 26px;
     font: inherit;
+    font-size: 17px;
     font-weight: 600;
     cursor: pointer;
-    transition: background var(--motion-fast) ease-out;
+    transition:
+      background var(--motion-fast) ease-out,
+      transform var(--motion-lift) var(--ease-spring);
+  }
+  .actions button:hover:not(:disabled),
+  .actions button:focus-visible {
+    transform: scale(calc(1 + (var(--lift-scale) - 1) / 2));
   }
   .play {
-    background: var(--color-text);
-    color: var(--color-bg);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
   }
   .play:hover:not(:disabled) {
     background: #ffffff;
@@ -296,12 +307,12 @@ function onkeydown(e: KeyboardEvent) {
     fill: currentColor;
   }
   .info {
-    background: rgb(255 255 255 / 0.16);
+    background: var(--fill-glass);
     color: var(--color-text);
-    backdrop-filter: blur(8px);
+    backdrop-filter: var(--material-blur);
   }
   .info:hover {
-    background: rgb(255 255 255 / 0.26);
+    background: var(--fill-glass-hover);
   }
   .progress {
     width: 120px;
@@ -313,7 +324,7 @@ function onkeydown(e: KeyboardEvent) {
   .progress span {
     display: block;
     height: 100%;
-    background: var(--color-accent);
+    background: var(--color-text);
   }
   .arrow {
     position: absolute;
@@ -325,10 +336,11 @@ function onkeydown(e: KeyboardEvent) {
     place-items: center;
     border: 0;
     border-radius: 50%;
-    background: rgb(11 13 17 / 0.45);
+    background: var(--material);
+    backdrop-filter: var(--material-blur);
     color: var(--color-text);
     cursor: pointer;
-    opacity: 0.7;
+    opacity: 0;
     transition:
       opacity var(--motion-fast) ease-out,
       background var(--motion-fast) ease-out;
@@ -338,7 +350,13 @@ function onkeydown(e: KeyboardEvent) {
     opacity: 1;
   }
   .arrow:hover {
-    background: rgb(11 13 17 / 0.7);
+    background: var(--material-thick);
+  }
+  /* Narrow window: the arrows would cover the text; the dots remain. */
+  @media (max-width: 800px) {
+    .arrow {
+      display: none;
+    }
   }
   .arrow svg {
     width: 22px;
@@ -350,15 +368,15 @@ function onkeydown(e: KeyboardEvent) {
     stroke-linejoin: round;
   }
   .prev {
-    left: var(--space-3);
+    left: var(--space-4);
   }
   .next {
-    right: var(--space-3);
+    right: var(--space-4);
   }
   .dots {
     position: absolute;
-    right: clamp(20px, 3vw, 40px);
-    bottom: clamp(24px, 3vw, 40px);
+    right: var(--gutter, 24px);
+    bottom: clamp(88px, 12vh, 132px);
     display: flex;
     gap: var(--space-1);
   }
@@ -376,15 +394,14 @@ function onkeydown(e: KeyboardEvent) {
     content: "";
     width: 8px;
     height: 8px;
-    border-radius: 50%;
-    background: rgb(255 255 255 / 0.4);
+    border-radius: 4px;
+    background: rgb(235 235 245 / 0.35);
     transition:
       width var(--motion-fast) ease-out,
       background var(--motion-fast) ease-out;
   }
   .dot[aria-current="true"]::before {
-    width: 20px;
-    border-radius: 4px;
+    width: 22px;
     background: var(--color-text);
   }
   button:focus-visible {
@@ -393,7 +410,7 @@ function onkeydown(e: KeyboardEvent) {
   }
   @media (max-width: 760px) {
     .content {
-      right: var(--space-6);
+      right: var(--gutter, 24px);
     }
     .overview {
       -webkit-line-clamp: 2;

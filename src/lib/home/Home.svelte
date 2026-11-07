@@ -202,9 +202,10 @@ onMount(() => {
 {/snippet}
 
 <div class="home" aria-busy={watchLoading}>
-  <header class="heading">
+  <!-- The hero opens the page (ADR 0031): the heading is for screen readers. -->
+  <header class="sr-only">
     <h1>Accueil</h1>
-    <p class="welcome">Bonjour {userName}</p>
+    <p>Bonjour {userName}</p>
   </header>
 
   {#if playError}
@@ -327,27 +328,21 @@ onMount(() => {
 </div>
 
 <style>
-  .heading {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-3);
-    margin-bottom: var(--space-6);
-  }
-  h1 {
-    margin: 0;
-    font-size: 28px;
-    letter-spacing: -0.01em;
-  }
-  .welcome {
-    margin: 0;
-    color: var(--color-text-muted);
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .row-failed {
     margin-bottom: 32px;
   }
   .row-failed h2 {
     margin: 0 0 var(--space-2);
-    font-size: 20px;
+    font-size: 22px;
+    font-weight: 600;
   }
   .row-error,
   .play-error {
@@ -375,36 +370,41 @@ onMount(() => {
   }
   button.secondary {
     margin-top: var(--space-2);
-    background: var(--color-elevated);
+    background: var(--fill-glass);
     color: var(--color-text);
     border: 0;
     border-radius: var(--radius-sm);
-    padding: var(--space-1) var(--space-3);
+    padding: var(--space-2) var(--space-4);
     font: inherit;
+    font-weight: 600;
     cursor: pointer;
+  }
+  button.secondary:hover {
+    background: var(--fill-glass-hover);
   }
   .see-all {
     background: transparent;
     border: 0;
-    border-radius: var(--radius-sm);
-    padding: var(--space-1) var(--space-2);
-    color: var(--color-accent);
+    border-radius: var(--radius-pill);
+    padding: var(--space-1) var(--space-3);
+    color: var(--color-text-secondary);
     font: inherit;
     font-size: 14px;
     cursor: pointer;
   }
   .see-all:hover {
-    background: var(--color-surface);
+    background: rgb(255 255 255 / 0.1);
+    color: var(--color-text);
   }
   button:focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
+  /* Same box as the hero: full bleed under the navigation pill. */
   .hero-skeleton {
-    height: clamp(300px, 40vw, 540px);
-    margin-bottom: 32px;
-    border-radius: var(--radius-lg);
-    background: var(--color-surface);
+    height: clamp(420px, 68vh, 760px);
+    margin: -76px calc(-1 * var(--gutter, 0px)) -48px;
+    background: linear-gradient(180deg, var(--color-surface), var(--color-bg));
     animation: pulse 1.4s ease-in-out infinite;
   }
   .skeleton .sk-image {

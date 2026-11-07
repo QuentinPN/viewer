@@ -70,8 +70,14 @@ export async function startScreen(page) {
   return (await libraryNav(page).count()) > 0 ? "signedIn" : "signedOut";
 }
 
+/** Account actions sit in the menu of the navigation pill (ADR 0031). */
+export async function accountAction(page, name) {
+  await page.getByRole("button", { name: /^Compte : / }).click();
+  await page.getByRole("button", { name, exact: true }).click();
+}
+
 export async function signOut(page) {
-  await page.getByRole("button", { name: "Se déconnecter" }).click();
+  await accountAction(page, "Se déconnecter");
   await signInHeading(page).waitFor({ timeout: 15000 });
 }
 

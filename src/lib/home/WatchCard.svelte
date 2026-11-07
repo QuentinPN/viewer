@@ -99,9 +99,13 @@ function activate() {
   .card[aria-disabled="true"] {
     cursor: progress;
   }
+  /* Focus lifts the artwork (ADR 0031); the accent ring marks the keyboard focus. */
   .card:focus-visible {
+    outline: none;
+  }
+  .card:focus-visible .frame {
     outline: 2px solid var(--color-accent);
-    outline-offset: 4px;
+    outline-offset: 3px;
   }
   .frame {
     position: relative;
@@ -109,15 +113,16 @@ function activate() {
     border-radius: var(--radius-md);
     overflow: hidden;
     background: linear-gradient(160deg, var(--color-elevated), var(--color-surface));
-    box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+    box-shadow: 0 6px 18px rgb(0 0 0 / 0.4);
+    transform-origin: center bottom;
     transition:
-      transform var(--motion-base) ease-out,
-      box-shadow var(--motion-base) ease-out;
+      transform var(--motion-lift) var(--ease-spring),
+      box-shadow var(--motion-lift) ease-out;
   }
   .card:hover .frame,
   .card:focus-visible .frame {
-    transform: translateY(-3px);
-    box-shadow: 0 14px 32px rgb(0 0 0 / 45%);
+    transform: scale(var(--lift-scale));
+    box-shadow: var(--shadow-lift);
   }
   img {
     width: 100%;
@@ -140,7 +145,7 @@ function activate() {
     inset: 0;
     display: grid;
     place-items: center;
-    background: rgb(11 13 17 / 45%);
+    background: rgb(0 0 0 / 0.35);
     opacity: 0;
     transition: opacity var(--motion-fast);
   }
@@ -154,8 +159,8 @@ function activate() {
     height: 44px;
     padding: 10px;
     border-radius: 50%;
-    background: rgb(245 246 248 / 92%);
-    fill: #0b0d11;
+    background: rgb(245 245 247 / 0.92);
+    fill: #000;
   }
   .spinner {
     width: 32px;
@@ -172,23 +177,23 @@ function activate() {
   }
   .progress {
     position: absolute;
-    left: var(--space-2);
-    right: var(--space-2);
-    bottom: var(--space-2);
+    left: 14px;
+    right: 14px;
+    bottom: 10px;
     height: 4px;
     border-radius: 2px;
-    background: rgb(245 246 248 / 30%);
+    background: rgb(255 255 255 / 0.3);
     overflow: hidden;
   }
   .progress span {
     display: block;
     height: 100%;
-    background: var(--color-accent);
+    background: #fff;
   }
   .title {
     display: block;
-    margin-top: var(--space-2);
-    font-size: 14px;
+    margin-top: 10px;
+    font-size: 15px;
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
@@ -197,7 +202,7 @@ function activate() {
   .meta {
     display: block;
     margin-top: 2px;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--color-text-muted);
     white-space: nowrap;
     overflow: hidden;
