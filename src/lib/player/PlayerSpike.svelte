@@ -361,7 +361,8 @@ function trackId(value: string): number | null {
   }
   .floating {
     align-self: center;
-    background: rgb(11 13 17 / 85%);
+    background: var(--material-thick);
+    backdrop-filter: var(--material-blur);
     padding: var(--space-2) var(--space-4);
     border-radius: var(--radius-sm);
   }
@@ -372,7 +373,8 @@ function trackId(value: string): number | null {
     padding: var(--space-4);
   }
   .badge {
-    background: rgb(11 13 17 / 70%);
+    background: var(--material);
+    backdrop-filter: var(--material-blur);
     color: var(--color-text-secondary);
     border-radius: var(--radius-sm);
     padding: var(--space-1) var(--space-3);

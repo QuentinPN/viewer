@@ -515,3 +515,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `npm run verify:web` exit 0 (123 tests); `gate21-session` all passed twice. Screenshots checked at 1280 × 720: splash, banner over the film detail.
 - **Not verified**: 125 % and 150 % scaling.
 - **Next**: the remaining hard-coded `rgb(11 13 17)` scrims.
+
+### 2026-11-07 — Redesign: last hard-coded scrims (ADR 0031)
+
+- **Changed**: `PlayerSpike.svelte` (Gate 1 prototype, debug builds only): the floating message and the badges use `--material-thick` / `--material` with `--material-blur` instead of `rgb(11 13 17)`. No `rgb(11 13 17)` is left in `src/`.
+- **Tests**: `npm run verify:web` exit 0 (123 tests).
+- **Not verified**: the prototype by eye (`run-gate1.ps1` needs a local media file; not run).
+- **Next**: check every redesigned screen at 125 % and 150 % scaling.
