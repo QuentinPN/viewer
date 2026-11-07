@@ -104,7 +104,8 @@ Verify real server resume/watched state, unsupported format fallback, network in
 - VERIFIED (2026-11-06): HTTPS streams open with the Windows root certificates (ADR 0026), `docs/evidence/gate4-https-2026-11-06.md`. Probed with real libmpv on public and local servers and a fake token; NOT VERIFIED against a real HTTPS Emby server or from the app's UI, as none is available.
 - VERIFIED (2026-11-06): `cargo audit` reports no vulnerability after updating `quick-xml` and `time`; 7 warnings remain, none a known vulnerability, `docs/evidence/gate4-audit-dependances-2026-11-06.md`.
 - VERIFIED (2026-11-06): with no stop report, the encoding leaves `/Sessions` by itself 50 to 70 s after the client goes silent, over 4 tries on the real server, `docs/evidence/gate4-encodeur-sans-rapport-2026-11-06.md`. The ffmpeg process itself was not observed.
-- NOT VERIFIED: release-only behaviors at run time, a real network cut, a real file mpv cannot read, a file whose video alone is unreadable, the encoder and the restart during a long pause.
+- VERIFIED (2026-11-06): playback resumes after a 5 min pause during a transcode, past what mpv had read ahead and with nothing skipped, on the real server, `docs/evidence/gate4-pause-longue-2026-11-06.md`. The encoding stayed present during the pause; a 30 min pause was not run (owner's choice, low stake).
+- NOT VERIFIED: release-only behaviors at run time, a real network cut, a real file mpv cannot read, a file whose video alone is unreadable.
 - MEASURED (2026-11-06): performance baselines, debug build, `docs/evidence/gate4-performance-2026-11-06.md`: playback start median 1184 ms over 11 films, 0 dropped frames in 60 s off-screen, navigation under 100 ms at the median, 92 % artwork hits on the second launch, up to 994 MiB private memory with the whole grid.
 - VERIFIED (2026-11-06): a stream that does not open ends after 45 s with a fallback or a message (ADR 0027), `docs/evidence/gate4-ouverture-2026-11-06.md`: through the local proxy with the final code; on the real film before the last two changes, as it has since left the library.
 
@@ -422,3 +423,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Found**: `TranscodingInfo` can vanish then return, from 20 s on, cause not established, so the first absence does not mean the end. The test's first version reported 20 s for that reason; it now waits for a stable absence.
 - **Not verified**: the ffmpeg process itself, a client that played for long before going silent, a long pause, a real network cut, another film or Emby version.
 - **Next**: a long pause during a transcode, or the real network cut with the owner at the PC.
+
+### 2026-11-06 — Long pause during a transcode
+
+- **Changed**: new scenario `scripts/e2e/gate4-pause.mjs`; the local proxy gets a `log-segments` mode that notes each HLS segment's number, time and status, with no URL. No app code.
+- **Tests**: one run on the real server (3 Mbit/s, test account), all checks passed: paused at 5.1 s for 5 min, 132 segments read ahead then none for 266 s; resumed to 426.2 s past the 396 s limit, largest step 1.2 s, 142 segments served after the resume, none refused; seek after a second pause landed at 1628.0 s in 2.3 s; no resume point left. Details in `docs/evidence/gate4-pause-longue-2026-11-06.md`.
+- **Found**: unlike a silent client, the encoding stays present during a pause, cause not established.
+- **Not verified**: a 30 min pause (started, stopped at the owner's request, judged low stake); the mini-PC's load; the committed scenario after its last edits (a check renamed, periodic encoder samples added).
+- **Next**: Gate 5, release build and installer.

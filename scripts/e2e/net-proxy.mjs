@@ -15,7 +15,9 @@
 //   on one file (ADR 0027). The rest is forwarded;
 // - "error-files": direct file and HLS segment requests get HTTP 500, like a file the
 //   server can no longer read. Playlists are forwarded: FFmpeg skips segment after
-//   segment (ADR 0027).
+//   segment (ADR 0027);
+// - "log-segments": every request is forwarded; each HLS segment is noted in `segments`
+//   with its number, time and HTTP status. No URL is kept.
 import { randomBytes } from "node:crypto";
 import net from "node:net";
 
@@ -49,6 +51,7 @@ export async function startProxy(targetUrl, port = 0) {
     junk: 0,
     errors: 0,
   };
+  const segments = [];
 
   const server = net.createServer((client) => {
     sockets.add(client);
@@ -101,9 +104,31 @@ export async function startProxy(targetUrl, port = 0) {
     upstream.on("close", () => sockets.delete(upstream));
     upstream.on("error", () => client.destroy());
     client.on("error", () => upstream.destroy());
+    if (mode === "log-segments") logSegments(client, upstream);
     client.pipe(upstream);
     upstream.pipe(client);
   });
+
+  /** Requests on one connection are answered in order, so the next status is the oldest's. */
+  function logSegments(client, upstream) {
+    const pending = [];
+    client.on("data", (chunk) => {
+      const line = chunk.toString("latin1").split("\r\n", 1)[0];
+      if (!/^GET /.test(line)) return;
+      const number = HLS_SEGMENT.test(line)
+        ? Number(/\/(\d+)\.ts/.exec(line)?.[1])
+        : null;
+      const entry = { number, at: Date.now(), status: null };
+      if (number !== null) segments.push(entry);
+      pending.push(entry);
+    });
+    upstream.on("data", (chunk) => {
+      const status = /^HTTP\/1\.\d (\d{3}) /.exec(
+        chunk.toString("latin1", 0, 32),
+      );
+      if (status && pending.length) pending.shift().status = Number(status[1]);
+    });
+  }
 
   /**
    * 401 when a request carries a token; the rest is forwarded. Every chunk is
@@ -174,6 +199,7 @@ export async function startProxy(targetUrl, port = 0) {
   return {
     url: `http://127.0.0.1:${actualPort}`,
     counts,
+    segments,
     get mode() {
       return mode;
     },
