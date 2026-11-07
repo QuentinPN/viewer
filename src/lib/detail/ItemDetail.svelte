@@ -255,7 +255,7 @@ onMount(() => {
   aria-busy={!detail && !error}
   bind:this={section}
 >
-  <div class="hero">
+  <div class="hero" class:has-backdrop={detail?.backdrop && !backdropFailed}>
     {#if detail?.backdrop && !backdropFailed}
       <img
         class="backdrop"
@@ -270,9 +270,14 @@ onMount(() => {
     <div class="scrim"></div>
 
     <div class="topbar">
-      <button type="button" class="back" onclick={onClose}>
+      <button
+        type="button"
+        class="back"
+        aria-label="Retour"
+        title="Retour (Échap)"
+        onclick={onClose}
+      >
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" /></svg>
-        Retour
       </button>
     </div>
 
@@ -635,6 +640,7 @@ onMount(() => {
     position: absolute;
     inset: 0;
     overflow-y: auto;
+    --gutter: clamp(var(--space-4), 5vw, 80px);
     background: var(--color-bg);
     outline: none;
   }
@@ -644,7 +650,7 @@ onMount(() => {
   }
   .hero {
     position: relative;
-    min-height: min(62vh, 640px);
+    min-height: clamp(420px, 72vh, 760px);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -668,32 +674,32 @@ onMount(() => {
     position: absolute;
     inset: 0;
     background:
-      linear-gradient(90deg, rgb(11 13 17 / 92%) 0%, rgb(11 13 17 / 55%) 45%, rgb(11 13 17 / 10%) 100%),
-      linear-gradient(0deg, var(--color-bg) 0%, rgb(11 13 17 / 0%) 45%);
+      linear-gradient(90deg, rgb(0 0 0 / 90%) 0%, rgb(0 0 0 / 40%) 50%, rgb(0 0 0 / 0%) 75%),
+      linear-gradient(0deg, var(--color-bg) 0%, rgb(0 0 0 / 0%) 45%);
   }
   .topbar {
     position: relative;
-    padding: var(--space-4) clamp(var(--space-4), 3vw, 48px);
+    padding: var(--space-4) clamp(var(--space-4), 3vw, 32px);
   }
   .back {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
-    border: 0;
-    border-radius: 999px;
-    background: rgb(11 13 17 / 60%);
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--separator);
+    border-radius: 50%;
+    background: var(--material);
+    backdrop-filter: var(--material-blur);
     color: var(--color-text);
-    font: inherit;
     cursor: pointer;
-    backdrop-filter: blur(8px);
   }
   .back:hover {
-    background: var(--color-elevated);
+    background: var(--material-thick);
   }
   .back svg {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -705,7 +711,10 @@ onMount(() => {
     display: flex;
     align-items: flex-end;
     gap: clamp(var(--space-4), 3vw, 40px);
-    padding: var(--space-6) clamp(var(--space-4), 3vw, 48px) var(--space-6);
+    padding: var(--space-6) var(--gutter) 40px;
+  }
+  .has-backdrop .poster {
+    display: none;
   }
   .poster {
     flex: none;
@@ -724,13 +733,13 @@ onMount(() => {
   }
   .headline {
     min-width: 0;
-    max-width: 760px;
+    max-width: 680px;
   }
   h1 {
     margin: 0;
-    font-size: clamp(28px, 3.4vw, 44px);
-    line-height: 1.1;
-    letter-spacing: -0.015em;
+    font-size: clamp(36px, 4.4vw, 64px);
+    font-weight: 700;
+    line-height: 1.05;
     outline: none;
   }
   /* Focused by script for screen readers only; it is not in the tab order. */
@@ -739,8 +748,8 @@ onMount(() => {
   }
   .logo {
     display: block;
-    max-width: min(420px, 100%);
-    max-height: 140px;
+    max-width: min(460px, 100%);
+    max-height: clamp(64px, min(12vw, 18vh), 160px);
     object-fit: contain;
     object-position: left bottom;
   }
@@ -780,7 +789,7 @@ onMount(() => {
     padding: var(--space-3) var(--space-4);
     border: 0;
     border-radius: var(--radius-md);
-    background: var(--color-surface);
+    background: var(--fill-glass);
     color: var(--color-text);
     font: inherit;
     text-align: start;
@@ -788,7 +797,7 @@ onMount(() => {
     transition: background var(--motion-fast) ease-out;
   }
   .adjacent button:hover {
-    background: var(--color-elevated);
+    background: var(--fill-glass-hover);
   }
   .adjacent .next {
     grid-column: 2;
@@ -796,10 +805,8 @@ onMount(() => {
     text-align: end;
   }
   .direction {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--color-text-muted);
+    font-size: 13px;
+    color: var(--color-text-secondary);
   }
   .target {
     max-width: 100%;
@@ -813,6 +820,7 @@ onMount(() => {
   }
   .meta {
     margin: var(--space-3) 0 0;
+    font-size: 15px;
     color: var(--color-text-secondary);
   }
   .rating {
@@ -836,7 +844,7 @@ onMount(() => {
   .genres li {
     padding: 2px var(--space-3);
     border-radius: 999px;
-    background: rgb(255 255 255 / 8%);
+    background: var(--fill-glass);
     font-size: 13px;
     color: var(--color-text-secondary);
   }
@@ -852,15 +860,11 @@ onMount(() => {
   }
   .pill {
     padding: var(--space-1) var(--space-3);
-    border-radius: 999px;
-    background: var(--color-accent);
-    color: #04121b;
+    border-radius: var(--radius-pill);
+    background: var(--fill-glass);
+    color: var(--color-text);
     font-size: 13px;
     font-weight: 600;
-  }
-  .pill.done {
-    background: var(--color-success);
-    color: #062014;
   }
   .resume {
     display: inline-flex;
@@ -873,16 +877,16 @@ onMount(() => {
     width: 120px;
     height: 4px;
     border-radius: 2px;
-    background: rgb(255 255 255 / 16%);
+    background: rgb(255 255 255 / 25%);
     overflow: hidden;
   }
   .bar span {
     display: block;
     height: 100%;
-    background: var(--color-accent);
+    background: #fff;
   }
   .body {
-    padding: var(--space-2) clamp(var(--space-4), 3vw, 48px) 64px;
+    padding: var(--space-2) var(--gutter) 64px;
   }
   .columns {
     display: grid;
@@ -897,7 +901,8 @@ onMount(() => {
   .overview {
     margin: 0;
     max-width: 72ch;
-    line-height: 1.6;
+    font-size: 17px;
+    line-height: 1.5;
     color: var(--color-text-secondary);
   }
   .muted {
@@ -909,9 +914,7 @@ onMount(() => {
     gap: var(--space-3);
   }
   dt {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    font-size: 13px;
     color: var(--color-text-muted);
   }
   dd {
@@ -927,10 +930,15 @@ onMount(() => {
   .tech {
     margin-top: 40px;
     max-width: 900px;
+    padding: 22px 24px;
+    border: 1px solid var(--separator);
+    border-radius: var(--radius-lg);
+    background: var(--material);
   }
   h2 {
     margin: 0 0 var(--space-4);
-    font-size: 20px;
+    font-size: 22px;
+    font-weight: 600;
   }
   h3 {
     margin: var(--space-4) 0 var(--space-2);
@@ -996,24 +1004,31 @@ onMount(() => {
     cursor: pointer;
   }
   .play-actions {
-    margin-top: var(--space-4);
+    margin-top: 22px;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-3);
+  }
+  .play-actions button {
+    height: 48px;
+    padding: 0 22px;
+    border-radius: 12px;
+    font-size: 17px;
+    font-weight: 600;
   }
   .play {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-6);
+    gap: 10px;
+  }
+  .play-actions .play {
+    padding: 0 26px;
+    box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
   }
   .play svg {
     width: 16px;
     height: 16px;
     fill: currentColor;
-  }
-  .from-start {
-    padding: var(--space-2) var(--space-4);
   }
   .favorite {
     display: inline-flex;
@@ -1063,13 +1078,18 @@ onMount(() => {
     margin-bottom: var(--space-1);
   }
   .primary {
-    background: var(--color-accent);
-    color: #04121b;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
     font-weight: 600;
   }
   .secondary {
-    background: var(--color-elevated);
+    background: var(--fill-glass);
+    backdrop-filter: var(--material-blur);
     color: var(--color-text);
+    transition: background var(--motion-fast);
+  }
+  .secondary:hover {
+    background: var(--fill-glass-hover);
   }
   button:focus-visible {
     outline: 2px solid var(--color-accent);

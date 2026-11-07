@@ -480,3 +480,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `npm run verify:web` exit 0 (Vitest 123); `gate3-sort-filter` all passed, its screenshots checked (defaults, no match, genre and favorites, keyboard focus on "Trier par").
 - **Not verified**: the open native list (drawn by Windows, dark through `color-scheme`) by eye; a narrow window.
 - **Next**: film detail.
+
+### 2026-11-07 — Redesign: film and episode detail (ADR 0031)
+
+- **Changed**: `ItemDetail.svelte` styles and back button: round glass icon button "Retour" (tooltip "Retour (Échap)"), hero 72 % of the window height (420 to 760 px) with black scrims, poster only without a backdrop, 64 px title, logo bounded by the height, glass genre and status pills, white "Lecture" and progress bar, glass "Favori" and adjacent-episode cards, technical info in a material panel. `scripts/e2e/scenario.mjs`: `accountAction` closes detail pages first, since the navigation is hidden there.
+- **Tests**: `npm run verify:web` exit 0; `gate3-episode`, `gate3-favorites` and `gate4-fallback` all passed (the first fallback run lost the server transcode once, the rerun passed); `gate2-ui` passed except the known `no_app_credential_left` (credential of the installed app). Screenshots checked: film, series, episode, narrow film.
+- **Not verified**: 125 % and 150 % scaling.
+- **Next**: series page and episode list.

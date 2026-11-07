@@ -72,7 +72,13 @@ export async function startScreen(page) {
 
 /** Account actions sit in the menu of the navigation pill (ADR 0031). */
 export async function accountAction(page, name) {
-  await page.getByRole("button", { name: /^Compte : / }).click();
+  const account = page.getByRole("button", { name: /^Compte : / });
+  // The navigation is hidden on detail pages: Escape closes them.
+  for (let i = 0; i < 3 && !(await account.isVisible()); i++) {
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(400);
+  }
+  await account.click();
   await page.getByRole("button", { name, exact: true }).click();
 }
 
