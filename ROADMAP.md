@@ -51,7 +51,8 @@ Connection/auth, typed API client, libraries, item details, PlaybackInfo, secure
 - VERIFIED (2026-10-28), evidence in `docs/evidence/gate2-lecture-2026-10-28.md`, ADR 0007: PlaybackInfo with a libmpv device profile, Direct Play / Direct Stream / Transcode decision from the server, stream URL without its `api_key` and token in the `X-Emby-Token` header, play button on the film detail page and on each episode, back to the detail page with focus kept; real server: 90 sampled items all Direct Play, stream 206 with the header and 401 without; CDP scenario `gate2-play` 13/13.
 - NOT VERIFIED (playback): picture, sound and subtitles seen or heard by a person through the Emby path; HEVC/AV1/HDR/Dolby Vision/DTS/TrueHD rendering; items with several sources.
 - VERIFIED (2026-10-28), evidence in `docs/evidence/gate2-suivi-2026-10-28.md`, ADR 0008: playback reporting from Rust (`/Sessions/Playing`, progress every 10 s and on pause / unpause / seek, stopped with `Failed` on error), stop flushed when the window closes during playback, watched state and resume point read back after the stop, "Reprendre" / "Lire depuis le début" on films, started episodes resume; real server (test account, cleaned up): resume point recorded at the stop position and cleared by a stop near 0; CDP scenario `gate2-resume` 20/20.
-- NOT VERIFIED (reporting): watched state set by the server at the end of a file; stop on a hard kill (none is sent by design); close with an unreachable server (3 s bound); audio/subtitle track choice not reported.
+- VERIFIED (2026-11-07): watched state set by the server at the natural end of a film (`gate4-watched`) and of an episode (`gate3-upnext`), from the stop report alone, no resume point left.
+- NOT VERIFIED (reporting): stop on a hard kill (none is sent by design); close with an unreachable server (3 s bound); audio/subtitle track choice not reported.
 - VERIFIED (2026-10-28), evidence in `docs/evidence/gate2-transcodage-2026-10-28.md`, ADR 0009: HLS transcoding when the server refuses Direct Play / Direct Stream (TranscodingUrl without `api_key`, token in the header), reasons shown in French in the player badge, text subtitles delivered as external files by the server and added to mpv asynchronously (server-side burn-in fails on this server), the stop report ends the encoding; real server at 3 Mbit/s (test account, short sessions, cleaned up): first segment in ~6 s, 4 external subtitles, no encoding left after the stop; CDP scenario `gate2-transcode` 10/10 including a seek to 10 min in 3.4 s.
 - NOT VERIFIED (transcoding): image subtitles (PGS/VOBSUB) in a transcode; transcoded picture, sound and subtitles by eye and ear; no bitrate setting in the UI (debug-only override).
 
@@ -577,4 +578,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **History**: tags set afterwards on the builds already installed: `v0.1.0` (6d3450d), `v0.2.0` (c844da3), `v0.3.0` (0c0b004); the fullscreen fix ships as `v0.3.1`. `CHANGELOG.md` sums up 0.1.0 to 0.3.0 by hand.
 - **Tests**: `src/release/version.test.ts` (9 tests: bumps, explicit versions, numeric compare, Cargo.toml, Cargo.lock with CRLF, package-lock root only, changelog order, the four files equal, Tauri reading package.json); `npm run verify:web` exit 0 (132 tests); `verify:rust` exit 0 (127 tests); debug build with the new `tauri.conf.json`; `gate3-settings` all passed with `version_shown`.
 - **Not verified**: the NSIS upgrade from 0.1.0 to 0.3.1 over the installed build (the owner runs it).
+- **Next**: the 1.0 work (below), in parallel sessions.
+
+### 2026-11-07 — Watched state at the end of a film
+
+- **Added**: `scripts/e2e/gate4-watched.mjs`. An unwatched film without a resume point is played to its natural end, so the player closes by itself. The server then marks it watched from the stop report alone (the app never calls `PlayedItems`): no resume point is left, and the detail page shows « Déjà vu ». The film is marked unplayed again at the end (`real_server_mark_unplayed`).
+- **Tests**: all passed on the real server with « 2 Hearts » (6103 s), which was marked unplayed again. The episode case was already checked by `gate3-upnext` (`first_episode_played`).
+- **Server side effects** (test account): one film marked watched, then unwatched.
 - **Next**: to be chosen.
