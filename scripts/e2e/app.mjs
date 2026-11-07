@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const exe = join(root, "src-tauri", "target", "debug", "viewer.exe");
+const debugExe = join(root, "src-tauri", "target", "debug", "viewer.exe");
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -58,12 +58,14 @@ export function runDir(group, name) {
 /**
  * Starts the debug build with a DevTools port on 127.0.0.1 and attaches to its page.
  * The window opens off-screen without taking the foreground (`VIEWER_E2E_OFFSCREEN`,
- * debug builds only), and Chromium is told not to throttle it while hidden.
+ * debug builds only), and Chromium is told not to throttle it while hidden. `exe`
+ * starts another build, such as the installed release, which ignores `VIEWER_*`.
  */
 export async function launch({
   port = 9339,
   env = {},
   timeoutMs = 30000,
+  exe = debugExe,
 } = {}) {
   // The test account is for the scenario only, never for the app process.
   const { VIEWER_EMBY_USER, VIEWER_EMBY_PASSWORD, ...inherited } = process.env;

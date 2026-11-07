@@ -105,7 +105,7 @@ Verify real server resume/watched state, unsupported format fallback, network in
 - VERIFIED (2026-11-06): `cargo audit` reports no vulnerability after updating `quick-xml` and `time`; 7 warnings remain, none a known vulnerability, `docs/evidence/gate4-audit-dependances-2026-11-06.md`.
 - VERIFIED (2026-11-06): with no stop report, the encoding leaves `/Sessions` by itself 50 to 70 s after the client goes silent, over 4 tries on the real server, `docs/evidence/gate4-encodeur-sans-rapport-2026-11-06.md`. The ffmpeg process itself was not observed.
 - VERIFIED (2026-11-06): playback resumes after a 5 min pause during a transcode, past what mpv had read ahead and with nothing skipped, on the real server, `docs/evidence/gate4-pause-longue-2026-11-06.md`. The encoding stayed present during the pause; a 30 min pause was not run (owner's choice, low stake).
-- NOT VERIFIED: release-only behaviors at run time, a real network cut, a real file mpv cannot read, a file whose video alone is unreadable.
+- NOT VERIFIED: a real network cut, a real file mpv cannot read, a file whose video alone is unreadable.
 - MEASURED (2026-11-06): performance baselines, debug build, `docs/evidence/gate4-performance-2026-11-06.md`: playback start median 1184 ms over 11 films, 0 dropped frames in 60 s off-screen, navigation under 100 ms at the median, 92 % artwork hits on the second launch, up to 994 MiB private memory with the whole grid.
 - VERIFIED (2026-11-06): a stream that does not open ends after 45 s with a fallback or a message (ADR 0027), `docs/evidence/gate4-ouverture-2026-11-06.md`: through the local proxy with the final code; on the real film before the last two changes, as it has since left the library.
 
@@ -114,7 +114,8 @@ Verify real server resume/watched state, unsupported format fallback, network in
 Redistribution/license audit, release build, Windows installer, clean-machine smoke test, documentation. Licence decided (2026-11-06, ADR 0002): personal use on the owner's own PCs, no distribution, so the current GPL-3.0 libmpv stays. Giving the app to anyone else reopens the choice between a GPL-3.0 project licence and an in-house LGPL libmpv; audit and options in `docs/evidence/gate5-licences-2026-11-06.md`.
 
 - DONE (2026-11-07): release build and per-user NSIS installer in French, with `libmpv-2.dll` beside the executable (ADR 0028). Built, not yet installed or run.
-- TODO: install on the owner's PC, release-only behaviors at run time, sign-in and playback with the installed build, uninstall; clean-machine smoke test.
+- VERIFIED (2026-11-07): installed on the owner's PC, the release build signs in, plays a film directly and seeks; release-only behaviors hold (bundled frontend, prototype refused, `VIEWER_*` ignored); uninstall removes files, entry and shortcuts, `docs/evidence/gate5-installation-2026-11-07.md`. Reinstalled for use.
+- TODO: clean-machine smoke test; picture, sound and subtitles by eye and ear with the release build.
 
 ## Work log
 
@@ -441,3 +442,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `./scripts/with-msvc.ps1 npx tauri build` exit 0, installer 35.63 MiB, SHA-256 `6ad4aea9…6966c`; the generated NSIS script installs `libmpv-2.dll` into the install folder and removes it on uninstall; `npm run verify:web` exit 0 (Vitest 113).
 - **Not verified**: installing, launching or playing with the release build; uninstalling; a clean machine; `verify:rust` after the change (no Rust code changed).
 - **Next**: install on the owner's PC and run the release smoke test.
+
+### 2026-11-07 — Release smoke test on the owner's PC
+
+- **Changed**: scenario `scripts/e2e/gate5-release.mjs`; `launch()` in `scripts/e2e/app.mjs` takes an `exe`. No app code.
+- **Tests**: silent install and uninstall, exit 0; `gate5-release` all passed on the installed build: frontend from `tauri.localhost`, window on screen, prototype refused, bitrate cap ignored ("Lecture directe · MKV"), "2 Coeurs" played (first picture after 5.1 s), seek to 600 s in 1.3 s, no resume left, exit 0 with no process left. Uninstall removed the folder, the entry and both shortcuts; reinstalled. Details in `docs/evidence/gate5-installation-2026-11-07.md`.
+- **Not verified**: a clean machine (WebView2 present, data shared with the debug build); picture, sound and subtitles by eye and ear; SmartScreen; transcoding, cuts and series with the release build.
+- **Next**: the owner uses the installed app; a clean-machine test if one is available.
