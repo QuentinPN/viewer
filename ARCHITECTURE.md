@@ -39,6 +39,8 @@ Sort and filters (ADR 0013): `emby_items` takes optional `ItemsOptions` (sort ke
 
 Favorites (ADR 0014): `emby_set_favorite(item_id, favorite)` returns the state the server reports; `emby_favorites()` feeds the home row. The detail page changes the toggle optimistically (`src/lib/detail/favorite.ts`) and tells `LibraryBrowser.svelte`, which bumps `favoritesVersion` so `Home.svelte` reads its row again.
 
+Version choice (ADR 0036): `MediaInfo.id` names each version of an item; `emby_play` takes an optional `media_source_id`, validated in Rust and sent as `MediaSourceId` in the PlaybackInfo body, and `playback::plan` keeps only that source (`NoCompatibleStream` if the server does not return it, never another version). Reports, the transcode fallback and « Reprendre » follow it. `src/lib/detail/versions.ts` builds the labels and keeps the choice per server, user and item in WebView `localStorage`; only the detail page uses it.
+
 Episode page (ADR 0016): `emby_item_detail` also accepts an episode and returns its `EpisodeContext` (series, season, number) with the previous and next episodes from `/Shows/{SeriesId}/Episodes?AdjacentTo=` (across seasons, other series filtered out). `ItemDetail.svelte` renders it and nests itself: a series page opens an episode page over its own section (`inert`, `visibility: hidden`), previous/next replace it, and the return calls `EpisodeList.reveal(episodeId, seasonId)`.
 
 Home hero (ADR 0015): `emby_hero()` returns up to five `HeroItem`s chosen in Rust (resume first, then recent unwatched films and series with a backdrop; a series' play target is its first unwatched episode). The item carries the `MediaItem` the detail page opens and the id the main button plays; `src/lib/home/Hero.svelte` only displays it.

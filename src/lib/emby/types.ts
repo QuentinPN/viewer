@@ -220,6 +220,8 @@ export interface StreamInfo {
 
 /** One version of a film. Says nothing about whether it plays directly. */
 export interface MediaInfo {
+  /** Passed to `emby_play` to play this version (ADR 0036). */
+  id: string | null;
   name: string | null;
   container: string | null;
   sizeBytes: number | null;
@@ -301,6 +303,8 @@ export type PlayMethod = "directPlay" | "directStream" | "transcode";
 /** A started playback: the method only, never the stream URL or the token. */
 export interface PlaybackStart {
   itemId: string;
+  /** The version played (ADR 0036): a fallback or a resume plays the same one. */
+  mediaSourceId: string;
   /** The start asked for: a fallback keeps "Reprendre" or "Lire depuis le début". */
   resume: boolean;
   method: PlayMethod;

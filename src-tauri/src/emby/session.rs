@@ -815,7 +815,7 @@ impl EmbyService {
         item_id: &str,
         resume: bool,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
-        self.negotiate(item_id, resume, false).await
+        self.negotiate(item_id, None, resume, false).await
     }
 
     /// Same as `prepare_playback`, for when the player could not open the direct
@@ -827,23 +827,46 @@ impl EmbyService {
         item_id: &str,
         resume: bool,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
-        self.negotiate(item_id, resume, true).await
+        self.negotiate(item_id, None, resume, true).await
+    }
+
+    /// `prepare_playback` or `prepare_transcode` for one version of an item with
+    /// several (ADR 0036); `None` lets the server pick, as before.
+    pub async fn prepare_version(
+        &self,
+        item_id: &str,
+        media_source_id: Option<&str>,
+        resume: bool,
+        force_transcode: bool,
+    ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
+        if media_source_id.is_some_and(|id| !is_source_id(id)) {
+            return Err(EmbyError::InvalidResponse("version invalide".into()));
+        }
+        self.negotiate(item_id, media_source_id, resume, force_transcode)
+            .await
     }
 
     async fn negotiate(
         &self,
         item_id: &str,
+        media_source_id: Option<&str>,
         resume: bool,
         force_transcode: bool,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
         let (client, user_id) = self.session()?;
         let profile = playback::device_profile(self.max_streaming_bitrate);
         let (info, item) = tokio::join!(
-            client.playback_info(&user_id, item_id, &profile, force_transcode),
+            client.playback_info(
+                &user_id,
+                item_id,
+                &profile,
+                force_transcode,
+                media_source_id
+            ),
             client.item(&user_id, item_id)
         );
         let response = self.expire_on_401(&client, info)?;
-        let mut plan = playback::plan(client.server(), response)?;
+        let mut plan = playback::plan(client.server(), response, media_source_id)?;
         if force_transcode && plan.method != PlayMethod::Transcode {
             return Err(EmbyError::NoCompatibleStream);
         }
@@ -1508,6 +1531,16 @@ fn is_id(id: &str) -> bool {
     !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
 }
 
+/// Media source ids seen: `mediasource_30207` for an item's own file, an item id
+/// for a merged version (ADR 0036).
+fn is_source_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
 const TICKS_PER_SECOND: i64 = 10_000_000;
 /// Enough names for one line of credits; the full cast is not shown.
 const MAX_CAST: usize = 12;
@@ -1584,6 +1617,7 @@ fn media_info(source: MediaSourceDto) -> MediaInfo {
             .collect::<Vec<_>>()
     };
     MediaInfo {
+        id: source.id.filter(|id| is_source_id(id)),
         video: source
             .media_streams
             .iter()

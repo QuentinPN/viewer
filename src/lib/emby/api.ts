@@ -83,10 +83,21 @@ export const embyApi = {
    * starts where the server says the user stopped (ADR 0008). With
    * `transcodeFallback`, direct play is refused to the server, which then
    * transcodes: the way out when the player could not open the direct source
-   * (ADR 0023).
+   * (ADR 0023). `mediaSourceId` plays one version of an item with several; null
+   * lets the server pick (ADR 0036).
    */
-  play: (itemId: string, resume: boolean, transcodeFallback = false) =>
-    invoke<PlaybackStart>("emby_play", { itemId, resume, transcodeFallback }),
+  play: (
+    itemId: string,
+    resume: boolean,
+    transcodeFallback = false,
+    mediaSourceId: string | null = null,
+  ) =>
+    invoke<PlaybackStart>("emby_play", {
+      itemId,
+      resume,
+      transcodeFallback,
+      mediaSourceId,
+    }),
   /**
    * Intro and credits to offer skipping (ADR 0030). `external: false` asks the
    * Emby server only. Never fails for an unreachable external source.

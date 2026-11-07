@@ -802,6 +802,7 @@ $effect(() => {
         onNavigate={navigateEpisode}
         focusOnLoad={openedVia}
         backLabel={searching ? "Retour à la recherche" : undefined}
+        versionScope="{user.server.id}:{user.userId}"
       />
     {/key}
   {/if}
