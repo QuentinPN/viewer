@@ -1,5 +1,10 @@
 # Journal des versions
 
+## 0.3.1 — 2026-11-07
+
+- Versioning: single version source, release script and About section
+- Fix: fullscreen from a maximized window left the taskbar visible
+
 ## 0.3.0 — 2026-11-07
 
 - Nouvelle direction visuelle inspirée d'Apple TV (ADR 0031) : pilule de navigation flottante, accueil, fiches film et épisode, saisons en pilules, grille d'épisodes, commandes du lecteur, cartes givrées de connexion et de perte de connexion, écran de démarrage avec logo.
