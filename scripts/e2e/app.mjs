@@ -7,6 +7,7 @@ import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
+import { staleStyles } from "./dev-styles.mjs";
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const debugExe = join(root, "src-tauri", "target", "debug", "viewer.exe");
@@ -95,6 +96,18 @@ export async function launch({
     timeout: timeoutMs,
   });
   await page.waitForLoadState("domcontentloaded");
+  if (exe === debugExe) {
+    const stale = await staleStyles(page, root);
+    if (stale.length) {
+      await browser.close().catch(() => {});
+      spawnSync("taskkill", ["/F", "/PID", String(proc.pid)], {
+        stdio: "ignore",
+      });
+      throw new Error(
+        `the Vite dev server serves old CSS (restart npm run dev): ${stale.join("; ")}`,
+      );
+    }
+  }
 
   /** Closes the window like the ✕ button (WM_CLOSE) and waits for the exit code. */
   async function close(timeout = 10000) {

@@ -550,4 +550,13 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 
 - **Fixed**: `Home.svelte` stored each library's latest row with an arrow returning the assignment to a `$state` property, which Svelte flags in dev (`assignment_value_stale`, once per library on each home load). The callback has a block body now; behavior unchanged.
 - **Tests**: `gate3-nav-many` all passed, the rows show; the Vite log has no new warning (the previous run of the same scenario logged 16). `npm run verify:web` exit 0 (123 tests).
+- **Next**: the Vite dev server serving old CSS.
+
+### 2026-11-07 — E2E: guard against old CSS from the Vite dev server
+
+- **Problem**: twice this session the dev server served a component's new markup with its old CSS; scenarios then tested the old layout, and a restart of `npm run dev` fixed it.
+- **Investigated**: a single edit and five writes 50 ms apart to `LibraryBrowser.svelte` were served at once; one listener on port 1420. Cause not found.
+- **Added**: `scripts/e2e/dev-styles.mjs`, called by `launch()` for the debug build: the page fetches each component's style module and every one-line declaration of the source `<style>` must be in it (`animation` left out, Svelte renames scoped keyframes). Otherwise the launch stops and names the components.
+- **Tests**: no false positive on the current tree (launch 523 ms including the check); a style module served with one declaration removed (Playwright route) is reported; `gate3-nav-many` all passed through it. `npm run verify:web` exit 0 (123 tests).
+- **Not verified**: the check on a real occurrence (not reproduced). Multi-line declarations and `animation` are not compared.
 - **Next**: to be chosen.
