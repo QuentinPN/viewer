@@ -64,6 +64,8 @@ export interface PlayerDiagnostics {
   volume: number | null;
   frameDropCount: number | null;
   decoderFrameDropCount: number | null;
+  /** Subtitle options in effect, as mpv reads them back (ADR 0035). */
+  subtitleOptions: [string, string][];
 }
 
 export interface AppInfo {

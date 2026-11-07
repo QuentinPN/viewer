@@ -16,7 +16,8 @@ use super::ffi::{self, MpvApi, MpvHandle};
 use super::{
     EndReason, ExternalSubtitle, MediaSource, OPEN_LIMIT, PlaybackRequest, PlayerCommand,
     PlayerDiagnostics, PlayerEngine, PlayerError, PlayerEvent, STALL_LIMIT, Stall, StallWatch,
-    Track, TrackKind, tls_roots,
+    SubtitleBackground, SubtitleColor, SubtitlePosition, SubtitleSize, SubtitleStyle, Track,
+    TrackKind, TrackPick, TrackSelection, tls_roots,
 };
 
 pub type EventSink = Box<dyn Fn(PlayerEvent) + Send + Sync>;
@@ -82,6 +83,9 @@ struct Inner {
     /// Subtitles of the last `load`, added by the event thread on `FILE_LOADED`
     /// (`sub-add` needs a loaded file).
     pending_subtitles: Mutex<Vec<(String, ExternalSubtitle)>>,
+    /// Tracks of the last `load`, selected by the event thread on `FILE_LOADED`,
+    /// once mpv knows the file's streams (ADR 0035).
+    pending_tracks: Mutex<TrackSelection>,
 }
 
 impl Inner {
@@ -219,6 +223,7 @@ impl MpvEngine {
             api,
             handle: RawHandle(raw),
             pending_subtitles: Mutex::new(Vec::new()),
+            pending_tracks: Mutex::new(TrackSelection::default()),
         };
 
         if let Err(e) = Self::configure(&inner, config) {
@@ -360,6 +365,18 @@ impl PlayerEngine for MpvEngine {
             .pending_subtitles
             .lock()
             .unwrap_or_else(|p| p.into_inner()) = subtitles;
+        for (name, value) in subtitle_options(&request.subtitle_style) {
+            inner.set_property(name, value)?;
+        }
+        // `aid` and `sid` are options too: a track picked during the last file
+        // would otherwise carry over to this one.
+        inner.set_property("aid", "auto")?;
+        let off = request.tracks.subtitle == TrackPick::Off;
+        inner.set_property("sid", if off { "no" } else { "auto" })?;
+        *inner
+            .pending_tracks
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = request.tracks;
         inner.set_property("pause", "no")?;
         inner.command(&["loadfile", &source.as_mpv_arg(), "replace"])
     }
@@ -418,6 +435,10 @@ impl PlayerEngine for MpvEngine {
             volume: f("volume"),
             frame_drop_count: i("frame-drop-count"),
             decoder_frame_drop_count: i("decoder-frame-drop-count"),
+            subtitle_options: SUBTITLE_OPTIONS
+                .iter()
+                .filter_map(|&n| Some((n.to_owned(), s(n)?)))
+                .collect(),
         }
     }
 
@@ -537,6 +558,95 @@ fn find_secret_key(s: &str) -> Option<(usize, usize)> {
     .min()
 }
 
+/// mpv options set for each file from the subtitle style (ADR 0035).
+const SUBTITLE_OPTIONS: [&str; 7] = [
+    "sub-scale",
+    "sub-color",
+    "sub-border-style",
+    "sub-back-color",
+    "sub-pos",
+    "sub-align-y",
+    "sub-ass-override",
+];
+
+/// Values of [`SUBTITLE_OPTIONS`], in order. They apply to text subtitles; ASS and
+/// SSA keep their own styles (`sub-ass-override=no`, so not even `sub-scale`)
+/// unless the user overrides them.
+fn subtitle_options(style: &SubtitleStyle) -> [(&'static str, &'static str); 7] {
+    let scale = match style.size {
+        SubtitleSize::Small => "0.8",
+        SubtitleSize::Normal => "1",
+        SubtitleSize::Large => "1.25",
+        SubtitleSize::Larger => "1.5",
+    };
+    let color = match style.color {
+        SubtitleColor::White => "#FFFFFF",
+        SubtitleColor::Yellow => "#FFE14D",
+    };
+    let border = match style.background {
+        SubtitleBackground::Outline => "outline-and-shadow",
+        SubtitleBackground::Box => "background-box",
+    };
+    // `sub-pos` is the bottom edge in percent of the height; 100 keeps mpv's margin.
+    let (pos, align) = match style.position {
+        SubtitlePosition::Bottom => ("100", "bottom"),
+        SubtitlePosition::Raised => ("85", "bottom"),
+        SubtitlePosition::Top => ("100", "top"),
+    };
+    let ass = if style.override_ass { "force" } else { "no" };
+    [
+        ("sub-scale", scale),
+        ("sub-color", color),
+        ("sub-border-style", border),
+        // The box colour, 70 % opaque black (#AARRGGBB). The outline style draws no
+        // shadow (`sub-shadow-offset` stays 0), so it ignores it.
+        ("sub-back-color", "#B3000000"),
+        ("sub-pos", pos),
+        ("sub-align-y", align),
+        ("sub-ass-override", ass),
+    ]
+}
+
+/// mpv track id of the stream with FFmpeg index `index` in a `track-list`, among
+/// the file's own tracks of that kind (`"audio"` or `"sub"`).
+fn track_with_ff_index(json: &str, kind: &str, index: i64) -> Option<i64> {
+    let tracks: serde_json::Value = serde_json::from_str(json).ok()?;
+    tracks.as_array()?.iter().find_map(|t| {
+        let own = t.get("external").and_then(serde_json::Value::as_bool) != Some(true);
+        (own && t.get("type")?.as_str()? == kind && t.get("ff-index")?.as_i64()? == index)
+            .then(|| t.get("id")?.as_i64())
+            .flatten()
+    })
+}
+
+/// Selects the tracks asked by the last `load`. A stream the file does not have
+/// leaves mpv's own choice.
+fn select_pending_tracks(inner: &Inner) {
+    let tracks = std::mem::take(
+        &mut *inner
+            .pending_tracks
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()),
+    );
+    for (pick, kind, property) in [
+        (tracks.audio, "audio", "aid"),
+        (tracks.subtitle, "sub", "sid"),
+    ] {
+        let TrackPick::Stream { index } = pick else {
+            continue;
+        };
+        let list = inner.get_property("track-list").unwrap_or_default();
+        match track_with_ff_index(&list, kind, index) {
+            Some(id) => {
+                if let Err(e) = inner.set_property(property, &id.to_string()) {
+                    log::warn!("piste {kind} {index} non choisie : {e}");
+                }
+            }
+            None => log::warn!("piste {kind} {index} absente du fichier"),
+        }
+    }
+}
+
 /// `sub-add` for the subtitles of the file that just loaded. A failure leaves the
 /// media playing without that track.
 fn add_pending_subtitles(inner: &Inner) {
@@ -615,6 +725,7 @@ fn event_loop(inner: &Inner, stop: &AtomicBool, sink: &EventSink, open_limit: Du
             }
             ffi::MPV_EVENT_START_FILE => stall.on_load_started(Instant::now()),
             ffi::MPV_EVENT_FILE_LOADED => {
+                select_pending_tracks(inner);
                 add_pending_subtitles(inner);
                 emit(&mut stall, sink, PlayerEvent::FileLoaded);
             }
@@ -847,6 +958,7 @@ mod tests {
                 http_headers: Vec::new(),
                 start_seconds: None,
                 subtitles: Vec::new(),
+                ..Default::default()
             };
             engine.load(&request, &MediaSource::parse(url).unwrap())
         };
@@ -881,6 +993,110 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    #[test]
+    fn finds_the_track_of_an_emby_stream_by_ff_index() {
+        let json = r#"[{"id":1,"type":"video","ff-index":0},
+            {"id":1,"type":"audio","ff-index":1},{"id":2,"type":"audio","ff-index":2},
+            {"id":1,"type":"sub","ff-index":3},{"id":2,"type":"sub","external":true,"ff-index":4},
+            {"id":3,"type":"sub","ff-index":4}]"#;
+        assert_eq!(track_with_ff_index(json, "audio", 2), Some(2));
+        assert_eq!(
+            track_with_ff_index(json, "sub", 4),
+            Some(3),
+            "not the added file"
+        );
+        assert_eq!(track_with_ff_index(json, "sub", 1), None, "an audio index");
+        assert_eq!(track_with_ff_index("not json", "audio", 1), None);
+    }
+
+    /// Preferences of ADR 0035 reach libmpv: style options, subtitles off, and the
+    /// audio stream picked by its index in the file.
+    #[test]
+    fn applies_subtitle_style_and_track_preferences() {
+        let Some(lib) = libmpv_path() else {
+            eprintln!("SKIPPED: libmpv not found (set VIEWER_LIBMPV)");
+            return;
+        };
+        let (tx, rx) = mpsc::channel();
+        let tx = Mutex::new(tx);
+        let engine = MpvEngine::new(
+            &lib,
+            &MpvConfig {
+                headless: true,
+                ..MpvConfig::default()
+            },
+            Box::new(move |e| {
+                let _ = tx.lock().unwrap().send(e);
+            }),
+        )
+        .expect("engine");
+        let style = SubtitleStyle {
+            size: SubtitleSize::Larger,
+            color: SubtitleColor::Yellow,
+            background: SubtitleBackground::Box,
+            position: SubtitlePosition::Raised,
+            override_ass: true,
+        };
+        let request = PlaybackRequest {
+            source: "http://127.0.0.1:1/video".into(),
+            tracks: TrackSelection {
+                audio: TrackPick::Stream { index: 2 },
+                subtitle: TrackPick::Off,
+            },
+            subtitle_style: style,
+            ..Default::default()
+        };
+        engine
+            .load(&request, &MediaSource::parse(&request.source).unwrap())
+            .expect("load");
+        // Every option name exists in this libmpv and reads back as set.
+        let options = engine.diagnostics().subtitle_options;
+        let read: Vec<(&str, &str)> = options
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
+        assert_eq!(
+            read,
+            [
+                ("sub-scale", "1.500000"),
+                ("sub-color", "#FFFFE14D"),
+                ("sub-border-style", "background-box"),
+                ("sub-back-color", "#B3000000"),
+                ("sub-pos", "85.000000"),
+                ("sub-align-y", "bottom"),
+                ("sub-ass-override", "force"),
+            ]
+        );
+        assert_eq!(engine.property("sid").as_deref(), Some("no"));
+
+        // The second audio stream of the file, by its index; the defaults come back.
+        *engine.inner.pending_tracks.lock().unwrap() = request.tracks;
+        engine
+            .load_raw("av://lavfi:testsrc2=size=160x120:duration=30[out0];sine=f=440[out1];sine=f=880[out2]")
+            .expect("loadfile");
+        assert!(
+            wait_for(&rx, Duration::from_secs(10), |e| *e
+                == PlayerEvent::FileLoaded),
+            "file loaded"
+        );
+        assert_eq!(
+            engine.property("current-tracks/audio/ff-index").as_deref(),
+            Some("2")
+        );
+        let defaults = PlaybackRequest {
+            source: "http://127.0.0.1:1/video".into(),
+            ..Default::default()
+        };
+        engine
+            .load(&defaults, &MediaSource::parse(&defaults.source).unwrap())
+            .expect("load");
+        assert_eq!(engine.property("options/aid").as_deref(), Some("auto"));
+        assert_eq!(engine.property("options/sid").as_deref(), Some("auto"));
+        assert_eq!(engine.property("sub-ass-override").as_deref(), Some("no"));
+        assert_eq!(engine.property("sub-color").as_deref(), Some("#FFFFFFFF"));
+        engine.shutdown();
+    }
+
     /// Loads `url` with a token in a headless engine; returns every event up to the
     /// final end of file. `None` when libmpv is not available.
     fn play_with_token(url: &str) -> Option<Vec<PlayerEvent>> {
@@ -906,6 +1122,7 @@ mod tests {
             http_headers: vec![("X-Emby-Token".to_owned(), "TEST-TOKEN".to_owned())],
             start_seconds: None,
             subtitles: Vec::new(),
+            ..Default::default()
         };
         engine
             .load(&request, &MediaSource::parse(url).unwrap())
@@ -982,6 +1199,7 @@ mod tests {
             http_headers: Vec::new(),
             start_seconds: None,
             subtitles: Vec::new(),
+            ..Default::default()
         };
         engine
             .load(&request, &MediaSource::parse(&url).unwrap())

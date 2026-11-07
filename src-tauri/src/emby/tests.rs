@@ -274,6 +274,12 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
                 (200, playback_direct())
             }
             "/emby/Items/40000/PlaybackInfo" if r.method == "POST" => (200, playback_transcode()),
+            // A transcode takes another audio track only with the source named (ADR 0035).
+            "/emby/Items/40001/PlaybackInfo" if r.method == "POST" => {
+                let other = r.body.contains("\"MediaSourceId\":\"mediasource_40001\"")
+                    && r.body.contains("\"AudioStreamIndex\":2");
+                (200, playback_transcode_audio(if other { 2 } else { 1 }))
+            }
             p if p.ends_with("/PlaybackInfo") => (404, NOT_FOUND_TEXT.into()),
             "/emby/Sessions/Playing"
             | "/emby/Sessions/Playing/Progress"
@@ -317,6 +323,27 @@ fn playback_transcode() -> String {
         "Language":"fre","DeliveryMethod":"External",
         "DeliveryUrl":"/Videos/40000/mediasource_40000/Subtitles/2/0/Stream.subrip?api_key={TOKEN}"}}]}}],
         "PlaySessionId":"ps2"}}"#
+    )
+}
+
+/// A transcode with French and English audio, French and English subtitle files,
+/// as the test server answers with and without `AudioStreamIndex` (ADR 0035).
+fn playback_transcode_audio(audio: i32) -> String {
+    format!(
+        r#"{{"MediaSources":[{{"Protocol":"File","Id":"mediasource_40001","Container":"mkv",
+        "SupportsTranscoding":true,"SupportsDirectStream":false,"SupportsDirectPlay":false,
+        "RequiredHttpHeaders":{{}},
+        "TranscodingUrl":"/videos/40001/master.m3u8?MediaSourceId=mediasource_40001&PlaySessionId=ps{audio}&AudioStreamIndex={audio}&api_key={TOKEN}",
+        "TranscodingSubProtocol":"hls","TranscodingContainer":"ts",
+        "DefaultAudioStreamIndex":{audio},"DefaultSubtitleStreamIndex":3,
+        "MediaStreams":[{{"Type":"Video","Index":0}},
+        {{"Type":"Audio","Index":1,"Language":"fre","IsDefault":true}},
+        {{"Type":"Audio","Index":2,"Language":"eng"}},
+        {{"Type":"Subtitle","Index":3,"Codec":"subrip","Language":"fre","IsForced":true,"DeliveryMethod":"External",
+        "DeliveryUrl":"/Videos/40001/mediasource_40001/Subtitles/3/0/Stream.subrip?api_key={TOKEN}"}},
+        {{"Type":"Subtitle","Index":4,"Codec":"subrip","Language":"eng","DeliveryMethod":"External",
+        "DeliveryUrl":"/Videos/40001/mediasource_40001/Subtitles/4/0/Stream.subrip?api_key={TOKEN}"}}]}}],
+        "PlaySessionId":"ps{audio}"}}"#
     )
 }
 
@@ -1726,6 +1753,80 @@ fn playback_transcodes_through_hls_under_the_bitrate_limit() {
     let body: serde_json::Value = serde_json::from_str(&info.body).unwrap();
     assert_eq!(body["MaxStreamingBitrate"], 3_000_000);
     assert_eq!(body["DeviceProfile"]["MaxStreamingBitrate"], 3_000_000);
+}
+
+#[test]
+fn track_preferences_pick_the_audio_of_a_transcode_and_its_subtitle_file() {
+    use super::models::PlayMethod;
+    use super::tracks::{SubtitleMode, TrackPreferences};
+    use crate::player::TrackPick;
+    let (server, fx, _) = signed_in_browser();
+    let infos = || {
+        server
+            .requests()
+            .into_iter()
+            .filter(|r| r.path.contains("/PlaybackInfo"))
+            .map(|r| serde_json::from_str::<serde_json::Value>(&r.body).unwrap())
+            .collect::<Vec<_>>()
+    };
+
+    // Without preferences: one request, the server's audio and subtitle.
+    let (plan, _) = run(fx.service.prepare_playback("40001", false)).unwrap();
+    assert_eq!(plan.method, PlayMethod::Transcode);
+    assert_eq!(infos().len(), 1);
+    assert!(infos()[0].get("AudioStreamIndex").is_none());
+    assert!(plan.url.contains("AudioStreamIndex=1"));
+    let selected: Vec<bool> = plan.subtitles.iter().map(|s| s.selected).collect();
+    assert_eq!(selected, [true, false]);
+
+    let english = TrackPreferences {
+        audio_language: Some("eng".into()),
+        subtitle_language: Some("eng".into()),
+        subtitle_mode: SubtitleMode::Always,
+    };
+    let (plan, headers) = run(fx.service.prepare("40001", false, false, &english)).unwrap();
+    let bodies = infos();
+    assert_eq!(
+        bodies.len(),
+        3,
+        "a second PlaybackInfo names the source and the audio"
+    );
+    assert_eq!(bodies[2]["MediaSourceId"], "mediasource_40001");
+    assert_eq!(bodies[2]["AudioStreamIndex"], 2);
+    assert!(plan.url.contains("PlaySessionId=ps2&AudioStreamIndex=2"));
+    assert_eq!(plan.play_session_id.as_deref(), Some("ps2"));
+    let selected: Vec<bool> = plan.subtitles.iter().map(|s| s.selected).collect();
+    assert_eq!(selected, [false, true]);
+    // The stream carries one audio track: the player keeps it.
+    assert_eq!(plan.tracks.audio, TrackPick::Auto);
+    assert!(!format!("{plan:?}").contains(TOKEN));
+    assert_eq!(headers, vec![("X-Emby-Token".to_owned(), TOKEN.to_owned())]);
+
+    // Subtitles off: no file selected and the player shows none.
+    let off = TrackPreferences {
+        subtitle_mode: SubtitleMode::Off,
+        ..TrackPreferences::default()
+    };
+    let (plan, _) = run(fx.service.prepare("40001", false, false, &off)).unwrap();
+    assert_eq!(infos().len(), 4);
+    assert!(plan.subtitles.iter().all(|s| !s.selected));
+    assert_eq!(plan.tracks.subtitle, TrackPick::Off);
+}
+
+#[test]
+fn track_preferences_select_streams_of_the_file_when_playing_it() {
+    use super::tracks::{SubtitleMode, TrackPreferences};
+    use crate::player::{TrackPick, TrackSelection};
+    let (_server, fx, _) = signed_in_browser();
+    // The server names streams it does not list: the player picks, as before.
+    let (plan, _) = run(fx.service.prepare_playback("30207", false)).unwrap();
+    assert_eq!(plan.tracks, TrackSelection::default());
+    let off = TrackPreferences {
+        subtitle_mode: SubtitleMode::Off,
+        ..TrackPreferences::default()
+    };
+    let (plan, _) = run(fx.service.prepare("30207", false, false, &off)).unwrap();
+    assert_eq!(plan.tracks.subtitle, TrackPick::Off);
 }
 
 #[test]

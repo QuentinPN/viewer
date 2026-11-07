@@ -23,6 +23,7 @@ use super::models::{
 use super::playback::{self, PlaybackPlan};
 use super::reporting::Report;
 use super::server_url::ServerUrl;
+use super::tracks::{self, TrackPreferences};
 use crate::segments::{MediaIds, Segment, SegmentQuery, emby_markers};
 
 /// Contents of `session.json`. Contains no secret.
@@ -801,7 +802,8 @@ impl EmbyService {
         item_id: &str,
         resume: bool,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
-        self.negotiate(item_id, resume, false).await
+        self.prepare(item_id, resume, false, &TrackPreferences::default())
+            .await
     }
 
     /// Same as `prepare_playback`, for when the player could not open the direct
@@ -813,25 +815,48 @@ impl EmbyService {
         item_id: &str,
         resume: bool,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
-        self.negotiate(item_id, resume, true).await
+        self.prepare(item_id, resume, true, &TrackPreferences::default())
+            .await
     }
 
-    async fn negotiate(
+    /// `prepare_playback` or, with `force_transcode`, `prepare_transcode`, with the
+    /// audio and subtitles picked from the user's preferences (ADR 0035).
+    pub async fn prepare(
         &self,
         item_id: &str,
         resume: bool,
         force_transcode: bool,
+        prefs: &TrackPreferences,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
         let (client, user_id) = self.session()?;
         let profile = playback::device_profile(self.max_streaming_bitrate);
         let (info, item) = tokio::join!(
-            client.playback_info(&user_id, item_id, &profile, force_transcode),
+            client.playback_info(&user_id, item_id, &profile, force_transcode, None),
             client.item(&user_id, item_id)
         );
         let response = self.expire_on_401(&client, info)?;
         let mut plan = playback::plan(client.server(), response)?;
         if force_transcode && plan.method != PlayMethod::Transcode {
             return Err(EmbyError::NoCompatibleStream);
+        }
+        let choice = tracks::apply(&mut plan, prefs);
+        let other_audio = choice
+            .audio
+            .filter(|&a| Some(a) != plan.default_audio_stream_index);
+        if let Some(audio) = other_audio.filter(|_| plan.method == PlayMethod::Transcode) {
+            // A transcode carries the audio the server picked; it takes another one
+            // only with the source named (ADR 0035).
+            let source = (plan.media_source_id.as_str(), audio);
+            let info = client
+                .playback_info(&user_id, item_id, &profile, force_transcode, Some(source))
+                .await;
+            let mut again = playback::plan(client.server(), self.expire_on_401(&client, info)?)?;
+            if again.method == PlayMethod::Transcode
+                && again.media_source_id == plan.media_source_id
+            {
+                tracks::apply(&mut again, prefs);
+                plan = again;
+            }
         }
         if force_transcode {
             // The server only knows we refused; the real reason is the player's.

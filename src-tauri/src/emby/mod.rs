@@ -12,6 +12,7 @@ pub mod server_url;
 pub mod session;
 #[cfg(test)]
 mod tests;
+pub mod tracks;
 
 use serde::Serialize;
 

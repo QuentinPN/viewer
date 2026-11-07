@@ -122,6 +122,7 @@ fn run(app: &AppHandle, media: &str, out: &Path) -> Report {
         http_headers,
         start_seconds: None,
         subtitles: Vec::new(),
+        ..Default::default()
     };
     let started = Instant::now();
     let loaded = engine.load(&request, &source).is_ok()

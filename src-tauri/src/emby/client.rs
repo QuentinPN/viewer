@@ -561,6 +561,7 @@ impl EmbyClient {
         item_id: &str,
         profile: &DeviceProfile,
         force_transcode: bool,
+        audio: Option<(&str, i32)>,
     ) -> Result<PlaybackInfoResponse, EmbyError> {
         self.require_token()?;
         let url = self
@@ -575,6 +576,8 @@ impl EmbyClient {
             auto_open_live_stream: false,
             enable_direct_play: !force_transcode,
             enable_direct_stream: !force_transcode,
+            media_source_id: audio.map(|(source, _)| source),
+            audio_stream_index: audio.map(|(_, index)| index),
         };
         let res = self
             .request_url(Method::POST, &url, &[("UserId", user_id)])

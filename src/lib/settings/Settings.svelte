@@ -11,6 +11,7 @@ import {
   sessionReads,
   usageRatio,
 } from "./format";
+import SubtitleSettings from "./SubtitleSettings.svelte";
 
 // `undefined` while loading, `null` when the app has no artwork cache.
 let stats = $state<ArtworkCacheStats | null | undefined>(undefined);
@@ -116,6 +117,8 @@ onMount(() => {
   </p>
   <p class="muted note">S'applique à la prochaine lecture.</p>
 </section>
+
+<SubtitleSettings />
 
 <section class="panel" aria-labelledby="settings-artwork">
   <h2 id="settings-artwork">Cache des images</h2>

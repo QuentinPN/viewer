@@ -3,7 +3,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{State, WebviewWindow};
 
 use crate::AppState;
@@ -15,9 +15,10 @@ use crate::emby::models::{
 };
 use crate::emby::reporting::ActivePlayback;
 use crate::emby::session::EmbyService;
+use crate::emby::tracks::TrackPreferences;
 use crate::player::{
     MediaSource, PlaybackRequest, PlayerCommand, PlayerDiagnostics, PlayerEngine, PlayerError,
-    PlayerEvent, Track,
+    PlayerEvent, SubtitleStyle, Track,
 };
 use crate::segments::{Segment, SegmentService};
 use crate::video_surface::SurfaceMode;
@@ -326,6 +327,14 @@ pub async fn emby_episodes(
         .await
 }
 
+/// Réglages › Sous-titres, kept on this PC and sent with each playback (ADR 0035).
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct PlaybackPreferences {
+    tracks: TrackPreferences,
+    subtitle_style: SubtitleStyle,
+}
+
 /// Plays a film or episode from the server (ADR 0007): PlaybackInfo, choice of the
 /// source, then the player. The UI gets the method only, never the URL or token.
 /// With `resume`, starts where the server says the user stopped; the playback is
@@ -337,13 +346,19 @@ pub async fn emby_play(
     item_id: String,
     resume: bool,
     transcode_fallback: Option<bool>,
+    preferences: Option<PlaybackPreferences>,
 ) -> Result<PlaybackStart, EmbyError> {
+    let preferences = preferences.unwrap_or_default();
+    preferences.tracks.validate()?;
     state.reporter.resend_stop().await;
-    let (plan, http_headers) = if transcode_fallback == Some(true) {
-        emby.prepare_transcode(&item_id, resume).await?
-    } else {
-        emby.prepare_playback(&item_id, resume).await?
-    };
+    let (plan, http_headers) = emby
+        .prepare(
+            &item_id,
+            resume,
+            transcode_fallback == Some(true),
+            &preferences.tracks,
+        )
+        .await?;
     let start_seconds = (plan.start_ticks > 0).then(|| plan.start_ticks as f64 / 10_000_000.0);
     state.reporter.begin(ActivePlayback::new(&item_id, &plan));
     let request = PlaybackRequest {
@@ -351,6 +366,8 @@ pub async fn emby_play(
         http_headers,
         start_seconds,
         subtitles: plan.subtitles,
+        tracks: plan.tracks,
+        subtitle_style: preferences.subtitle_style,
     };
     let player = |e: PlayerError| {
         // Nothing was loaded: drop the announced playback, nothing is reported.

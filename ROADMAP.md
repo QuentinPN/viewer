@@ -578,3 +578,12 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `src/release/version.test.ts` (9 tests: bumps, explicit versions, numeric compare, Cargo.toml, Cargo.lock with CRLF, package-lock root only, changelog order, the four files equal, Tauri reading package.json); `npm run verify:web` exit 0 (132 tests); `verify:rust` exit 0 (127 tests); debug build with the new `tauri.conf.json`; `gate3-settings` all passed with `version_shown`.
 - **Not verified**: the NSIS upgrade from 0.1.0 to 0.3.1 over the installed build (the owner runs it).
 - **Next**: to be chosen.
+
+### 2026-11-07 — Audio and subtitle preferences (ADR 0035)
+
+- **Asked**: `PRODUCT.md` P1, advanced subtitle preferences.
+- **Checked on the server** (read only, Emby 4.10.1.0): in Direct Play `AudioStreamIndex`/`SubtitleStreamIndex` are ignored; in a transcode `AudioStreamIndex` is honoured only with `MediaSourceId`, and subtitles come as external files.
+- **Added**: Réglages › « Audio et sous-titres » — audio language, subtitles (« Comme sur le serveur Emby », « Désactivés », « Forcés uniquement », « Toujours ») and their language; size, colour, outline or dark box, position of text subtitles, and an opt-in for ASS. Kept on this PC (`viewer.player.subtitles`), sent with `emby_play`, validated in Rust. `emby/tracks.rs` picks the tracks from the source's streams; Direct Play selects them in mpv by `ff-index`, a transcode with another audio asks a second PlaybackInfo with `MediaSourceId` and `AudioStreamIndex` and selects the external subtitle file. The engine resets `aid`/`sid` and applies the `sub-*` options at each load (a manual pick no longer carries over to the next file). The server's preferences in the Emby account are left untouched.
+- **Tests**: `emby::tracks` (7), two fake-server playbacks (transcode with another audio, Direct Play), `player::mpv` (ff-index lookup; style, `sid=no`, audio by ff-index and reset read back from mpv), `subtitles.test.ts` (5). E2E `gate3-subtitles` all passed (17 checks) on film 30207: English audio and the full French subtitles with the preferences, the server's French audio and default subtitle without, style options read in mpv, no resume point left.
+- **Not verified**: the look of the subtitles on the picture (the mpv video is not captured); a file whose Emby `Index` differs from the FFmpeg index (mpv's pick then stays).
+- **Next**: to be chosen.
