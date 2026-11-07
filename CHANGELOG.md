@@ -1,5 +1,15 @@
 # Journal des versions
 
+## 1.0.0 — 2026-11-07
+
+- Fix: caption buttons ignored once the player controls faded
+- Audio and subtitle preferences (ADR 0035)
+- Settings: streaming quality, local and remote bitrate caps (ADR 0037)
+- Chapters in the player (ADR 0034)
+- Diagnostics: local redacted log file, panic hook and log folder button
+- Detail: choose between versions of a film or episode (ADR 0036)
+- Test: watched state set by the server at the end of a film
+
 ## 0.3.1 — 2026-11-07
 
 - Versioning: single version source, release script and About section
