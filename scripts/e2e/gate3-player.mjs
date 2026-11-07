@@ -155,6 +155,23 @@ try {
     JSON.stringify(faded),
   );
   await shot(page, "controls-hidden");
+  // The caption buttons still take clicks: they never fall through to the video,
+  // which would pause it instead of minimizing.
+  const caption = await page.evaluate(() =>
+    [...document.querySelectorAll(".titlebar button")].map((b) => {
+      const r = b.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        r.x + r.width / 2,
+        r.y + r.height / 2,
+      );
+      return b.contains(hit);
+    }),
+  );
+  check(
+    "caption_buttons_take_clicks_when_faded",
+    caption.length === 3 && caption.every(Boolean),
+    JSON.stringify(caption),
+  );
   await page.mouse.move(420, 320);
   await page.waitForTimeout(400);
   const moved = await chrome(page);

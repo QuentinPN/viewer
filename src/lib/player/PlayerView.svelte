@@ -647,8 +647,19 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
       onclick={onSurfaceClick}
     ></button>
 
+    {#if !fullscreen}
+      <!-- Outside the chrome: the caption buttons fade with it but always take clicks. -->
+      <div
+        class="caption"
+        class:faded={!chromeVisible}
+        role="presentation"
+        onpointerenter={() => (overChrome = true)}
+        onpointerleave={() => (overChrome = false)}
+      >
+        <TitleBar overVideo />
+      </div>
+    {/if}
     <header class="top chrome" class:windowed={!fullscreen}>
-      {#if !fullscreen}<TitleBar overVideo />{/if}
       <button type="button" class="round" aria-label="Revenir" title="Revenir (Échap)" onclick={() => close()}>
         {@render icon("back")}
       </button>
@@ -991,6 +1002,12 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   }
   .player.hidden .chrome * {
     pointer-events: none;
+  }
+  .caption {
+    transition: opacity var(--motion-base) ease;
+  }
+  .caption.faded {
+    opacity: 0;
   }
 
   .opening-panel {

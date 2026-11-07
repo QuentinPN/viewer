@@ -630,3 +630,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `emby::tracks` (7), two fake-server playbacks (transcode with another audio, Direct Play), `player::mpv` (ff-index lookup; style, `sid=no`, audio by ff-index and reset read back from mpv), `subtitles.test.ts` (5). E2E `gate3-subtitles` all passed (17 checks) on film 30207: English audio and the full French subtitles with the preferences, the server's French audio and default subtitle without, style options read in mpv, no resume point left.
 - **Not verified**: the look of the subtitles on the picture (the mpv video is not captured); a file whose Emby `Index` differs from the FFmpeg index (mpv's pick then stays).
 - **Next**: to be chosen.
+
+### 2026-11-07 — Caption buttons during playback
+
+- **Problem** (owner report): in the player, minimize, maximize and close did not answer; the click paused or resumed the video. The title bar sat inside the player chrome, which takes no clicks once it fades after 3 s, so clicks fell through to the video surface.
+- **Fixed**: `PlayerView.svelte` renders the title bar outside the chrome; it fades with it but always takes clicks.
+- **Tests**: `gate3-player` all passed with the new check `caption_buttons_take_clicks_when_faded` (hit test of the three buttons while the controls are hidden); `npm run verify:web` exit 0 (157 tests). After the merge of the five 1.0 sessions: `verify:rust` exit 0 (163 passed), 25 of 26 scenarios passed; `gate2-ui` fails only on `no_app_credential_left`, the old leftover credential the owner keeps; `gate4-pause` failed once on an early end of file after the server reset the connection at resume, then passed in full on a rerun.
+- **Next**: release 1.0.0.
