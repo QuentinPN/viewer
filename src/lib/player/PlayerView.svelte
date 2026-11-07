@@ -3,12 +3,20 @@
 // that fade after a few seconds without activity, audio, subtitles and
 // diagnostic panels. The video is the native surface under this transparent page.
 // At the end of an episode, a card offers the next one (ADR 0018). During an
-// intro or the credits, a button skips them (ADR 0030).
+// intro or the credits, a button skips them (ADR 0030). Chapters are marked on
+// the seek bar and listed in their own panel (ADR 0034).
 import { onDestroy, onMount, tick } from "svelte";
 import { embyApi } from "../emby/api";
-import type { EpisodeLink, PlaybackStart, Segment } from "../emby/types";
+import type {
+  Chapter,
+  EpisodeLink,
+  PlaybackStart,
+  Segment,
+} from "../emby/types";
 import TitleBar from "../window/TitleBar.svelte";
 import { playerApi } from "./api";
+import ChaptersPanel from "./ChaptersPanel.svelte";
+import { chapterIndex, chapterMarks, chapterTarget } from "./chapters";
 import {
   canFallBack,
   formatRemaining,
@@ -80,7 +88,7 @@ const EARLY_EOF_SECONDS = 30;
 const HIDE_AFTER_MS = 3000;
 const SKIP_SECONDS = 10;
 
-type Panel = "audio" | "subs" | "info";
+type Panel = "audio" | "subs" | "info" | "chapters";
 
 let active = $state(false);
 /**
@@ -107,6 +115,7 @@ let volume = $state<VolumeSetting>(readVolume(storage()));
 let audioButton = $state<HTMLButtonElement | null>(null);
 let subsButton = $state<HTMLButtonElement | null>(null);
 let infoButton = $state<HTMLButtonElement | null>(null);
+let chaptersButton = $state<HTMLButtonElement | null>(null);
 let panelElement = $state<HTMLElement | null>(null);
 /** Next episode of the series, looked up while this one plays. */
 let nextEpisode = $state<EpisodeLink | null>(null);
@@ -122,6 +131,8 @@ let segments = $state<Segment[]>([]);
 let skipSetting = readSkip(storage());
 /** Segments already skipped on their own: once per playback. */
 let autoSkipped = new Set<string>();
+/** Chapters of this playback; empty until the lookup answers, or with fewer than two. */
+let chapters = $state<Chapter[]>([]);
 
 const heading = $derived(
   playbackHeading(
@@ -145,6 +156,9 @@ const skipAlsoNext = $derived(
   segment ? offersNextToo(segment, duration, nextEpisode !== null) : false,
 );
 const decision = $derived(playMethodLabel(playback));
+const chapterNow = $derived(chapterIndex(chapters, position));
+const chapterName = $derived(chapters[chapterNow]?.name ?? null);
+const marks = $derived(chapterMarks(chapters, duration));
 const audioTracks = $derived(tracks.filter((t) => t.kind === "audio"));
 const subTracks = $derived(tracks.filter((t) => t.kind === "sub"));
 const subsOff = $derived(!subTracks.some((t) => t.selected));
@@ -195,6 +209,21 @@ $effect(() => {
     })
     .catch(() => {
       // No button then.
+    });
+});
+
+// Chapters of each playback; an answer for an older one is dropped. Nothing is
+// shown when the lookup fails.
+$effect(() => {
+  const { itemId } = playback;
+  chapters = [];
+  embyApi
+    .chapters(itemId)
+    .then((found) => {
+      if (playback.itemId === itemId) chapters = found;
+    })
+    .catch(() => {
+      // No marks and no panel then.
     });
 });
 
@@ -424,7 +453,9 @@ function toggleButton(which: Panel) {
     ? audioButton
     : which === "subs"
       ? subsButton
-      : infoButton;
+      : which === "chapters"
+        ? chaptersButton
+        : infoButton;
 }
 
 async function openPanel(which: Panel) {
@@ -435,8 +466,9 @@ async function openPanel(which: Panel) {
   panel = which;
   await tick();
   const target =
-    panelElement?.querySelector<HTMLElement>("input:checked") ??
-    panelElement?.querySelector<HTMLElement>("input, [tabindex]");
+    panelElement?.querySelector<HTMLElement>(
+      "input:checked, [aria-current='true']",
+    ) ?? panelElement?.querySelector<HTMLElement>("input, button, [tabindex]");
   target?.focus();
 }
 
@@ -499,7 +531,17 @@ function onKeydown(e: KeyboardEvent) {
     case "toggleInfo":
       void openPanel("info");
       break;
+    case "chapter": {
+      const to = chapterTarget(chapters, position, action.delta);
+      if (to !== null) void run({ type: "seekAbsolute", seconds: to });
+      break;
+    }
   }
+}
+
+function goToChapter(start: number) {
+  closePanel();
+  void run({ type: "seekAbsolute", seconds: start });
 }
 
 function onSurfaceClick() {
@@ -560,6 +602,9 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     {:else if name === "subs"}
       <rect x="3" y="5" width="18" height="14" rx="2.5" />
       <path d="M7 12h4M13 12h4M7 15.5h7" />
+    {:else if name === "chapters"}
+      <path d="M9 6.5h11M9 12h11M9 17.5h11" />
+      <path d="M4.5 6.5h.2M4.5 12h.2M4.5 17.5h.2" />
     {:else if name === "info"}
       <circle cx="12" cy="12" r="8.5" />
       <path d="M12 11v5.5M12 7.6v.2" />
@@ -667,7 +712,13 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
           class="panel"
           class:info={panel === "info"}
           role="dialog"
-          aria-label={panel === "audio" ? "Audio" : panel === "subs" ? "Sous-titres" : "Informations de lecture"}
+          aria-label={panel === "audio"
+            ? "Audio"
+            : panel === "subs"
+              ? "Sous-titres"
+              : panel === "chapters"
+                ? "Chapitres"
+                : "Informations de lecture"}
           bind:this={panelElement}
         >
           {#if panel === "audio"}
@@ -711,6 +762,8 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
                 </label>
               {/each}
             </fieldset>
+          {:else if panel === "chapters"}
+            <ChaptersPanel {chapters} current={chapterNow} onSelect={goToChapter} />
           {:else}
             <h2 tabindex="-1">Informations de lecture</h2>
             <dl>
@@ -755,10 +808,16 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
           oninput={onSeekInput}
           onchange={onSeekChange}
           aria-label="Position de lecture"
-          aria-valuetext={`${formatTime(position)} sur ${formatTime(duration)}`}
+          aria-valuetext={`${formatTime(position)} sur ${formatTime(duration)}${chapterName ? `, ${chapterName}` : ""}`}
         />
+        {#if marks.length > 0}
+          <div class="marks" aria-hidden="true">
+            {#each marks as mark (mark)}<span style:left={`${mark}%`}></span>{/each}
+          </div>
+        {/if}
         <div class="times">
           <span class="time">{formatTime(position)}</span>
+          {#if chapterName}<span class="chapter-name">{chapterName}</span>{/if}
           <span class="time" title="Temps restant">{formatRemaining(position, duration)}</span>
         </div>
       </div>
@@ -820,6 +879,21 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
           </button>
         </div>
         <div class="group end">
+          {#if chapters.length > 0}
+            <button
+              type="button"
+              class="round"
+              class:on={panel === "chapters"}
+              aria-label="Chapitres"
+              aria-expanded={panel === "chapters"}
+              aria-keyshortcuts="PageUp PageDown"
+              title="Chapitres (Pg préc. / Pg suiv.)"
+              bind:this={chaptersButton}
+              onclick={() => openPanel("chapters")}
+            >
+              {@render icon("chapters")}
+            </button>
+          {/if}
           <button
             type="button"
             class="round"
@@ -994,11 +1068,39 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     background: linear-gradient(rgb(0 0 0 / 0%), rgb(0 0 0 / 75%));
   }
   .timeline {
+    position: relative;
     display: grid;
   }
   .times {
     display: flex;
     justify-content: space-between;
+    gap: var(--space-4);
+  }
+  /* Chapter starts (ADR 0034): thin dark cuts across the 24 px high seek bar. */
+  .marks {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 24px;
+    pointer-events: none;
+  }
+  .marks span {
+    position: absolute;
+    top: 50%;
+    width: 2px;
+    height: 8px;
+    translate: -1px -50%;
+    background: rgb(0 0 0 / 55%);
+  }
+  .chapter-name {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    text-shadow: 0 1px 3px rgb(0 0 0 / 80%);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .time {
     font-size: 13px;

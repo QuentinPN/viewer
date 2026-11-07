@@ -326,6 +326,7 @@ pub fn run() {
             commands::emby_episodes,
             commands::emby_play,
             commands::emby_segments,
+            commands::emby_chapters,
         ])
         .build(context())
         .expect("error while building Viewer");

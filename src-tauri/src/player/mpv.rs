@@ -418,6 +418,7 @@ impl PlayerEngine for MpvEngine {
             volume: f("volume"),
             frame_drop_count: i("frame-drop-count"),
             decoder_frame_drop_count: i("decoder-frame-drop-count"),
+            chapter_count: i("chapters"),
         }
     }
 

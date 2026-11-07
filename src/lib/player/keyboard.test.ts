@@ -2,6 +2,18 @@ import { describe, expect, it } from "vitest";
 import { mapPlayerKey } from "./keyboard";
 
 describe("mapPlayerKey", () => {
+  it("moves between chapters with Page Up and Page Down", () => {
+    expect(mapPlayerKey("PageUp", { inTextField: false })).toEqual({
+      kind: "chapter",
+      delta: -1,
+    });
+    expect(mapPlayerKey("PageDown", { inTextField: false })).toEqual({
+      kind: "chapter",
+      delta: 1,
+    });
+    expect(mapPlayerKey("PageDown", { inTextField: true })).toBeNull();
+  });
+
   it("toggles pause with Space and k", () => {
     const expected = { kind: "command", command: { type: "togglePause" } };
     expect(mapPlayerKey(" ", { inTextField: false })).toEqual(expected);

@@ -337,6 +337,9 @@ fn movie_detail() -> String {
                   {"Name":"Lance Hool","Id":"30300","Type":"Director"},
                   {"Name":"Scénariste","Id":"30301","Type":"Writer"}],
         "Studios":[{"Name":"Silver Lion Films","Id":30218}],
+        "Chapters":[{"StartPositionTicks":0,"Name":"Chapitre 1","MarkerType":"Chapter","ChapterIndex":0},
+          {"StartPositionTicks":4875700000,"Name":"Chapitre 2","MarkerType":"Chapter","ChapterIndex":1},
+          {"StartPositionTicks":7265580000,"Name":"Chapitre 3","MarkerType":"Chapter","ChapterIndex":2}],
         "UserData":{"PlaybackPositionTicks":18310167000,"PlayCount":0,"IsFavorite":true,"Played":false},
         "ImageTags":{"Primary":"7b213eb5_6379","Logo":"028272e6_6379"},
         "BackdropImageTags":["2edd4b0e_6379"],
@@ -1609,6 +1612,37 @@ fn episode_detail_has_series_context_guests_and_neighbours_across_seasons() {
     assert_eq!((ep.index, ep.index_end), (Some(2), Some(3)));
     assert!(ep.previous.is_none() && ep.next.is_none());
     assert!(bare.poster.is_none() && bare.logo.is_none());
+}
+
+/// Chapters (ADR 0034): the item's `Chapters` of Emby 4.10.2.0, in seconds.
+#[test]
+fn chapters_come_from_the_item_in_seconds() {
+    let (server, fx, revoked) = signed_in_browser();
+    let found = run(fx.service.chapters("30207")).unwrap();
+    let req = server.requests().into_iter().last().unwrap();
+    assert_eq!(req.path, format!("/emby/Users/{USER_ID}/Items/30207"));
+    let found: Vec<_> = found.iter().map(|c| (c.start, c.name.as_str())).collect();
+    assert_eq!(
+        found,
+        [
+            (0.0, "Chapitre 1"),
+            (487.57, "Chapitre 2"),
+            (726.558, "Chapitre 3")
+        ]
+    );
+    let json = serde_json::to_string(&run(fx.service.chapters("30207")).unwrap()).unwrap();
+    assert!(
+        json.starts_with(r#"[{"start":0.0,"name":"Chapitre 1"}"#),
+        "{json}"
+    );
+
+    // No chapters: nothing to show, no error.
+    assert!(run(fx.service.chapters("80473")).unwrap().is_empty());
+    let err = run(fx.service.chapters("999")).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
+    revoked.store(true, Ordering::SeqCst);
+    let err = run(fx.service.chapters("30207")).unwrap_err();
+    assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
 }
 
 #[test]

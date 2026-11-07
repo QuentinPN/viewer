@@ -9,6 +9,7 @@ use tauri::{State, WebviewWindow};
 use crate::AppState;
 use crate::emby::EmbyError;
 use crate::emby::artwork_cache::{ArtworkCacheCleared, ArtworkCacheStats};
+use crate::emby::chapters::Chapter;
 use crate::emby::models::{
     EpisodePage, HeroItem, ItemDetail, ItemPage, ItemsOptions, Library, MediaItem, PlaybackStart,
     SavedServer, SearchResults, Season, ServerSummary, SessionStatus, SignedInUser, WatchItem,
@@ -304,6 +305,15 @@ pub async fn emby_segments(
     Ok(segments
         .lookup(key, markers, query.as_ref(), external)
         .await)
+}
+
+/// Chapters of a film or episode, in seconds of the file (ADR 0034).
+#[tauri::command]
+pub async fn emby_chapters(
+    emby: State<'_, EmbyService>,
+    item_id: String,
+) -> Result<Vec<Chapter>, EmbyError> {
+    emby.chapters(&item_id).await
 }
 
 #[tauri::command]

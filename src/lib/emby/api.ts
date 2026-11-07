@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   ArtworkCacheCleared,
   ArtworkCacheStats,
+  Chapter,
   EmbyError,
   EpisodePage,
   HeroItem,
@@ -92,6 +93,8 @@ export const embyApi = {
    */
   segments: (itemId: string, external: boolean) =>
     invoke<Segment[]>("emby_segments", { itemId, external }),
+  /** Chapters of a film or episode, none when it has fewer than two (ADR 0034). */
+  chapters: (itemId: string) => invoke<Chapter[]>("emby_chapters", { itemId }),
   /** `null` when the app has no artwork cache directory. */
   artworkStats: () => invoke<ArtworkCacheStats | null>("artwork_cache_stats"),
   /** Empties the artwork cache of every server (ADR 0021). */

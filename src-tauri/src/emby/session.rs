@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use super::EmbyError;
 use super::artwork_cache::{ArtworkCache, ArtworkCacheCleared, ArtworkCacheStats};
+use super::chapters::{self, Chapter};
 use super::client::{AccessToken, DeviceIdentity, EmbyClient, EpisodesQuery, ItemsQuery};
 use super::credentials::{self, CredentialStore};
 use super::images::{self, ImageRequest, ImageType};
@@ -768,6 +769,19 @@ impl EmbyService {
                 duration_ms,
             });
         Ok((markers, query))
+    }
+
+    /// Chapters of a film or episode for the player (ADR 0034), from the item's
+    /// `Chapters`; none when it has fewer than two.
+    pub async fn chapters(&self, item_id: &str) -> Result<Vec<Chapter>, EmbyError> {
+        let (client, user_id) = self.session()?;
+        let dto = self.expire_on_401(&client, client.item(&user_id, item_id).await)?;
+        if dto.id != item_id {
+            return Err(EmbyError::InvalidResponse(
+                "le serveur a renvoyé un autre élément".into(),
+            ));
+        }
+        Ok(chapters::chapters(&dto.chapters, dto.run_time_ticks))
     }
 
     /// Seasons of a series, in server order; unusable entries are dropped.

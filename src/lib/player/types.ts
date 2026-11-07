@@ -64,6 +64,8 @@ export interface PlayerDiagnostics {
   volume: number | null;
   frameDropCount: number | null;
   decoderFrameDropCount: number | null;
+  /** Chapters mpv found in the file (ADR 0034). */
+  chapterCount: number | null;
 }
 
 export interface AppInfo {
