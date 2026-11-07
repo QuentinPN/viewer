@@ -17,6 +17,7 @@ use crate::player::{
     MediaSource, PlaybackRequest, PlayerCommand, PlayerDiagnostics, PlayerEngine, PlayerError,
     PlayerEvent, Track,
 };
+use crate::segments::{Segment, SegmentService};
 use crate::video_surface::SurfaceMode;
 
 #[tauri::command]
@@ -268,6 +269,25 @@ pub async fn emby_item_detail(
     item_id: String,
 ) -> Result<ItemDetail, EmbyError> {
     emby.item_detail(&item_id).await
+}
+
+/// Intro and credits of an item (ADR 0030). `external: false` keeps everything on
+/// the Emby server. A failure of an external source is silent: fewer segments.
+#[tauri::command]
+pub async fn emby_segments(
+    emby: State<'_, EmbyService>,
+    segments: State<'_, SegmentService>,
+    item_id: String,
+    external: bool,
+) -> Result<Vec<Segment>, EmbyError> {
+    let key = emby.segments_key(&item_id, external)?;
+    if let Some(found) = segments.cached(&key) {
+        return Ok(found);
+    }
+    let (markers, query) = emby.segment_query(&item_id).await?;
+    Ok(segments
+        .lookup(key, markers, query.as_ref(), external)
+        .await)
 }
 
 #[tauri::command]

@@ -1,0 +1,144 @@
+import { describe, expect, it } from "vitest";
+import type { Segment } from "../emby/types";
+import {
+  activeSegment,
+  DEFAULT_SKIP,
+  offersNextToo,
+  readSkip,
+  SKIP_KEY,
+  saveSkip,
+  segmentEnd,
+  skipAction,
+} from "./segments";
+
+function memoryStorage(initial: Record<string, string> = {}): Storage {
+  const data = new Map(Object.entries(initial));
+  return {
+    get length() {
+      return data.size;
+    },
+    clear: () => data.clear(),
+    getItem: (k) => data.get(k) ?? null,
+    key: (i) => [...data.keys()][i] ?? null,
+    removeItem: (k) => void data.delete(k),
+    setItem: (k, v) => void data.set(k, v),
+  };
+}
+
+const intro: Segment = {
+  kind: "intro",
+  start: 0,
+  end: 24.7,
+  source: "theIntroDb",
+};
+const credits: Segment = {
+  kind: "credits",
+  start: 1332.1,
+  end: 1441.1,
+  source: "theIntroDb",
+};
+const openCredits: Segment = {
+  kind: "credits",
+  start: 2400,
+  end: null,
+  source: "emby",
+};
+// Credits followed by a scene: TheIntroDB's film example.
+const midCredits: Segment = {
+  kind: "credits",
+  start: 5801.8,
+  end: 6371.1,
+  source: "theIntroDb",
+};
+
+describe("skip setting", () => {
+  it("asks the external sources and does not skip on its own by default", () => {
+    expect(readSkip(null)).toEqual(DEFAULT_SKIP);
+    expect(DEFAULT_SKIP).toEqual({ external: true, auto: false });
+  });
+
+  it("keeps what was saved and ignores malformed values", () => {
+    const storage = memoryStorage();
+    saveSkip(storage, { external: false, auto: true });
+    expect(readSkip(storage)).toEqual({ external: false, auto: true });
+    expect(readSkip(memoryStorage({ [SKIP_KEY]: "{" }))).toEqual(DEFAULT_SKIP);
+    expect(readSkip(memoryStorage({ [SKIP_KEY]: "null" }))).toEqual(
+      DEFAULT_SKIP,
+    );
+    expect(
+      readSkip(memoryStorage({ [SKIP_KEY]: '{"external":"no","auto":true}' })),
+    ).toEqual({ external: true, auto: true });
+  });
+
+  it("survives a storage that refuses writes", () => {
+    const refusing = {
+      ...memoryStorage(),
+      setItem: () => {
+        throw new Error("quota");
+      },
+    };
+    expect(() => saveSkip(refusing, DEFAULT_SKIP)).not.toThrow();
+  });
+});
+
+describe("active segment", () => {
+  const all = [intro, credits];
+
+  it("shows the button inside a segment only", () => {
+    expect(activeSegment(all, 0, 1441.1)).toBe(intro);
+    expect(activeSegment(all, 10, 1441.1)).toBe(intro);
+    expect(activeSegment(all, 100, 1441.1)).toBeNull();
+    expect(activeSegment(all, 1400, 1441.1)).toBe(credits);
+  });
+
+  it("hides it in the last half second", () => {
+    expect(activeSegment(all, 24.3, 1441.1)).toBeNull();
+    expect(activeSegment(all, 24.1, 1441.1)).toBe(intro);
+  });
+
+  it("waits for the duration for credits with no end", () => {
+    expect(activeSegment([openCredits], 2500, 0)).toBeNull();
+    expect(activeSegment([openCredits], 2500, 2700)).toBe(openCredits);
+  });
+});
+
+describe("skip action", () => {
+  it("jumps to the end of the intro", () => {
+    expect(skipAction(intro, 1441.1, true)).toEqual({
+      kind: "seek",
+      to: 24.7,
+      label: "Passer l'intro",
+    });
+  });
+
+  it("offers the next episode when the credits end the file", () => {
+    expect(skipAction(credits, 1441.1, true)).toEqual({
+      kind: "next",
+      label: "Épisode suivant",
+    });
+    // Within two seconds of the end counts as the end.
+    expect(skipAction(credits, 1442.5, true)?.kind).toBe("next");
+    expect(skipAction(openCredits, 2700, true)?.kind).toBe("next");
+  });
+
+  it("skips to the end without a next episode", () => {
+    expect(skipAction(credits, 1441.1, false)).toEqual({
+      kind: "seek",
+      to: 1441.1,
+      label: "Passer le générique",
+    });
+    expect(segmentEnd(openCredits, 2700)).toBe(2700);
+  });
+
+  it("skips credits followed by a scene, and offers the next episode too", () => {
+    expect(skipAction(midCredits, 6408, true)).toEqual({
+      kind: "seek",
+      to: 6371.1,
+      label: "Passer le générique",
+    });
+    expect(offersNextToo(midCredits, 6408, true)).toBe(true);
+    expect(offersNextToo(midCredits, 6408, false)).toBe(false);
+    expect(offersNextToo(credits, 1441.1, true)).toBe(false);
+    expect(offersNextToo(intro, 1441.1, true)).toBe(false);
+  });
+});

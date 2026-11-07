@@ -1,6 +1,7 @@
 mod commands;
 pub mod emby;
 pub mod player;
+pub mod segments;
 #[cfg(debug_assertions)]
 mod spike;
 mod video_surface;
@@ -238,6 +239,7 @@ pub fn run() {
             let wid = None;
 
             app.manage(emby_service(app)?);
+            app.manage(segments::SegmentService::new(env!("CARGO_PKG_VERSION")));
 
             app.manage(AppState {
                 player: Mutex::new(None),
@@ -323,6 +325,7 @@ pub fn run() {
             commands::emby_seasons,
             commands::emby_episodes,
             commands::emby_play,
+            commands::emby_segments,
         ])
         .build(context())
         .expect("error while building Viewer");

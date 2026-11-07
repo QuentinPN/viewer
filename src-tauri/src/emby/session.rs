@@ -23,6 +23,7 @@ use super::models::{
 use super::playback::{self, PlaybackPlan};
 use super::reporting::Report;
 use super::server_url::ServerUrl;
+use crate::segments::{MediaIds, Segment, SegmentQuery, emby_markers};
 
 /// Contents of `session.json`. Contains no secret.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -705,6 +706,68 @@ impl EmbyService {
             (ep.previous, ep.next) = neighbours(around.items, &ep.series_id, item_id);
         }
         Ok(detail)
+    }
+
+    /// Cache key of an item's segments: one per server, user and privacy setting.
+    pub fn segments_key(&self, item_id: &str, external: bool) -> Result<String, EmbyError> {
+        let (client, user_id) = self.session()?;
+        Ok(format!(
+            "{}|{user_id}|{item_id}|{external}",
+            client.server().as_str()
+        ))
+    }
+
+    /// Emby's markers of an item and what the external sources are asked about it
+    /// (ADR 0030): a film by its ids, an episode by its series' ids and numbers.
+    /// `None` when the item has no usable id.
+    pub async fn segment_query(
+        &self,
+        item_id: &str,
+    ) -> Result<(Vec<Segment>, Option<SegmentQuery>), EmbyError> {
+        let (client, user_id) = self.session()?;
+        let dto = self.expire_on_401(&client, client.item(&user_id, item_id).await)?;
+        if dto.id != item_id {
+            return Err(EmbyError::InvalidResponse(
+                "le serveur a renvoyé un autre élément".into(),
+            ));
+        }
+        let markers = emby_markers(&dto.chapters);
+        let duration_ms = dto
+            .run_time_ticks
+            .filter(|&t| t > 0)
+            .map(|t| (t / 10_000) as u64);
+        let query = match dto.item_type.as_str() {
+            "Movie" => Some((MediaIds::from_provider_ids(&dto.provider_ids), None)),
+            "Episode" => match (
+                dto.series_id.as_deref().filter(|id| is_id(id)),
+                dto.parent_index_number,
+                dto.index_number,
+            ) {
+                (Some(series_id), Some(season), Some(episode)) => {
+                    match client.item(&user_id, series_id).await {
+                        Ok(series) if series.id == series_id => Some((
+                            MediaIds::from_provider_ids(&series.provider_ids),
+                            Some((season, episode)),
+                        )),
+                        Err(EmbyError::SessionExpired) => {
+                            return self.expire_on_401(&client, Err(EmbyError::SessionExpired));
+                        }
+                        // The series is only needed for its ids: no query, no error.
+                        _ => None,
+                    }
+                }
+                _ => None,
+            },
+            _ => None,
+        };
+        let query = query
+            .filter(|(ids, _)| !ids.is_empty())
+            .map(|(ids, episode)| SegmentQuery {
+                ids,
+                episode,
+                duration_ms,
+            });
+        Ok((markers, query))
     }
 
     /// Seasons of a series, in server order; unusable entries are dropped.

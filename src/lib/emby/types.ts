@@ -342,3 +342,12 @@ export interface ArtworkCacheCleared {
   entries: number;
   bytes: number;
 }
+
+/** A range the player offers to skip, in seconds of the file (ADR 0030). */
+export interface Segment {
+  kind: "intro" | "credits";
+  start: number;
+  /** `null`: credits that run to the end of the file. */
+  end: number | null;
+  source: "emby" | "introDb" | "theIntroDb";
+}

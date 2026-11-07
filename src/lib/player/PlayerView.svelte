@@ -2,10 +2,11 @@
 // Player of a playback started from Emby (ADR 0017): title at the top, controls
 // that fade after a few seconds without activity, audio, subtitles and
 // diagnostic panels. The video is the native surface under this transparent page.
-// At the end of an episode, a card offers the next one (ADR 0018).
+// At the end of an episode, a card offers the next one (ADR 0018). During an
+// intro or the credits, a button skips them (ADR 0030).
 import { onDestroy, onMount, tick } from "svelte";
 import { embyApi } from "../emby/api";
-import type { EpisodeLink, PlaybackStart } from "../emby/types";
+import type { EpisodeLink, PlaybackStart, Segment } from "../emby/types";
 import TitleBar from "../window/TitleBar.svelte";
 import { playerApi } from "./api";
 import {
@@ -18,6 +19,14 @@ import {
   trackLabel,
 } from "./format";
 import { mapPlayerKey } from "./keyboard";
+import {
+  activeSegment,
+  offersNextToo,
+  readSkip,
+  type SkipAction,
+  segmentKey,
+  skipAction,
+} from "./segments";
 import type {
   EndReason,
   PlayerCommand,
@@ -107,6 +116,12 @@ let upNextLeft = $state<number | null>(null);
 let launching = $state<EpisodeLink | null>(null);
 let playNowButton = $state<HTMLButtonElement | null>(null);
 let stopCountdown: (() => void) | undefined;
+/** Intro and credits of this playback; empty until the lookup answers. */
+let segments = $state<Segment[]>([]);
+/** Read at each playback, so a change in Paramètres applies to the next one. */
+let skipSetting = readSkip(storage());
+/** Segments already skipped on their own: once per playback. */
+let autoSkipped = new Set<string>();
 
 const heading = $derived(
   playbackHeading(
@@ -117,6 +132,17 @@ const upNext = $derived(
   upNextLeft !== null && nextEpisode
     ? playbackHeading(nextTitle(nextEpisode, playback.title))
     : null,
+);
+const segment = $derived(
+  active && upNext === null && panel === null && !launching
+    ? activeSegment(segments, position, duration)
+    : null,
+);
+const skip = $derived(
+  segment ? skipAction(segment, duration, nextEpisode !== null) : null,
+);
+const skipAlsoNext = $derived(
+  segment ? offersNextToo(segment, duration, nextEpisode !== null) : false,
 );
 const decision = $derived(playMethodLabel(playback));
 const audioTracks = $derived(tracks.filter((t) => t.kind === "audio"));
@@ -153,6 +179,35 @@ $effect(() => {
     .catch(() => {
       // No card then: the end closes the player as for a film.
     });
+});
+
+// Segments of each playback; an answer for an older one is dropped. Nothing is
+// shown when the lookup fails.
+$effect(() => {
+  const { itemId } = playback;
+  segments = [];
+  autoSkipped = new Set();
+  skipSetting = readSkip(storage());
+  embyApi
+    .segments(itemId, skipSetting.external)
+    .then((found) => {
+      if (playback.itemId === itemId) segments = found;
+    })
+    .catch(() => {
+      // No button then.
+    });
+});
+
+// With "Passer automatiquement", each segment is skipped once: seeking back into
+// it shows the button again.
+$effect(() => {
+  if (!segment || !skip || !skipSetting.auto) return;
+  const key = segmentKey(segment);
+  if (autoSkipped.has(key)) return;
+  autoSkipped.add(key);
+  // Credits up to the end start the countdown, so it can still be cancelled.
+  if (skip.kind === "next") void offerNext();
+  else runSkip(skip);
 });
 
 let unlisten: (() => void) | undefined;
@@ -305,6 +360,8 @@ function interruptedBy(reason: EndReason): boolean {
 
 /** The episode ended: the card counts down, then the next one starts. */
 async function offerNext() {
+  // Skipping the credits may already have opened it before the end of file.
+  if (upNextLeft !== null) return;
   panel = null;
   upNextLeft = UP_NEXT_SECONDS;
   stopCountdown = startCountdown(
@@ -341,6 +398,11 @@ async function playNext() {
   diag = null;
   const failure = await onPlayNext(next.id);
   if (failure) error = failure;
+}
+
+function runSkip(action: SkipAction) {
+  if (action.kind === "next") void playNext();
+  else void run({ type: "seekAbsolute", seconds: action.to });
 }
 
 async function close(then: () => void = onExit) {
@@ -407,6 +469,12 @@ function onKeydown(e: KeyboardEvent) {
   if (inRadio && (e.key === " " || e.key.startsWith("Arrow"))) return;
   const inTextField =
     target instanceof HTMLInputElement && target.type === "text";
+  // Enter skips while the button shows, whatever control has the focus.
+  if (e.key === "Enter" && skip && !inTextField) {
+    e.preventDefault();
+    runSkip(skip);
+    return;
+  }
   const action = mapPlayerKey(e.key, { inTextField, shift: e.shiftKey });
   if (!action || (!active && action.kind !== "exitFullscreen")) return;
   e.preventDefault();
@@ -552,6 +620,23 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
       </div>
     {/if}
     {#if error}<p class="error floating" role="alert">{error}</p>{/if}
+
+    {#if skip}
+      <div class="skip" role="group" aria-label={skip.label}>
+        {#if skipAlsoNext}
+          <button type="button" class="skip-next" onclick={() => playNext()}>Épisode suivant</button>
+        {/if}
+        <button
+          type="button"
+          class="skip-main"
+          title={`${skip.label} (Entrée)`}
+          aria-keyshortcuts="Enter"
+          onclick={() => runSkip(skip)}
+        >
+          {skip.label}
+        </button>
+      </div>
+    {/if}
 
     {#if upNext && upNextLeft !== null}
       <div class="up-next" role="dialog" aria-label="Épisode suivant">
@@ -1239,7 +1324,48 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     height: 18px;
   }
 
+  /* Skip intro or credits (ADR 0030): above the controls, and still there when
+     they fade. */
+  .skip {
+    position: absolute;
+    right: var(--space-6);
+    bottom: 120px;
+    z-index: 1;
+    display: flex;
+    gap: var(--space-2);
+  }
+  .skip button {
+    padding: var(--space-2) var(--space-4);
+    border: 0;
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgb(0 0 0 / 40%);
+  }
+  .skip-main {
+    background: #fff;
+    color: #0b0d11;
+  }
+  .skip-main:hover {
+    background: #e6e8ec;
+  }
+  .skip-next {
+    background: rgb(21 25 34 / 86%);
+    color: var(--color-text);
+  }
+  .skip-next:hover {
+    background: rgb(45 51 64 / 92%);
+  }
+  .skip button:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
   @media (max-width: 640px) {
+    .skip {
+      right: var(--space-4);
+    }
     .top,
     .bottom {
       padding-left: var(--space-4);
