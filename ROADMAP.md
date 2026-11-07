@@ -7,7 +7,7 @@ Status vocabulary: `TODO`, `IN PROGRESS`, `BLOCKED`, `VERIFIED`. Never mark VERI
 Initialize Tauri 2 + Svelte 5 + TypeScript strict, Biome, svelte-check, Vitest, Rust fmt/clippy/test. Establish CI and build reproducibility.
 
 - VERIFIED (2026-10-27): `npm run verify` green locally (Biome, svelte-check, Vitest 8/8, Vite build, cargo fmt, clippy `-D warnings`, cargo test 10/10 with real libmpv). Pinned libmpv fetch with SHA-256 check (`scripts/fetch-libmpv.ps1`). Decisions: ADR 0001, ADR 0002.
-- TODO: first run of `.github/workflows/ci.yml` on GitHub (no remote configured yet). Release build of the full app with bundling stays disabled until Gate 5.
+- TODO: first run of `.github/workflows/ci.yml` on GitHub (no remote configured yet). Release build and installer: see Gate 5.
 
 ## Gate 1 — Native playback feasibility [IN PROGRESS · core path VERIFIED]
 
@@ -112,6 +112,9 @@ Verify real server resume/watched state, unsupported format fallback, network in
 ## Gate 5 — Packaging [TODO]
 
 Redistribution/license audit, release build, Windows installer, clean-machine smoke test, documentation. Licence decided (2026-11-06, ADR 0002): personal use on the owner's own PCs, no distribution, so the current GPL-3.0 libmpv stays. Giving the app to anyone else reopens the choice between a GPL-3.0 project licence and an in-house LGPL libmpv; audit and options in `docs/evidence/gate5-licences-2026-11-06.md`.
+
+- DONE (2026-11-07): release build and per-user NSIS installer in French, with `libmpv-2.dll` beside the executable (ADR 0028). Built, not yet installed or run.
+- TODO: install on the owner's PC, release-only behaviors at run time, sign-in and playback with the installed build, uninstall; clean-machine smoke test.
 
 ## Work log
 
@@ -431,3 +434,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Found**: unlike a silent client, the encoding stays present during a pause, cause not established.
 - **Not verified**: a 30 min pause (started, stopped at the owner's request, judged low stake); the mini-PC's load; the committed scenario after its last edits (a check renamed, periodic encoder samples added).
 - **Next**: Gate 5, release build and installer.
+
+### 2026-11-07 — Release build and installer
+
+- **Changed**: ADR 0028; bundling turned on in `tauri.conf.json`: NSIS, per-user install, French, `libmpv-2.dll` copied beside the executable. `@tauri-apps/api` pinned to 2.11.1: the CLI refused to build with 2.12.4 against the `tauri` 2.11.6 crate, and `tauri` 2.12 needs Rust 1.90.
+- **Tests**: `./scripts/with-msvc.ps1 npx tauri build` exit 0, installer 35.63 MiB, SHA-256 `6ad4aea9…6966c`; the generated NSIS script installs `libmpv-2.dll` into the install folder and removes it on uninstall; `npm run verify:web` exit 0 (Vitest 113).
+- **Not verified**: installing, launching or playing with the release build; uninstalling; a clean machine; `verify:rust` after the change (no Rust code changed).
+- **Next**: install on the owner's PC and run the release smoke test.

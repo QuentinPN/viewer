@@ -22,7 +22,7 @@
     "verify": "npm run verify:web && npm run verify:rust"
   },
   "dependencies": {
-    "@tauri-apps/api": "2.12.4"
+    "@tauri-apps/api": "2.11.1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
