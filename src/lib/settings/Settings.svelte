@@ -13,6 +13,7 @@ import {
   usageRatio,
 } from "./format";
 import PlaybackQuality from "./PlaybackQuality.svelte";
+import SubtitleSettings from "./SubtitleSettings.svelte";
 
 // `undefined` while loading, `null` when the app has no artwork cache.
 let stats = $state<ArtworkCacheStats | null | undefined>(undefined);
@@ -120,6 +121,8 @@ onMount(() => {
 </section>
 
 <PlaybackQuality />
+
+<SubtitleSettings />
 
 <section class="panel" aria-labelledby="settings-artwork">
   <h2 id="settings-artwork">Cache des images</h2>

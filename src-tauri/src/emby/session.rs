@@ -25,6 +25,7 @@ use super::playback::{self, PlaybackPlan};
 use super::quality::{BITRATE_CHOICES, PlaybackQuality, QualityCaps, QualityStore, StreamingLimit};
 use super::reporting::Report;
 use super::server_url::ServerUrl;
+use super::tracks::{self, TrackPreferences};
 use crate::segments::{MediaIds, Segment, SegmentQuery, emby_markers};
 
 /// Contents of `session.json`. Contains no secret.
@@ -860,7 +861,8 @@ impl EmbyService {
         item_id: &str,
         resume: bool,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
-        self.negotiate(item_id, None, resume, false).await
+        self.prepare_source(item_id, None, resume, false, &TrackPreferences::default())
+            .await
     }
 
     /// Same as `prepare_playback`, for when the player could not open the direct
@@ -872,7 +874,8 @@ impl EmbyService {
         item_id: &str,
         resume: bool,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
-        self.negotiate(item_id, None, resume, true).await
+        self.prepare_source(item_id, None, resume, true, &TrackPreferences::default())
+            .await
     }
 
     /// `prepare_playback` or `prepare_transcode` for one version of an item with
@@ -884,20 +887,42 @@ impl EmbyService {
         resume: bool,
         force_transcode: bool,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
-        if media_source_id.is_some_and(|id| !is_source_id(id)) {
-            return Err(EmbyError::InvalidResponse("version invalide".into()));
-        }
-        self.negotiate(item_id, media_source_id, resume, force_transcode)
+        self.prepare_source(
+            item_id,
+            media_source_id,
+            resume,
+            force_transcode,
+            &TrackPreferences::default(),
+        )
+        .await
+    }
+
+    /// `prepare_playback` or, with `force_transcode`, `prepare_transcode`, with the
+    /// audio and subtitles picked from the user's preferences (ADR 0035).
+    pub async fn prepare(
+        &self,
+        item_id: &str,
+        resume: bool,
+        force_transcode: bool,
+        prefs: &TrackPreferences,
+    ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
+        self.prepare_source(item_id, None, resume, force_transcode, prefs)
             .await
     }
 
-    async fn negotiate(
+    /// `prepare` for one version of the item, or the server's pick with `None`
+    /// (ADR 0035, 0036).
+    pub async fn prepare_source(
         &self,
         item_id: &str,
         media_source_id: Option<&str>,
         resume: bool,
         force_transcode: bool,
+        prefs: &TrackPreferences,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
+        if media_source_id.is_some_and(|id| !is_source_id(id)) {
+            return Err(EmbyError::InvalidResponse("version invalide".into()));
+        }
         let (client, user_id) = self.session()?;
         let limit = self.streaming_limit(&client);
         let profile = playback::device_profile(limit.bitrate);
@@ -907,7 +932,8 @@ impl EmbyService {
                 item_id,
                 &profile,
                 force_transcode,
-                media_source_id
+                media_source_id,
+                None
             ),
             client.item(&user_id, item_id)
         );
@@ -915,6 +941,33 @@ impl EmbyService {
         let mut plan = playback::plan(client.server(), response, media_source_id)?;
         if force_transcode && plan.method != PlayMethod::Transcode {
             return Err(EmbyError::NoCompatibleStream);
+        }
+        let choice = tracks::apply(&mut plan, prefs);
+        let other_audio = choice
+            .audio
+            .filter(|&a| Some(a) != plan.default_audio_stream_index);
+        if let Some(audio) = other_audio.filter(|_| plan.method == PlayMethod::Transcode) {
+            // A transcode carries the audio the server picked; it takes another one
+            // only with the source named (ADR 0035).
+            let source = plan.media_source_id.as_str();
+            let info = client
+                .playback_info(
+                    &user_id,
+                    item_id,
+                    &profile,
+                    force_transcode,
+                    Some(source),
+                    Some(audio),
+                )
+                .await;
+            let response = self.expire_on_401(&client, info)?;
+            let mut again = playback::plan(client.server(), response, Some(source))?;
+            if again.method == PlayMethod::Transcode
+                && again.media_source_id == plan.media_source_id
+            {
+                tracks::apply(&mut again, prefs);
+                plan = again;
+            }
         }
         if force_transcode {
             // The server only knows we refused; the real reason is the player's.

@@ -66,6 +66,8 @@ export interface PlayerDiagnostics {
   decoderFrameDropCount: number | null;
   /** Chapters mpv found in the file (ADR 0034). */
   chapterCount: number | null;
+  /** Subtitle options in effect, as mpv reads them back (ADR 0035). */
+  subtitleOptions: [string, string][];
 }
 
 export interface AppInfo {

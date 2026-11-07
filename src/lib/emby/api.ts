@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { preferenceStorage, readPreferences } from "../player/subtitles";
 import type {
   ArtworkCacheCleared,
   ArtworkCacheStats,
@@ -85,7 +86,8 @@ export const embyApi = {
    * `transcodeFallback`, direct play is refused to the server, which then
    * transcodes: the way out when the player could not open the direct source
    * (ADR 0023). `mediaSourceId` plays one version of an item with several; null
-   * lets the server pick (ADR 0036).
+   * lets the server pick (ADR 0036). The audio and subtitle preferences of
+   * Réglages go along (ADR 0035).
    */
   play: (
     itemId: string,
@@ -98,6 +100,7 @@ export const embyApi = {
       resume,
       transcodeFallback,
       mediaSourceId,
+      preferences: readPreferences(preferenceStorage()),
     }),
   /**
    * Intro and credits to offer skipping (ADR 0030). `external: false` asks the

@@ -5,12 +5,12 @@
 
 use super::EmbyError;
 use super::models::{
-    DeviceProfile, DirectPlayProfile, MediaSourceInfo, PlayMethod, PlaybackInfoResponse,
-    PlaybackTitle, SubtitleProfile, TranscodingProfile,
+    DeviceProfile, DirectPlayProfile, MediaSourceInfo, MediaStreamDto, PlayMethod,
+    PlaybackInfoResponse, PlaybackTitle, SubtitleProfile, TranscodingProfile,
 };
 use super::quality::StreamingLimit;
 use super::server_url::ServerUrl;
-use crate::player::ExternalSubtitle;
+use crate::player::{ExternalSubtitle, TrackSelection};
 
 /// Sent when no cap is chosen ("Maximale", ADR 0037).
 pub const MAX_STREAMING_BITRATE: u64 = 400_000_000;
@@ -84,6 +84,13 @@ pub struct PlaybackPlan {
     pub title: Option<PlaybackTitle>,
     /// Set by the session from the bitrate setting (ADR 0037).
     pub bitrate_limit: Option<StreamingLimit>,
+    /// The source's streams (`DeliveryUrl` without token) and the server's picks, for
+    /// the track choice (ADR 0035).
+    pub streams: Vec<MediaStreamDto>,
+    pub default_audio_stream_index: Option<i32>,
+    pub default_subtitle_stream_index: Option<i32>,
+    /// Set by the session from the user's preferences (ADR 0035).
+    pub tracks: TrackSelection,
 }
 
 /// Picks the source asked for (ADR 0036), else the first the server offers, and the
@@ -124,6 +131,7 @@ pub fn plan(
         transcoding_url,
         transcoding_container,
         required_http_headers,
+        default_audio_stream_index,
         default_subtitle_stream_index,
         media_streams,
         ..
@@ -159,6 +167,17 @@ pub fn plan(
         subtitles,
         title: None,
         bitrate_limit: None,
+        // `DeliveryUrl` holds the token: kept without it, as the files are.
+        streams: media_streams
+            .into_iter()
+            .map(|mut s| {
+                s.delivery_url = s.delivery_url.and_then(|u| stream_url(server, &u).ok());
+                s
+            })
+            .collect(),
+        default_audio_stream_index,
+        default_subtitle_stream_index,
+        tracks: TrackSelection::default(),
     })
 }
 

@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
 /// What to play. Built by the coordinator, never by the Svelte UI directly.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaybackRequest {
     /// Local file path or http(s) URL. Validated by [`MediaSource::parse`].
@@ -25,6 +25,85 @@ pub struct PlaybackRequest {
     /// delivers separately). Validated like `source`.
     #[serde(default)]
     pub subtitles: Vec<ExternalSubtitle>,
+    /// Audio and subtitle tracks to select once the file is loaded (ADR 0035).
+    #[serde(default)]
+    pub tracks: TrackSelection,
+    /// How text subtitles look (ADR 0035).
+    #[serde(default)]
+    pub subtitle_style: SubtitleStyle,
+}
+
+/// Which track of a kind to select once the file is loaded (ADR 0035).
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum TrackPick {
+    /// The player's own choice, from the file's flags.
+    #[default]
+    Auto,
+    /// No track; only meaningful for subtitles.
+    Off,
+    /// The stream with this index in the container, as FFmpeg numbers it (Emby's
+    /// `Index`). Left to the player when the file has no such stream.
+    Stream { index: i64 },
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TrackSelection {
+    #[serde(default)]
+    pub audio: TrackPick,
+    #[serde(default)]
+    pub subtitle: TrackPick,
+}
+
+/// Look of text subtitles (SRT, WebVTT…). ASS/SSA keep their own styling unless
+/// `override_ass` is set (ADR 0035).
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SubtitleStyle {
+    pub size: SubtitleSize,
+    pub color: SubtitleColor,
+    pub background: SubtitleBackground,
+    pub position: SubtitlePosition,
+    pub override_ass: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum SubtitleSize {
+    Small,
+    #[default]
+    Normal,
+    Large,
+    Larger,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum SubtitleColor {
+    #[default]
+    White,
+    Yellow,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum SubtitleBackground {
+    /// mpv's default: a dark outline around the letters.
+    #[default]
+    Outline,
+    /// A translucent dark box behind the text.
+    Box,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum SubtitlePosition {
+    #[default]
+    Bottom,
+    /// Higher up, clear of the player's controls and of text burnt into the picture.
+    Raised,
+    Top,
 }
 
 /// A subtitle file loaded next to the media, with the same HTTP headers.
@@ -201,6 +280,9 @@ pub struct PlayerDiagnostics {
     pub decoder_frame_drop_count: Option<i64>,
     /// Chapters mpv found in the file (`chapters`), compared with Emby's (ADR 0034).
     pub chapter_count: Option<i64>,
+    /// Subtitle options in effect (ADR 0035): `sub-scale`, `sub-color`,
+    /// `sub-border-style`, `sub-pos`, `sub-align-y`, `sub-ass-override`.
+    pub subtitle_options: Vec<(String, String)>,
 }
 
 #[derive(Debug, thiserror::Error)]

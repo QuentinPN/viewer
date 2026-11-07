@@ -295,7 +295,7 @@ pub struct MediaSourceDto {
     pub media_streams: Vec<MediaStreamDto>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct MediaStreamDto {
     /// `Video`, `Audio`, `Subtitle`, `EmbeddedImage`, `Attachment`…
@@ -760,10 +760,12 @@ pub struct PlaybackInfoRequest<'a> {
     /// what the server offered for direct playback (ADR 0023).
     pub enable_direct_play: bool,
     pub enable_direct_stream: bool,
-    /// One version of an item with several (ADR 0036): the server answers with that
-    /// source only, or `NoCompatibleStream` for an id it does not know.
+    /// The audio a transcode must carry (ADR 0035). Emby 4.10.1.0 ignores
+    /// `AudioStreamIndex` without `MediaSourceId`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub media_source_id: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub audio_stream_index: Option<i32>,
 }
 
 /// What the player can play, as Emby's `DeviceProfile` describes it. Comma
@@ -854,6 +856,9 @@ pub struct MediaSourceInfo {
     /// Headers the stream needs, in addition to authentication.
     #[serde(default)]
     pub required_http_headers: Option<std::collections::HashMap<String, String>>,
+    /// Audio the server picked from the user's preferences (its `Configuration`).
+    #[serde(default)]
+    pub default_audio_stream_index: Option<i32>,
     /// Subtitle the server picked from the user's preferences.
     #[serde(default)]
     pub default_subtitle_stream_index: Option<i32>,
