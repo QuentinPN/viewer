@@ -198,6 +198,12 @@ try {
   app = await launch();
   page = app.page;
   const hangStart = Date.now();
+  // The splash stays up while the request hangs: capture it.
+  await page
+    .locator("main.screen[aria-busy='true']")
+    .waitFor({ timeout: 10000 })
+    .then(() => shot(page, "splash"))
+    .catch(() => {});
   first = await firstScreen(page, 60000);
   check(
     "hanging_start_recovery_screen",

@@ -508,3 +508,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `npm run verify:web` exit 0 (123 tests); `gate21-session` all passed; `gate2-ui` passed everything except the known `no_app_credential_left` (leftover credential of the installed app, not touched). Screenshots checked at 1280 × 720: address step, saved sessions, reauthentication overlay (fits, "Changer de serveur" on one line).
 - **Not verified**: 125 % and 150 % scaling.
 - **Next**: splash and interrupted-playback banner.
+
+### 2026-11-07 — Redesign: splash and interrupted-playback banner (ADR 0031)
+
+- **Changed**: `App.svelte`: the splash shows the 88 px logo over the same dark radial backdrop as sign-in, with a white sweeping bar; the "Lecture interrompue." banner is a frosted card with pill buttons ("Reprendre" white, "Fermer" glass) and a visible focus ring. `gate21-session` now captures the splash while the server hangs.
+- **Tests**: `npm run verify:web` exit 0 (123 tests); `gate21-session` all passed twice. Screenshots checked at 1280 × 720: splash, banner over the film detail.
+- **Not verified**: 125 % and 150 % scaling.
+- **Next**: the remaining hard-coded `rgb(11 13 17)` scrims.

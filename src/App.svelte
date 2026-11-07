@@ -10,6 +10,7 @@ import LibraryBrowser from "./lib/library/LibraryBrowser.svelte";
 import { playerApi } from "./lib/player/api";
 import PlayerSpike from "./lib/player/PlayerSpike.svelte";
 import PlayerView from "./lib/player/PlayerView.svelte";
+import Logo from "./lib/window/Logo.svelte";
 import TitleBar from "./lib/window/TitleBar.svelte";
 
 // Session first (ADR 0012): the saved Emby session is restored behind a branded
@@ -238,6 +239,7 @@ async function signOut() {
   {:else if conn.kind === "restoring"}
     <main class="screen" aria-busy="true">
       <div class="splash">
+        <Logo size={88} />
         <p class="brand">Viewer</p>
         <p class="muted" role="status">Ouverture de votre session…</p>
         <span class="bar" aria-hidden="true"></span>
@@ -287,7 +289,7 @@ async function signOut() {
     place-items: center;
     padding: var(--space-4);
     background:
-      radial-gradient(ellipse at 30% 10%, rgb(85 182 232 / 12%), transparent 60%),
+      radial-gradient(60% 60% at 50% 45%, rgb(42 50 66 / 55%) 0%, rgb(0 0 0 / 0%) 100%),
       var(--color-bg);
   }
   .overlay {
@@ -307,19 +309,20 @@ async function signOut() {
     gap: var(--space-2);
   }
   .brand {
-    margin: 0;
-    font-size: 32px;
+    margin: var(--space-3) 0 0;
+    font-size: 28px;
     font-weight: 700;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
   }
   .bar {
     width: 120px;
     height: 3px;
+    margin-top: var(--space-3);
     border-radius: 2px;
     background: linear-gradient(
       90deg,
       transparent,
-      var(--color-accent),
+      rgb(255 255 255 / 85%),
       transparent
     );
     background-size: 200% 100%;
@@ -336,8 +339,7 @@ async function signOut() {
   @media (prefers-reduced-motion: reduce) {
     .bar {
       animation: none;
-      background: var(--color-accent);
-      opacity: 0.6;
+      background: rgb(255 255 255 / 50%);
     }
   }
   .layer {
@@ -361,10 +363,12 @@ async function signOut() {
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    background: var(--color-elevated);
-    border-radius: var(--radius-md);
-    box-shadow: 0 16px 40px rgb(0 0 0 / 45%);
+    padding: var(--space-3) var(--space-3) var(--space-3) 20px;
+    background: rgb(36 36 42 / 72%);
+    backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgb(255 255 255 / 10%);
+    border-radius: 20px;
+    box-shadow: 0 24px 60px rgb(0 0 0 / 55%);
   }
   .banner p {
     margin: 0;
@@ -376,18 +380,31 @@ async function signOut() {
     font-size: 13px;
   }
   .banner button {
-    background: var(--color-accent);
-    color: #04121b;
+    flex: none;
+    height: 40px;
+    padding: 0 20px;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
     border: 0;
-    border-radius: var(--radius-sm);
-    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-pill);
     font: inherit;
     font-weight: 600;
     cursor: pointer;
+    transition: background var(--motion-fast);
+  }
+  .banner button:hover:not(:disabled) {
+    background: #fff;
   }
   .banner button.secondary {
-    background: transparent;
+    background: var(--fill-glass);
     color: var(--color-text);
+  }
+  .banner button.secondary:hover:not(:disabled) {
+    background: var(--fill-glass-hover);
+  }
+  .banner button:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
   }
   .banner button:disabled {
     opacity: 0.55;
