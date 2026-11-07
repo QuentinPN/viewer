@@ -1,17 +1,28 @@
-/* Design tokens from DESIGN.md (initial proposals, to be validated in UI). */
+/* Design tokens (DESIGN.md; Apple TV direction, ADR 0031). */
 :root {
-  --color-bg: #0b0d11;
-  --color-surface: #151922;
-  --color-elevated: #202631;
-  --color-text: #f5f6f8;
-  --color-text-secondary: #a6afbc;
-  --color-text-muted: #738092;
-  --color-accent: #55b6e8;
+  --color-bg: #000000;
+  --color-surface: #1c1c1e;
+  --color-elevated: #2c2c2e;
+  --color-text: #f5f5f7;
+  --color-text-secondary: rgb(235 235 245 / 0.7);
+  --color-text-muted: rgb(235 235 245 / 0.55);
+  --color-accent: #8fd3f5;
   --color-success: #64c69a;
-  --color-danger: #f07d82;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
+  --color-danger: #ff6961;
+  /* White primary buttons with black text; glass secondary buttons. */
+  --color-primary: #f5f5f7;
+  --color-on-primary: #000000;
+  --fill-glass: rgb(120 120 128 / 0.36);
+  --fill-glass-hover: rgb(120 120 128 / 0.5);
+  /* Translucent materials for what floats over the content. */
+  --material: rgb(40 40 46 / 0.6);
+  --material-thick: rgb(36 36 42 / 0.78);
+  --material-blur: blur(20px) saturate(180%);
+  --separator: rgb(255 255 255 / 0.08);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -19,7 +30,15 @@
   --space-6: 24px;
   --motion-fast: 120ms;
   --motion-base: 200ms;
+  /* Focus lift of cards: short spring, no overshoot visible at this scale. */
+  --motion-lift: 320ms;
+  --ease-spring: cubic-bezier(0.2, 0.9, 0.25, 1.15);
+  --lift-scale: 1.06;
+  --shadow-lift:
+    0 22px 44px rgb(0 0 0 / 0.65), 0 0 0 1px rgb(255 255 255 / 0.28);
   --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display:
+    "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
   /* Custom title bar (ADR 0029); the player puts its own over the video. */
   --titlebar-height: 32px;
   color-scheme: dark;
@@ -29,6 +48,8 @@
   :root {
     --motion-fast: 0ms;
     --motion-base: 0ms;
+    --motion-lift: 0ms;
+    --lift-scale: 1;
   }
 }
 
@@ -49,6 +70,13 @@ body {
   font-family: var(--font-ui);
   font-size: 15px;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
 
 #app {

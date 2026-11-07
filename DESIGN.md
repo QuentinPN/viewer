@@ -2,15 +2,17 @@
 
 ## Experience
 
-Premium cinematic desktop media browser inspired by Infuse's clarity. Original Viewer identity, dark theme, subtle depth, generous media imagery, restrained animation. French copy.
+Cinematic desktop media browser in the spirit of the Apple TV app (ADR 0031; it replaces the earlier Infuse inspiration): black canvas, large artwork, translucent floating materials, focus shown by lifting the item, calm spring motion. Original Viewer identity, no Apple assets or fonts. Windows keyboard shortcuts only (Ctrl, Alt, Maj, Win; never ⌘ or ⌥). French copy. Mockups: the design canvas « Viewer — redesign Apple TV » (7 screens at 1440×900).
 
-## Design tokens (initial proposals; validate in UI)
+## Design tokens (`src/app.css`)
 
-- Background `#0B0D11`; surface `#151922`; elevated `#202631`.
-- Text primary `#F5F6F8`, secondary `#A6AFBC`, muted `#738092`.
-- Accent `#55B6E8`; success `#64C69A`; danger `#F07D82`.
-- Radius: 8/12/18 px; spacing: 4 px scale; motion: 120–240 ms with reduced-motion support.
-- Use system-friendly typography with reliable Windows rendering; avoid bundling unlicensed fonts.
+- Background `#000`; solid surfaces `#1C1C1E` / `#2C2C2E` (skeletons, cards without artwork).
+- Text `#F5F5F7`, secondary `rgb(235 235 245 / 0.7)`, muted `rgb(235 235 245 / 0.55)` (≥ 4.5:1 on black).
+- Materials for floating UI (navigation, panels, secondary buttons): `rgb(40 40 46 / 0.6)` with `blur(20px) saturate(180%)`, thin `rgb(255 255 255 / 0.08)` border. Keep blur off large scrolling areas.
+- Primary button: white `#F5F5F7` with black text. Secondary: glass `rgb(120 120 128 / 0.36)`. Accent `#8FD3F5` (from the logo) only for focus rings, links and small markers; success `#64C69A`; danger `#FF6961`.
+- Radius 10/14/22 px, pills for navigation; spacing on a 4 px scale.
+- Focus: cards lift (×1.06, shadow, light ring) on a 320 ms spring; the accent outline stays for the keyboard. Reduced motion: no scale and no transition, the ring stays.
+- Type: Segoe UI Variable Display for headings (−0.02em, line-height 1.05), Segoe UI Variable Text for the rest; no bundled fonts.
 
 ## Main screens
 
