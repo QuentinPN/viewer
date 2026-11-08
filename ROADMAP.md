@@ -637,3 +637,9 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Fixed**: `PlayerView.svelte` renders the title bar outside the chrome; it fades with it but always takes clicks.
 - **Tests**: `gate3-player` all passed with the new check `caption_buttons_take_clicks_when_faded` (hit test of the three buttons while the controls are hidden); `npm run verify:web` exit 0 (157 tests). After the merge of the five 1.0 sessions: `verify:rust` exit 0 (163 passed), 25 of 26 scenarios passed; `gate2-ui` fails only on `no_app_credential_left`, the old leftover credential the owner keeps; `gate4-pause` failed once on an early end of file after the server reset the connection at resume, then passed in full on a rerun.
 - **Next**: release 1.0.0.
+
+### 2026-11-08 — Window opens maximized
+
+- **Changed** (owner request): `tauri.conf.json` opens the main window maximized instead of 1280×720; that size stays the restored size.
+- **Tests**: `./scripts/with-msvc.ps1 cargo check` exit 0 (the config is parsed at build).
+- **Not verified**: the app was not launched.
