@@ -643,3 +643,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Changed** (owner request): `tauri.conf.json` opens the main window maximized instead of 1280×720; that size stays the restored size.
 - **Tests**: `./scripts/with-msvc.ps1 cargo check` exit 0 (the config is parsed at build).
 - **Not verified**: the app was not launched.
+
+### 2026-11-08 — Release 1.0.1 and automatic GitHub releases
+
+- **Released**: 1.0.1 (maximized window, stale played marks and episode counts after a playback). First GitHub release, created by hand, with the installer (SHA-256 `b129dda2…75c4ee`, matched online).
+- **Changed** (owner request, ADR 0038): `npm run release:publish` checks the tagged release commit on main, fetches libmpv, runs both verify scripts, builds the installer, pushes main and the tag, and creates the GitHub release with the CHANGELOG.md section; the hash GitHub computes must match the local build. `--dry-run` stops after the build.
+- **Tests**: `npm run release:publish -- --dry-run` exit 0 in a worktree (refusals shown as warnings, Vitest 161, Rust 163 passed, installer built, notes printed); without `--dry-run` it refuses on a modified tree, exit 1.
+- **Not verified**: a real publish through the script (next release). In a worktree without `npm ci`, `fetch-libmpv.ps1` cannot extract the archive (no 7-Zip).

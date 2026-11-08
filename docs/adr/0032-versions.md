@@ -23,4 +23,4 @@ L'application restait en 0.1.0 : chaque installateur portait le même numéro, e
 
 ## Conséquences
 - L'installateur NSIS de Tauri remplace une version plus ancienne déjà installée ; le numéro de l'entrée de désinstallation suit.
-- Construire un installateur se fait après `npm run release`, pour que son numéro corresponde au tag.
+- Construire un installateur se fait après `npm run release`, pour que son numéro corresponde au tag : `npm run release:publish` le construit et le publie en release GitHub (ADR 0038).
