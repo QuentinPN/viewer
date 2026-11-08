@@ -6,6 +6,7 @@ import {
   emptyPager,
   itemSubtitle,
   PAGE_SIZE,
+  refreshItems,
 } from "./pager";
 
 const item = (id: number, extra: Partial<MediaItem> = {}): MediaItem => ({
@@ -74,6 +75,24 @@ describe("appendPage", () => {
   it("ends on an empty library", () => {
     const s = appendPage(emptyPager(), page(0, 0, 0));
     expect(s).toEqual({ items: [], next: 0, total: 0, done: true });
+  });
+});
+
+describe("refreshItems", () => {
+  it("puts fresh copies in place, order and paging unchanged", () => {
+    const s = appendPage(emptyPager(), page(0, 3, 200));
+    const fresh = [item(2, { unplayedCount: 4 }), item(1, { played: true })];
+    const r = refreshItems(s, fresh);
+    expect(r.items.map((i) => i.id)).toEqual(["0", "1", "2"]);
+    expect(r.items[1]?.played).toBe(true);
+    expect(r.items[2]?.unplayedCount).toBe(4);
+    expect({ ...r, items: [] }).toEqual({ ...s, items: [] });
+  });
+
+  it("neither adds nor drops items", () => {
+    const s = appendPage(emptyPager(), page(0, 2, 200));
+    expect(refreshItems(s, [item(9)])).toBe(s);
+    expect(refreshItems(s, []).items).toHaveLength(2);
   });
 });
 
