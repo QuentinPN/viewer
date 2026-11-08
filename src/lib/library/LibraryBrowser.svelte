@@ -44,7 +44,13 @@ import {
   withSort,
 } from "./options";
 import PosterCard from "./PosterCard.svelte";
-import { appendPage, countLabel, emptyPager, PAGE_SIZE } from "./pager";
+import {
+  appendPage,
+  countLabel,
+  emptyPager,
+  PAGE_SIZE,
+  refreshItems,
+} from "./pager";
 
 interface Props {
   user: SignedInUser;
@@ -464,9 +470,38 @@ async function loadMore() {
   }
 }
 
+/**
+ * After a playback, the pages already shown are read again and their cards
+ * updated in place (played mark, episode counts); the grid and its scroll stay.
+ * A failure changes nothing: the next F5 or playback catches up.
+ */
+async function refreshShown() {
+  const library = selected;
+  if (!library || pager.items.length === 0) return;
+  const gen = generation;
+  const end = pager.next;
+  const shownOptions = $state.snapshot(options);
+  try {
+    for (let start = 0; start < end; start += PAGE_SIZE) {
+      const page = await embyApi.items(
+        library.id,
+        start,
+        PAGE_SIZE,
+        shownOptions,
+      );
+      if (gen !== generation) return;
+      pager = refreshItems(pager, page.items);
+    }
+  } catch {
+    // Quiet: the cards shown are only a little stale.
+  }
+}
+
 onMount(() => {
   void loadLibraries();
+  const unlisten = embyApi.onPlaybackStopped(() => void refreshShown());
   return () => {
+    void unlisten.then((stop) => stop());
     observer?.disconnect();
     clearTimeout(debounce);
   };

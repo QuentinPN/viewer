@@ -1,9 +1,9 @@
 <script lang="ts">
 // Home page (DESIGN.md, Home; ADR 0010): the hero (ADR 0015), then "Reprendre"
 // and "À suivre" play at once, then favorites (ADR 0014) and the latest additions
-// of each library open their detail page. Rows load in parallel; the hero,
-// "Reprendre" and "À suivre" are read again after every playback, "Favoris" after
-// every favorite change.
+// of each library open their detail page. Rows load in parallel; every row is read
+// again in place after a playback (played marks, episode counts), "Favoris" also
+// after every favorite change.
 import { onMount, untrack } from "svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
 import type {
@@ -64,6 +64,7 @@ let playError = $state<{ title: string; error: EmbyError } | null>(null);
 // Bumped by every reload of the watch rows: older answers are dropped.
 let watchGeneration = 0;
 let favoritesGeneration = 0;
+const latestGeneration: Record<string, number> = {};
 
 const nextUpShown = $derived(
   nextUp.items ? withoutDuplicates(nextUp.items, inProgress.items ?? []) : null,
@@ -117,15 +118,26 @@ function retryFavorites() {
   loadFavorites();
 }
 
-function loadLatest(library: Library) {
-  latest[library.id] = loadingRow();
+/** `inPlace` keeps the cards shown until the answer comes (after a playback). */
+function loadLatest(library: Library, inPlace = false) {
+  const gen = (latestGeneration[library.id] ?? 0) + 1;
+  latestGeneration[library.id] = gen;
+  if (!inPlace) latest[library.id] = loadingRow();
   void loadRow(
     () => embyApi.latest(library.id),
     // A block body: an assignment to a proxy property is not its value.
     (r) => {
       latest[library.id] = r;
     },
+    () => gen === latestGeneration[library.id],
   );
+}
+
+/** Played state and episode counts changed: every row showing them is read again. */
+function afterPlayback() {
+  loadWatchRows();
+  loadFavorites();
+  for (const library of libraries) loadLatest(library, true);
 }
 
 async function start(id: string, resume: boolean, title: string) {
@@ -180,7 +192,7 @@ onMount(() => {
   loadWatchRows();
   loadFavorites();
   for (const library of libraries) loadLatest(library);
-  const unlisten = embyApi.onPlaybackStopped(() => loadWatchRows());
+  const unlisten = embyApi.onPlaybackStopped(afterPlayback);
   return () => {
     void unlisten.then((stop) => stop());
   };

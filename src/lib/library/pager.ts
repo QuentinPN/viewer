@@ -50,6 +50,19 @@ export function appendPage<T extends { id: string }>(
   return { items, next, total, done };
 }
 
+/**
+ * Puts fresh copies of loaded items in place (played mark, episode counts after a
+ * playback). Order, membership and paging stay: the grid and its scroll do not move.
+ */
+export function refreshItems<T extends { id: string }>(
+  state: PagerState<T>,
+  fresh: T[],
+): PagerState<T> {
+  const byId = new Map(fresh.map((i) => [i.id, i]));
+  if (!state.items.some((i) => byId.has(i.id))) return state;
+  return { ...state, items: state.items.map((i) => byId.get(i.id) ?? i) };
+}
+
 /** "2020 · 1 h 41" style subtitle for a card. */
 export function itemSubtitle(item: MediaItem): string {
   const parts: string[] = [];
