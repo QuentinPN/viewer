@@ -865,3 +865,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Fixed** (search, ADR 0047): coming back from a page opened from the results, the system keyboard opened over them, since the field held the focus for a frame. It is now closed once the card has the focus.
 - **Tests**: `testDebugUnitTest` 130/130 (`SeriesTargetTest` 7). `assembleDebug` and `lintDebug` OK. Checked on the Shield with "Raid": Commissaire Moulin S7·É7 opens on "Saison 7" (not the default season 1) with É7 focused; Pokémon S19·É40 opens on É40; Back returns to the focused card without the keyboard; 0 token lines in logcat.
 - **Not verified**: whether the search answer carries `SeasonId` or the season number was used (both give the same season here), a special episode.
+
+### 2026-11-09 — Android TV: tracks follow the server's defaults
+
+- **Added**: ADR 0055. With no remembered choice (ADR 0042), the player takes the tracks the server picked in PlaybackInfo (`DefaultAudioStreamIndex`, `DefaultSubtitleStreamIndex`, computed from the account's language preferences), mapped to mpv by `ff-index` as on Windows; mpv decides only when the server names nothing usable. A remembered choice still wins. Read-only: nothing is written to the account.
+- **Fixed**: on a transcode only the server's subtitle file is selected (every file used to be added with `select`); `aid`/`sid` are reset before each file, so the next episode does not inherit them.
+- **Tests**: `testDebugUnitTest` 136/136. `assembleDebug` and `lintDebug` OK. Checked on the Shield, Overgeared S1·É6 in Direct Play: with the remembered choice, `tracks audio=-→2 (remembered) sub=-→no (remembered)`; with it set aside, `tracks audio=1→1 (server) sub=4→1 (server)`, the menu checking "Français — Forced · ASS" and "Français · AAC stéréo". Remembered choices restored afterwards; 0 token lines in logcat.
+- **Not verified**: a title where the server's pick differs from mpv's (here they match), a transcode, the next episode in the same engine, each `SubtitleMode` of the account.
