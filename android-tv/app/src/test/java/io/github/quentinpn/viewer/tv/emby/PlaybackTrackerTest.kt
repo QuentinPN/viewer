@@ -1,6 +1,7 @@
 package io.github.quentinpn.viewer.tv.emby
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -133,5 +134,60 @@ class PlaybackTrackerTest {
         assertEquals(listOf(ReportKind.Stopped to null), kinds(stop))
         assertEquals("30207", stop.single().body.itemId)
         assertEquals("80475", t.fileLoaded(t0).single().body.itemId)
+    }
+
+    @Test
+    fun aLostStopReportIsResentWithAGrowingDelayThenGivenUp() {
+        val t0 = 1_000L
+        val s = ResendSchedule(t0)
+        assertFalse(s.due(t0 + 4_000))
+        assertTrue(s.due(t0 + STOP_RESEND_FIRST_MS))
+
+        val t1 = t0 + STOP_RESEND_FIRST_MS
+        s.postpone(t1)
+        assertFalse(s.due(t1 + 9_000))
+        assertTrue(s.due(t1 + 10_000))
+
+        val t2 = t1 + 10_000
+        s.postpone(t2)
+        assertTrue(s.due(t2 + STOP_RESEND_CAP_MS))
+        s.postpone(t2)
+        assertTrue("capped", s.due(t2 + STOP_RESEND_CAP_MS))
+
+        assertFalse(s.expired(t0 + STOP_RESEND_GIVE_UP_MS - 1_000))
+        assertTrue(s.expired(t0 + STOP_RESEND_GIVE_UP_MS))
+    }
+
+    @Test
+    fun aLateProgressCarriesThePositionOfTheLostStop() {
+        val stop = Report(
+            ReportKind.Stopped,
+            PlaybackReport(
+                itemId = "30207",
+                mediaSourceId = "ms",
+                playSessionId = "ps1",
+                positionTicks = 7_583_000_000,
+                runTimeTicks = 60_000_000_000,
+                playMethod = "Transcode",
+                failed = true,
+            ),
+        )
+        val late = stop.lateProgress()
+        assertEquals(ReportKind.Progress, late.kind)
+        assertEquals(7_583_000_000, late.body.positionTicks)
+        assertEquals("ps1", late.body.playSessionId)
+        assertEquals("Transcode", late.body.playMethod)
+        assertEquals(false, late.body.isPaused)
+        assertEquals(true, late.body.canSeek)
+        assertEquals("TimeUpdate", late.body.eventName)
+        assertNull(late.body.failed)
+    }
+
+    @Test
+    fun idleOnlyWithNothingAnnouncedOrPlaying() {
+        val t = PlaybackTracker()
+        assertTrue(t.idle)
+        t.begin(ActivePlayback("i", "ms", null, PlayMethod.DirectPlay, null, 0), 0)
+        assertFalse(t.idle)
     }
 }

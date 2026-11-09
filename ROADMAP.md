@@ -824,3 +824,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - `player/Skip.kt`, `PlayerOverlay.kt`: "Passer l'intro" bottom right during the intro, focused; at the credits of an episode with a next one, the next-episode card opens once, and "Annuler" or Back lets the credits play with "Passer le générique"; a film or last episode gets "Passer le générique".
 - **Tests**: `testDebugUnitTest` 104/104 (`SegmentsTest` 13, `SkipTest` 6, `EmbyClientTest` +1). `assembleDebug` and `lintDebug` OK, no warning in the changed files. Checked on the Shield: Overgeared S1É6 logs `segments=Intro@112.0-199.0 (IntroDb), Credits@1330.0-1421.68 (IntroDb)`; "Passer l'intro" shown at 2:49 with the focus, OK logs `skip to 199.0` and the button goes; 0 token lines in logcat.
 - **Not verified**: the credits (the stop report at about 93 % would mark the episode watched on the server), the button with the track menu open, Emby's own markers (none on the server), a film. The provider ids of what is watched go to two third-party services, as on Windows.
+
+### 2026-11-09 — Android TV: lost stop report resent
+
+- **Added**: the Windows resend of a lost stop report (ADR 0024, `src-tauri/src/emby/reporting.rs`) in `PlaybackReporter`.
+  - A stop report still not sent after its one retry, for a passing failure (unreachable, HTTP 5xx), is kept with its session and tried again after 5 s, then 10 s, then every 15 s, and given up after an hour or on a lasting error.
+  - Each try sends a progress report first (`Report.lateProgress()`): the server ignores a stop's position once it closed the playback itself. A new playback drops the lost report, so it never overwrites a newer position. Screens reload their user data once it goes through.
+- **Tests**: `testDebugUnitTest` 107/107 (`PlaybackTrackerTest` +3: schedule, late progress, idle). `assembleDebug` and `lintDebug` OK. Checked on the Shield: a normal stop is still sent (`report Stopped position=2400000000`); 0 token lines in logcat.
+- **Not verified**: the resend itself on the device: cutting the network also cuts adb, which runs over Wi-Fi. Covered by the unit tests only. Unlike Windows, a new playback does not wait for the resend: the TV pages pass the resume point they read.
