@@ -61,6 +61,17 @@ class EmbyClientTest {
     }
 
     @Test
+    fun fullItemAsksWithoutFields() = runBlocking {
+        respond(200, """{"Id":"e1","Type":"Episode","ProviderIds":{"Imdb":"tt0903747"},"Chapters":[{"StartPositionTicks":300000000,"MarkerType":"IntroStart"}]}""")
+        val item = client.withToken("secret-token").fullItem("u1", "e1")
+        assertEquals("IntroStart", item.chapters.single().markerType)
+        val request = server.takeRequest()
+        assertEquals("/emby/Users/u1/Items/e1", request.url.encodedPath)
+        assertNull("no Fields, no token in the URL", request.url.query)
+        assertTrue("Token=\"secret-token\"" in request.headers["X-Emby-Authorization"]!!)
+    }
+
+    @Test
     fun wrongPasswordIsInvalidCredentials() = expectError(EmbyError.InvalidCredentials::class.java) {
         respond(401)
         client.authenticate("Quentin", "bad")

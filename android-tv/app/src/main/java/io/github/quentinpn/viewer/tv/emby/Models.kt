@@ -60,6 +60,17 @@ data class BaseItemDto(
     @SerialName("ParentThumbItemId") val parentThumbItemId: String? = null,
     @SerialName("ParentThumbImageTag") val parentThumbImageTag: String? = null,
     @SerialName("UserData") val userData: UserItemData? = null,
+    /** Key case varies (`Imdb` on an episode, `IMDB` on its series): sent to the intro services only (ADR 0048). */
+    @SerialName("ProviderIds") val providerIds: Map<String, String> = emptyMap(),
+    @SerialName("Chapters") val chapters: List<ChapterInfo> = emptyList(),
+)
+
+/** `MarkerType` is `Chapter`, `IntroStart`, `IntroEnd` or `CreditsStart` (ADR 0030). */
+@Serializable
+data class ChapterInfo(
+    @SerialName("StartPositionTicks") val startPositionTicks: Long = 0,
+    @SerialName("Name") val name: String? = null,
+    @SerialName("MarkerType") val markerType: String? = null,
 )
 
 @Serializable

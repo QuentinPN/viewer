@@ -150,6 +150,13 @@ class EmbyClient(
         return call(get(url), BaseItemDto.serializer())
     }
 
+    /**
+     * One item without `Fields`, as the Windows client reads it for segments (ADR 0030):
+     * Emby 4.10.2.0 then returns its `Chapters` and `ProviderIds`.
+     */
+    suspend fun fullItem(userId: String, itemId: String): BaseItemDto =
+        call(get(server.api("/Users/${segment(userId)}/Items/${segment(itemId)}")), BaseItemDto.serializer())
+
     /** Seasons of a series, in order (`0` = specials). Unknown series: 404. */
     suspend fun seasons(userId: String, seriesId: String): QueryResult<BaseItemDto> {
         val url = server.api("/Shows/${segment(seriesId)}/Seasons").newBuilder()

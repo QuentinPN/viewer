@@ -111,6 +111,8 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
 
     override fun seekBy(seconds: Double) = command("seek", seconds.toString(), "relative")
 
+    override fun seekTo(seconds: Double) = command("seek", seconds.coerceAtLeast(0.0).toString(), "absolute")
+
     override fun cycleSubtitle() = command("cycle", "sub")
 
     override fun cycleAudio() = command("cycle", "audio")
