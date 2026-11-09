@@ -832,3 +832,22 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - Each try sends a progress report first (`Report.lateProgress()`): the server ignores a stop's position once it closed the playback itself. A new playback drops the lost report, so it never overwrites a newer position. Screens reload their user data once it goes through.
 - **Tests**: `testDebugUnitTest` 107/107 (`PlaybackTrackerTest` +3: schedule, late progress, idle). `assembleDebug` and `lintDebug` OK. Checked on the Shield: a normal stop is still sent (`report Stopped position=2400000000`); 0 token lines in logcat.
 - **Not verified**: the resend itself on the device: cutting the network also cuts adb, which runs over Wi-Fi. Covered by the unit tests only. Unlike Windows, a new playback does not wait for the resend: the TV pages pass the resume point they read.
+
+### 2026-11-09 — Android TV: settings
+
+- **Added**: ADR 0051, a "Réglages" screen opened from the home header, saved per Emby user on the device.
+  - From the Windows settings: IntroDB/TheIntroDB on or off (default on), "Passer automatiquement" (default off), and the "Réseau local" and "Accès distant" streaming caps, picked from the Windows list (40 down to 1.5 Mbit/s, or "Maximale (automatique)"). The cap used depends on the server address. An "À propos" section shows the version.
+  - Automatic skip passes each intro or credits once per playback, and never while the track menu or the up-next card is open.
+- **Tests**: `testDebugUnitTest` 117/117 (`PlaybackSettingsTest` 6, `SkipTest` +3, `ServerUrlTest` +1). `assembleDebug` and `lintDebug` OK. Checked on the Shield:
+  - the screen and its note ("adresse du réseau local"); Back returns to "Réglages";
+  - a 1.5 Mbit/s local cap logs `method=Transcode maxBitrate=1500000` and plays 720p H.264; back on "Maximale" it logs `DirectPlay maxBitrate=400000000`;
+  - the automatic skip logs `auto skip`, `skip to 199.0`; going back into the intro shows the button with no second skip;
+  - with the external sources off, `segments=` is empty;
+  - the settings survive a restart. All were set back to their defaults afterwards.
+- **Not verified**: the credits with automatic skip and the up-next card (an end-of-episode stop would mark it watched), another Emby user getting the defaults.
+
+### 2026-11-09 — Android TV: token kept out of mpv's verbose log
+
+- **Fixed**: ADR 0052. On an HLS transcode, lavf logged the unused `X-Emby-Token` header at verbose level, and libplayer.so copies every libmpv line to logcat itself, at VERBOSE priority. A 20-line C library (`app/src/main/cpp/viewerlog.c`, built by CMake) now raises the process's minimum logcat priority to DEBUG before mpv starts. The redacted Kotlin copy at INFO and above stays.
+- **Tests**: found on the Shield during the settings check (1 token line on a transcode). After the fix, the same transcode gives 0 token lines and 0 `mpv` lines in logcat. `testDebugUnitTest`, `assembleDebug` and `lintDebug` OK.
+- **Not verified**: Android 9 and 10 (minSdk 28), where `__android_log_set_minimum_priority` does not exist: the app logs a warning and the verbose copy remains. The Shield runs Android 11.

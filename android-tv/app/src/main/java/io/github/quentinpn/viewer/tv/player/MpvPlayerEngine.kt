@@ -20,7 +20,8 @@ private const val VO = "gpu"
  * [headers] are set once, before `mpv_initialize`: libmpv logs every later option
  * or property change with its value at verbose level, and libplayer copies each
  * libmpv log line to logcat itself, before [redactSecrets] can see it. Messages
- * emitted before init are never delivered, so the token stays out of logcat.
+ * emitted before init are never delivered. Later ones can still carry it (lavf lists
+ * the headers an HLS transcode left unused): [NativeLog] drops that verbose copy.
  * They apply to every request of this engine, external subtitles included.
  */
 class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap()) : PlayerEngine, MPVLib.EventObserver, MPVLib.LogObserver {
@@ -31,6 +32,7 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
 
     init {
         check(alive.compareAndSet(false, true)) { "Un seul lecteur mpv peut exister à la fois" }
+        NativeLog.ensureQuiet()
         MPVLib.create(context.applicationContext)
         for ((name, value) in OPTIONS) {
             val rc = MPVLib.setOptionString(name, value)

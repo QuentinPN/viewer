@@ -34,6 +34,9 @@ android {
 
     buildFeatures { compose = true }
 
+    // A few lines of C that keep libmpv's verbose log out of logcat (ADR 0052)
+    externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
+
     packaging {
         // The prebuilt mpv-android libraries are already stripped
         jniLibs.keepDebugSymbols += "**/*.so"
