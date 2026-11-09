@@ -48,6 +48,7 @@ import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
+import io.github.quentinpn.viewer.tv.emby.startTicks
 
 internal sealed interface Load<out T> {
     data object Loading : Load<Nothing>
@@ -86,6 +87,13 @@ internal fun initialEpisodeIndex(episodes: List<BaseItemDto>, episodeId: String?
     episodes.indexOfFirst { it.id == episodeId }.takeIf { episodeId != null && it >= 0 }
         ?: episodes.indexOfFirst { it.userData?.played != true }.coerceAtLeast(0)
 
+/**
+ * The page of an episode card: the season shown, so Back comes to this row even when the
+ * episode itself names another season (a special aired within it, ADR 0054).
+ */
+internal fun cardTarget(seriesId: String, seasonId: String, episode: BaseItemDto): SeriesTarget =
+    SeriesTarget(seriesId, seasonId = seasonId, seasonNumber = episode.parentIndexNumber, episodeId = episode.id)
+
 /** A series: its overview, a chip per season, and the season's episodes in a row. */
 @Composable
 fun SeriesScreen(
@@ -93,7 +101,10 @@ fun SeriesScreen(
     userId: String,
     target: SeriesTarget,
     images: ImageLoader,
+    /** A long press on an episode card plays it at once. */
     onPlay: (itemId: String, startTicks: Long) -> Unit,
+    /** OK on an episode card opens its page, naming the season it was shown in (ADR 0060). */
+    onOpenEpisode: (SeriesTarget) -> Unit,
     onSessionExpired: () -> Unit,
     /** Changes after each playback: the episodes' watched state is read again. */
     refresh: Int = 0,
@@ -138,7 +149,7 @@ fun SeriesScreen(
                             focusEpisode = null
                         }
                         seasonId?.let { id ->
-                            Episodes(client, userId, seriesId, id, focusEpisode, d.value.series, images, onPlay, onSessionExpired, refresh)
+                            Episodes(client, userId, seriesId, id, focusEpisode, d.value.series, images, onPlay, onOpenEpisode, onSessionExpired, refresh)
                         }
                     }
                 }
@@ -244,6 +255,7 @@ private fun Episodes(
     series: BaseItemDto,
     images: ImageLoader,
     onPlay: (itemId: String, startTicks: Long) -> Unit,
+    onOpenEpisode: (SeriesTarget) -> Unit,
     onSessionExpired: () -> Unit,
     refresh: Int,
 ) {
@@ -284,9 +296,16 @@ private fun Episodes(
                 ) {
                     itemsIndexed(e.value, key = { _, it -> it.id }) { index, episode ->
                         val modifier = if (index == start) Modifier.focusRequester(first) else Modifier
-                        EpisodeCard(episode, series, client, images, modifier.onFocusChanged { if (it.isFocused) focused = episode }) {
-                            onPlay(episode.id, if (episode.userData?.played == true) 0 else episode.userData?.playbackPositionTicks ?: 0)
-                        }
+                        EpisodeCard(
+                            episode,
+                            series,
+                            client,
+                            images,
+                            modifier.onFocusChanged { if (it.isFocused) focused = episode },
+                            // OK opens the page, as on a film; a long press plays at once
+                            onClick = { onOpenEpisode(cardTarget(seriesId, seasonId, episode)) },
+                            onLongClick = { onPlay(episode.id, episode.startTicks()) },
+                        )
                     }
                 }
                 focused?.overview?.let {
@@ -299,6 +318,12 @@ private fun Episodes(
                         modifier = Modifier.padding(horizontal = 48.dp).fillMaxWidth(0.7f),
                     )
                 }
+                Text(
+                    "OK : fiche de l'épisode  ·  appui long : lecture",
+                    color = Palette.textSecondary,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 48.dp),
+                )
             }
             LaunchedEffect(seasonId) {
                 runCatching { first.requestFocus() }
@@ -315,11 +340,13 @@ private fun EpisodeCard(
     images: ImageLoader,
     modifier: Modifier,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(10.dp)
     Column(Modifier.width(280.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Card(
             onClick = onClick,
+            onLongClick = onLongClick,
             modifier = modifier.fillMaxWidth().aspectRatio(16f / 9f),
             shape = CardDefaults.shape(shape),
             scale = CardDefaults.scale(focusedScale = 1.06f),

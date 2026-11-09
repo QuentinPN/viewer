@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
+import io.github.quentinpn.viewer.tv.ui.EpisodeScreen
 import io.github.quentinpn.viewer.tv.ui.HomeMemory
 import io.github.quentinpn.viewer.tv.ui.HomeScreen
 import io.github.quentinpn.viewer.tv.ui.LibraryMemory
@@ -52,6 +53,7 @@ class MainActivity : ComponentActivity() {
                     val client = remember(current) { AppServices.client(this, current) }
                     val images = remember(client) { AppServices.images(this, client) }
                     var series by remember(current) { mutableStateOf<SeriesTarget?>(null) }
+                    var episode by remember(current) { mutableStateOf<SeriesTarget?>(null) }
                     var movie by remember(current) { mutableStateOf<String?>(null) }
                     var library by remember(current) { mutableStateOf<LibraryMemory?>(null) }
                     var search by remember(current) { mutableStateOf<SearchMemory?>(null) }
@@ -61,7 +63,7 @@ class MainActivity : ComponentActivity() {
                     val home = remember(current) { HomeMemory() }
                     val refresh by AppServices.reporter.stopped.collectAsState()
                     val versions = remember(current) { VersionStore(this, current.userId) }
-                    // A version is only chosen on the film page (ADR 0058); elsewhere the server picks
+                    // A version is only chosen on the film and episode pages (ADR 0058, 0060); elsewhere the server picks
                     val playSource = { itemId: String, startTicks: Long, mediaSourceId: String? ->
                         startActivity(
                             Intent(this, PlayerActivity::class.java)
@@ -76,10 +78,39 @@ class MainActivity : ComponentActivity() {
                         notice = "Session expirée. Reconnectez-vous."
                         session = null
                     }
+                    // Over the series page: Back shows it again, on the episode's season and card (ADR 0060)
+                    val openEpisode = episode
+                    if (openEpisode != null) {
+                        EpisodeScreen(
+                            client,
+                            current.userId,
+                            openEpisode,
+                            images,
+                            versions,
+                            onPlay = playSource,
+                            onNavigate = { episode = it },
+                            onBack = {
+                                series = it
+                                episode = null
+                            },
+                            onSessionExpired = expired,
+                            refresh = refresh,
+                        )
+                        return@ViewerTheme
+                    }
                     val openSeries = series
                     if (openSeries != null) {
                         BackHandler { series = null }
-                        SeriesScreen(client, current.userId, openSeries, images, onPlay = play, onSessionExpired = expired, refresh = refresh)
+                        SeriesScreen(
+                            client,
+                            current.userId,
+                            openSeries,
+                            images,
+                            onPlay = play,
+                            onOpenEpisode = { episode = it },
+                            onSessionExpired = expired,
+                            refresh = refresh,
+                        )
                         return@ViewerTheme
                     }
                     val openMovie = movie

@@ -63,6 +63,10 @@ data class BaseItemDto(
     @SerialName("SeasonId") val seasonId: String? = null,
     @SerialName("ParentIndexNumber") val parentIndexNumber: Int? = null,
     @SerialName("IndexNumber") val indexNumber: Int? = null,
+    /** Last number of a double episode (ADR 0016). */
+    @SerialName("IndexNumberEnd") val indexNumberEnd: Int? = null,
+    /** An episode's air date, ISO 8601 in UTC (`2024-07-04T22:00:00.0000000Z`). */
+    @SerialName("PremiereDate") val premiereDate: String? = null,
     @SerialName("RunTimeTicks") val runTimeTicks: Long? = null,
     @SerialName("ImageTags") val imageTags: Map<String, String> = emptyMap(),
     @SerialName("BackdropImageTags") val backdropImageTags: List<String> = emptyList(),
