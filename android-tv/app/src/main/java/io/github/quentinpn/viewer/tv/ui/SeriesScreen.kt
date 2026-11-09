@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -207,15 +208,24 @@ private fun Header(series: BaseItemDto) {
 
 @Composable
 private fun SeasonChips(seasons: List<BaseItemDto>, selected: String?, onSelect: (String) -> Unit) {
-    LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(seasons, key = { it.id }) { season ->
-            // Filled for the season shown, outlined for the others (FilterChip is still experimental)
-            if (season.id == selected) {
-                Button(onClick = {}) { SeasonText(season) }
-            } else {
-                OutlinedButton(onClick = { onSelect(season.id) }) { SeasonText(season) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        LazyRow(Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(seasons, key = { it.id }) { season ->
+                // Filled for the season shown, outlined for the others (FilterChip is still experimental)
+                if (season.id == selected) {
+                    Button(onClick = {}) { SeasonText(season) }
+                } else {
+                    OutlinedButton(onClick = { onSelect(season.id) }) { SeasonText(season) }
+                }
             }
         }
+        // On this line, always on screen: the episode row below runs past the bottom edge
+        Text(
+            "OK : fiche de l'épisode  ·  appui long : lecture",
+            color = Palette.textSecondary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(end = 48.dp),
+        )
     }
 }
 
@@ -318,12 +328,6 @@ private fun Episodes(
                         modifier = Modifier.padding(horizontal = 48.dp).fillMaxWidth(0.7f),
                     )
                 }
-                Text(
-                    "OK : fiche de l'épisode  ·  appui long : lecture",
-                    color = Palette.textSecondary,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 48.dp),
-                )
             }
             LaunchedEffect(seasonId) {
                 runCatching { first.requestFocus() }
