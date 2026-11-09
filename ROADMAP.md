@@ -816,3 +816,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - D-pad Down leaves the text field for the results (the field kept the key for its cursor; found on the device and fixed).
 - **Tests**: `testDebugUnitTest` 84/84 (`SearchTest` 8, `SearchGroupsTest` 3). `assembleDebug` and `lintDebug` OK, no warning in the new files. Checked on the Shield: "over" gives Films · 2 (Overdrive, Overdose) and Séries · 3 (Overgeared, Tonikawa, My Instant Death Ability…); Tonikawa opened and Back returned to its card; Back from the results lands on "Rechercher"; 0 token lines in logcat.
 - **Not verified**: the voice input, a term with no match and the error state on the device (covered by the tests only).
+
+### 2026-11-09 — Android TV: skip intro and credits
+
+- **Added**: ADR 0048, the Windows segments (`src-tauri/src/segments`, ADR 0030) in the TV player. Supersedes ADR 0043 on the Emby credits markers.
+  - `emby/Segments.kt`: Emby chapter markers first, then IntroDB, then TheIntroDB, in the Windows order; ids checked before any URL, a separate HTTP client without the Emby header or redirects (3 s connect, 4 s per call, 64 KiB answers), 256 definitive answers cached in memory.
+  - `player/Skip.kt`, `PlayerOverlay.kt`: "Passer l'intro" bottom right during the intro, focused; at the credits of an episode with a next one, the next-episode card opens once, and "Annuler" or Back lets the credits play with "Passer le générique"; a film or last episode gets "Passer le générique".
+- **Tests**: `testDebugUnitTest` 104/104 (`SegmentsTest` 13, `SkipTest` 6, `EmbyClientTest` +1). `assembleDebug` and `lintDebug` OK, no warning in the changed files. Checked on the Shield: Overgeared S1É6 logs `segments=Intro@112.0-199.0 (IntroDb), Credits@1330.0-1421.68 (IntroDb)`; "Passer l'intro" shown at 2:49 with the focus, OK logs `skip to 199.0` and the button goes; 0 token lines in logcat.
+- **Not verified**: the credits (the stop report at about 93 % would mark the episode watched on the server), the button with the track menu open, Emby's own markers (none on the server), a film. The provider ids of what is watched go to two third-party services, as on Windows.
