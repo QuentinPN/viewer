@@ -23,6 +23,7 @@ import io.github.quentinpn.viewer.tv.ui.MovieScreen
 import io.github.quentinpn.viewer.tv.ui.SearchMemory
 import io.github.quentinpn.viewer.tv.ui.SearchScreen
 import io.github.quentinpn.viewer.tv.ui.SeriesScreen
+import io.github.quentinpn.viewer.tv.ui.SeriesTarget
 import io.github.quentinpn.viewer.tv.ui.SettingsScreen
 import io.github.quentinpn.viewer.tv.ui.SignInScreen
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
@@ -49,7 +50,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     val client = remember(current) { AppServices.client(this, current) }
                     val images = remember(client) { AppServices.images(this, client) }
-                    var series by remember(current) { mutableStateOf<String?>(null) }
+                    var series by remember(current) { mutableStateOf<SeriesTarget?>(null) }
                     var movie by remember(current) { mutableStateOf<String?>(null) }
                     var library by remember(current) { mutableStateOf<LibraryMemory?>(null) }
                     var search by remember(current) { mutableStateOf<SearchMemory?>(null) }
@@ -92,7 +93,7 @@ class MainActivity : ComponentActivity() {
                             images,
                             openLibrary,
                             onOptionsChanged = { libraryPrefs.save(openLibrary.library, it) },
-                            onOpenSeries = { series = it },
+                            onOpenSeries = { series = SeriesTarget(it) },
                             onOpenMovie = { movie = it },
                             onSessionExpired = expired,
                         )
@@ -128,7 +129,7 @@ class MainActivity : ComponentActivity() {
                         userName = current.userName,
                         images = images,
                         onPlay = play,
-                        onOpenSeries = { series = it },
+                        onOpenSeries = { series = SeriesTarget(it) },
                         onOpenMovie = { movie = it },
                         onOpenLibrary = { library = LibraryMemory(it, libraryPrefs.load(it)) },
                         onOpenSearch = { search = SearchMemory() },

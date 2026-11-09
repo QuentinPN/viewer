@@ -50,6 +50,8 @@ data class BaseItemDto(
     @SerialName("Overview") val overview: String? = null,
     @SerialName("SeriesName") val seriesName: String? = null,
     @SerialName("SeriesId") val seriesId: String? = null,
+    /** An episode's season; a special aired within a season has the specials' one (ADR 0016, gate 2). */
+    @SerialName("SeasonId") val seasonId: String? = null,
     @SerialName("ParentIndexNumber") val parentIndexNumber: Int? = null,
     @SerialName("IndexNumber") val indexNumber: Int? = null,
     @SerialName("RunTimeTicks") val runTimeTicks: Long? = null,

@@ -59,12 +59,39 @@ internal sealed interface Load<out T> {
 
 private class SeriesData(val series: BaseItemDto, val seasons: List<BaseItemDto>)
 
+/**
+ * A series page to open; an episode found by search also names its season (`SeasonId`,
+ * else `ParentIndexNumber`) and itself, to open on that season with its card focused.
+ */
+data class SeriesTarget(
+    val seriesId: String,
+    val seasonId: String? = null,
+    val seasonNumber: Int? = null,
+    val episodeId: String? = null,
+)
+
+/** The page of [episode]'s series, on its season and card; null without a series. */
+internal fun episodeTarget(episode: BaseItemDto): SeriesTarget? = episode.seriesId?.let {
+    SeriesTarget(it, seasonId = episode.seasonId, seasonNumber = episode.parentIndexNumber, episodeId = episode.id)
+}
+
+/** The target's season when the series has it (by id, else by number), else [defaultSeason]. */
+internal fun openingSeason(seasons: List<BaseItemDto>, target: SeriesTarget): BaseItemDto? =
+    target.seasonId?.let { id -> seasons.firstOrNull { it.id == id } }
+        ?: target.seasonNumber?.let { n -> seasons.firstOrNull { it.indexNumber == n } }
+        ?: defaultSeason(seasons)
+
+/** The card focused first: [episodeId] when listed, else the first episode not watched yet, else the first. */
+internal fun initialEpisodeIndex(episodes: List<BaseItemDto>, episodeId: String?): Int =
+    episodes.indexOfFirst { it.id == episodeId }.takeIf { episodeId != null && it >= 0 }
+        ?: episodes.indexOfFirst { it.userData?.played != true }.coerceAtLeast(0)
+
 /** A series: its overview, a chip per season, and the season's episodes in a row. */
 @Composable
 fun SeriesScreen(
     client: EmbyClient,
     userId: String,
-    seriesId: String,
+    target: SeriesTarget,
     images: ImageLoader,
     onPlay: (itemId: String, startTicks: Long) -> Unit,
     onSessionExpired: () -> Unit,
@@ -74,6 +101,9 @@ fun SeriesScreen(
     var data by remember { mutableStateOf<Load<SeriesData>>(Load.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
     var seasonId by remember { mutableStateOf<String?>(null) }
+    // The searched episode is focused until another season is chosen
+    var focusEpisode by remember { mutableStateOf(target.episodeId) }
+    val seriesId = target.seriesId
 
     suspend fun <T> load(block: suspend () -> T): Load<T> = try {
         Load.Ready(block())
@@ -89,7 +119,7 @@ fun SeriesScreen(
         val next = load { SeriesData(client.item(userId, seriesId), client.seasons(userId, seriesId).items) }
         if (!shown || next is Load.Ready) data = next
         val seasons = (data as? Load.Ready)?.value?.seasons.orEmpty()
-        if (seasonId == null) seasonId = defaultSeason(seasons)?.id
+        if (seasonId == null) seasonId = openingSeason(seasons, target)?.id
     }
 
     Box(Modifier.fillMaxSize().background(Palette.background)) {
@@ -103,9 +133,12 @@ fun SeriesScreen(
                     if (d.value.seasons.isEmpty()) {
                         Text("Aucune saison sur le serveur.", color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp))
                     } else {
-                        SeasonChips(d.value.seasons, seasonId) { seasonId = it }
+                        SeasonChips(d.value.seasons, seasonId) {
+                            seasonId = it
+                            focusEpisode = null
+                        }
                         seasonId?.let { id ->
-                            Episodes(client, userId, seriesId, id, d.value.series, images, onPlay, onSessionExpired, refresh)
+                            Episodes(client, userId, seriesId, id, focusEpisode, d.value.series, images, onPlay, onSessionExpired, refresh)
                         }
                     }
                 }
@@ -207,6 +240,7 @@ private fun Episodes(
     userId: String,
     seriesId: String,
     seasonId: String,
+    focusEpisode: String?,
     series: BaseItemDto,
     images: ImageLoader,
     onPlay: (itemId: String, startTicks: Long) -> Unit,
@@ -237,8 +271,8 @@ private fun Episodes(
         is Load.Ready -> if (e.value.isEmpty()) {
             Text("Aucun épisode dans cette saison.", color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp))
         } else {
-            // Focus lands on the first episode not watched yet
-            val start = e.value.indexOfFirst { it.userData?.played != true }.coerceAtLeast(0)
+            // Focus lands on the searched episode, else on the first one not watched yet
+            val start = initialEpisodeIndex(e.value, focusEpisode)
             val first = remember(seasonId) { FocusRequester() }
             // Starts scrolled to that episode: an item off screen cannot take focus
             val row = remember(seasonId) { LazyListState(firstVisibleItemIndex = start) }

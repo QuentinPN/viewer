@@ -128,7 +128,7 @@ fun SearchScreen(
     userId: String,
     images: ImageLoader,
     memory: SearchMemory,
-    onOpenSeries: (seriesId: String) -> Unit,
+    onOpenSeries: (SeriesTarget) -> Unit,
     onOpenMovie: (movieId: String) -> Unit,
     onSessionExpired: () -> Unit,
 ) {
@@ -199,9 +199,9 @@ fun SearchScreen(
                     memory.opened = group.title to item.id
                     when (item.type) {
                         "Movie" -> onOpenMovie(item.id)
-                        "Series" -> onOpenSeries(item.id)
-                        // No episode page yet: its series, where it can be played
-                        "Episode" -> item.seriesId?.let(onOpenSeries)
+                        "Series" -> onOpenSeries(SeriesTarget(item.id))
+                        // No episode page yet: its series, on its season and card, where it can be played
+                        "Episode" -> episodeTarget(item)?.let(onOpenSeries)
                     }
                 }
             }
