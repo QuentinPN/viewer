@@ -105,6 +105,8 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         // `aid` and `sid` are options too: a track selected in the last file would carry over (as on Windows)
         MPVLib.setPropertyString("aid", "auto")
         MPVLib.setPropertyString("sid", "auto")
+        // So are the delays: each file starts in sync, the next episode too (ADR 0062)
+        for (kind in DelayKind.entries) MPVLib.setPropertyDouble(kind.property, 0.0)
         MPVLib.command(arrayOf("loadfile", file.source.uri, "replace", "-1", file.options))
     }
 
@@ -138,6 +140,12 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         if (released.get()) return
         // Set as properties: they stay for the next files of this engine, and each item sets them again
         for ((name, value) in subtitleOptions(style)) MPVLib.setPropertyString(name, value)
+    }
+
+    override fun setDelay(kind: DelayKind, seconds: Double): Double? {
+        if (released.get()) return null
+        MPVLib.setPropertyDouble(kind.property, seconds)
+        return MPVLib.getPropertyDouble(kind.property)
     }
 
     override fun property(name: String): String? = if (released.get()) null else MPVLib.getPropertyString(name)

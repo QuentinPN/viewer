@@ -70,6 +70,9 @@ interface PlayerEngine {
     /** Look of text subtitles, from Réglages; [setSubtitlePosition] places them. */
     fun setSubtitleStyle(style: SubtitleStyle)
 
+    /** Sets a delay, in seconds, for the loaded file only (ADR 0062); returns the value mpv then holds, null if unreadable. */
+    fun setDelay(kind: DelayKind, seconds: Double): Double?
+
     /** Diagnostics only: reads one libmpv property as text. */
     fun property(name: String): String?
 

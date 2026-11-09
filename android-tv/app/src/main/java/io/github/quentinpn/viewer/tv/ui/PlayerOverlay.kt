@@ -36,6 +36,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
@@ -48,11 +53,15 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import io.github.quentinpn.viewer.tv.player.Chapter
+import io.github.quentinpn.viewer.tv.player.DelayChange
+import io.github.quentinpn.viewer.tv.player.DelayKind
+import io.github.quentinpn.viewer.tv.player.Delays
 import io.github.quentinpn.viewer.tv.player.InfoRow
 import io.github.quentinpn.viewer.tv.player.SkipPrompt
 import io.github.quentinpn.viewer.tv.player.Track
 import io.github.quentinpn.viewer.tv.player.TrackType
 import io.github.quentinpn.viewer.tv.player.chapterIndex
+import io.github.quentinpn.viewer.tv.player.formatDelay
 import kotlinx.coroutines.delay
 
 private const val HIDE_AFTER_MS = 5_000L
@@ -99,6 +108,9 @@ class PlayerUi {
     /** The "Informations de lecture" panel is open while this is not null (ADR 0061); refreshed by the player. */
     var info by mutableStateOf<List<InfoRow>?>(null)
 
+    /** Subtitle and audio delays, as mpv holds them; this playback only (ADR 0062). */
+    var delays by mutableStateOf(Delays())
+
     val menuOpen get() = tracks != null || chapterMenu || info != null
 
     fun closeMenus() {
@@ -132,6 +144,7 @@ class PlayerUi {
         chapters = emptyList()
         chapterMenu = false
         info = null
+        delays = Delays()
         controls = false
     }
 
@@ -159,7 +172,7 @@ internal fun episodeLabel(season: Int?, episode: Int?, name: String): String {
     return if (code.isEmpty()) name else if (name.isEmpty()) code else "$code — $name"
 }
 
-/** Time, progress and title over the video, the audio / subtitle, chapter and information menus, the skip button and the next episode card. */
+/** Time, progress and title over the video, the audio / subtitle / delay, chapter and information menus, the skip button and the next episode card. */
 @Composable
 fun PlayerOverlay(
     ui: PlayerUi,
@@ -169,6 +182,7 @@ fun PlayerOverlay(
     onCancelNext: () -> Unit,
     onSkip: () -> Unit,
     onInfo: () -> Unit,
+    onDelay: (DelayKind, DelayChange) -> Unit,
 ) {
     ui.AutoHide()
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -187,7 +201,7 @@ fun PlayerOverlay(
             // Above the text of the controls while they show; stays when they fade
             SkipButton(skip, !ui.menuOpen, onSkip, Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
         }
-        ui.tracks?.let { TrackMenu(it, onSelect, onInfo, Modifier.align(Alignment.CenterEnd)) }
+        ui.tracks?.let { TrackMenu(it, ui.delays, onSelect, onDelay, onInfo, Modifier.align(Alignment.CenterEnd)) }
         ui.info?.let { InfoMenu(it, Modifier.align(Alignment.CenterEnd)) }
         if (ui.chapterMenu) ChapterMenu(ui.chapters, chapterIndex(ui.chapters, ui.position), onChapter, Modifier.align(Alignment.CenterEnd))
     }
@@ -289,11 +303,14 @@ private sealed interface MenuRow {
 
     data class Choice(val type: TrackType, val id: Int?, val label: String, val selected: Boolean) : MenuRow
 
+    /** ◀ ▶ shift by a tenth of a second, OK goes back to none (ADR 0062). */
+    data class Delay(val kind: DelayKind, val seconds: Double) : MenuRow
+
     /** Last row: opens "Informations de lecture" in place of the menu (ADR 0061). */
     data object Info : MenuRow
 }
 
-private fun menuRows(tracks: List<Track>): List<MenuRow> = buildList {
+private fun menuRows(tracks: List<Track>, delays: Delays): List<MenuRow> = buildList {
     val subs = tracks.filter { it.type == TrackType.Subtitle }
     add(MenuRow.Header("Sous-titres"))
     add(MenuRow.Choice(TrackType.Subtitle, null, "Désactivés", subs.none { it.selected }))
@@ -303,12 +320,23 @@ private fun menuRows(tracks: List<Track>): List<MenuRow> = buildList {
         add(MenuRow.Header("Audio"))
         audio.forEach { add(MenuRow.Choice(it.type, it.id, it.label, it.selected)) }
     }
+    add(MenuRow.Header("Synchronisation"))
+    // Shifting subtitles that do not show would change nothing visible
+    if (subs.any { it.selected }) add(MenuRow.Delay(DelayKind.Subtitle, delays.subtitle))
+    add(MenuRow.Delay(DelayKind.Audio, delays.audio))
     add(MenuRow.Info)
 }
 
 @Composable
-private fun TrackMenu(tracks: List<Track>, onSelect: (TrackType, Int?) -> Unit, onInfo: () -> Unit, modifier: Modifier) {
-    val rows = menuRows(tracks)
+private fun TrackMenu(
+    tracks: List<Track>,
+    delays: Delays,
+    onSelect: (TrackType, Int?) -> Unit,
+    onDelay: (DelayKind, DelayChange) -> Unit,
+    onInfo: () -> Unit,
+    modifier: Modifier,
+) {
+    val rows = menuRows(tracks, delays)
     val first = remember { FocusRequester() }
     // Focus starts on the subtitle in use
     val start = rows.indexOfFirst { it is MenuRow.Choice && it.type == TrackType.Subtitle && it.selected }
@@ -331,6 +359,24 @@ private fun TrackMenu(tracks: List<Track>, onSelect: (TrackType, Int?) -> Unit, 
                     headlineContent = { Text(row.label, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     trailingContent = if (row.selected) ({ Text("✓") }) else null,
                     modifier = if (rows.indexOf(row) == start) Modifier.focusRequester(first) else Modifier,
+                )
+                is MenuRow.Delay -> ListItem(
+                    selected = false,
+                    onClick = { onDelay(row.kind, DelayChange.Reset) },
+                    headlineContent = { Text(row.kind.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = { Text("◀ ▶ 0,1 s  ·  OK remet à zéro", maxLines = 1) },
+                    trailingContent = { Text(formatDelay(row.seconds)) },
+                    // Held down, the key repeats: one tenth per repeat; ▲ ▼ still move between rows
+                    modifier = Modifier.onPreviewKeyEvent {
+                        if (it.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        val change = when (it.key) {
+                            Key.DirectionLeft -> DelayChange.Earlier
+                            Key.DirectionRight -> DelayChange.Later
+                            else -> return@onPreviewKeyEvent false
+                        }
+                        onDelay(row.kind, change)
+                        true
+                    },
                 )
                 MenuRow.Info -> ListItem(
                     selected = false,

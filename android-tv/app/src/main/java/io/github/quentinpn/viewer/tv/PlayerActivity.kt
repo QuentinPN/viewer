@@ -28,6 +28,8 @@ import io.github.quentinpn.viewer.tv.emby.nextEpisode
 import io.github.quentinpn.viewer.tv.emby.plan
 import io.github.quentinpn.viewer.tv.emby.segmentQuery
 import io.github.quentinpn.viewer.tv.emby.startTicks
+import io.github.quentinpn.viewer.tv.player.DelayChange
+import io.github.quentinpn.viewer.tv.player.DelayKind
 import io.github.quentinpn.viewer.tv.player.MediaSource
 import io.github.quentinpn.viewer.tv.player.MpvPlayerEngine
 import io.github.quentinpn.viewer.tv.player.PlaybackFacts
@@ -38,6 +40,7 @@ import io.github.quentinpn.viewer.tv.player.SkipPrompt
 import io.github.quentinpn.viewer.tv.player.TrackPreference
 import io.github.quentinpn.viewer.tv.player.TrackPreferenceStore
 import io.github.quentinpn.viewer.tv.player.TrackType
+import io.github.quentinpn.viewer.tv.player.changeDelay
 import io.github.quentinpn.viewer.tv.player.chapters
 import io.github.quentinpn.viewer.tv.player.decide
 import io.github.quentinpn.viewer.tv.player.describeTrack
@@ -78,6 +81,7 @@ private const val INFO_REFRESH_MS = 1_000L
  * item played: external sources, automatic skip and the streaming cap (ADR 0051),
  * and the look of subtitles (ADR 0053). UP lists the item's chapters, if it has some (ADR 0057).
  * "Informations de lecture" opens from the last row of the track menu, or the INFO key (ADR 0061).
+ * Subtitles and audio can be shifted from the track menu, for the current file only (ADR 0062).
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
     private var engine: PlayerEngine? = null
@@ -117,7 +121,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val surface = SurfaceView(this)
         val overlay = ComposeView(this).apply {
-            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip, ::openInfo) } }
+            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip, ::openInfo, ::shiftDelay) } }
         }
         setContentView(
             // With the menu focused, keys reach the root before the overlay: the player sees them first
@@ -509,6 +513,15 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         player.selectTrack(type, id)
         Log.i(TAG, "${type.property}=${player.property(type.property)}")
         ui.tracks = player.tracks()
+    }
+
+    /** A delay row of the track menu: what mpv holds afterwards is shown (ADR 0062). */
+    private fun shiftDelay(kind: DelayKind, change: DelayChange) {
+        val player = engine ?: return
+        val applied = player.setDelay(kind, changeDelay(ui.delays.of(kind), change))
+        Log.i(TAG, "${kind.property}=$applied")
+        // Unreadable: the row keeps the last value mpv gave
+        if (applied != null) ui.delays = ui.delays.with(kind, applied)
     }
 
     override fun onStop() {
