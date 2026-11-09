@@ -19,6 +19,7 @@ android-tv/.gradle/
 android-tv/.kotlin/
 android-tv/build/
 android-tv/app/build/
+android-tv/app/.cxx/
 android-tv/local.properties
 
 # Local evidence produced by spike runs (may contain local paths); curated copies go to docs/evidence/
