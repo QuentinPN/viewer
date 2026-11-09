@@ -60,6 +60,23 @@ data class BaseItemDto(
     @SerialName("ParentThumbItemId") val parentThumbItemId: String? = null,
     @SerialName("ParentThumbImageTag") val parentThumbImageTag: String? = null,
     @SerialName("UserData") val userData: UserItemData? = null,
+    // Detail fields: `/Users/{Id}/Items/{Id}` returns them without `Fields`
+    @SerialName("Genres") val genres: List<String> = emptyList(),
+    @SerialName("Studios") val studios: List<NameDto> = emptyList(),
+    @SerialName("People") val people: List<PersonDto> = emptyList(),
+    @SerialName("OfficialRating") val officialRating: String? = null,
+    @SerialName("CommunityRating") val communityRating: Double? = null,
+)
+
+/** `Studios[].Id` is a number on Emby 4.10, unlike other ids: only the name is read. */
+@Serializable
+data class NameDto(@SerialName("Name") val name: String = "")
+
+@Serializable
+data class PersonDto(
+    @SerialName("Name") val name: String = "",
+    /** `Actor`, `Director`, `Writer`, `Producer`, `GuestStar`… */
+    @SerialName("Type") val type: String = "",
 )
 
 @Serializable

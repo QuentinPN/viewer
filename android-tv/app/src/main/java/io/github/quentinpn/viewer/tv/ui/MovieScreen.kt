@@ -89,6 +89,7 @@ private fun Details(movie: BaseItemDto, onPlay: (itemId: String, startTicks: Lon
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             movie.productionYear?.let { Text(it.toString(), color = Palette.textSecondary) }
             movie.runTimeTicks?.let { Text(length(it), color = Palette.textSecondary) }
+            tags(movie).forEach { Text(it, color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             if (played) {
                 Text(
                     "Vu",
@@ -101,6 +102,7 @@ private fun Details(movie: BaseItemDto, onPlay: (itemId: String, startTicks: Lon
         movie.overview?.let {
             Text(it, color = Palette.textSecondary, maxLines = 5, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
         }
+        Facts(movie)
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // One first button whatever the resume state, so a reload does not drop its focus
             Button(onClick = { onPlay(movie.id, if (resume) position else 0) }, modifier = Modifier.focusRequester(first)) {

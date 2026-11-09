@@ -799,3 +799,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `testDebugUnitTest` 70/70 (`DefaultSeasonTest` 3). `assembleDebug` and `lintDebug` OK. Checked on the Shield: Overgeared shows "Saison 1 2" (accent), É5 "Vu", focus on É6.
 - **Not verified**: a watched season's check and a series with several seasons where the first is finished (none on the test account).
 - **Next**: search and skip intro/credits (in progress).
+
+### 2026-11-09 — Android TV: detail credits
+
+- **Added**: ADR 0050, the Windows facts list (`ItemDetail.svelte`) on the TV film and series pages.
+  - `BaseItemDto`: `Genres`, `Studios` (name only), `People` (name, type), `OfficialRating`, `CommunityRating`, already returned by `/Users/{Id}/Items/{Id}`.
+  - `ui/Credits.kt`: `tags()` puts the rating, three genres and the score after the year; `facts()` lists Réalisation, Scénario (films), Avec (6 actors) and Studio / Diffusion. The series page keeps two lines for the episodes row.
+- **Tests**: `testDebugUnitTest` 73/73 (`FactsTest` 3). `assembleDebug` and `lintDebug` OK, no new warning. Checked on the Shield: Overgeared "2026 · BR-14 · Fantasy, Animation, Action · ★ 7,7", Avec and Diffusion; a film with Réalisation, Scénario, Avec and Studio.
+- **Not verified**: an item without people or genres (lines left out by `facts`, covered by the tests only).

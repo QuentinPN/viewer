@@ -1,0 +1,48 @@
+package io.github.quentinpn.viewer.tv.ui
+
+import io.github.quentinpn.viewer.tv.emby.BaseItemDto
+import io.github.quentinpn.viewer.tv.emby.NameDto
+import io.github.quentinpn.viewer.tv.emby.PersonDto
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class FactsTest {
+    private val people = listOf(
+        PersonDto("Denis Villeneuve", "Director"),
+        PersonDto("Jon Spaihts", "Writer"),
+        PersonDto(" ", "Actor"),
+    ) + (1..8).map { PersonDto("Acteur $it", "Actor") }
+
+    @Test
+    fun filmFacts() {
+        val film = BaseItemDto(id = "f", type = "Movie", people = people, studios = listOf(NameDto("Legendary")))
+        assertEquals(
+            listOf(
+                Fact("Réalisation", "Denis Villeneuve"),
+                Fact("Scénario", "Jon Spaihts"),
+                Fact("Avec", "Acteur 1, Acteur 2, Acteur 3, Acteur 4, Acteur 5, Acteur 6"),
+                Fact("Studio", "Legendary"),
+            ),
+            facts(film),
+        )
+    }
+
+    @Test
+    fun seriesShowNoWriterAndABroadcaster() {
+        val series = BaseItemDto(id = "s", type = "Series", people = people.drop(1).take(3), studios = listOf(NameDto("Crunchyroll")))
+        assertEquals(listOf(Fact("Avec", "Acteur 1"), Fact("Diffusion", "Crunchyroll")), facts(series))
+        assertEquals(emptyList<Fact>(), facts(BaseItemDto(id = "e")))
+    }
+
+    @Test
+    fun tagsAfterTheYear() {
+        val item = BaseItemDto(
+            id = "i",
+            officialRating = "TV-14",
+            genres = listOf("Action", "", "Fantastique", "Animation", "Aventure"),
+            communityRating = 7.44,
+        )
+        assertEquals(listOf("TV-14", "Action, Fantastique, Animation", "★ 7,4"), tags(item))
+        assertEquals(emptyList<String>(), tags(BaseItemDto(id = "j", communityRating = 0.0)))
+    }
+}
