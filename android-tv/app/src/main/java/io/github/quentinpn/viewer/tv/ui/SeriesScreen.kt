@@ -82,12 +82,14 @@ fun SeriesScreen(
         Load.Failed(e.error.message)
     }
 
-    LaunchedEffect(attempt) {
-        data = Load.Loading
-        data = load { SeriesData(client.item(userId, seriesId), client.seasons(userId, seriesId).items) }
+    LaunchedEffect(attempt, refresh) {
+        // After a playback the seasons' counts are read again in place, the season kept
+        val shown = data is Load.Ready
+        if (!shown) data = Load.Loading
+        val next = load { SeriesData(client.item(userId, seriesId), client.seasons(userId, seriesId).items) }
+        if (!shown || next is Load.Ready) data = next
         val seasons = (data as? Load.Ready)?.value?.seasons.orEmpty()
-        // The first real season rather than the specials
-        if (seasonId == null) seasonId = (seasons.firstOrNull { (it.indexNumber ?: 0) > 0 } ?: seasons.firstOrNull())?.id
+        if (seasonId == null) seasonId = defaultSeason(seasons)?.id
     }
 
     Box(Modifier.fillMaxSize().background(Palette.background)) {
@@ -162,12 +164,32 @@ private fun SeasonChips(seasons: List<BaseItemDto>, selected: String?, onSelect:
         items(seasons, key = { it.id }) { season ->
             // Filled for the season shown, outlined for the others (FilterChip is still experimental)
             if (season.id == selected) {
-                Button(onClick = {}) { Text(seasonLabel(season)) }
+                Button(onClick = {}) { SeasonText(season) }
             } else {
-                OutlinedButton(onClick = { onSelect(season.id) }) { Text(seasonLabel(season)) }
+                OutlinedButton(onClick = { onSelect(season.id) }) { SeasonText(season) }
             }
         }
     }
+}
+
+/** The season's name, then a check once watched or the episodes left in the accent colour, as on Windows. */
+@Composable
+private fun SeasonText(season: BaseItemDto) {
+    Text(seasonLabel(season))
+    val data = season.userData
+    val unplayed = data?.unplayedItemCount ?: 0
+    when {
+        data?.played == true -> Text("  ✓")
+        unplayed > 0 -> Text("  $unplayed", color = Palette.accent)
+    }
+}
+
+/** First regular season with episodes left, else the first regular one, else the specials (Windows `defaultSeason`). */
+internal fun defaultSeason(seasons: List<BaseItemDto>): BaseItemDto? {
+    val regular = seasons.filter { it.indexNumber != 0 }
+    return regular.firstOrNull { it.userData?.played != true && (it.userData?.unplayedItemCount ?: 0) > 0 }
+        ?: regular.firstOrNull()
+        ?: seasons.firstOrNull()
 }
 
 private fun seasonLabel(season: BaseItemDto) = when (season.indexNumber) {
