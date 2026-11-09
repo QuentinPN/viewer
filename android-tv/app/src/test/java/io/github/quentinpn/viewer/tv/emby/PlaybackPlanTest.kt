@@ -56,6 +56,33 @@ class PlaybackPlanTest {
         val sub = plan.subtitles.single()
         assertEquals("http://192.168.1.10:8096/emby/videos/i1/m1/Subtitles/3/0/Stream.ass", sub.url)
         assertTrue(sub.selected)
+        // A transcode only shows the server's subtitle pick when it comes as a file
+        assertEquals(ServerTracks(audio = null, subtitle = 3), plan.serverTracks)
+    }
+
+    /** A film with the account's picks given as JSON values. */
+    private fun directPlay(audio: String, subtitle: String) = plan(
+        server,
+        response(
+            """{"MediaSources":[{"Id":"m1","SupportsDirectPlay":true,"DirectStreamUrl":"/videos/i1/stream.mkv",
+            "DefaultAudioStreamIndex":$audio,"DefaultSubtitleStreamIndex":$subtitle,"MediaStreams":[
+              {"Index":0,"Type":"Video"},
+              {"Index":1,"Type":"Audio","Language":"fre"},
+              {"Index":2,"Type":"Audio","Language":"eng"},
+              {"Index":4,"Type":"Subtitle","Language":"fre"},
+              {"Index":9,"Type":"Subtitle","Language":"spa","IsExternal":true}]}]}""",
+        ),
+    ).serverTracks
+
+    @Test
+    fun theServerPicksAreKeptWhenThisPlaybackCanShowThem() {
+        assertEquals(ServerTracks(audio = 1, subtitle = 4), directPlay("1", "4"))
+        // -1 (none), absent, or an index of no such stream: mpv decides, as on Windows
+        assertEquals(ServerTracks(audio = 2, subtitle = null), directPlay("2", "-1"))
+        assertEquals(ServerTracks(audio = null, subtitle = null), directPlay("null", "null"))
+        assertEquals(ServerTracks(audio = null, subtitle = null), directPlay("4", "2"))
+        // The server's external file is not loaded when playing the file
+        assertEquals(ServerTracks(audio = 1, subtitle = null), directPlay("1", "9"))
     }
 
     @Test

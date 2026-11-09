@@ -164,6 +164,9 @@ data class MediaSourceInfo(
     @SerialName("DirectStreamUrl") val directStreamUrl: String? = null,
     @SerialName("TranscodingUrl") val transcodingUrl: String? = null,
     @SerialName("RequiredHttpHeaders") val requiredHttpHeaders: Map<String, String>? = null,
+    /** Audio the server picked from the account's preferences (its `Configuration`, ADR 0035). */
+    @SerialName("DefaultAudioStreamIndex") val defaultAudioStreamIndex: Int? = null,
+    /** Subtitle the server picked from the account's preferences. */
     @SerialName("DefaultSubtitleStreamIndex") val defaultSubtitleStreamIndex: Int? = null,
     @SerialName("MediaStreams") val mediaStreams: List<MediaStreamDto> = emptyList(),
 )
@@ -194,4 +197,6 @@ data class MediaStreamDto(
     @SerialName("Language") val language: String? = null,
     @SerialName("DeliveryMethod") val deliveryMethod: String? = null,
     @SerialName("DeliveryUrl") val deliveryUrl: String? = null,
+    /** A file beside the media (`.srt`…), not one of its own streams. */
+    @SerialName("IsExternal") val isExternal: Boolean = false,
 )

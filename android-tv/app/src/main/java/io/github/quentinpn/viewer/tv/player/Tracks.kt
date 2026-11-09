@@ -7,7 +7,10 @@ enum class TrackType(val mpv: String, val property: String) {
     Subtitle("sub", "sid"),
 }
 
-/** One audio or subtitle track of the playing file, as mpv numbers it; [lang] and [title] as the file gives them. */
+/**
+ * One audio or subtitle track of the playing file, as mpv numbers it; [lang] and [title] as the file gives them.
+ * [ffIndex] is the stream's number in its file: for the media's own streams, Emby's `Index` (ADR 0035, 0055).
+ */
 data class Track(
     val id: Int,
     val type: TrackType,
@@ -15,6 +18,8 @@ data class Track(
     val selected: Boolean,
     val lang: String? = null,
     val title: String? = null,
+    val ffIndex: Int? = null,
+    val external: Boolean = false,
 )
 
 /**
@@ -29,15 +34,19 @@ fun readTracks(get: (String) -> String?): List<Track> {
         val id = prop("id")?.toIntOrNull() ?: return@mapNotNull null
         val title = prop("title")
         val lang = prop("lang")
+        val external = prop("external") == "yes"
         val label = trackLabel(
             type = type,
             title = title,
             lang = lang,
             codec = prop("codec"),
             channels = prop("demux-channel-count")?.toIntOrNull(),
-            external = prop("external") == "yes",
+            external = external,
         )
-        Track(id, type, label, selected = prop("selected") == "yes", lang = lang, title = title)
+        Track(
+            id, type, label, selected = prop("selected") == "yes", lang = lang, title = title,
+            ffIndex = prop("ff-index")?.toIntOrNull(), external = external,
+        )
     }
 }
 

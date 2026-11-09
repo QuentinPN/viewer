@@ -19,7 +19,9 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.ExternalSubtitle
+import io.github.quentinpn.viewer.tv.emby.PlayMethod
 import io.github.quentinpn.viewer.tv.emby.Segment
+import io.github.quentinpn.viewer.tv.emby.ServerTracks
 import io.github.quentinpn.viewer.tv.emby.deviceProfile
 import io.github.quentinpn.viewer.tv.emby.embyMarkers
 import io.github.quentinpn.viewer.tv.emby.nextEpisode
@@ -35,7 +37,8 @@ import io.github.quentinpn.viewer.tv.player.SkipPrompt
 import io.github.quentinpn.viewer.tv.player.TrackPreference
 import io.github.quentinpn.viewer.tv.player.TrackPreferenceStore
 import io.github.quentinpn.viewer.tv.player.TrackType
-import io.github.quentinpn.viewer.tv.player.choose
+import io.github.quentinpn.viewer.tv.player.decide
+import io.github.quentinpn.viewer.tv.player.describeTrack
 import io.github.quentinpn.viewer.tv.player.subtitlePosition
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettings
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
@@ -57,7 +60,8 @@ private const val NATURAL_END_MARGIN_SECONDS = 30.0
  * Plays one Emby item. Not exported: it negotiates the stream itself through
  * PlaybackInfo, so the token never travels in an Intent (ADR 0007, 0038).
  * Start, progress and stop go to the server through [PlaybackReporter] (ADR 0040).
- * The last audio and subtitle picked in the menu apply to the next files (ADR 0042).
+ * The last audio and subtitle picked in the menu apply to the next files (ADR 0042);
+ * without one, the tracks the server picked from the account's preferences (ADR 0055).
  * At the natural end of an episode, the next one is offered and plays in the same
  * engine (ADR 0043). Intros and credits get a skip button, and the next episode is
  * offered from the start of its credits (ADR 0048). The Réglages apply from the next
@@ -68,6 +72,10 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     private var engine: PlayerEngine? = null
     private val ui = PlayerUi()
     private var subtitles: List<ExternalSubtitle> = emptyList()
+
+    /** The server's track picks for the file being loaded, and whether it is a transcode (ADR 0055). */
+    private var serverTracks = ServerTracks()
+    private var transcode = false
     private var surfaceHolder: SurfaceHolder? = null
     private var preferences: TrackPreferenceStore? = null
     private var settingsStore: PlaybackSettingsStore? = null
@@ -212,8 +220,10 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             if (current != itemId) return
             Log.i(TAG, "play method=${chosen.method} source=${chosen.mediaSourceId} subtitles=${chosen.subtitles.size} maxBitrate=$bitrate")
             Log.i(TAG, "subtitle style=${settings.subtitles}")
-            // The selected subtitle goes last: each sub-add selects its track
+            // The server's subtitle goes last, added selected; the others are added without (ADR 0055)
             subtitles = chosen.subtitles.sortedBy { it.selected }
+            serverTracks = chosen.serverTracks
+            transcode = chosen.method == PlayMethod.Transcode
             val source = MediaSource.parse(chosen.url) ?: throw EmbyException(EmbyError.InvalidResponse("adresse de flux refusée"))
             // Reported once the file is loaded; never if loading fails
             reporter.begin(
@@ -269,20 +279,25 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             ui.status = null
             ui.show()
         }
-        subtitles.forEach { sub -> MediaSource.parse(sub.url)?.let { engine?.addSubtitle(it) } }
-        applyPreferences()
+        subtitles.forEach { sub -> MediaSource.parse(sub.url)?.let { engine?.addSubtitle(it, sub.selected) } }
+        applyTracks()
     }
 
-    /** After the external subtitles: one of them may be the remembered choice. */
-    private fun applyPreferences() {
+    /**
+     * After the external subtitles: one of them may be the remembered choice. The
+     * remembered choice, else the server's pick, else mpv's (ADR 0042, 0055).
+     */
+    private fun applyTracks() {
         val player = engine ?: return
         val store = preferences ?: return
         val tracks = player.tracks()
-        for (type in TrackType.entries) {
-            val selection = choose(tracks, type, store.load(type)) ?: continue
-            player.selectTrack(type, selection.id)
-            Log.i(TAG, "${type.property}=${player.property(type.property)} (préférence)")
+        val described = TrackType.entries.map { type ->
+            val server = if (type == TrackType.Audio) serverTracks.audio else serverTracks.subtitle
+            val decision = decide(tracks, type, store.load(type), server, transcode)
+            decision.selection?.let { player.selectTrack(type, it.id) }
+            "${type.mpv}=${describeTrack(decision, player.property(type.property))}"
         }
+        Log.i(TAG, "tracks ${described.joinToString(" ")}")
     }
 
     override fun onPosition(seconds: Double) {

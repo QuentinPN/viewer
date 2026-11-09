@@ -22,16 +22,65 @@ data class Selection(val id: Int?)
  * the first track of that language. Null when nothing matches or it is already
  * selected: mpv's own choice then stays.
  */
-fun choose(tracks: List<Track>, type: TrackType, preference: TrackPreference?): Selection? {
+fun choose(tracks: List<Track>, type: TrackType, preference: TrackPreference?): Selection? =
+    remembered(tracks, type, preference)?.takeUnless { isSelected(tracks, type, it) }
+
+/** The track [preference] designates among [tracks], selected or not; null when nothing matches. */
+private fun remembered(tracks: List<Track>, type: TrackType, preference: TrackPreference?): Selection? {
     preference ?: return null
-    val ofType = tracks.filter { it.type == type }
-    if (preference.off) return if (ofType.any { it.selected }) Selection(null) else null
-    val sameLanguage = ofType.filter { sameLanguage(it.lang, preference.lang) }
+    if (preference.off) return Selection(null)
+    val sameLanguage = tracks.filter { it.type == type && sameLanguage(it.lang, preference.lang) }
     val track = sameLanguage.firstOrNull { it.title.equals(preference.title, ignoreCase = true) }
         ?: sameLanguage.firstOrNull()
         ?: return null
-    return if (track.selected) null else Selection(track.id)
+    return Selection(track.id)
 }
+
+private fun isSelected(tracks: List<Track>, type: TrackType, selection: Selection): Boolean {
+    val ofType = tracks.filter { it.type == type }
+    return if (selection.id == null) ofType.none { it.selected } else ofType.any { it.id == selection.id && it.selected }
+}
+
+/** Where the track of a type comes from, as written in the `ViewerTV` log. */
+enum class TrackOrigin(val log: String) {
+    /** Picked in the track menu earlier (ADR 0042). */
+    Remembered("remembered"),
+
+    /** `DefaultAudioStreamIndex` / `DefaultSubtitleStreamIndex` of PlaybackInfo (ADR 0055). */
+    Server("server"),
+
+    /** Neither: mpv's own choice (`slang`, the file's default flags). */
+    Mpv("mpv"),
+}
+
+/**
+ * The track to play for [type]: [selection] null leaves mpv's current track, which
+ * is then already the one wanted. [embyIndex] is the server's pick when [origin] is
+ * [TrackOrigin.Server].
+ */
+data class TrackDecision(val origin: TrackOrigin, val embyIndex: Int? = null, val selection: Selection? = null)
+
+/**
+ * The remembered choice (ADR 0042) first, then the server's pick [serverIndex], then
+ * mpv's. As on Windows (ADR 0035), when playing the file the Emby `Index` of one of
+ * its own streams is the mpv track of the same type with that `ff-index`, external
+ * files left out. A transcode carries the server's audio, and its subtitle pick was
+ * added selected ([transcode]): nothing is left to select.
+ */
+fun decide(tracks: List<Track>, type: TrackType, preference: TrackPreference?, serverIndex: Int?, transcode: Boolean): TrackDecision {
+    remembered(tracks, type, preference)?.let { wanted ->
+        return TrackDecision(TrackOrigin.Remembered, selection = wanted.takeUnless { isSelected(tracks, type, it) })
+    }
+    serverIndex ?: return TrackDecision(TrackOrigin.Mpv)
+    if (transcode) return TrackDecision(TrackOrigin.Server, serverIndex)
+    val track = tracks.firstOrNull { it.type == type && !it.external && it.ffIndex == serverIndex }
+        ?: return TrackDecision(TrackOrigin.Mpv)
+    return TrackDecision(TrackOrigin.Server, serverIndex, Selection(track.id).takeUnless { track.selected })
+}
+
+/** "2→1 (server)", "-→no (remembered)": Emby index, mpv's track once applied, origin. No URL, no token. */
+fun describeTrack(decision: TrackDecision, mpvTrack: String?): String =
+    "${decision.embyIndex ?: "-"}→${mpvTrack ?: "?"} (${decision.origin.log})"
 
 /** Kept per Emby user in plain preferences: a language and a track title are not secrets. */
 class TrackPreferenceStore(context: Context, private val userId: String) {

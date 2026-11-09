@@ -31,7 +31,29 @@ data class PlaybackPlan(
     val playSessionId: String?,
     val runTimeTicks: Long?,
     val subtitles: List<ExternalSubtitle>,
+    /** Tracks the server picked from the account's preferences, that this playback can show. */
+    val serverTracks: ServerTracks = ServerTracks(),
 )
+
+/**
+ * Emby `Index` of the audio and subtitle the server picked (`DefaultAudioStreamIndex`,
+ * `DefaultSubtitleStreamIndex`); null when it named none or one this playback cannot
+ * show. Same filter as `tracks::choose` on Windows (ADR 0035): when playing the file,
+ * only its own streams, as the server's external files are not loaded; for a
+ * transcode, only subtitles delivered as files (the others would be burnt in).
+ */
+data class ServerTracks(val audio: Int? = null, val subtitle: Int? = null)
+
+internal fun serverTracks(source: MediaSourceInfo, method: PlayMethod): ServerTracks {
+    fun pick(index: Int?, type: String, shown: (MediaStreamDto) -> Boolean) =
+        index?.takeIf { i -> source.mediaStreams.any { it.index == i && it.type == type && shown(it) } }
+    return ServerTracks(
+        audio = pick(source.defaultAudioStreamIndex, "Audio") { !it.isExternal },
+        subtitle = pick(source.defaultSubtitleStreamIndex, "Subtitle") {
+            if (method == PlayMethod.Transcode) it.deliveryMethod == "External" && it.deliveryUrl != null else !it.isExternal
+        },
+    )
+}
 
 /**
  * Same declaration as the Windows libmpv profile: the mpv-android build ships the
@@ -105,6 +127,7 @@ fun plan(server: ServerUrl, response: PlaybackInfoResponse): PlaybackPlan {
         playSessionId = response.playSessionId,
         runTimeTicks = source.runTimeTicks?.takeIf { it > 0 },
         subtitles = subtitles,
+        serverTracks = serverTracks(source, method),
     )
 }
 

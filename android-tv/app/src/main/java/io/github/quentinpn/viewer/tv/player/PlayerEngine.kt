@@ -44,7 +44,8 @@ interface PlayerEngine {
      */
     fun load(source: MediaSource, startSeconds: Double = 0.0)
 
-    fun addSubtitle(source: MediaSource)
+    /** Adds an external subtitle file to the loaded one; [select] makes it the shown track. */
+    fun addSubtitle(source: MediaSource, select: Boolean = true)
 
     fun togglePause()
 

@@ -102,12 +102,16 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
     private fun loadNow(file: PendingFile) {
         // keep-open paused the previous file on its last frame
         MPVLib.setPropertyString("pause", "no")
+        // `aid` and `sid` are options too: a track selected in the last file would carry over (as on Windows)
+        MPVLib.setPropertyString("aid", "auto")
+        MPVLib.setPropertyString("sid", "auto")
         MPVLib.command(arrayOf("loadfile", file.source.uri, "replace", "-1", file.options))
     }
 
-    override fun addSubtitle(source: MediaSource) {
+    override fun addSubtitle(source: MediaSource, select: Boolean) {
         if (released.get()) return
-        MPVLib.command(arrayOf("sub-add", source.uri, "select"))
+        // `auto` adds the track without selecting it, as on Windows (ADR 0009)
+        MPVLib.command(arrayOf("sub-add", source.uri, if (select) "select" else "auto"))
     }
 
     override fun togglePause() = command("cycle", "pause")
@@ -210,7 +214,7 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
             "hwdec-codecs" to "h264,hevc,mpeg4,mpeg2video,vp8,vp9,av1",
             "ao" to "audiotrack,opensles",
             "audio-set-media-role" to "yes",
-            // French subtitles by default; a choice made in the track menu then wins (ADR 0042)
+            // French subtitles when neither the track menu (ADR 0042) nor the server (ADR 0055) picks one
             "slang" to "fr,fre,fra",
             // The Shield has 3 GB of RAM: a bounded demuxer cache
             "demuxer-max-bytes" to "${64 * 1024 * 1024}",
