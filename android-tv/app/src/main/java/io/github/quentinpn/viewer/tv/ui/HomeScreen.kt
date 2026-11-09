@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -294,13 +296,43 @@ internal fun ItemCard(
                         Text(item.name, color = Palette.textSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                if (landscape) Progress(item)
+                Progress(item)
+                if (!landscape) badge(item)?.let { Badge(it, Modifier.align(Alignment.TopEnd)) }
             }
         }
         Text(title(item), color = Palette.text, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
         subtitle(item)?.let {
             Text(it, color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
         }
+    }
+}
+
+/** Corner mark of a poster, as in the Windows grid: a check once watched, else the episodes left. */
+internal sealed interface PosterBadge {
+    data object Played : PosterBadge
+
+    data class Unplayed(val count: Int) : PosterBadge
+}
+
+internal fun badge(item: BaseItemDto): PosterBadge? {
+    val data = item.userData ?: return null
+    if (data.played) return PosterBadge.Played
+    val count = data.unplayedItemCount ?: return null
+    return if (item.type == "Series" && count > 0) PosterBadge.Unplayed(count) else null
+}
+
+@Composable
+private fun Badge(badge: PosterBadge, modifier: Modifier) {
+    val text = when (badge) {
+        PosterBadge.Played -> "✓"
+        is PosterBadge.Unplayed -> if (badge.count > 99) "99+" else badge.count.toString()
+    }
+    Box(
+        modifier.padding(8.dp).defaultMinSize(minWidth = 28.dp, minHeight = 28.dp)
+            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(14.dp)).padding(horizontal = 7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = Color.White, style = MaterialTheme.typography.labelMedium)
     }
 }
 

@@ -66,6 +66,8 @@ data class BaseItemDto(
 data class UserItemData(
     @SerialName("Played") val played: Boolean = false,
     @SerialName("PlaybackPositionTicks") val playbackPositionTicks: Long = 0,
+    /** Series and seasons only: episodes not yet watched. */
+    @SerialName("UnplayedItemCount") val unplayedItemCount: Int? = null,
 )
 
 @Serializable
