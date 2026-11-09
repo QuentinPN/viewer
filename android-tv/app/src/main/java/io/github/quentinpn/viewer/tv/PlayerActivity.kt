@@ -30,6 +30,7 @@ import io.github.quentinpn.viewer.tv.emby.segmentQuery
 import io.github.quentinpn.viewer.tv.emby.startTicks
 import io.github.quentinpn.viewer.tv.player.MediaSource
 import io.github.quentinpn.viewer.tv.player.MpvPlayerEngine
+import io.github.quentinpn.viewer.tv.player.PlaybackFacts
 import io.github.quentinpn.viewer.tv.player.PlayerEngine
 import io.github.quentinpn.viewer.tv.player.PlayerListener
 import io.github.quentinpn.viewer.tv.player.SkipPlan
@@ -40,14 +41,19 @@ import io.github.quentinpn.viewer.tv.player.TrackType
 import io.github.quentinpn.viewer.tv.player.chapters
 import io.github.quentinpn.viewer.tv.player.decide
 import io.github.quentinpn.viewer.tv.player.describeTrack
+import io.github.quentinpn.viewer.tv.player.playbackInfo
 import io.github.quentinpn.viewer.tv.player.subtitlePosition
+import io.github.quentinpn.viewer.tv.player.transcodeReasons
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettings
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
+import io.github.quentinpn.viewer.tv.settings.mbits
 import io.github.quentinpn.viewer.tv.ui.PlayerOverlay
 import io.github.quentinpn.viewer.tv.ui.PlayerUi
 import io.github.quentinpn.viewer.tv.ui.UpNext
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import io.github.quentinpn.viewer.tv.ui.episodeLabel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 private const val TAG = "ViewerTV"
@@ -56,6 +62,9 @@ private const val SEEK_SECONDS = 10.0
 
 /** As the tracker (ADR 0012): an end further than this from the duration is a cut stream. */
 private const val NATURAL_END_MARGIN_SECONDS = 30.0
+
+/** "Informations de lecture" is read again this often while it is open (ADR 0061). */
+private const val INFO_REFRESH_MS = 1_000L
 
 /**
  * Plays one Emby item. Not exported: it negotiates the stream itself through
@@ -68,6 +77,7 @@ private const val NATURAL_END_MARGIN_SECONDS = 30.0
  * offered from the start of its credits (ADR 0048). The Réglages apply from the next
  * item played: external sources, automatic skip and the streaming cap (ADR 0051),
  * and the look of subtitles (ADR 0053). UP lists the item's chapters, if it has some (ADR 0057).
+ * "Informations de lecture" opens from the last row of the track menu, or the INFO key (ADR 0061).
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
     private var engine: PlayerEngine? = null
@@ -77,6 +87,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     /** The server's track picks for the file being loaded, and whether it is a transcode (ADR 0055). */
     private var serverTracks = ServerTracks()
     private var transcode = false
+
+    /** How the server delivers the file being loaded, for "Informations de lecture" (ADR 0061). */
+    private var facts: PlaybackFacts? = null
     private var surfaceHolder: SurfaceHolder? = null
     private var preferences: TrackPreferenceStore? = null
     private var settingsStore: PlaybackSettingsStore? = null
@@ -104,7 +117,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val surface = SurfaceView(this)
         val overlay = ComposeView(this).apply {
-            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip) } }
+            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip, ::openInfo) } }
         }
         setContentView(
             // With the menu focused, keys reach the root before the overlay: the player sees them first
@@ -146,6 +159,16 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             }
         }
 
+        // While "Informations de lecture" is open, its values are read again each second
+        lifecycleScope.launch {
+            snapshotFlow { ui.info != null }.collectLatest { open ->
+                while (open) {
+                    delay(INFO_REFRESH_MS)
+                    if (ui.info != null) ui.info = readInfo()
+                }
+            }
+        }
+
         play(itemId, startTicks, intent.getStringExtra(EXTRA_MEDIA_SOURCE_ID))
     }
 
@@ -154,6 +177,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         current = itemId
         next = null
         skips = null
+        facts = null
         settings = settingsStore?.load() ?: PlaybackSettings()
         ui.reset()
         lifecycleScope.launch { describe(itemId) }
@@ -227,6 +251,13 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             subtitles = chosen.subtitles.sortedBy { it.selected }
             serverTracks = chosen.serverTracks
             transcode = chosen.method == PlayMethod.Transcode
+            // Only the reasons are kept from the URL: it is never shown
+            val local = client.server.isLocal
+            facts = PlaybackFacts(
+                method = chosen.method,
+                reasons = if (transcode) transcodeReasons(chosen.url) else emptyList(),
+                cap = (settings.capFor(local)?.let(::mbits) ?: "Maximale") + if (local) " · réseau local" else " · accès distant",
+            )
             val source = MediaSource.parse(chosen.url) ?: throw EmbyException(EmbyError.InvalidResponse("adresse de flux refusée"))
             // Reported once the file is loaded; never if loading fails
             reporter.begin(
@@ -434,6 +465,8 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             ui.tracks = p.tracks()
             ui.show()
         }
+        // Remotes that have it; the Shield's has not, and goes through the track menu
+        KeyEvent.KEYCODE_INFO -> { _ -> openInfo() }
         else -> null
     }
 
@@ -453,6 +486,20 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         ui.position = start
         ui.chapterMenu = false
         ui.show()
+    }
+
+    /** "Informations de lecture" in place of the track menu (ADR 0061). */
+    private fun openInfo() {
+        val rows = readInfo() ?: return
+        ui.tracks = null
+        ui.chapterMenu = false
+        ui.info = rows
+        ui.show()
+    }
+
+    /** The panel's rows for the file being played; null before its negotiation or without a player. */
+    private fun readInfo() = engine?.let { player ->
+        facts?.let { playbackInfo(it, player.tracks(), player::property) }
     }
 
     private fun selectTrack(type: TrackType, id: Int?) {

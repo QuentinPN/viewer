@@ -102,7 +102,7 @@ internal fun languageName(code: String): String {
     else name.replaceFirstChar { it.titlecase(Locale.FRENCH) }
 }
 
-private fun codecName(codec: String) = when (codec) {
+internal fun codecName(codec: String) = when (codec) {
     "subrip" -> "SRT"
     "hdmv_pgs_subtitle" -> "PGS"
     "dvd_subtitle" -> "VobSub"
@@ -111,7 +111,7 @@ private fun codecName(codec: String) = when (codec) {
     else -> codec.uppercase(Locale.ROOT)
 }
 
-private fun channelLayout(channels: Int) = when (channels) {
+internal fun channelLayout(channels: Int) = when (channels) {
     1 -> "mono"
     2 -> "stéréo"
     6 -> "5.1"

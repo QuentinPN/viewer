@@ -42,11 +42,13 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
+import androidx.tv.material3.DenseListItem
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import io.github.quentinpn.viewer.tv.player.Chapter
+import io.github.quentinpn.viewer.tv.player.InfoRow
 import io.github.quentinpn.viewer.tv.player.SkipPrompt
 import io.github.quentinpn.viewer.tv.player.Track
 import io.github.quentinpn.viewer.tv.player.TrackType
@@ -94,11 +96,15 @@ class PlayerUi {
     /** The "Chapitres" menu is open. */
     var chapterMenu by mutableStateOf(false)
 
-    val menuOpen get() = tracks != null || chapterMenu
+    /** The "Informations de lecture" panel is open while this is not null (ADR 0061); refreshed by the player. */
+    var info by mutableStateOf<List<InfoRow>?>(null)
+
+    val menuOpen get() = tracks != null || chapterMenu || info != null
 
     fun closeMenus() {
         tracks = null
         chapterMenu = false
+        info = null
     }
 
     // Bumped on each key: restarts the hide delay
@@ -125,6 +131,7 @@ class PlayerUi {
         skip = null
         chapters = emptyList()
         chapterMenu = false
+        info = null
         controls = false
     }
 
@@ -152,7 +159,7 @@ internal fun episodeLabel(season: Int?, episode: Int?, name: String): String {
     return if (code.isEmpty()) name else if (name.isEmpty()) code else "$code — $name"
 }
 
-/** Time, progress and title over the video, the audio / subtitle and chapter menus, the skip button and the next episode card. */
+/** Time, progress and title over the video, the audio / subtitle, chapter and information menus, the skip button and the next episode card. */
 @Composable
 fun PlayerOverlay(
     ui: PlayerUi,
@@ -161,6 +168,7 @@ fun PlayerOverlay(
     onPlayNext: () -> Unit,
     onCancelNext: () -> Unit,
     onSkip: () -> Unit,
+    onInfo: () -> Unit,
 ) {
     ui.AutoHide()
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -179,7 +187,8 @@ fun PlayerOverlay(
             // Above the text of the controls while they show; stays when they fade
             SkipButton(skip, !ui.menuOpen, onSkip, Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
         }
-        ui.tracks?.let { TrackMenu(it, onSelect, Modifier.align(Alignment.CenterEnd)) }
+        ui.tracks?.let { TrackMenu(it, onSelect, onInfo, Modifier.align(Alignment.CenterEnd)) }
+        ui.info?.let { InfoMenu(it, Modifier.align(Alignment.CenterEnd)) }
         if (ui.chapterMenu) ChapterMenu(ui.chapters, chapterIndex(ui.chapters, ui.position), onChapter, Modifier.align(Alignment.CenterEnd))
     }
 }
@@ -266,7 +275,7 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
             }
         }
         Text(
-            "OK lecture / pause  ·  ◀ ▶ 10 s  ·  ▼ audio et sous-titres" + if (ui.chapters.isNotEmpty()) "  ·  ▲ chapitres" else "",
+            "OK lecture / pause  ·  ◀ ▶ 10 s  ·  ▼ audio, sous-titres et infos" + if (ui.chapters.isNotEmpty()) "  ·  ▲ chapitres" else "",
             color = Palette.textSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -279,6 +288,9 @@ private sealed interface MenuRow {
     data class Header(val text: String) : MenuRow
 
     data class Choice(val type: TrackType, val id: Int?, val label: String, val selected: Boolean) : MenuRow
+
+    /** Last row: opens "Informations de lecture" in place of the menu (ADR 0061). */
+    data object Info : MenuRow
 }
 
 private fun menuRows(tracks: List<Track>): List<MenuRow> = buildList {
@@ -291,10 +303,11 @@ private fun menuRows(tracks: List<Track>): List<MenuRow> = buildList {
         add(MenuRow.Header("Audio"))
         audio.forEach { add(MenuRow.Choice(it.type, it.id, it.label, it.selected)) }
     }
+    add(MenuRow.Info)
 }
 
 @Composable
-private fun TrackMenu(tracks: List<Track>, onSelect: (TrackType, Int?) -> Unit, modifier: Modifier) {
+private fun TrackMenu(tracks: List<Track>, onSelect: (TrackType, Int?) -> Unit, onInfo: () -> Unit, modifier: Modifier) {
     val rows = menuRows(tracks)
     val first = remember { FocusRequester() }
     // Focus starts on the subtitle in use
@@ -318,6 +331,12 @@ private fun TrackMenu(tracks: List<Track>, onSelect: (TrackType, Int?) -> Unit, 
                     headlineContent = { Text(row.label, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     trailingContent = if (row.selected) ({ Text("✓") }) else null,
                     modifier = if (rows.indexOf(row) == start) Modifier.focusRequester(first) else Modifier,
+                )
+                MenuRow.Info -> ListItem(
+                    selected = false,
+                    onClick = onInfo,
+                    headlineContent = { Text("Informations de lecture", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    modifier = Modifier.padding(top = 16.dp),
                 )
             }
         }
@@ -359,6 +378,44 @@ private fun ChapterMenu(chapters: List<Chapter>, current: Int, onChapter: (Doubl
                 headlineContent = { Text(chapter.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 trailingContent = { Text(seconds(chapter.start)) },
                 modifier = if (i == start) Modifier.focusRequester(focus) else Modifier,
+            )
+        }
+    }
+    LaunchedEffect(Unit) {
+        withFrameNanos {}
+        runCatching { focus.requestFocus() }
+    }
+}
+
+/**
+ * "Informations de lecture" (ADR 0061): one row per value the player knows, refreshed
+ * about once per second. Rows take the focus, so ▲ ▼ scroll a list taller than the screen
+ * and the skip button never takes it; OK does nothing, Retour closes the panel.
+ */
+@Composable
+private fun InfoMenu(rows: List<InfoRow>, modifier: Modifier) {
+    val focus = remember { FocusRequester() }
+    LazyColumn(
+        modifier.fillMaxHeight().width(460.dp).background(Palette.surface.copy(alpha = 0.95f)),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        item {
+            Text(
+                "Informations de lecture",
+                color = Palette.textSecondary,
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(start = 12.dp, top = 16.dp, bottom = 4.dp),
+            )
+        }
+        // Keyed by label: the focused row keeps the focus when the values refresh
+        itemsIndexed(rows, key = { _, row -> row.label }) { i, row ->
+            DenseListItem(
+                selected = false,
+                onClick = {},
+                overlineContent = { Text(row.label) },
+                headlineContent = { Text(row.value, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                modifier = if (i == 0) Modifier.focusRequester(focus) else Modifier,
             )
         }
     }
