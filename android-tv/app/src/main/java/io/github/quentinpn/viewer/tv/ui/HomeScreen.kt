@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -179,7 +180,12 @@ private fun Shelves(
     val target = memory.opened?.takeIf { (title, id) -> shelves.any { it.title == title && it.items.any { i -> i.id == id } } }
         ?: shelves.first().let { it.title to it.items.first().id }
     // Again when the target changes: a refresh can remove the card that had focus
-    LaunchedEffect(target) { runCatching { first.requestFocus() } }
+    // (an episode watched to the end leaves "Reprendre"). One frame first, so the
+    // new card is placed; else focus falls on "Déconnecter" at the top.
+    LaunchedEffect(target) {
+        withFrameNanos {}
+        runCatching { first.requestFocus() }
+    }
     LazyColumn(state = memory.column, contentPadding = PaddingValues(bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         items(shelves, key = { it.title }) { shelf ->
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

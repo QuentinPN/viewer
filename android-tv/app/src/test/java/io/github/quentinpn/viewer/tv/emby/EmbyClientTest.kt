@@ -172,6 +172,20 @@ class EmbyClientTest {
     }
 
     @Test
+    fun adjacentEpisodesComeWithUserDataWithoutImages() = runBlocking {
+        respond(200, """{"Items":[{"Id":"e2","SeriesId":"ser1"},{"Id":"e3","SeriesId":"ser1","UserData":{"PlaybackPositionTicks":5}}],"TotalRecordCount":2}""")
+        val episodes = client.withToken("t").adjacentEpisodes("u1", "ser1", "e2")
+        assertEquals(listOf("e2", "e3"), episodes.map { it.id })
+        assertEquals(5L, episodes[1].userData?.playbackPositionTicks)
+        val url = server.takeRequest().url
+        assertEquals("/emby/Shows/ser1/Episodes", url.encodedPath)
+        assertEquals("e2", url.queryParameter("AdjacentTo"))
+        assertEquals("u1", url.queryParameter("UserId"))
+        assertEquals("false", url.queryParameter("EnableImages"))
+        assertEquals("true", url.queryParameter("EnableUserData"))
+    }
+
+    @Test
     fun emptyEpisodePageStopsPaging() = runBlocking {
         respond(200, """{"Items":[],"TotalRecordCount":5}""")
         assertTrue(client.withToken("t").episodes("u1", "ser1", "s1").isEmpty())

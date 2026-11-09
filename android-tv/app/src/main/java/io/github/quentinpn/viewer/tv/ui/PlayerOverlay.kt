@@ -38,14 +38,19 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.Button
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import io.github.quentinpn.viewer.tv.player.Track
 import io.github.quentinpn.viewer.tv.player.TrackType
 import kotlinx.coroutines.delay
 
 private const val HIDE_AFTER_MS = 5_000L
+
+/** Seconds before the next episode starts on its own. */
+private const val NEXT_COUNTDOWN = 10
 
 // Fade above the text of the controls: the picture shows through it
 private val FADE = 96.dp
@@ -71,6 +76,9 @@ class PlayerUi {
     /** The track menu is open while this is not null. */
     var tracks by mutableStateOf<List<Track>?>(null)
 
+    /** The "Épisode suivant" card is shown while this is not null. */
+    var upNext by mutableStateOf<UpNext?>(null)
+
     // Bumped on each key: restarts the hide delay
     private var shown by mutableIntStateOf(0)
 
@@ -80,6 +88,18 @@ class PlayerUi {
     }
 
     fun hide() {
+        controls = false
+    }
+
+    /** Before another file: nothing of the previous one stays on screen. */
+    fun reset() {
+        title = ""
+        detail = null
+        position = 0.0
+        duration = 0.0
+        status = "Chargement…"
+        tracks = null
+        upNext = null
         controls = false
     }
 
@@ -98,17 +118,65 @@ class PlayerUi {
     }
 }
 
-/** Time, progress and title over the video, and the audio / subtitle menu. */
+/** The episode offered at the end of the current one. */
+data class UpNext(val series: String, val label: String)
+
+/** "S1 · É3 — Le titre", or the name alone without numbers. */
+internal fun episodeLabel(season: Int?, episode: Int?, name: String): String {
+    val code = listOfNotNull(season?.let { "S$it" }, episode?.let { "É$it" }).joinToString(" · ")
+    return if (code.isEmpty()) name else if (name.isEmpty()) code else "$code — $name"
+}
+
+/** Time, progress and title over the video, the audio / subtitle menu and the next episode card. */
 @Composable
-fun PlayerOverlay(ui: PlayerUi, onSelect: (TrackType, Int?) -> Unit) {
+fun PlayerOverlay(ui: PlayerUi, onSelect: (TrackType, Int?) -> Unit, onPlayNext: () -> Unit, onCancelNext: () -> Unit) {
     ui.AutoHide()
     Box(Modifier.fillMaxSize()) {
         ui.status?.let {
             Text(it, color = Palette.text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.align(Alignment.Center))
         }
-        // Always shown while paused, so the picture never looks frozen
-        if (ui.status == null && (ui.controls || ui.paused)) Controls(ui, Modifier.align(Alignment.BottomCenter))
+        val upNext = ui.upNext
+        if (upNext != null) {
+            UpNextCard(upNext, onPlayNext, onCancelNext, Modifier.align(Alignment.BottomCenter))
+        } else if (ui.status == null && (ui.controls || ui.paused)) {
+            // Always shown while paused, so the picture never looks frozen
+            Controls(ui, Modifier.align(Alignment.BottomCenter))
+        }
         ui.tracks?.let { TrackMenu(it, onSelect, Modifier.align(Alignment.CenterEnd)) }
+    }
+}
+
+@Composable
+private fun UpNextCard(upNext: UpNext, onPlay: () -> Unit, onCancel: () -> Unit, modifier: Modifier) {
+    var left by remember(upNext) { mutableIntStateOf(NEXT_COUNTDOWN) }
+    val play = remember { FocusRequester() }
+    LaunchedEffect(upNext) {
+        withFrameNanos {}
+        runCatching { play.requestFocus() }
+        while (left > 0) {
+            delay(1_000)
+            left--
+        }
+        onPlay()
+    }
+    Column(
+        modifier.fillMaxWidth()
+            .background(Brush.verticalGradient(0f to Color.Transparent, 0.35f to Color.Black.copy(alpha = 0.7f), 1f to Color.Black.copy(alpha = 0.9f)))
+            .padding(start = 48.dp, end = 48.dp, top = FADE, bottom = 36.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("Épisode suivant", color = Palette.textSecondary, style = MaterialTheme.typography.titleSmall)
+        Text(upNext.series, color = Palette.text, style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(upNext.label, color = Palette.text, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text("Lecture dans $left s", color = Palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
+        // Empties as the countdown runs, by whole seconds
+        Box(Modifier.width(320.dp).height(4.dp).background(Color.White.copy(alpha = 0.25f), RoundedCornerShape(2.dp))) {
+            Box(Modifier.fillMaxWidth(left / NEXT_COUNTDOWN.toFloat()).height(4.dp).background(Palette.text, RoundedCornerShape(2.dp)))
+        }
+        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Button(onClick = onPlay, modifier = Modifier.focusRequester(play)) { Text("Lire maintenant") }
+            OutlinedButton(onClick = onCancel) { Text("Annuler") }
+        }
     }
 }
 

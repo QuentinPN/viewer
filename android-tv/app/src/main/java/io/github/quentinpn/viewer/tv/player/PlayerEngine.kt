@@ -38,7 +38,7 @@ interface PlayerEngine {
     fun detachSurface()
 
     /**
-     * Playback begins at [startSeconds]. HTTP headers (the token) are given when the
+     * Playback begins at [startSeconds], unpaused; a loaded file is replaced. HTTP headers (the token) are given when the
      * engine is created, never in the URL.
      */
     fun load(source: MediaSource, startSeconds: Double = 0.0)

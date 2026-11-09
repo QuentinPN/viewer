@@ -126,7 +126,7 @@ Separate native app in `android-tv/` (Kotlin, libmpv from mpv-android, ADR 0038)
 
 - VERIFIED (2026-11-09) on the NVIDIA Shield (Android 11), `docs/evidence/gate-tv1-2026-11-09.md`: HEVC 1080p 10-bit with ASS and HEVC 4K HDR10 with AC3 5.1, hardware decoding (`mediacodec`), no decoder drops, French subtitles picked by default, ASS on the picture at the next line, seek, pause, track switching, token in a header only, teardown 130–309 ms.
 - TODO: HDR output to the TV by eye; Dolby Vision, DTS and bitstream audio; AudioTrack refusing AAC 44.1 kHz stereo (OpenSL ES fallback plays); cache wait when switching subtitles on 4K; HTTPS (`tls-ca-file`); Fire TV and Nokia.
-- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return; playback reporting (ADR 0040): resume row, resume start, "Vu" after the end, screens updated in place; film details page with "Reprendre à …" / "Lire depuis le début"; player controls (ADR 0041): title, progress, time, pause, ±10 s, audio and subtitle menu; last audio/subtitle choice remembered per user, subtitles moved above the controls (ADR 0042).
+- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return; playback reporting (ADR 0040): resume row, resume start, "Vu" after the end, screens updated in place; film details page with "Reprendre à …" / "Lire depuis le début"; player controls (ADR 0041): title, progress, time, pause, ±10 s, audio and subtitle menu; last audio/subtitle choice remembered per user, subtitles moved above the controls (ADR 0042); next episode (ADR 0043): card at the natural end with a 10 s countdown, "Lire maintenant" and "Annuler", next episode played in the same player.
 - TODO: track choice from the Emby account preferences; resending a stop report lost to a network cut; Transcode with external subtitles and resume start on the real server; sign-out checked on the device.
 
 ## Work log
@@ -719,3 +719,24 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - external (Emby-delivered) subtitles chosen as the preference;
   - a top-placed sign subtitle while the controls show.
 - **Next**: a "Prochain épisode" prompt at the end of an episode, or a full library grid per collection.
+
+### 2026-11-09 — Android TV: next episode
+
+- **Added**: ADR 0043.
+  - `EmbyClient.adjacentEpisodes` (`/Shows/{id}/Episodes?AdjacentTo=`), `emby/NextEpisode.kt` (`nextEpisode`, `startTicks`).
+  - In the player overlay, a card "Épisode suivant": series, "S1 · É3 — titre", 10 s countdown with a gauge, "Lire maintenant" (focused) and "Annuler".
+  - `PlayerActivity` loads the next episode into the same mpv (`loadfile replace`, unpaused), ignores the replaced file's end and stale answers.
+- **Fixed**: back on the home screen, the card that had focus can leave "Reprendre" (episode watched). The focus fell on "Déconnecter", and one OK press signed out. The home screen now waits one frame before focusing the target card.
+- **Tests**: `testDebugUnitTest` 50/50 (`NextEpisodeTest` 3, `EpisodeLabelTest` 1, `EmbyClientTest` +1). `assembleDebug` and `lintDebug` OK. Checked on the Shield (Overgeared, account `claude`):
+  - É2→É3→É4→É5 chained on their own after the countdown, unpaused, each with its `Stopped` then `Start` report;
+  - the remembered Japanese audio stayed on the next episodes;
+  - "Annuler" closes the player (`Stopped position=14190000000`), and the home focus lands on the new "Reprendre" card (É6);
+  - 0 token lines in logcat.
+
+  Evidence: `docs/evidence/tv-client-2026-11-09.md`.
+- **Not verified**:
+  - a next episode in another season;
+  - the last episode of a series (no card expected);
+  - Back on the card (same `finish` as "Annuler").
+- **Side effect**: É2 to É5 of Overgeared are now watched on the test account.
+- **Next**: a full library grid per collection, or Emby's credits markers to show the card earlier.

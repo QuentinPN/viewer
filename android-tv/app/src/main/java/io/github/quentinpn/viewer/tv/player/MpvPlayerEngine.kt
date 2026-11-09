@@ -97,6 +97,8 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
     }
 
     private fun loadNow(file: PendingFile) {
+        // keep-open paused the previous file on its last frame
+        MPVLib.setPropertyString("pause", "no")
         MPVLib.command(arrayOf("loadfile", file.source.uri, "replace", "-1", file.options))
     }
 

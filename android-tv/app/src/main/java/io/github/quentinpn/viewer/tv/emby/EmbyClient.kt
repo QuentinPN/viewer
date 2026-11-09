@@ -141,6 +141,21 @@ class EmbyClient(
         return all.filter { it.seriesId == null || it.seriesId == seriesId }
     }
 
+    /**
+     * Episodes around one of a series, across seasons (ADR 0016). Emby 4.10.1.0 answers
+     * up to 5 episodes before it then the rest of the series; no images, but user data
+     * for the resume point of the next one.
+     */
+    suspend fun adjacentEpisodes(userId: String, seriesId: String, episodeId: String): List<BaseItemDto> {
+        val url = server.api("/Shows/${segment(seriesId)}/Episodes").newBuilder()
+            .addQueryParameter("UserId", segment(userId))
+            .addQueryParameter("AdjacentTo", segment(episodeId))
+            .addQueryParameter("EnableImages", "false")
+            .addQueryParameter("EnableUserData", "true")
+            .build()
+        return call(get(url), QueryResult.serializer(BaseItemDto.serializer())).items
+    }
+
     /** Playback negotiation (ADR 0007): the server answers with its sources for this profile. */
     suspend fun playbackInfo(userId: String, itemId: String, profile: DeviceProfile): PlaybackInfoResponse {
         val id = segment(userId)
