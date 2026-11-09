@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -146,17 +145,18 @@ fun SeriesScreen(
             is Load.Ready -> {
                 Backdrop(d.value.series, client, images)
                 // Scrolls: Down from the episode row reaches the similar titles below the screen
-                Column(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = 40.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
+                val scroll = rememberScrollState()
+                ScrollingPage(scroll, Modifier.fillMaxSize(), Modifier.padding(top = 40.dp), Arrangement.spacedBy(16.dp)) {
                     Header(d.value.series)
                     if (d.value.seasons.isEmpty()) {
                         Text("Aucune saison sur le serveur.", color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp))
                     } else {
-                        SeasonChips(d.value.seasons, seasonId) {
-                            seasonId = it
-                            focusEpisode = null
+                        // Back on the chips, the series' title shows again
+                        Box(Modifier.topOnFocus(scroll)) {
+                            SeasonChips(d.value.seasons, seasonId) {
+                                seasonId = it
+                                focusEpisode = null
+                            }
                         }
                         seasonId?.let { id ->
                             Episodes(client, userId, seriesId, id, focusEpisode, d.value.series, images, onPlay, onOpenEpisode, onSessionExpired, refresh)

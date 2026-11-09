@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -84,8 +83,10 @@ fun MovieScreen(
                 // The details fill the screen as before; Down from the buttons scrolls to the row
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val screen = maxHeight
-                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                        Details(m.value, versions, onPlay, Modifier.height(screen))
+                    val scroll = rememberScrollState()
+                    ScrollingPage(scroll, Modifier.fillMaxSize()) {
+                        // Back on the buttons, the film's title shows again
+                        Details(m.value, versions, onPlay, Modifier.height(screen).topOnFocus(scroll))
                         SimilarRow(similar, client, images, onOpenSimilar)
                     }
                 }
