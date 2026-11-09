@@ -807,3 +807,12 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - `ui/Credits.kt`: `tags()` puts the rating, three genres and the score after the year; `facts()` lists Réalisation, Scénario (films), Avec (6 actors) and Studio / Diffusion. The series page keeps two lines for the episodes row.
 - **Tests**: `testDebugUnitTest` 73/73 (`FactsTest` 3). `assembleDebug` and `lintDebug` OK, no new warning. Checked on the Shield: Overgeared "2026 · BR-14 · Fantasy, Animation, Action · ★ 7,7", Avec and Diffusion; a film with Réalisation, Scénario, Avec and Studio.
 - **Not verified**: an item without people or genres (lines left out by `facts`, covered by the tests only).
+
+### 2026-11-09 — Android TV: search
+
+- **Added**: ADR 0047, the Windows search (`emby_search`, `title_matches`, ADR 0011 and 0020) on TV, reached from "Rechercher" in the home header.
+  - `emby/Search.kt`: same cleaning, two-letter minimum, three requests in parallel (25 films, 25 series, 100 episodes, 24 shown), episodes kept when a word of their title starts with the term.
+  - `ui/SearchScreen.kt`: results 300 ms after the last key, or at once with the keyboard's Search key; a new term cancels the request running. Films, Séries and Épisodes rows; an episode opens its series (no episode page yet). Back from a film or series returns to the results with the term and the focused card.
+  - D-pad Down leaves the text field for the results (the field kept the key for its cursor; found on the device and fixed).
+- **Tests**: `testDebugUnitTest` 84/84 (`SearchTest` 8, `SearchGroupsTest` 3). `assembleDebug` and `lintDebug` OK, no warning in the new files. Checked on the Shield: "over" gives Films · 2 (Overdrive, Overdose) and Séries · 3 (Overgeared, Tonikawa, My Instant Death Ability…); Tonikawa opened and Back returned to its card; Back from the results lands on "Rechercher"; 0 token lines in logcat.
+- **Not verified**: the voice input, a term with no match and the error state on the device (covered by the tests only).

@@ -29,9 +29,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
@@ -206,6 +213,7 @@ fun SearchScreen(
 private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Modifier, onSearch: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val focusManager = LocalFocusManager.current
     val shape = RoundedCornerShape(8.dp)
     Box(
         Modifier.padding(horizontal = 48.dp, vertical = 8.dp).fillMaxWidth(0.6f)
@@ -223,7 +231,15 @@ private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Mod
             cursorBrush = SolidColor(Palette.accent),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-            modifier = modifier.fillMaxWidth(),
+            // A text field keeps the D-pad for its cursor: Down goes on to the results
+            modifier = modifier.fillMaxWidth().onPreviewKeyEvent {
+                if (it.key == Key.DirectionDown && it.type == KeyEventType.KeyDown) {
+                    focusManager.moveFocus(FocusDirection.Down)
+                    true
+                } else {
+                    false
+                }
+            },
         )
     }
 }
