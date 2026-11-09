@@ -146,17 +146,18 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             }
         }
 
-        play(itemId, startTicks)
+        play(itemId, startTicks, intent.getStringExtra(EXTRA_MEDIA_SOURCE_ID))
     }
 
-    private fun play(itemId: String, startTicks: Long) {
+    /** [mediaSourceId]: the version chosen on the film page (ADR 0058); null lets the server pick. */
+    private fun play(itemId: String, startTicks: Long, mediaSourceId: String? = null) {
         current = itemId
         next = null
         skips = null
         settings = settingsStore?.load() ?: PlaybackSettings()
         ui.reset()
         lifecycleScope.launch { describe(itemId) }
-        lifecycleScope.launch { negotiate(itemId, startTicks) }
+        lifecycleScope.launch { negotiate(itemId, startTicks, mediaSourceId) }
     }
 
     /** Title over the video and the next episode: playback never waits for them. */
@@ -214,11 +215,11 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         }
     }
 
-    private suspend fun negotiate(itemId: String, startTicks: Long) {
+    private suspend fun negotiate(itemId: String, startTicks: Long, mediaSourceId: String?) {
         try {
             // The cap of the server's kind of address, else the default limit (ADR 0037, 0051)
             val bitrate = settings.maxStreamingBitrate(client.server.isLocal)
-            val chosen = plan(client.server, client.playbackInfo(userId, itemId, deviceProfile(bitrate)))
+            val chosen = plan(client.server, client.playbackInfo(userId, itemId, deviceProfile(bitrate), mediaSourceId), mediaSourceId)
             if (current != itemId) return
             Log.i(TAG, "play method=${chosen.method} source=${chosen.mediaSourceId} subtitles=${chosen.subtitles.size} maxBitrate=$bitrate")
             Log.i(TAG, "subtitle style=${settings.subtitles}")
@@ -480,5 +481,6 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     companion object {
         const val EXTRA_ITEM_ID = "itemId"
         const val EXTRA_START_TICKS = "startTicks"
+        const val EXTRA_MEDIA_SOURCE_ID = "mediaSourceId"
     }
 }

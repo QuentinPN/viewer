@@ -88,15 +88,25 @@ fun deviceProfile(maxStreamingBitrate: Long = MAX_STREAMING_BITRATE) = DevicePro
             EXTERNAL_TEXT_SUBTITLES.map { SubtitleProfile(it, "External") },
 )
 
-/** Picks the first source the server offers and the best way to play it. */
-fun plan(server: ServerUrl, response: PlaybackInfoResponse): PlaybackPlan {
+/**
+ * A `MediaSourceId` this client sends, as `is_source_id` on Windows (ADR 0036): other
+ * ids are neither offered nor sent.
+ */
+fun isSourceId(id: String) =
+    id.isNotEmpty() && id.length <= 128 && id.all { (it.isLetterOrDigit() && it.code < 128) || it == '-' || it == '_' }
+
+/**
+ * Picks the source asked for (ADR 0058), else the first the server offers, and the best
+ * way to play it. A version the server did not offer is not replaced by another.
+ */
+fun plan(server: ServerUrl, response: PlaybackInfoResponse, mediaSourceId: String? = null): PlaybackPlan {
     when (response.errorCode) {
         null -> {}
         "NotAllowed" -> throw EmbyException(EmbyError.PlaybackRefused("lecture non autorisée pour ce compte"))
         "RateLimitExceeded" -> throw EmbyException(EmbyError.PlaybackRefused("trop de lectures en cours sur le serveur"))
         else -> throw EmbyException(EmbyError.NoCompatibleStream)
     }
-    val source = response.mediaSources.firstOrNull() ?: throw EmbyException(EmbyError.NoCompatibleStream)
+    val source = response.mediaSources.firstOrNull { mediaSourceId == null || it.id == mediaSourceId } ?: throw EmbyException(EmbyError.NoCompatibleStream)
     // A transcode also fills DirectStreamUrl with the transcoding URL, so the flags
     // decide, not which URL is present.
     val (method, raw) = when {

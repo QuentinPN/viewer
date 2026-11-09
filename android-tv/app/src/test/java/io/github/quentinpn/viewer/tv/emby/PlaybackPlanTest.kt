@@ -2,6 +2,7 @@ package io.github.quentinpn.viewer.tv.emby
 
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -83,6 +84,28 @@ class PlaybackPlanTest {
         assertEquals(ServerTracks(audio = null, subtitle = null), directPlay("4", "2"))
         // The server's external file is not loaded when playing the file
         assertEquals(ServerTracks(audio = 1, subtitle = null), directPlay("1", "9"))
+    }
+
+    @Test
+    fun theChosenVersionIsPlayedAndNeverReplaced() {
+        // Two versions in one answer, as a server that ignores `MediaSourceId` would send (ADR 0036)
+        val answer = response(
+            """{"MediaSources":[
+            {"Id":"m1","SupportsDirectPlay":true,"DirectStreamUrl":"/videos/i1/original.mkv?MediaSourceId=m1"},
+            {"Id":"m2","SupportsDirectPlay":true,"DirectStreamUrl":"/videos/i1/original.mkv?MediaSourceId=m2"}]}""",
+        )
+        assertEquals("m1", plan(server, answer).mediaSourceId)
+        val second = plan(server, answer, "m2")
+        assertEquals("m2", second.mediaSourceId)
+        assertTrue(second.url.endsWith("MediaSourceId=m2"))
+        expectError(EmbyError.NoCompatibleStream::class.java) { plan(server, answer, "m3") }
+    }
+
+    @Test
+    fun sourceIds() {
+        assertTrue(isSourceId("mediasource_30207"))
+        assertTrue(isSourceId("0123abcd-ef"))
+        for (id in listOf("", "a/b", "a b", "é", "a".repeat(129))) assertFalse(id, isSourceId(id))
     }
 
     @Test

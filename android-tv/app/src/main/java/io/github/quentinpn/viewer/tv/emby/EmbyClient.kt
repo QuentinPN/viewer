@@ -263,15 +263,31 @@ class EmbyClient(
         return call(get(url), QueryResult.serializer(BaseItemDto.serializer())).items
     }
 
-    /** Playback negotiation (ADR 0007): the server answers with its sources for this profile. */
-    suspend fun playbackInfo(userId: String, itemId: String, profile: DeviceProfile): PlaybackInfoResponse {
+    /**
+     * Playback negotiation (ADR 0007): the server answers with its sources for this profile,
+     * only [mediaSourceId]'s when one version is asked for (ADR 0058).
+     */
+    suspend fun playbackInfo(
+        userId: String,
+        itemId: String,
+        profile: DeviceProfile,
+        mediaSourceId: String? = null,
+    ): PlaybackInfoResponse {
+        if (mediaSourceId != null && !isSourceId(mediaSourceId)) {
+            throw EmbyException(EmbyError.InvalidResponse("version invalide"))
+        }
         val id = segment(userId)
         val url = server.api("/Items/${segment(itemId)}/PlaybackInfo").newBuilder()
             .addQueryParameter("UserId", id)
             .build()
         val body = json.encodeToString(
             PlaybackInfoRequest.serializer(),
-            PlaybackInfoRequest(userId = id, maxStreamingBitrate = profile.maxStreamingBitrate, deviceProfile = profile),
+            PlaybackInfoRequest(
+                userId = id,
+                maxStreamingBitrate = profile.maxStreamingBitrate,
+                deviceProfile = profile,
+                mediaSourceId = mediaSourceId,
+            ),
         )
         return call(post(url, body.toRequestBody(JSON_TYPE)), PlaybackInfoResponse.serializer())
     }
