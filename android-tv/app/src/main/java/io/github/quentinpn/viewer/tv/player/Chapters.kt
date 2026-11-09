@@ -17,8 +17,6 @@ private const val MAX_NAME_CHARS = 120
 /** A seek lands about on the start: a position this close counts as in it. */
 private const val LANDING_SLACK_SECONDS = 0.5
 
-private val SPACES = Regex("(?U)\\s+")
-
 /** A chapter, from [start] seconds of the file. */
 data class Chapter(val start: Double, val name: String)
 
@@ -44,7 +42,22 @@ fun chapters(infos: List<ChapterInfo>, runTimeTicks: Long?): List<Chapter> {
 
 /** One line of printable text, or null when nothing is left. */
 private fun cleanName(name: String?): String? {
-    val line = name?.trim()?.split(SPACES)?.joinToString(" ")?.filterNot { it.isISOControl() } ?: return null
+    if (name == null) return null
+    // No regex: Android's ICU rejects the (?U) flag the JVM needs for Unicode spaces
+    val line = buildString {
+        var space = false
+        for (c in name) {
+            when {
+                c.isWhitespace() -> space = true
+                c.isISOControl() -> Unit
+                else -> {
+                    if (space && isNotEmpty()) append(' ')
+                    space = false
+                    append(c)
+                }
+            }
+        }
+    }
     // Cut by characters, never inside a surrogate pair
     val cut = if (line.codePointCount(0, line.length) > MAX_NAME_CHARS) line.substring(0, line.offsetByCodePoints(0, MAX_NAME_CHARS)) else line
     return cut.ifEmpty { null }

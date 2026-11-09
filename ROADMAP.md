@@ -878,3 +878,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Added**: ADR 0056. An "À suivre" row after "Reprendre": `/Shows/NextUp` (16 at most), keeping only unwatched, unstarted episodes and dropping those already in "Reprendre" (the account's resume section from `/Users/{Id}/HomeSections` when it has one). Loaded in parallel; the row is hidden when empty or on error. A card plays the episode from the start through the existing episode path.
 - **Tests**: `testDebugUnitTest` 144/144 (`NextUpTest` 8). `assembleDebug` and `lintDebug` OK. Checked on the Shield: the home loads and shows no "À suivre" row, which is right for the account `claude`: the only next episode (Overgeared S1·É6, after É5 watched) is already in "Reprendre". No warning or error in logcat; 0 token lines.
 - **Not verified**: the row with cards (filling it would mean marking episodes watched on the account), a click on one of its cards.
+
+### 2026-11-09 — Android TV: chapters in the player
+
+- **Added**: ADR 0057. UP opens a "Chapitres" panel when the item has at least two regular chapters (Emby's `Chapters`, same rules as Windows): one row per chapter with its start, focus on the one playing; OK jumps to it, Back closes the panel. The controls hint adds "▲ chapitres".
+- **Fixed before merge**: chapter names were cleaned with a `(?U)` regex, which Android's ICU rejects: the player crashed as soon as an item loaded. JVM unit tests could not see it; now a plain character loop, with a test.
+- **Tests**: `testDebugUnitTest` 152/152 (`ChaptersTest`). `assembleDebug` and `lintDebug` OK. Checked on the Shield, Overgeared S1·É6: UP at 13:16 opens the panel on "Chapter 2"; "Intro" jumps to 1:52 (`chapter at 112.0`); reopened, the panel focuses "Intro"; Back closes it and keeps the controls; the stop report is sent. 0 token lines in logcat.
+- **Not verified**: an item with many chapters (scrolling), an item without chapters (UP should only show the controls), a transcode.

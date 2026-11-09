@@ -57,6 +57,12 @@ class ChaptersTest {
     }
 
     @Test
+    fun namesKeepOneLineOfPrintableText() {
+        val found = chapters(listOf(info(0, " Acte un\u0001 \u0007 fin\t"), info(600_000_000, "\u0001 ")), null)
+        assertEquals(listOf("Acte un fin", "Chapitre 2"), found.map { it.name })
+    }
+
+    @Test
     fun dropsWhatCannotBeNavigated() {
         // Negative, past the end, and a duplicate within a second
         val found = chapters(
