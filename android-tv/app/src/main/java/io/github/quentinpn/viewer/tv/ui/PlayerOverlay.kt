@@ -3,6 +3,7 @@ package io.github.quentinpn.viewer.tv.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -43,6 +44,7 @@ import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
+import io.github.quentinpn.viewer.tv.player.SkipPrompt
 import io.github.quentinpn.viewer.tv.player.Track
 import io.github.quentinpn.viewer.tv.player.TrackType
 import kotlinx.coroutines.delay
@@ -79,6 +81,9 @@ class PlayerUi {
     /** The "Épisode suivant" card is shown while this is not null. */
     var upNext by mutableStateOf<UpNext?>(null)
 
+    /** "Passer l'intro" or "Passer le générique" during a segment (ADR 0048). */
+    var skip by mutableStateOf<SkipPrompt.Button?>(null)
+
     // Bumped on each key: restarts the hide delay
     private var shown by mutableIntStateOf(0)
 
@@ -100,6 +105,7 @@ class PlayerUi {
         status = "Chargement…"
         tracks = null
         upNext = null
+        skip = null
         controls = false
     }
 
@@ -118,8 +124,8 @@ class PlayerUi {
     }
 }
 
-/** The episode offered at the end of the current one. */
-data class UpNext(val series: String, val label: String)
+/** The episode offered at the end of the current one, or from the start of its credits ([atCredits]). */
+data class UpNext(val series: String, val label: String, val atCredits: Boolean = false)
 
 /** "S1 · É3 — Le titre", or the name alone without numbers. */
 internal fun episodeLabel(season: Int?, episode: Int?, name: String): String {
@@ -127,11 +133,11 @@ internal fun episodeLabel(season: Int?, episode: Int?, name: String): String {
     return if (code.isEmpty()) name else if (name.isEmpty()) code else "$code — $name"
 }
 
-/** Time, progress and title over the video, the audio / subtitle menu and the next episode card. */
+/** Time, progress and title over the video, the audio / subtitle menu, the skip button and the next episode card. */
 @Composable
-fun PlayerOverlay(ui: PlayerUi, onSelect: (TrackType, Int?) -> Unit, onPlayNext: () -> Unit, onCancelNext: () -> Unit) {
+fun PlayerOverlay(ui: PlayerUi, onSelect: (TrackType, Int?) -> Unit, onPlayNext: () -> Unit, onCancelNext: () -> Unit, onSkip: () -> Unit) {
     ui.AutoHide()
-    Box(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
         ui.status?.let {
             Text(it, color = Palette.text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.align(Alignment.Center))
         }
@@ -142,8 +148,25 @@ fun PlayerOverlay(ui: PlayerUi, onSelect: (TrackType, Int?) -> Unit, onPlayNext:
             // Always shown while paused, so the picture never looks frozen
             Controls(ui, Modifier.align(Alignment.BottomCenter))
         }
+        val skip = ui.skip
+        if (skip != null && upNext == null && ui.status == null) {
+            // Above the text of the controls while they show; stays when they fade
+            SkipButton(skip, ui.tracks == null, onSkip, Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
+        }
         ui.tracks?.let { TrackMenu(it, onSelect, Modifier.align(Alignment.CenterEnd)) }
     }
+}
+
+/** Focused when it appears or the track menu closes, never while the menu is open. */
+@Composable
+private fun SkipButton(skip: SkipPrompt.Button, focus: Boolean, onSkip: () -> Unit, modifier: Modifier) {
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(skip.label, focus) {
+        if (!focus) return@LaunchedEffect
+        withFrameNanos {}
+        runCatching { requester.requestFocus() }
+    }
+    Button(onClick = onSkip, modifier = modifier.focusRequester(requester)) { Text(skip.label) }
 }
 
 @Composable

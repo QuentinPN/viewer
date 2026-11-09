@@ -49,6 +49,9 @@ interface PlayerEngine {
 
     fun seekBy(seconds: Double)
 
+    /** Absolute seek; at or past the duration, the file reaches its end (keep-open). */
+    fun seekTo(seconds: Double)
+
     fun cycleSubtitle()
 
     fun cycleAudio()

@@ -66,6 +66,9 @@ data class BaseItemDto(
     @SerialName("People") val people: List<PersonDto> = emptyList(),
     @SerialName("OfficialRating") val officialRating: String? = null,
     @SerialName("CommunityRating") val communityRating: Double? = null,
+    /** Key case varies (`Imdb` on an episode, `IMDB` on its series): sent to the intro services only (ADR 0048). */
+    @SerialName("ProviderIds") val providerIds: Map<String, String> = emptyMap(),
+    @SerialName("Chapters") val chapters: List<ChapterInfo> = emptyList(),
 )
 
 /** `Studios[].Id` is a number on Emby 4.10, unlike other ids: only the name is read. */
@@ -77,6 +80,14 @@ data class PersonDto(
     @SerialName("Name") val name: String = "",
     /** `Actor`, `Director`, `Writer`, `Producer`, `GuestStar`… */
     @SerialName("Type") val type: String = "",
+)
+
+/** `MarkerType` is `Chapter`, `IntroStart`, `IntroEnd` or `CreditsStart` (ADR 0030). */
+@Serializable
+data class ChapterInfo(
+    @SerialName("StartPositionTicks") val startPositionTicks: Long = 0,
+    @SerialName("Name") val name: String? = null,
+    @SerialName("MarkerType") val markerType: String? = null,
 )
 
 @Serializable

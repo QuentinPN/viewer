@@ -6,6 +6,7 @@ import coil3.ImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import io.github.quentinpn.viewer.tv.emby.DeviceIdentity
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
+import io.github.quentinpn.viewer.tv.emby.SegmentSources
 import io.github.quentinpn.viewer.tv.emby.ServerUrl
 import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.session.SessionStore
@@ -16,6 +17,13 @@ object AppServices {
     val http: OkHttpClient by lazy { EmbyClient.defaultHttp() }
 
     val reporter: PlaybackReporter by lazy { PlaybackReporter() }
+
+    /** Intro and credits sources, with their in-memory cache (ADR 0048). */
+    fun segments(context: Context): SegmentSources = segmentSources ?: synchronized(this) {
+        segmentSources ?: SegmentSources(SegmentSources.http(http, device(context).version)).also { segmentSources = it }
+    }
+
+    @Volatile private var segmentSources: SegmentSources? = null
 
     fun store(context: Context) = SessionStore(context)
 

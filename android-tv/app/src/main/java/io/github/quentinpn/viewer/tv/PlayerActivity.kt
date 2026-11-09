@@ -20,13 +20,17 @@ import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.ExternalSubtitle
 import io.github.quentinpn.viewer.tv.emby.deviceProfile
+import io.github.quentinpn.viewer.tv.emby.embyMarkers
 import io.github.quentinpn.viewer.tv.emby.nextEpisode
 import io.github.quentinpn.viewer.tv.emby.plan
+import io.github.quentinpn.viewer.tv.emby.segmentQuery
 import io.github.quentinpn.viewer.tv.emby.startTicks
 import io.github.quentinpn.viewer.tv.player.MediaSource
 import io.github.quentinpn.viewer.tv.player.MpvPlayerEngine
 import io.github.quentinpn.viewer.tv.player.PlayerEngine
 import io.github.quentinpn.viewer.tv.player.PlayerListener
+import io.github.quentinpn.viewer.tv.player.SkipPlan
+import io.github.quentinpn.viewer.tv.player.SkipPrompt
 import io.github.quentinpn.viewer.tv.player.TrackPreference
 import io.github.quentinpn.viewer.tv.player.TrackPreferenceStore
 import io.github.quentinpn.viewer.tv.player.TrackType
@@ -52,7 +56,8 @@ private const val NATURAL_END_MARGIN_SECONDS = 30.0
  * Start, progress and stop go to the server through [PlaybackReporter] (ADR 0040).
  * The last audio and subtitle picked in the menu apply to the next files (ADR 0042).
  * At the natural end of an episode, the next one is offered and plays in the same
- * engine (ADR 0043).
+ * engine (ADR 0043). Intros and credits get a skip button, and the next episode is
+ * offered from the start of its credits (ADR 0048).
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
     private var engine: PlayerEngine? = null
@@ -69,6 +74,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     /** The episode after the current one, once known. */
     private var next: BaseItemDto? = null
 
+    /** Intro and credits of the current item, once known (ADR 0048). */
+    private var skips: SkipPlan? = null
+
     // END_FILE events of a file replaced by the next episode: not the end of playback
     @Volatile private var replacedEnds = 0
     private val reporter = AppServices.reporter
@@ -78,7 +86,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val surface = SurfaceView(this)
         val overlay = ComposeView(this).apply {
-            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::playNext, ::finish) } }
+            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::playNext, ::cancelNext, ::skip) } }
         }
         setContentView(
             // With the menu focused, keys reach the root before the overlay: the player sees them first
@@ -93,7 +101,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         // Back closes the track menu, then the controls, then the player
         onBackPressedDispatcher.addCallback(this) {
             when {
-                ui.upNext != null -> finish()
+                ui.upNext != null -> cancelNext()
                 ui.tracks != null -> ui.tracks = null
                 ui.controls && !ui.paused -> ui.hide()
                 else -> finish()
@@ -125,6 +133,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     private fun play(itemId: String, startTicks: Long) {
         current = itemId
         next = null
+        skips = null
         ui.reset()
         lifecycleScope.launch { describe(itemId) }
         lifecycleScope.launch { negotiate(itemId, startTicks) }
@@ -133,8 +142,10 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     /** Title over the video and the next episode: playback never waits for them. */
     private suspend fun describe(itemId: String) {
         try {
-            val item = client.item(userId, itemId)
+            // Without Fields: also carries the chapters and provider ids for the segments
+            val item = client.fullItem(userId, itemId)
             if (current != itemId) return
+            lifecycleScope.launch { findSegments(item) }
             if (item.type == "Episode") {
                 ui.title = item.seriesName ?: item.name
                 ui.detail = episodeLabel(item.parentIndexNumber, item.indexNumber, item.name)
@@ -149,6 +160,30 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             }
         } catch (_: EmbyException) {
         }
+    }
+
+    /**
+     * Emby's markers, then IntroDB and TheIntroDB (ADR 0030): a failure only means no
+     * button, and playback never waits for them.
+     */
+    private suspend fun findSegments(item: BaseItemDto) {
+        val sources = AppServices.segments(this)
+        val key = "${client.server.url}|$userId|${item.id}"
+        val found = sources.cached(key) ?: run {
+            val series = item.seriesId?.takeIf { item.type == "Episode" }?.let { seriesId ->
+                try {
+                    client.fullItem(userId, seriesId)
+                } catch (_: EmbyException) {
+                    // Only needed for its ids: no query, no error
+                    null
+                }
+            }
+            if (current != item.id) return
+            sources.lookup(key, embyMarkers(item.chapters), segmentQuery(item, series))
+        }
+        if (current != item.id) return
+        Log.i(TAG, "segments=${found.joinToString { "${it.kind}@${it.start}-${it.end ?: "end"} (${it.source})" }}")
+        skips = SkipPlan(found)
     }
 
     private suspend fun negotiate(itemId: String, startTicks: Long) {
@@ -223,7 +258,10 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     override fun onPosition(seconds: Double) {
         reporter.event { position(seconds, it) }
-        runOnUiThread { ui.position = seconds }
+        runOnUiThread {
+            ui.position = seconds
+            updateSkip()
+        }
     }
 
     override fun onDuration(seconds: Double) {
@@ -263,6 +301,35 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         runOnUiThread { finish() }
     }
 
+    /** The skip button, or the up-next card from the start of the credits. */
+    private fun updateSkip() {
+        // Until the new file loads, positions are still those of the replaced one
+        val prompt = if (ui.status == null) skips?.at(ui.position, ui.duration, next != null) else null
+        if (prompt == SkipPrompt.UpNext && ui.upNext == null) {
+            val following = next ?: return
+            ui.tracks = null
+            ui.upNext = UpNext(following.seriesName ?: ui.title, episodeLabel(following.parentIndexNumber, following.indexNumber, following.name), atCredits = true)
+            Log.i(TAG, "up next at the credits")
+        }
+        ui.skip = prompt as? SkipPrompt.Button
+    }
+
+    /** Seeks past the segment; past the end of the file, mpv ends it as a natural end. */
+    private fun skip() {
+        val player = engine ?: return
+        val target = ui.skip?.to ?: return
+        Log.i(TAG, "skip to $target")
+        player.seekTo(target)
+        ui.position = target
+        ui.skip = null
+        ui.show()
+    }
+
+    /** At the credits, the card goes and the credits play on; at the end, the player closes. */
+    private fun cancelNext() {
+        if (ui.upNext?.atCredits == true) ui.upNext = null else finish()
+    }
+
     private fun playNext() {
         val following = next ?: return finish()
         Log.i(TAG, "play next=${following.id}")
@@ -281,6 +348,12 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     private fun handleKey(event: KeyEvent): Boolean {
         val player = engine ?: return false
         if (ui.status != null || ui.tracks != null || ui.upNext != null) return false
+        // OK presses the skip button while it shows; play / pause keys still pause
+        val ok = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER
+        if (ok && ui.skip != null) {
+            if (event.action == KeyEvent.ACTION_DOWN) skip()
+            return true
+        }
         val action = action(event.keyCode) ?: return false
         if (event.action == KeyEvent.ACTION_DOWN) action(player)
         return true
