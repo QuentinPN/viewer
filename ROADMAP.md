@@ -892,3 +892,9 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Changed at merge**: the film page reads the item without `Fields` (`fullItem`), as Windows does, so `MediaSources` is present.
 - **Tests**: `testDebugUnitTest` 162/162 (`VersionsTest`, `EmbyClientTest`, `PlaybackPlanTest`). `assembleDebug` and `lintDebug` OK. Checked on the Shield: a single-version film page (Street Fighter : La Légende de Chun-Li) shows in full with no version button; playback from "Reprendre" unchanged (Direct Play, reports sent); 0 token lines in logcat.
 - **Not verified**: no film on the test server has two versions, so the button, playing a second version and its reports are covered by unit tests only. Episodes have no chooser (the TV has no episode page).
+
+### 2026-11-09 — Android TV: playback information panel
+
+- **Added**: ADR 0061. "Informations de lecture", the last row of the ▼ track menu (or the INFO key on remotes that have one): play method with the transcode reasons, streaming cap, container, video codec, resolution, frame rate, colour, decoding, audio track, format and output, subtitles, measured bitrate, dropped frames, buffer ahead; read from the PlaybackPlan and libmpv, refreshed each second, a missing value left out. Never shows the stream URL or the token.
+- **Tests**: `testDebugUnitTest` 172/172 (`PlaybackInfoTest` 10). `assembleDebug` and `lintDebug` OK. Checked on the Shield, Overgeared S1·É6: "Lecture directe", "Maximale · réseau local", MKV, H.264 (AVC), 1920 × 1080 (1080p), 23,976 i/s, SDR · BT.709, "Matériel (mediacodec)", Japonais · AAC stéréo, AAC · stéréo · 48 kHz, AudioTrack · stéréo, measured bitrate 6,3 then 8,4 Mb/s a second later, 0 dropped frames, 86 s ahead; Back closes the panel and keeps the controls. 0 token lines in logcat.
+- **Not verified**: a transcode (its reasons in the URL), HDR, multichannel output, the INFO key (the Shield remote has none).
