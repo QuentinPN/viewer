@@ -916,3 +916,9 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Changed** at the owner's request: the hero takes 85 % of the screen height and carries the header (« Accueil », Rechercher, Réglages, Déconnecter) over its backdrop, read at 1920 px, with a dark band at the top; the header scrolls away with it. Focus on the hero brings the column back to its top. Without a hero the header stays first in the column.
 - **Tests**: `testDebugUnitTest` 197/197, `assembleDebug` and `lintDebug` OK. Checked on the Shield: home opens on the whole hero with the header; DOWN reaches the "Reprendre" shelf, UP shows the whole hero again with the focus on "Plus d'infos", UP again reaches "Rechercher".
 - **Next**: a redesign after the owner's reference (top bar and hero information), mock-up first.
+
+### 2026-11-09 — Android TV: subtitle and audio delay
+
+- **Added**: ADR 0062. Under « Synchronisation » in the ▼ track menu: « Décalage des sous-titres » (only while a subtitle track is on) and « Décalage audio »; ◀ ▶ by 0,1 s within ±10 s, OK back to « Aucun ». Set through mpv's `sub-delay` and `audio-delay` and read back from mpv. For the current file only: both go back to 0 at each new file, the next episode included.
+- **Tests**: `testDebugUnitTest` 202/202 (`DelayTest` 5). `assembleDebug` and `lintDebug` OK. Checked on the Shield, Overgeared S1·É6: « Décalage audio » +0,3 s (`audio-delay=0.1`, `0.2`, `0.3` read back from mpv), OK back to « Aucun » (`audio-delay=0.0`); with « Français · ASS » on, the « Décalage des sous-titres » row appears and goes to −0,5 s (`sub-delay=-0.5`); subtitles back to « Désactivés » remove the row. Stop report sent (resume at 9:47 on the account `claude`). 0 token lines in logcat.
+- **Not verified**: the reset at the next episode in the same engine, bitstream audio output, text subtitles, whether the shift is perceptible on screen (only mpv's values were read).
