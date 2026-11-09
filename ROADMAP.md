@@ -885,3 +885,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Fixed before merge**: chapter names were cleaned with a `(?U)` regex, which Android's ICU rejects: the player crashed as soon as an item loaded. JVM unit tests could not see it; now a plain character loop, with a test.
 - **Tests**: `testDebugUnitTest` 152/152 (`ChaptersTest`). `assembleDebug` and `lintDebug` OK. Checked on the Shield, Overgeared S1·É6: UP at 13:16 opens the panel on "Chapter 2"; "Intro" jumps to 1:52 (`chapter at 112.0`); reopened, the panel focuses "Intro"; Back closes it and keeps the controls; the stop report is sent. 0 token lines in logcat.
 - **Not verified**: an item with many chapters (scrolling), an item without chapters (UP should only show the controls), a transcode.
+
+### 2026-11-09 — Android TV: choose the media version
+
+- **Added**: ADR 0058, the Windows version chooser (ADR 0036) on the TV film page. From two versions with a usable id, a "Version : …" button (same labels as Windows: resolution, codec, depth, HDR, size) cycles through them; the choice is kept per user and film (ids only, the first version never stored) and sent as `MediaSourceId` in the PlaybackInfo body, never in the URL. `plan` takes only the asked version and fails rather than play another one. "Reprendre" and "Lire depuis le début" send it; elsewhere the server picks, as before.
+- **Changed at merge**: the film page reads the item without `Fields` (`fullItem`), as Windows does, so `MediaSources` is present.
+- **Tests**: `testDebugUnitTest` 162/162 (`VersionsTest`, `EmbyClientTest`, `PlaybackPlanTest`). `assembleDebug` and `lintDebug` OK. Checked on the Shield: a single-version film page (Street Fighter : La Légende de Chun-Li) shows in full with no version button; playback from "Reprendre" unchanged (Direct Play, reports sent); 0 token lines in logcat.
+- **Not verified**: no film on the test server has two versions, so the button, playing a second version and its reports are covered by unit tests only. Episodes have no chooser (the TV has no episode page).

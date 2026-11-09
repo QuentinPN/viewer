@@ -57,7 +57,8 @@ fun MovieScreen(
         val shown = movie is Load.Ready
         if (!shown) movie = Load.Loading
         val next = try {
-            Load.Ready(client.item(userId, movieId))
+            // Without Fields, as Windows reads its detail: also carries the MediaSources (ADR 0058)
+            Load.Ready(client.fullItem(userId, movieId))
         } catch (e: EmbyException) {
             if (e.error == EmbyError.SessionExpired) onSessionExpired()
             Load.Failed(e.error.message)
