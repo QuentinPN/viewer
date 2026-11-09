@@ -19,12 +19,14 @@ import io.github.quentinpn.viewer.tv.ui.LibraryMemory
 import io.github.quentinpn.viewer.tv.ui.LibraryPreferenceStore
 import io.github.quentinpn.viewer.tv.ui.LibraryScreen
 import io.github.quentinpn.viewer.tv.ui.MovieScreen
+import io.github.quentinpn.viewer.tv.ui.SearchMemory
+import io.github.quentinpn.viewer.tv.ui.SearchScreen
 import io.github.quentinpn.viewer.tv.ui.SeriesScreen
 import io.github.quentinpn.viewer.tv.ui.SignInScreen
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import kotlinx.coroutines.launch
 
-/** Launcher: sign-in when no session is stored, else the home shelves, a library grid, the series and film pages. */
+/** Launcher: sign-in when no session is stored, else the home shelves, a library grid or the search, the series and film pages. */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,6 +50,7 @@ class MainActivity : ComponentActivity() {
                     var series by remember(current) { mutableStateOf<String?>(null) }
                     var movie by remember(current) { mutableStateOf<String?>(null) }
                     var library by remember(current) { mutableStateOf<LibraryMemory?>(null) }
+                    var search by remember(current) { mutableStateOf<SearchMemory?>(null) }
                     val libraryPrefs = remember(current) { LibraryPreferenceStore(this, current.userId) }
                     val home = remember(current) { HomeMemory() }
                     val refresh by AppServices.reporter.stopped.collectAsState()
@@ -91,6 +94,21 @@ class MainActivity : ComponentActivity() {
                         )
                         return@ViewerTheme
                     }
+                    // Also under the film and series pages: Back from them returns to the results
+                    val openSearch = search
+                    if (openSearch != null) {
+                        BackHandler { search = null }
+                        SearchScreen(
+                            client,
+                            current.userId,
+                            images,
+                            openSearch,
+                            onOpenSeries = { series = it },
+                            onOpenMovie = { movie = it },
+                            onSessionExpired = expired,
+                        )
+                        return@ViewerTheme
+                    }
                     HomeScreen(
                         client = client,
                         userId = current.userId,
@@ -100,6 +118,7 @@ class MainActivity : ComponentActivity() {
                         onOpenSeries = { series = it },
                         onOpenMovie = { movie = it },
                         onOpenLibrary = { library = LibraryMemory(it, libraryPrefs.load(it)) },
+                        onOpenSearch = { search = SearchMemory() },
                         onSessionExpired = expired,
                         memory = home,
                         refresh = refresh,
