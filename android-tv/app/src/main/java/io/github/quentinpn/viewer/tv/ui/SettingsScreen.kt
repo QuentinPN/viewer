@@ -128,7 +128,7 @@ fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, version:
         item {
             Choice(
                 "Appliquer aussi aux sous-titres stylés (ASS)",
-                "Sinon, ils gardent la police, les couleurs et la place prévues par leur auteur.",
+                "Sinon, ils gardent la police et les couleurs prévues par leur auteur ; seule la position suit ce réglage.",
                 onOff(style.overrideAss),
             ) { change(style.copy(overrideAss = !style.overrideAss)) }
         }

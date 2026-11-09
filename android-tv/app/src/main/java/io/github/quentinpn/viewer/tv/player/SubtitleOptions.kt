@@ -9,8 +9,9 @@ import kotlin.math.roundToInt
 
 /**
  * mpv properties for [style] (ADR 0053), the values of `subtitle_options` on Windows
- * (src-tauri/src/player/mpv.rs, ADR 0035). ASS and SSA keep their own styles
- * (`sub-ass-override=no`, so not even `sub-scale`) unless the user overrides them.
+ * (src-tauri/src/player/mpv.rs, ADR 0035). ASS and SSA keep their own styles unless
+ * the user overrides them: `yes` rather than Windows' `no`, which would also pin them
+ * under the TV controls (`sub-pos` is ignored with `no`; seen on the Shield).
  * `sub-pos` is left out: [subtitlePosition] gives it, as it also follows the controls.
  */
 fun subtitleOptions(style: SubtitleStyle): List<Pair<String, String>> {
@@ -36,7 +37,7 @@ fun subtitleOptions(style: SubtitleStyle): List<Pair<String, String>> {
         // The box colour, 70 % opaque black (#AARRGGBB); the outline style ignores it
         "sub-back-color" to "#B3000000",
         "sub-align-y" to align,
-        "sub-ass-override" to if (style.overrideAss) "force" else "no",
+        "sub-ass-override" to if (style.overrideAss) "force" else "yes",
     )
 }
 

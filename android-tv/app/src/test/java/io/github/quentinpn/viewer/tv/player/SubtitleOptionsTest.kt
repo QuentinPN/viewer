@@ -18,7 +18,7 @@ class SubtitleOptionsTest {
                 "sub-border-style" to "outline-and-shadow",
                 "sub-back-color" to "#B3000000",
                 "sub-align-y" to "bottom",
-                "sub-ass-override" to "no",
+                "sub-ass-override" to "yes",
             ),
             subtitleOptions(SubtitleStyle()),
         )
