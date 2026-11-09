@@ -10,6 +10,7 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.lifecycleScope
 import io.github.quentinpn.viewer.tv.emby.ActivePlayback
@@ -22,11 +23,15 @@ import io.github.quentinpn.viewer.tv.player.MediaSource
 import io.github.quentinpn.viewer.tv.player.MpvPlayerEngine
 import io.github.quentinpn.viewer.tv.player.PlayerEngine
 import io.github.quentinpn.viewer.tv.player.PlayerListener
+import io.github.quentinpn.viewer.tv.player.TrackPreference
+import io.github.quentinpn.viewer.tv.player.TrackPreferenceStore
 import io.github.quentinpn.viewer.tv.player.TrackType
+import io.github.quentinpn.viewer.tv.player.choose
 import io.github.quentinpn.viewer.tv.ui.PlayerOverlay
 import io.github.quentinpn.viewer.tv.ui.PlayerUi
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 private const val TAG = "ViewerTV"
 private const val TICKS_PER_SECOND = 10_000_000.0
@@ -36,12 +41,14 @@ private const val SEEK_SECONDS = 10.0
  * Plays one Emby item. Not exported: it negotiates the stream itself through
  * PlaybackInfo, so the token never travels in an Intent (ADR 0007, 0038).
  * Start, progress and stop go to the server through [PlaybackReporter] (ADR 0040).
+ * The last audio and subtitle picked in the menu apply to the next files (ADR 0042).
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
     private var engine: PlayerEngine? = null
     private val ui = PlayerUi()
     private var subtitles: List<ExternalSubtitle> = emptyList()
     private var surfaceHolder: SurfaceHolder? = null
+    private var preferences: TrackPreferenceStore? = null
     private val reporter = AppServices.reporter
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,7 +86,15 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         val startTicks = intent.getLongExtra(EXTRA_START_TICKS, 0).coerceAtLeast(0)
         val startSeconds = startTicks / TICKS_PER_SECOND
         val client = AppServices.client(this, session)
+        preferences = TrackPreferenceStore(this, session.userId)
         surface.holder.addCallback(this)
+
+        // Subtitles move above the controls while they show
+        lifecycleScope.launch {
+            snapshotFlow { ui.covered }.collect { covered ->
+                engine?.setSubtitlePosition((100 * (1 - covered)).roundToInt())
+            }
+        }
 
         // Only for the title over the video: playback does not wait for it
         lifecycleScope.launch {
@@ -146,6 +161,19 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             ui.show()
         }
         subtitles.forEach { sub -> MediaSource.parse(sub.url)?.let { engine?.addSubtitle(it) } }
+        applyPreferences()
+    }
+
+    /** After the external subtitles: one of them may be the remembered choice. */
+    private fun applyPreferences() {
+        val player = engine ?: return
+        val store = preferences ?: return
+        val tracks = player.tracks()
+        for (type in TrackType.entries) {
+            val selection = choose(tracks, type, store.load(type)) ?: continue
+            player.selectTrack(type, selection.id)
+            Log.i(TAG, "${type.property}=${player.property(type.property)} (préférence)")
+        }
     }
 
     override fun onPosition(seconds: Double) {
@@ -218,6 +246,8 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     private fun selectTrack(type: TrackType, id: Int?) {
         val player = engine ?: return
+        val track = ui.tracks?.find { it.type == type && it.id == id }
+        preferences?.save(type, track?.let(TrackPreference::of) ?: TrackPreference.OFF)
         player.selectTrack(type, id)
         Log.i(TAG, "${type.property}=${player.property(type.property)}")
         ui.tracks = player.tracks()

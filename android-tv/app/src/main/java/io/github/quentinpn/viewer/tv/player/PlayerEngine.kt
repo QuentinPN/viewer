@@ -59,6 +59,9 @@ interface PlayerEngine {
     /** Selects a track by its id; `null` turns subtitles (or audio) off. */
     fun selectTrack(type: TrackType, id: Int?)
 
+    /** Vertical place of subtitles, in % of the picture height: 100 is their normal place, lower moves them up. */
+    fun setSubtitlePosition(percent: Int)
+
     /** Diagnostics only: reads one libmpv property as text. */
     fun property(name: String): String?
 

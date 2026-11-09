@@ -119,6 +119,10 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         if (!released.get()) MPVLib.setPropertyString(type.property, id?.toString() ?: "no")
     }
 
+    override fun setSubtitlePosition(percent: Int) {
+        if (!released.get()) MPVLib.setPropertyString("sub-pos", percent.coerceIn(0, 100).toString())
+    }
+
     override fun property(name: String): String? = if (released.get()) null else MPVLib.getPropertyString(name)
 
     override fun release() {
@@ -193,7 +197,7 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
             "hwdec-codecs" to "h264,hevc,mpeg4,mpeg2video,vp8,vp9,av1",
             "ao" to "audiotrack,opensles",
             "audio-set-media-role" to "yes",
-            // French subtitles by default; user preferences come with the real player UI
+            // French subtitles by default; a choice made in the track menu then wins (ADR 0042)
             "slang" to "fr,fre,fra",
             // The Shield has 3 GB of RAM: a bounded demuxer cache
             "demuxer-max-bytes" to "${64 * 1024 * 1024}",

@@ -7,8 +7,15 @@ enum class TrackType(val mpv: String, val property: String) {
     Subtitle("sub", "sid"),
 }
 
-/** One audio or subtitle track of the playing file, as mpv numbers it. */
-data class Track(val id: Int, val type: TrackType, val label: String, val selected: Boolean)
+/** One audio or subtitle track of the playing file, as mpv numbers it; [lang] and [title] as the file gives them. */
+data class Track(
+    val id: Int,
+    val type: TrackType,
+    val label: String,
+    val selected: Boolean,
+    val lang: String? = null,
+    val title: String? = null,
+)
 
 /**
  * Reads mpv's `track-list` through its sub-properties ([get] returns null for a
@@ -20,15 +27,17 @@ fun readTracks(get: (String) -> String?): List<Track> {
         fun prop(name: String) = get("track-list/$i/$name")?.takeIf { it.isNotEmpty() }
         val type = TrackType.entries.find { it.mpv == prop("type") } ?: return@mapNotNull null
         val id = prop("id")?.toIntOrNull() ?: return@mapNotNull null
+        val title = prop("title")
+        val lang = prop("lang")
         val label = trackLabel(
             type = type,
-            title = prop("title"),
-            lang = prop("lang"),
+            title = title,
+            lang = lang,
             codec = prop("codec"),
             channels = prop("demux-channel-count")?.toIntOrNull(),
             external = prop("external") == "yes",
         )
-        Track(id, type, label, selected = prop("selected") == "yes")
+        Track(id, type, label, selected = prop("selected") == "yes", lang = lang, title = title)
     }
 }
 
@@ -51,17 +60,32 @@ internal fun trackLabel(type: TrackType, title: String?, lang: String?, codec: S
     }
 }
 
-private val LANGUAGES = mapOf(
-    "fr" to "Français", "fre" to "Français", "fra" to "Français",
-    "en" to "Anglais", "eng" to "Anglais",
-    "ja" to "Japonais", "jpn" to "Japonais",
-    "de" to "Allemand", "ger" to "Allemand", "deu" to "Allemand",
-    "es" to "Espagnol", "spa" to "Espagnol",
-    "it" to "Italien", "ita" to "Italien",
+// ISO 639-2 codes (both forms) to ISO 639-1, for the languages met in the library
+private val CODES = mapOf(
+    "fre" to "fr", "fra" to "fr",
+    "eng" to "en",
+    "jpn" to "ja",
+    "ger" to "de", "deu" to "de",
+    "spa" to "es",
+    "ita" to "it",
 )
 
+private val LANGUAGES = mapOf(
+    "fr" to "Français",
+    "en" to "Anglais",
+    "ja" to "Japonais",
+    "de" to "Allemand",
+    "es" to "Espagnol",
+    "it" to "Italien",
+)
+
+private fun canonical(code: String) = code.lowercase(Locale.ROOT).let { CODES[it] ?: it }
+
+/** "fre", "fra" and "fr" are the same language; two unknown languages too. */
+internal fun sameLanguage(a: String?, b: String?) = a?.let(::canonical) == b?.let(::canonical)
+
 internal fun languageName(code: String): String {
-    val lower = code.lowercase(Locale.ROOT)
+    val lower = canonical(code)
     LANGUAGES[lower]?.let { return it }
     if (lower == "und") return "Langue inconnue"
     val name = Locale.forLanguageTag(lower).getDisplayLanguage(Locale.FRENCH)

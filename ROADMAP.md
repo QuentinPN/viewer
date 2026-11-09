@@ -126,8 +126,8 @@ Separate native app in `android-tv/` (Kotlin, libmpv from mpv-android, ADR 0038)
 
 - VERIFIED (2026-11-09) on the NVIDIA Shield (Android 11), `docs/evidence/gate-tv1-2026-11-09.md`: HEVC 1080p 10-bit with ASS and HEVC 4K HDR10 with AC3 5.1, hardware decoding (`mediacodec`), no decoder drops, French subtitles picked by default, ASS on the picture at the next line, seek, pause, track switching, token in a header only, teardown 130–309 ms.
 - TODO: HDR output to the TV by eye; Dolby Vision, DTS and bitstream audio; AudioTrack refusing AAC 44.1 kHz stereo (OpenSL ES fallback plays); cache wait when switching subtitles on 4K; HTTPS (`tls-ca-file`); Fire TV and Nokia.
-- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return; playback reporting (ADR 0040): resume row, resume start, "Vu" after the end, screens updated in place; film details page with "Reprendre à …" / "Lire depuis le début"; player controls (ADR 0041): title, progress, time, pause, ±10 s, audio and subtitle menu.
-- TODO: track choice remembered and reported; subtitles moved above the controls; resending a stop report lost to a network cut; Transcode with external subtitles and resume start on the real server; sign-out checked on the device.
+- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return; playback reporting (ADR 0040): resume row, resume start, "Vu" after the end, screens updated in place; film details page with "Reprendre à …" / "Lire depuis le début"; player controls (ADR 0041): title, progress, time, pause, ±10 s, audio and subtitle menu; last audio/subtitle choice remembered per user, subtitles moved above the controls (ADR 0042).
+- TODO: track choice from the Emby account preferences; resending a stop report lost to a network cut; Transcode with external subtitles and resume start on the real server; sign-out checked on the device.
 
 ## Work log
 
@@ -701,3 +701,21 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   Evidence: `docs/evidence/tv-client-2026-11-09.md`.
 - **Not verified**: the Menu key and media keys on a remote that has them; a file without a subtitle; transcoded streams.
 - **Next**: remember the chosen audio/subtitle language per user, and move subtitles above the overlay while it shows.
+
+### 2026-11-09 — Android TV: remembered tracks, subtitles above the controls
+
+- **Added**: ADR 0042.
+  - **Remembered choice.** A pick in the track menu is saved per Emby user: language and title, or subtitles off. It is applied when every later file loads: the same language and title first, else the first track of that language, else mpv's choice. The logic is in `player/TrackPreferences.kt` (`choose`, `sameLanguage`).
+  - **Subtitles move up.** While the controls show, the overlay measures how much of the screen its text covers, and the player sets `sub-pos` to that height. It goes back to 100 when they hide.
+- **Tests**: `testDebugUnitTest` 45/45 (`TrackPreferencesTest` 4). `assembleDebug` and `lintDebug` OK. Checked on the Shield, same episode:
+  - a subtitle line sits above the title while paused with the controls, and the same line is at its normal place once they hide;
+  - after picking full French subtitles and Japanese audio, the next playback applies them on its own (`aid=2 (préférence)`, `sid=2 (préférence)`), and the menu shows both checks;
+  - "Désactivés" is remembered too (`sid=no (préférence)`);
+  - 0 token lines in logcat.
+
+  Evidence: `docs/evidence/tv-client-2026-11-09.md`.
+- **Not verified**:
+  - the choice applied to another file, such as the next episode; the matching logic is unit-tested only;
+  - external (Emby-delivered) subtitles chosen as the preference;
+  - a top-placed sign subtitle while the controls show.
+- **Next**: a "Prochain épisode" prompt at the end of an episode, or a full library grid per collection.

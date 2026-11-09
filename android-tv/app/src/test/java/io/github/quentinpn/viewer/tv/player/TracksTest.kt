@@ -19,9 +19,9 @@ class TracksTest {
         )
         assertEquals(
             listOf(
-                Track(1, TrackType.Audio, "Japonais · AAC stéréo", selected = true),
-                Track(1, TrackType.Subtitle, "Français · ASS", selected = false),
-                Track(2, TrackType.Subtitle, "Anglais · SRT (externe)", selected = true),
+                Track(1, TrackType.Audio, "Japonais · AAC stéréo", selected = true, lang = "jpn"),
+                Track(1, TrackType.Subtitle, "Français · ASS", selected = false, lang = "fre"),
+                Track(2, TrackType.Subtitle, "Anglais · SRT (externe)", selected = true, lang = "eng"),
             ),
             readTracks { props[it] },
         )

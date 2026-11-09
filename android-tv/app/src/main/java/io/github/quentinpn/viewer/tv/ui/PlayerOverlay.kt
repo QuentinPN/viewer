@@ -17,9 +17,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +33,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ListItem
@@ -41,6 +46,9 @@ import io.github.quentinpn.viewer.tv.player.TrackType
 import kotlinx.coroutines.delay
 
 private const val HIDE_AFTER_MS = 5_000L
+
+// Fade above the text of the controls: the picture shows through it
+private val FADE = 96.dp
 
 /** What the player screen shows; written on the UI thread by the player activity. */
 class PlayerUi {
@@ -56,6 +64,10 @@ class PlayerUi {
     var controls by mutableStateOf(false)
         private set
 
+    /** Share of the screen height under the text of the controls, from the bottom; 0 while hidden. */
+    var covered by mutableFloatStateOf(0f)
+        private set
+
     /** The track menu is open while this is not null. */
     var tracks by mutableStateOf<List<Track>?>(null)
 
@@ -69,6 +81,10 @@ class PlayerUi {
 
     fun hide() {
         controls = false
+    }
+
+    internal fun cover(fraction: Float) {
+        covered = fraction
     }
 
     @Composable
@@ -98,10 +114,16 @@ fun PlayerOverlay(ui: PlayerUi, onSelect: (TrackType, Int?) -> Unit) {
 
 @Composable
 private fun Controls(ui: PlayerUi, modifier: Modifier) {
+    val fade = with(LocalDensity.current) { FADE.toPx() }
+    DisposableEffect(Unit) { onDispose { ui.cover(0f) } }
     Column(
         modifier.fillMaxWidth()
+            .onGloballyPositioned { layout ->
+                val height = layout.parentLayoutCoordinates?.size?.height ?: return@onGloballyPositioned
+                if (height > 0) ui.cover(1f - (layout.positionInParent().y + fade) / height)
+            }
             .background(Brush.verticalGradient(0f to Color.Transparent, 0.35f to Color.Black.copy(alpha = 0.6f), 1f to Color.Black.copy(alpha = 0.85f)))
-            .padding(start = 48.dp, end = 48.dp, top = 96.dp, bottom = 36.dp),
+            .padding(start = 48.dp, end = 48.dp, top = FADE, bottom = 36.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(ui.title, color = Palette.text, style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
