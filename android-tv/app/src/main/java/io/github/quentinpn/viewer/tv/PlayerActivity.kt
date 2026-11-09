@@ -37,6 +37,7 @@ import io.github.quentinpn.viewer.tv.player.SkipPrompt
 import io.github.quentinpn.viewer.tv.player.TrackPreference
 import io.github.quentinpn.viewer.tv.player.TrackPreferenceStore
 import io.github.quentinpn.viewer.tv.player.TrackType
+import io.github.quentinpn.viewer.tv.player.chapters
 import io.github.quentinpn.viewer.tv.player.decide
 import io.github.quentinpn.viewer.tv.player.describeTrack
 import io.github.quentinpn.viewer.tv.player.subtitlePosition
@@ -66,7 +67,7 @@ private const val NATURAL_END_MARGIN_SECONDS = 30.0
  * engine (ADR 0043). Intros and credits get a skip button, and the next episode is
  * offered from the start of its credits (ADR 0048). The Réglages apply from the next
  * item played: external sources, automatic skip and the streaming cap (ADR 0051),
- * and the look of subtitles (ADR 0053).
+ * and the look of subtitles (ADR 0053). UP lists the item's chapters, if it has some (ADR 0057).
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
     private var engine: PlayerEngine? = null
@@ -103,7 +104,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val surface = SurfaceView(this)
         val overlay = ComposeView(this).apply {
-            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::playNext, ::cancelNext, ::skip) } }
+            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip) } }
         }
         setContentView(
             // With the menu focused, keys reach the root before the overlay: the player sees them first
@@ -115,11 +116,11 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
                 addView(overlay)
             },
         )
-        // Back closes the track menu, then the controls, then the player
+        // Back closes a menu, then the controls, then the player
         onBackPressedDispatcher.addCallback(this) {
             when {
                 ui.upNext != null -> cancelNext()
-                ui.tracks != null -> ui.tracks = null
+                ui.menuOpen -> ui.closeMenus()
                 ui.controls && !ui.paused -> ui.hide()
                 else -> finish()
             }
@@ -164,6 +165,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             // Without Fields: also carries the chapters and provider ids for the segments
             val item = client.fullItem(userId, itemId)
             if (current != itemId) return
+            ui.chapters = chapters(item.chapters, item.runTimeTicks)
             lifecycleScope.launch { findSegments(item) }
             if (item.type == "Episode") {
                 ui.title = item.seriesName ?: item.name
@@ -327,7 +329,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             // A cut stream also reaches its end: no next episode then
             val natural = ui.duration <= 0 || ui.duration - ui.position <= NATURAL_END_MARGIN_SECONDS
             if (following != null && natural && ui.upNext == null) {
-                ui.tracks = null
+                ui.closeMenus()
                 ui.upNext = UpNext(following.seriesName ?: ui.title, episodeLabel(following.parentIndexNumber, following.indexNumber, following.name))
             } else if (ui.upNext == null) {
                 finish()
@@ -351,13 +353,13 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         val prompt = if (ui.status == null) skips?.at(ui.position, ui.duration, next != null) else null
         if (prompt == SkipPrompt.UpNext && ui.upNext == null) {
             val following = next ?: return
-            ui.tracks = null
+            ui.closeMenus()
             ui.upNext = UpNext(following.seriesName ?: ui.title, episodeLabel(following.parentIndexNumber, following.indexNumber, following.name), atCredits = true)
             Log.i(TAG, "up next at the credits")
         }
         if (prompt is SkipPrompt.Auto) {
             // Not while a menu or card is open: the button shows instead, as after a seek back
-            if (ui.tracks == null && ui.upNext == null) {
+            if (!ui.menuOpen && ui.upNext == null) {
                 Log.i(TAG, "auto skip")
                 seekPast(prompt.to)
                 return
@@ -393,7 +395,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     }
 
     /**
-     * The remote drives the player itself; only the open track menu hands its keys
+     * The remote drives the player itself; only an open menu hands its keys
      * to Compose, for focus. Back goes through the dispatcher callback.
      */
     // Nothing focused (menu closed): keys come here instead of through the root view
@@ -403,7 +405,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     private fun handleKey(event: KeyEvent): Boolean {
         val player = engine ?: return false
-        if (ui.status != null || ui.tracks != null || ui.upNext != null) return false
+        if (ui.status != null || ui.menuOpen || ui.upNext != null) return false
         // OK presses the skip button while it shows; play / pause keys still pause
         val ok = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER
         if (ok && ui.skip != null) {
@@ -423,7 +425,10 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         }
         KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> { p -> seek(p, -SEEK_SECONDS) }
         KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { p -> seek(p, SEEK_SECONDS) }
-        KeyEvent.KEYCODE_DPAD_UP -> { _ -> ui.show() }
+        KeyEvent.KEYCODE_DPAD_UP -> { _ ->
+            ui.chapterMenu = ui.chapters.isNotEmpty()
+            ui.show()
+        }
         KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_MENU -> { p ->
             ui.tracks = p.tracks()
             ui.show()
@@ -436,6 +441,16 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         // Shown at once; mpv's next position replaces it
         val end = if (ui.duration > 0) ui.duration else Double.MAX_VALUE
         ui.position = (ui.position + seconds).coerceIn(0.0, end)
+        ui.show()
+    }
+
+    /** A row of the chapter menu: playback goes to its start and the menu closes. */
+    private fun goToChapter(start: Double) {
+        val player = engine ?: return
+        Log.i(TAG, "chapter at $start")
+        player.seekTo(start)
+        ui.position = start
+        ui.chapterMenu = false
         ui.show()
     }
 
