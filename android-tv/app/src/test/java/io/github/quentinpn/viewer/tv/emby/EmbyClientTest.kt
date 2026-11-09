@@ -202,6 +202,41 @@ class EmbyClientTest {
     }
 
     @Test
+    fun libraryPageCarriesSortAndFilters() = runBlocking {
+        respond(200, """{"Items":[],"TotalRecordCount":0}""")
+        val options = ItemsOptions(SortKey.Year, descending = true, watch = WatchFilter.Unplayed, favorites = true, genre = "Science-Fiction")
+        client.withToken("t").libraryItems("u1", "lib1", "Movie", 0, 60, options)
+        val url = server.takeRequest().url
+        for ((name, value) in listOf(
+            "SortBy" to "ProductionYear,SortName", "SortOrder" to "Descending",
+            "Filters" to "IsUnplayed,IsFavorite", "Genres" to "Science-Fiction",
+        )) {
+            assertEquals(name, value, url.queryParameter(name))
+        }
+    }
+
+    @Test
+    fun noFilterLeavesTheQueryBare() = runBlocking {
+        respond(200, """{"Items":[],"TotalRecordCount":0}""")
+        client.withToken("t").libraryItems("u1", "lib1", "Series", 0, 60, ItemsOptions(genre = "A|B"))
+        val url = server.takeRequest().url
+        assertEquals(null, url.queryParameter("Filters"))
+        // A genre with the separator is never sent
+        assertEquals(null, url.queryParameter("Genres"))
+    }
+
+    @Test
+    fun genresAreReadByName() = runBlocking {
+        respond(200, """{"Items":[{"Id":"g1","Name":"Action"},{"Id":"g2","Name":"Drame"},{"Id":"g3","Name":"x|y"}],"TotalRecordCount":3}""")
+        assertEquals(listOf("Action", "Drame"), client.withToken("t").genres("u1", "lib1", "Movie"))
+        val url = server.takeRequest().url
+        assertEquals("/emby/Genres", url.encodedPath)
+        for ((name, value) in listOf("UserId" to "u1", "ParentId" to "lib1", "IncludeItemTypes" to "Movie", "Recursive" to "true")) {
+            assertEquals(name, value, url.queryParameter(name))
+        }
+    }
+
+    @Test
     fun emptyEpisodePageStopsPaging() = runBlocking {
         respond(200, """{"Items":[],"TotalRecordCount":5}""")
         assertTrue(client.withToken("t").episodes("u1", "ser1", "s1").isEmpty())

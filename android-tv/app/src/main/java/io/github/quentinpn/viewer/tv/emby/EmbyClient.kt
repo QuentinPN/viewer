@@ -98,25 +98,48 @@ class EmbyClient(
     }
 
     /**
-     * One page of a library's films or series by title, as the Windows grid asks;
-     * [itemTypes] is `Movie` or `Series`. The server ignores an unknown `ParentId`
+     * One page of a library's films or series, sorted and filtered as the Windows grid
+     * asks; [itemTypes] is `Movie` or `Series`. The server ignores an unknown `ParentId`
      * and answers the whole server: pass library ids read from [views] only.
      */
-    suspend fun libraryItems(userId: String, parentId: String, itemTypes: String, startIndex: Int, limit: Int): QueryResult<BaseItemDto> {
-        val url = server.api("/Users/${segment(userId)}/Items").newBuilder()
+    suspend fun libraryItems(
+        userId: String,
+        parentId: String,
+        itemTypes: String,
+        startIndex: Int,
+        limit: Int,
+        options: ItemsOptions = ItemsOptions(),
+    ): QueryResult<BaseItemDto> {
+        val builder = server.api("/Users/${segment(userId)}/Items").newBuilder()
             .addQueryParameter("ParentId", segment(parentId))
             .addQueryParameter("Recursive", "true")
             .addQueryParameter("IncludeItemTypes", itemTypes)
-            .addQueryParameter("SortBy", "SortName")
-            .addQueryParameter("SortOrder", "Ascending")
+            .addQueryParameter("SortBy", options.sort.sortBy)
+            .addQueryParameter("SortOrder", if (options.descending) "Descending" else "Ascending")
             .addQueryParameter("StartIndex", startIndex.toString())
             .addQueryParameter("Limit", limit.toString())
             .addQueryParameter("Fields", "ProductionYear")
             .addQueryParameter("EnableUserData", "true")
             .addQueryParameter("ImageTypeLimit", "1")
             .addQueryParameter("EnableImageTypes", "Primary")
+        options.filters()?.let { builder.addQueryParameter("Filters", it) }
+        options.genre?.takeIf(::isUsableGenre)?.let { builder.addQueryParameter("Genres", it) }
+        return call(get(builder.build()), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
+    /** Genre names used by a library's films or series, by name. */
+    suspend fun genres(userId: String, parentId: String, itemTypes: String): List<String> {
+        val url = server.api("/Genres").newBuilder()
+            .addQueryParameter("UserId", segment(userId))
+            .addQueryParameter("ParentId", segment(parentId))
+            .addQueryParameter("IncludeItemTypes", itemTypes)
+            .addQueryParameter("Recursive", "true")
+            .addQueryParameter("SortBy", "SortName")
+            .addQueryParameter("SortOrder", "Ascending")
+            .addQueryParameter("EnableImages", "false")
+            .addQueryParameter("EnableUserData", "false")
             .build()
-        return call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
+        return call(get(url), QueryResult.serializer(BaseItemDto.serializer())).items.map { it.name }.filter(::isUsableGenre).distinct()
     }
 
     /** One series or film, with its overview, length and user data. */

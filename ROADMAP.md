@@ -126,7 +126,7 @@ Separate native app in `android-tv/` (Kotlin, libmpv from mpv-android, ADR 0038)
 
 - VERIFIED (2026-11-09) on the NVIDIA Shield (Android 11), `docs/evidence/gate-tv1-2026-11-09.md`: HEVC 1080p 10-bit with ASS and HEVC 4K HDR10 with AC3 5.1, hardware decoding (`mediacodec`), no decoder drops, French subtitles picked by default, ASS on the picture at the next line, seek, pause, track switching, token in a header only, teardown 130–309 ms.
 - TODO: HDR output to the TV by eye; Dolby Vision, DTS and bitstream audio; AudioTrack refusing AAC 44.1 kHz stereo (OpenSL ES fallback plays); cache wait when switching subtitles on 4K; HTTPS (`tls-ca-file`); Fire TV and Nokia.
-- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return; playback reporting (ADR 0040): resume row, resume start, "Vu" after the end, screens updated in place; film details page with "Reprendre à …" / "Lire depuis le début"; player controls (ADR 0041): title, progress, time, pause, ±10 s, audio and subtitle menu; last audio/subtitle choice remembered per user, subtitles moved above the controls (ADR 0042); next episode (ADR 0043): card at the natural end with a 10 s countdown, "Lire maintenant" and "Annuler", next episode played in the same player; library grid (ADR 0044): "Tout voir" at the end of each latest-additions shelf, all films or series by title, paged by 60 as it scrolls.
+- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return; playback reporting (ADR 0040): resume row, resume start, "Vu" after the end, screens updated in place; film details page with "Reprendre à …" / "Lire depuis le début"; player controls (ADR 0041): title, progress, time, pause, ±10 s, audio and subtitle menu; last audio/subtitle choice remembered per user, subtitles moved above the controls (ADR 0042); next episode (ADR 0043): card at the natural end with a 10 s countdown, "Lire maintenant" and "Annuler", next episode played in the same player; library grid (ADR 0044): "Tout voir" at the end of each latest-additions shelf, all films or series by title, paged by 60 as it scrolls; sort and filters in that grid (ADR 0045): title, date added, year or rating, watch state, favorites and one genre, kept per library.
 - TODO: track choice from the Emby account preferences; resending a stop report lost to a network cut; Transcode with external subtitles and resume start on the real server; sign-out checked on the device.
 
 ## Work log
@@ -759,3 +759,26 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - a page that fails mid-grid (the bottom "Réessayer");
   - the whole 606-film grid scrolled to the end.
 - **Next**: sort and filters in the grid (ADR 0013 on Windows), or Emby's credits markers for the next-episode card.
+
+### 2026-11-09 — Android TV: library sort and filters
+
+- **Added**: ADR 0045, the Windows choices of ADR 0013 on the TV grid.
+  - `emby/ItemsOptions.kt`: `SortKey`, `WatchFilter`, `ItemsOptions` and `isUsableGenre`, as in `models.rs`.
+  - `EmbyClient.libraryItems` takes the options (`SortBy`, `SortOrder`, `Filters`, `Genres` only when set); `EmbyClient.genres` reads `/Genres` for one library.
+  - `ui/LibraryScreen.kt`: a toolbar above the grid (Tri, direction, Visionnage, Favoris, Genre, Réinitialiser). Each change starts over from page 0 with a new grid state; a page of the old query is dropped. A side list picks the genre. "Aucun titre ne correspond à ces filtres." when nothing matches.
+  - `ui/LibraryPreferences.kt`: choices kept per user and per library in plain preferences.
+- **Fixed during the check**:
+  - the grid stayed on "Chargement…": `LazyGridState.scrollToItem` waits for the grid's first layout, and the grid is only shown once a page has landed. A new `LazyGridState` per query replaces the scroll;
+  - a filter button that turns filled is another composable, so it lost the focus and the next OK changed the sort. The pressed button takes the focus back.
+- **Tests**: `testDebugUnitTest` 64/64 (`ItemsOptionsTest` 4, `LibraryOptionsTest` 3, `EmbyClientTest` +3). `assembleDebug` and `lintDebug` OK; one new `UseKtx` hint, the same `prefs.edit()` form as `TrackPreferenceStore`. Checked on the Shield, account `claude`, read only:
+  - Films: by date added, by year (2026 first), by rating; "Non vus" 606, "Vus" 0 and "En cours" 0 with the empty message; "Animation" 38 titles; "Favoris" 0; "Réinitialiser" back to 606;
+  - the choices survive an app restart;
+  - focus stays on the pressed button; Back closes the genre list on the "Genre" button; a film opened after the changes returns to its card;
+  - 0 token lines in logcat.
+
+  Evidence: `docs/evidence/tv-client-2026-11-09.md`.
+- **Not verified**:
+  - a non-empty "Vus", "En cours" or "Favoris" list: the test account has none, and no favorite was added on the server;
+  - the Anime library's toolbar (no "En cours" there, covered by a unit test only);
+  - the D-pad can leave the genre list sideways while it is open.
+- **Next**: Emby's credits markers for the next-episode card, or watched marks on grid posters.

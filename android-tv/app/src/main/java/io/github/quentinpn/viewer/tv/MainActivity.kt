@@ -16,6 +16,7 @@ import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.ui.HomeMemory
 import io.github.quentinpn.viewer.tv.ui.HomeScreen
 import io.github.quentinpn.viewer.tv.ui.LibraryMemory
+import io.github.quentinpn.viewer.tv.ui.LibraryPreferenceStore
 import io.github.quentinpn.viewer.tv.ui.LibraryScreen
 import io.github.quentinpn.viewer.tv.ui.MovieScreen
 import io.github.quentinpn.viewer.tv.ui.SeriesScreen
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
                     var series by remember(current) { mutableStateOf<String?>(null) }
                     var movie by remember(current) { mutableStateOf<String?>(null) }
                     var library by remember(current) { mutableStateOf<LibraryMemory?>(null) }
+                    val libraryPrefs = remember(current) { LibraryPreferenceStore(this, current.userId) }
                     val home = remember(current) { HomeMemory() }
                     val refresh by AppServices.reporter.stopped.collectAsState()
                     val play = { itemId: String, startTicks: Long ->
@@ -82,6 +84,7 @@ class MainActivity : ComponentActivity() {
                             current.userId,
                             images,
                             openLibrary,
+                            onOptionsChanged = { libraryPrefs.save(openLibrary.library, it) },
                             onOpenSeries = { series = it },
                             onOpenMovie = { movie = it },
                             onSessionExpired = expired,
@@ -96,7 +99,7 @@ class MainActivity : ComponentActivity() {
                         onPlay = play,
                         onOpenSeries = { series = it },
                         onOpenMovie = { movie = it },
-                        onOpenLibrary = { library = LibraryMemory(it) },
+                        onOpenLibrary = { library = LibraryMemory(it, libraryPrefs.load(it)) },
                         onSessionExpired = expired,
                         memory = home,
                         refresh = refresh,
