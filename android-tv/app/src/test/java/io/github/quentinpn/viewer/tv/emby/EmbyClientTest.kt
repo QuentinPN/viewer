@@ -141,6 +141,23 @@ class EmbyClientTest {
         assertTrue(body.contains("\"IsPlayback\":true"))
         assertTrue(body.contains("\"MaxStreamingBitrate\":400000000"))
         assertTrue(body.contains("\"Format\":\"ass\",\"Method\":\"External\""))
+        // No version chosen: the server picks, as before ADR 0058
+        assertFalse(body.contains("MediaSourceId"))
+    }
+
+    @Test
+    fun playbackInfoNamesTheChosenVersionInTheBody() = runBlocking {
+        respond(200, """{"MediaSources":[],"PlaySessionId":"ps"}""")
+        client.withToken("t").playbackInfo("u1", "i1", deviceProfile(), "mediasource_30501")
+        val request = server.takeRequest()
+        assertNull(request.url.queryParameter("MediaSourceId"))
+        assertTrue(request.body!!.utf8().contains("\"MediaSourceId\":\"mediasource_30501\""))
+    }
+
+    @Test
+    fun invalidVersionIsNeverSent() {
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").playbackInfo("u1", "i1", deviceProfile(), "a/b") }
+        assertEquals(0, server.requestCount)
     }
 
     @Test
@@ -150,6 +167,7 @@ class EmbyClientTest {
         assertEquals("Résumé", movie.overview)
         assertEquals(67_200_000_000L, movie.runTimeTicks)
         assertEquals(27_670_000_000L, movie.userData?.playbackPositionTicks)
+        assertEquals(emptyList<MediaSourceDto>(), movie.mediaSources)
         val url = server.takeRequest().url
         assertEquals("/emby/Users/u1/Items/m1", url.encodedPath)
         assertEquals("Overview", url.queryParameter("Fields"))

@@ -71,6 +71,33 @@ data class BaseItemDto(
     /** Key case varies (`Imdb` on an episode, `IMDB` on its series): sent to the intro services only (ADR 0048). */
     @SerialName("ProviderIds") val providerIds: Map<String, String> = emptyMap(),
     @SerialName("Chapters") val chapters: List<ChapterInfo> = emptyList(),
+    /** The versions of a film or episode (ADR 0058); PlaybackInfo decides how each one plays. */
+    @SerialName("MediaSources") val mediaSources: List<MediaSourceDto> = emptyList(),
+)
+
+/** One version in an item's detail, as `MediaSourceDto` on Windows (ADR 0036). */
+@Serializable
+data class MediaSourceDto(
+    /** What PlaybackInfo's `MediaSourceId` names. */
+    @SerialName("Id") val id: String? = null,
+    @SerialName("Name") val name: String? = null,
+    @SerialName("Size") val size: Long? = null,
+    @SerialName("Bitrate") val bitrate: Long? = null,
+    @SerialName("MediaStreams") val mediaStreams: List<SourceStreamDto> = emptyList(),
+)
+
+/** The stream fields a version label needs; `Index` is not read, so its absence breaks nothing. */
+@Serializable
+data class SourceStreamDto(
+    @SerialName("Type") val type: String = "",
+    @SerialName("Codec") val codec: String? = null,
+    @SerialName("Width") val width: Int? = null,
+    @SerialName("Height") val height: Int? = null,
+    @SerialName("BitDepth") val bitDepth: Int? = null,
+    /** `SDR`, `HDR 10`, `DolbyVision`. */
+    @SerialName("VideoRange") val videoRange: String? = null,
+    /** `HDR 10`, `Profile 8.1 (HDR10 compatible)`, `None`. */
+    @SerialName("ExtendedVideoSubTypeDescription") val extendedVideoSubTypeDescription: String? = null,
 )
 
 /** `Studios[].Id` is a number on Emby 4.10, unlike other ids: only the name is read. */
@@ -109,6 +136,8 @@ internal data class PlaybackInfoRequest(
     @SerialName("AutoOpenLiveStream") val autoOpenLiveStream: Boolean = false,
     @SerialName("EnableDirectPlay") val enableDirectPlay: Boolean = true,
     @SerialName("EnableDirectStream") val enableDirectStream: Boolean = true,
+    /** The version to play (ADR 0036, 0058); left out, the server picks its first. */
+    @SerialName("MediaSourceId") val mediaSourceId: String? = null,
 )
 
 @Serializable

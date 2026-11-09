@@ -35,14 +35,16 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 
-/** A film: backdrop, year, length, overview, and "Reprendre" / "Lire depuis le début". */
+/** A film: backdrop, year, length, overview, "Reprendre" / "Lire depuis le début", and its version if it has several. */
 @Composable
 fun MovieScreen(
     client: EmbyClient,
     userId: String,
     movieId: String,
     images: ImageLoader,
-    onPlay: (itemId: String, startTicks: Long) -> Unit,
+    versions: VersionStore,
+    /** [mediaSourceId] is the version chosen here; null lets the server pick, as for a film with one version. */
+    onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit,
     onSessionExpired: () -> Unit,
     /** Changes after each playback: the resume point and watched mark are read again. */
     refresh: Int = 0,
@@ -69,18 +71,21 @@ fun MovieScreen(
             is Load.Failed -> Retry(m.message) { attempt++ }
             is Load.Ready -> {
                 Backdrop(m.value, client, images)
-                Details(m.value, onPlay)
+                Details(m.value, versions, onPlay)
             }
         }
     }
 }
 
 @Composable
-private fun Details(movie: BaseItemDto, onPlay: (itemId: String, startTicks: Long) -> Unit) {
+private fun Details(movie: BaseItemDto, versions: VersionStore, onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit) {
     val played = movie.userData?.played == true
     val position = movie.userData?.playbackPositionTicks ?: 0
     val resume = !played && position > 0
     val first = remember { FocusRequester() }
+    // Empty with fewer than two versions: no button, and nothing sent to the server (ADR 0058)
+    val choices = remember(movie.mediaSources) { versionChoices(movie.mediaSources) }
+    var version by remember(movie.id, choices) { mutableStateOf(versions.load(movie.id, choices)) }
     Column(
         Modifier.fillMaxHeight().fillMaxWidth(0.6f).padding(horizontal = 48.dp, vertical = 56.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Bottom),
@@ -105,10 +110,23 @@ private fun Details(movie: BaseItemDto, onPlay: (itemId: String, startTicks: Lon
         Facts(movie)
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // One first button whatever the resume state, so a reload does not drop its focus
-            Button(onClick = { onPlay(movie.id, if (resume) position else 0) }, modifier = Modifier.focusRequester(first)) {
+            Button(onClick = { onPlay(movie.id, if (resume) position else 0, version) }, modifier = Modifier.focusRequester(first)) {
                 Text(if (resume) "Reprendre à ${clock(position)}" else "Lire")
             }
-            if (resume) OutlinedButton(onClick = { onPlay(movie.id, 0) }) { Text("Lire depuis le début") }
+            if (resume) OutlinedButton(onClick = { onPlay(movie.id, 0, version) }) { Text("Lire depuis le début") }
+        }
+        choices.firstOrNull { it.id == version }?.let { chosen ->
+            // OK goes to the next version, as the choices of Réglages
+            OutlinedButton(
+                onClick = {
+                    nextVersion(version, choices)?.let {
+                        version = it
+                        versions.save(movie.id, choices, it)
+                    }
+                },
+            ) {
+                Text("Version : ${chosen.label}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
     // Also after a reload removed the focused "Lire depuis le début"; one frame later, once laid out

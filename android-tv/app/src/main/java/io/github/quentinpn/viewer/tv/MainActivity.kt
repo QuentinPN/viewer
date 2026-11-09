@@ -27,6 +27,7 @@ import io.github.quentinpn.viewer.tv.ui.SeriesTarget
 import io.github.quentinpn.viewer.tv.ui.SettingsScreen
 import io.github.quentinpn.viewer.tv.ui.SignInScreen
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
+import io.github.quentinpn.viewer.tv.ui.VersionStore
 import kotlinx.coroutines.launch
 
 /** Launcher: sign-in when no session is stored, else the home shelves, a library grid or the search, the settings, the series and film pages. */
@@ -59,13 +60,17 @@ class MainActivity : ComponentActivity() {
                     val settingsStore = remember(current) { PlaybackSettingsStore(this, current.userId) }
                     val home = remember(current) { HomeMemory() }
                     val refresh by AppServices.reporter.stopped.collectAsState()
-                    val play = { itemId: String, startTicks: Long ->
+                    val versions = remember(current) { VersionStore(this, current.userId) }
+                    // A version is only chosen on the film page (ADR 0058); elsewhere the server picks
+                    val playSource = { itemId: String, startTicks: Long, mediaSourceId: String? ->
                         startActivity(
                             Intent(this, PlayerActivity::class.java)
                                 .putExtra(PlayerActivity.EXTRA_ITEM_ID, itemId)
-                                .putExtra(PlayerActivity.EXTRA_START_TICKS, startTicks),
+                                .putExtra(PlayerActivity.EXTRA_START_TICKS, startTicks)
+                                .putExtra(PlayerActivity.EXTRA_MEDIA_SOURCE_ID, mediaSourceId),
                         )
                     }
+                    val play = { itemId: String, startTicks: Long -> playSource(itemId, startTicks, null) }
                     val expired = {
                         store.clear()
                         notice = "Session expirée. Reconnectez-vous."
@@ -80,7 +85,7 @@ class MainActivity : ComponentActivity() {
                     val openMovie = movie
                     if (openMovie != null) {
                         BackHandler { movie = null }
-                        MovieScreen(client, current.userId, openMovie, images, onPlay = play, onSessionExpired = expired, refresh = refresh)
+                        MovieScreen(client, current.userId, openMovie, images, versions, onPlay = playSource, onSessionExpired = expired, refresh = refresh)
                         return@ViewerTheme
                     }
                     // Under the film and series pages: Back from them returns to the grid
