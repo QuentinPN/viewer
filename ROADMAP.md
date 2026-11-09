@@ -872,3 +872,9 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Fixed**: on a transcode only the server's subtitle file is selected (every file used to be added with `select`); `aid`/`sid` are reset before each file, so the next episode does not inherit them.
 - **Tests**: `testDebugUnitTest` 136/136. `assembleDebug` and `lintDebug` OK. Checked on the Shield, Overgeared S1·É6 in Direct Play: with the remembered choice, `tracks audio=-→2 (remembered) sub=-→no (remembered)`; with it set aside, `tracks audio=1→1 (server) sub=4→1 (server)`, the menu checking "Français — Forced · ASS" and "Français · AAC stéréo". Remembered choices restored afterwards; 0 token lines in logcat.
 - **Not verified**: a title where the server's pick differs from mpv's (here they match), a transcode, the next episode in the same engine, each `SubtitleMode` of the account.
+
+### 2026-11-09 — Android TV: next up on the home
+
+- **Added**: ADR 0056. An "À suivre" row after "Reprendre": `/Shows/NextUp` (16 at most), keeping only unwatched, unstarted episodes and dropping those already in "Reprendre" (the account's resume section from `/Users/{Id}/HomeSections` when it has one). Loaded in parallel; the row is hidden when empty or on error. A card plays the episode from the start through the existing episode path.
+- **Tests**: `testDebugUnitTest` 144/144 (`NextUpTest` 8). `assembleDebug` and `lintDebug` OK. Checked on the Shield: the home loads and shows no "À suivre" row, which is right for the account `claude`: the only next episode (Overgeared S1·É6, after É5 watched) is already in "Reprendre". No warning or error in logcat; 0 token lines.
+- **Not verified**: the row with cards (filling it would mean marking episodes watched on the account), a click on one of its cards.
