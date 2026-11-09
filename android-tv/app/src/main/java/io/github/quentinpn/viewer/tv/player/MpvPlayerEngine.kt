@@ -113,6 +113,12 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
 
     override fun cycleAudio() = command("cycle", "audio")
 
+    override fun tracks(): List<Track> = if (released.get()) emptyList() else readTracks { MPVLib.getPropertyString(it) }
+
+    override fun selectTrack(type: TrackType, id: Int?) {
+        if (!released.get()) MPVLib.setPropertyString(type.property, id?.toString() ?: "no")
+    }
+
     override fun property(name: String): String? = if (released.get()) null else MPVLib.getPropertyString(name)
 
     override fun release() {

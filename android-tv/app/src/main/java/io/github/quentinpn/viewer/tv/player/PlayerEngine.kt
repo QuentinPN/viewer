@@ -53,6 +53,12 @@ interface PlayerEngine {
 
     fun cycleAudio()
 
+    /** Audio and subtitle tracks of the loaded file; empty before it is loaded. */
+    fun tracks(): List<Track>
+
+    /** Selects a track by its id; `null` turns subtitles (or audio) off. */
+    fun selectTrack(type: TrackType, id: Int?)
+
     /** Diagnostics only: reads one libmpv property as text. */
     fun property(name: String): String?
 

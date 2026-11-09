@@ -126,8 +126,8 @@ Separate native app in `android-tv/` (Kotlin, libmpv from mpv-android, ADR 0038)
 
 - VERIFIED (2026-11-09) on the NVIDIA Shield (Android 11), `docs/evidence/gate-tv1-2026-11-09.md`: HEVC 1080p 10-bit with ASS and HEVC 4K HDR10 with AC3 5.1, hardware decoding (`mediacodec`), no decoder drops, French subtitles picked by default, ASS on the picture at the next line, seek, pause, track switching, token in a header only, teardown 130–309 ms.
 - TODO: HDR output to the TV by eye; Dolby Vision, DTS and bitstream audio; AudioTrack refusing AAC 44.1 kHz stereo (OpenSL ES fallback plays); cache wait when switching subtitles on 4K; HTTPS (`tls-ca-file`); Fire TV and Nokia.
-- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return; playback reporting (ADR 0040): resume row, resume start, "Vu" after the end, screens updated in place; film details page with "Reprendre à …" / "Lire depuis le début".
-- TODO: player controls UI; resending a stop report lost to a network cut; Transcode with external subtitles and resume start on the real server; sign-out checked on the device.
+- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return; playback reporting (ADR 0040): resume row, resume start, "Vu" after the end, screens updated in place; film details page with "Reprendre à …" / "Lire depuis le début"; player controls (ADR 0041): title, progress, time, pause, ±10 s, audio and subtitle menu.
+- TODO: track choice remembered and reported; subtitles moved above the controls; resending a stop report lost to a network cut; Transcode with external subtitles and resume start on the real server; sign-out checked on the device.
 
 ## Work log
 
@@ -686,3 +686,18 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `testDebugUnitTest` 38/38 (`DurationLabelsTest` 2, 1 new `EmbyClientTest`), `assembleDebug`, `lintDebug` OK; on the Shield with a 1 h 36 film: page shown, stop at 473–495 s → "Reprendre à 7:53" focused, resume start at 495 s, start over at 0, stop at 68 s clears the resume point ("Lire" focused), back to home with focus on the same poster, 0 token lines in logcat, `docs/evidence/tv-client-2026-11-09.md`.
 - **Not verified**: a film already watched ("Vu" badge); a film without backdrop or overview.
 - **Next**: player controls (progress bar, time, track menus).
+
+### 2026-11-09 — Android TV: player controls
+
+- **Added**: ADR 0041. A Compose overlay sits over the mpv surface: title (series and "S1 · É2 — title", or film and year), progress bar, time played and left, and "En pause". It shows on load and on every key, and hides after 5 s of playback. OK pauses, left/right seek 10 s, up shows the overlay, down or Menu opens the audio and subtitle menu. The menu is built from mpv's `track-list`, with French labels, and selects through `aid`/`sid`. Back closes the menu, then the overlay, then the player. New engine methods: `tracks()`, `selectTrack()`.
+- **Bug found and fixed**: the first build ignored every key. Android only hands keys to the root view when a view has focus, so the activity now also handles `onKeyDown`/`onKeyUp`. Overriding `Activity.dispatchKeyEvent` is refused by lint (`RestrictedApi`).
+- **Tests**: `testDebugUnitTest` 41/41 (`TracksTest` 3), `assembleDebug`, `lintDebug` OK. Checked on the Shield with an anime episode (3 French ASS subtitle tracks, 3 audio tracks):
+  - overlay with title, time and remaining time;
+  - seek, pause, auto-hide after 5 s;
+  - menu focus starts on the subtitle in use; subtitle switched (`sid=3`) and audio switched to Japanese (`aid=2`), check mark moved;
+  - Back cascade;
+  - stop report on exit, 0 token lines in logcat.
+
+  Evidence: `docs/evidence/tv-client-2026-11-09.md`.
+- **Not verified**: the Menu key and media keys on a remote that has them; a file without a subtitle; transcoded streams.
+- **Next**: remember the chosen audio/subtitle language per user, and move subtitles above the overlay while it shows.

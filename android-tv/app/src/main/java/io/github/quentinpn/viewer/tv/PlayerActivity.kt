@@ -3,15 +3,14 @@ package io.github.quentinpn.viewer.tv
 import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
-import android.view.Gravity
 import android.view.KeyEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
+import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.lifecycleScope
 import io.github.quentinpn.viewer.tv.emby.ActivePlayback
 import io.github.quentinpn.viewer.tv.emby.EmbyError
@@ -23,10 +22,15 @@ import io.github.quentinpn.viewer.tv.player.MediaSource
 import io.github.quentinpn.viewer.tv.player.MpvPlayerEngine
 import io.github.quentinpn.viewer.tv.player.PlayerEngine
 import io.github.quentinpn.viewer.tv.player.PlayerListener
+import io.github.quentinpn.viewer.tv.player.TrackType
+import io.github.quentinpn.viewer.tv.ui.PlayerOverlay
+import io.github.quentinpn.viewer.tv.ui.PlayerUi
+import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import kotlinx.coroutines.launch
 
 private const val TAG = "ViewerTV"
 private const val TICKS_PER_SECOND = 10_000_000.0
+private const val SEEK_SECONDS = 10.0
 
 /**
  * Plays one Emby item. Not exported: it negotiates the stream itself through
@@ -35,7 +39,7 @@ private const val TICKS_PER_SECOND = 10_000_000.0
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
     private var engine: PlayerEngine? = null
-    private lateinit var status: TextView
+    private val ui = PlayerUi()
     private var subtitles: List<ExternalSubtitle> = emptyList()
     private var surfaceHolder: SurfaceHolder? = null
     private val reporter = AppServices.reporter
@@ -44,19 +48,27 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val surface = SurfaceView(this)
-        status = TextView(this).apply {
-            textSize = 20f
-            setTextColor(Color.WHITE)
-            text = "Chargement…"
+        val overlay = ComposeView(this).apply {
+            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack) } }
         }
         setContentView(
-            FrameLayout(this).apply {
+            // With the menu focused, keys reach the root before the overlay: the player sees them first
+            object : FrameLayout(this) {
+                override fun dispatchKeyEvent(event: KeyEvent) = handleKey(event) || super.dispatchKeyEvent(event)
+            }.apply {
                 setBackgroundColor(Color.BLACK)
                 addView(surface)
-                val wrap = FrameLayout.LayoutParams.WRAP_CONTENT
-                addView(status, FrameLayout.LayoutParams(wrap, wrap, Gravity.CENTER))
+                addView(overlay)
             },
         )
+        // Back closes the track menu, then the controls, then the player
+        onBackPressedDispatcher.addCallback(this) {
+            when {
+                ui.tracks != null -> ui.tracks = null
+                ui.controls && !ui.paused -> ui.hide()
+                else -> finish()
+            }
+        }
 
         val session = AppServices.store(this).load()
         val itemId = intent.getStringExtra(EXTRA_ITEM_ID)
@@ -69,6 +81,23 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         val client = AppServices.client(this, session)
         surface.holder.addCallback(this)
 
+        // Only for the title over the video: playback does not wait for it
+        lifecycleScope.launch {
+            try {
+                val item = client.item(session.userId, itemId)
+                if (item.type == "Episode") {
+                    ui.title = item.seriesName ?: item.name
+                    ui.detail = listOfNotNull(
+                        item.parentIndexNumber?.let { "S$it" },
+                        item.indexNumber?.let { "É$it" },
+                    ).joinToString(" · ").let { if (it.isEmpty()) item.name else "$it — ${item.name}" }
+                } else {
+                    ui.title = item.name
+                    ui.detail = item.productionYear?.toString()
+                }
+            } catch (_: EmbyException) {
+            }
+        }
         lifecycleScope.launch {
             try {
                 val chosen = plan(client.server, client.playbackInfo(session.userId, itemId, deviceProfile()))
@@ -91,7 +120,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
                 }
                 player.load(source, startSeconds)
             } catch (e: EmbyException) {
-                status.text = e.error.message
+                ui.status = e.error.message
             }
         }
     }
@@ -112,15 +141,27 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     override fun onFileLoaded() {
         reporter.event { fileLoaded(it) }
-        runOnUiThread { status.visibility = View.GONE }
+        runOnUiThread {
+            ui.status = null
+            ui.show()
+        }
         subtitles.forEach { sub -> MediaSource.parse(sub.url)?.let { engine?.addSubtitle(it) } }
     }
 
-    override fun onPosition(seconds: Double) = reporter.event { position(seconds, it) }
+    override fun onPosition(seconds: Double) {
+        reporter.event { position(seconds, it) }
+        runOnUiThread { ui.position = seconds }
+    }
 
-    override fun onDuration(seconds: Double) = reporter.event { duration(seconds); emptyList() }
+    override fun onDuration(seconds: Double) {
+        reporter.event { duration(seconds); emptyList() }
+        runOnUiThread { ui.duration = seconds }
+    }
 
-    override fun onPauseChanged(paused: Boolean) = reporter.event { paused(paused, it) }
+    override fun onPauseChanged(paused: Boolean) {
+        reporter.event { paused(paused, it) }
+        runOnUiThread { ui.paused = paused }
+    }
 
     override fun onSeek() = reporter.event { seeked(); emptyList() }
 
@@ -134,21 +175,52 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         runOnUiThread { finish() }
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        val player = engine ?: return super.onKeyDown(keyCode, event)
-        when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_SPACE -> player.togglePause()
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> player.seekBy(-10.0)
-            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> player.seekBy(10.0)
-            KeyEvent.KEYCODE_DPAD_UP -> {
-                player.cycleSubtitle()
-                Log.i(TAG, "sid=${player.property("sid")}")
-            }
-            KeyEvent.KEYCODE_DPAD_DOWN -> player.cycleAudio()
-            else -> return super.onKeyDown(keyCode, event)
-        }
+    /**
+     * The remote drives the player itself; only the open track menu hands its keys
+     * to Compose, for focus. Back goes through the dispatcher callback.
+     */
+    // Nothing focused (menu closed): keys come here instead of through the root view
+    override fun onKeyDown(keyCode: Int, event: KeyEvent) = handleKey(event) || super.onKeyDown(keyCode, event)
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent) = handleKey(event) || super.onKeyUp(keyCode, event)
+
+    private fun handleKey(event: KeyEvent): Boolean {
+        val player = engine ?: return false
+        if (ui.status != null || ui.tracks != null) return false
+        val action = action(event.keyCode) ?: return false
+        if (event.action == KeyEvent.ACTION_DOWN) action(player)
         return true
+    }
+
+    private fun action(keyCode: Int): ((PlayerEngine) -> Unit)? = when (keyCode) {
+        KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_SPACE -> { p ->
+            p.togglePause()
+            ui.show()
+        }
+        KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> { p -> seek(p, -SEEK_SECONDS) }
+        KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { p -> seek(p, SEEK_SECONDS) }
+        KeyEvent.KEYCODE_DPAD_UP -> { _ -> ui.show() }
+        KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_MENU -> { p ->
+            ui.tracks = p.tracks()
+            ui.show()
+        }
+        else -> null
+    }
+
+    private fun seek(player: PlayerEngine, seconds: Double) {
+        player.seekBy(seconds)
+        // Shown at once; mpv's next position replaces it
+        val end = if (ui.duration > 0) ui.duration else Double.MAX_VALUE
+        ui.position = (ui.position + seconds).coerceIn(0.0, end)
+        ui.show()
+    }
+
+    private fun selectTrack(type: TrackType, id: Int?) {
+        val player = engine ?: return
+        player.selectTrack(type, id)
+        Log.i(TAG, "${type.property}=${player.property(type.property)}")
+        ui.tracks = player.tracks()
     }
 
     override fun onStop() {
