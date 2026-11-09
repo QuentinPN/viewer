@@ -217,6 +217,25 @@ class EmbyClientTest {
     }
 
     @Test
+    fun similarAsksForFilmsAndSeriesWithPosters() = runBlocking {
+        respond(200, """{"Items":[{"Id":"m2","Name":"Akira","Type":"Movie"},{"Id":"s1","Type":"Series"}],"TotalRecordCount":2}""")
+        val similar = client.withToken("secret-token").similar("u1", "m1", 12)
+        assertEquals(listOf("m2", "s1"), similar.items.map { it.id })
+        val request = server.takeRequest()
+        val url = request.url
+        assertEquals("/emby/Items/m1/Similar", url.encodedPath)
+        for ((name, value) in listOf(
+            "UserId" to "u1", "Limit" to "12", "IncludeItemTypes" to "Movie,Series",
+            "Fields" to "PrimaryImageAspectRatio,ProductionYear", "EnableUserData" to "true",
+            "ImageTypeLimit" to "1", "EnableImageTypes" to "Primary",
+        )) {
+            assertEquals(name, value, url.queryParameter(name))
+        }
+        assertFalse("no token in the URL", "secret-token" in url.toString())
+        assertTrue("Token=\"secret-token\"" in request.headers["X-Emby-Authorization"]!!)
+    }
+
+    @Test
     fun libraryPageIsSortedByTitle() = runBlocking {
         respond(200, """{"Items":[{"Id":"m1","Name":"Akira","Type":"Movie"}],"TotalRecordCount":120}""")
         val page = client.withToken("t").libraryItems("u1", "lib1", "Movie", 60, 60)

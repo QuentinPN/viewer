@@ -7,13 +7,16 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
+import io.github.quentinpn.viewer.tv.ui.DetailPage
 import io.github.quentinpn.viewer.tv.ui.EpisodeScreen
 import io.github.quentinpn.viewer.tv.ui.HomeMemory
 import io.github.quentinpn.viewer.tv.ui.HomeScreen
@@ -29,6 +32,9 @@ import io.github.quentinpn.viewer.tv.ui.SettingsScreen
 import io.github.quentinpn.viewer.tv.ui.SignInScreen
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import io.github.quentinpn.viewer.tv.ui.VersionStore
+import io.github.quentinpn.viewer.tv.ui.pushPage
+import io.github.quentinpn.viewer.tv.ui.replaceTop
+import io.github.quentinpn.viewer.tv.ui.similarPage
 import kotlinx.coroutines.launch
 
 /** Launcher: sign-in when no session is stored, else the home shelves, a library grid or the search, the settings, the series and film pages. */
@@ -52,9 +58,12 @@ class MainActivity : ComponentActivity() {
                 } else {
                     val client = remember(current) { AppServices.client(this, current) }
                     val images = remember(client) { AppServices.images(this, client) }
-                    var series by remember(current) { mutableStateOf<SeriesTarget?>(null) }
+                    // Film and series pages, the shown one last: a similar title stacks its page (ADR 0063)
+                    var pages by remember(current) { mutableStateOf<List<DetailPage>>(emptyList()) }
                     var episode by remember(current) { mutableStateOf<SeriesTarget?>(null) }
-                    var movie by remember(current) { mutableStateOf<String?>(null) }
+                    val openSeries = { target: SeriesTarget -> pages = listOf(DetailPage.Series(target)) }
+                    val openMovie = { id: String -> pages = listOf(DetailPage.Movie(id)) }
+                    val openSimilar: (BaseItemDto) -> Unit = { item -> similarPage(item)?.let { pages = pushPage(pages, it) } }
                     var library by remember(current) { mutableStateOf<LibraryMemory?>(null) }
                     var search by remember(current) { mutableStateOf<SearchMemory?>(null) }
                     var settings by remember(current) { mutableStateOf(false) }
@@ -90,7 +99,7 @@ class MainActivity : ComponentActivity() {
                             onPlay = playSource,
                             onNavigate = { episode = it },
                             onBack = {
-                                series = it
+                                pages = replaceTop(pages, DetailPage.Series(it))
                                 episode = null
                             },
                             onSessionExpired = expired,
@@ -98,25 +107,37 @@ class MainActivity : ComponentActivity() {
                         )
                         return@ViewerTheme
                     }
-                    val openSeries = series
-                    if (openSeries != null) {
-                        BackHandler { series = null }
-                        SeriesScreen(
-                            client,
-                            current.userId,
-                            openSeries,
-                            images,
-                            onPlay = play,
-                            onOpenEpisode = { episode = it },
-                            onSessionExpired = expired,
-                            refresh = refresh,
-                        )
-                        return@ViewerTheme
-                    }
-                    val openMovie = movie
-                    if (openMovie != null) {
-                        BackHandler { movie = null }
-                        MovieScreen(client, current.userId, openMovie, images, versions, onPlay = playSource, onSessionExpired = expired, refresh = refresh)
+                    val page = pages.lastOrNull()
+                    if (page != null) {
+                        // Back shows the page below: the film or series a similar title was opened from
+                        BackHandler { pages = pages.dropLast(1) }
+                        // Fresh state per page: a similar series replaces this one at the same place
+                        key(pages.size, page) {
+                            when (page) {
+                                is DetailPage.Series -> SeriesScreen(
+                                    client,
+                                    current.userId,
+                                    page.target,
+                                    images,
+                                    onPlay = play,
+                                    onOpenEpisode = { episode = it },
+                                    onOpenSimilar = openSimilar,
+                                    onSessionExpired = expired,
+                                    refresh = refresh,
+                                )
+                                is DetailPage.Movie -> MovieScreen(
+                                    client,
+                                    current.userId,
+                                    page.id,
+                                    images,
+                                    versions,
+                                    onPlay = playSource,
+                                    onOpenSimilar = openSimilar,
+                                    onSessionExpired = expired,
+                                    refresh = refresh,
+                                )
+                            }
+                        }
                         return@ViewerTheme
                     }
                     // Under the film and series pages: Back from them returns to the grid
@@ -129,8 +150,8 @@ class MainActivity : ComponentActivity() {
                             images,
                             openLibrary,
                             onOptionsChanged = { libraryPrefs.save(openLibrary.library, it) },
-                            onOpenSeries = { series = SeriesTarget(it) },
-                            onOpenMovie = { movie = it },
+                            onOpenSeries = { openSeries(SeriesTarget(it)) },
+                            onOpenMovie = openMovie,
                             onSessionExpired = expired,
                         )
                         return@ViewerTheme
@@ -144,8 +165,8 @@ class MainActivity : ComponentActivity() {
                             current.userId,
                             images,
                             openSearch,
-                            onOpenSeries = { series = it },
-                            onOpenMovie = { movie = it },
+                            onOpenSeries = openSeries,
+                            onOpenMovie = openMovie,
                             onSessionExpired = expired,
                         )
                         return@ViewerTheme
@@ -165,8 +186,8 @@ class MainActivity : ComponentActivity() {
                         userName = current.userName,
                         images = images,
                         onPlay = play,
-                        onOpenSeries = { series = SeriesTarget(it) },
-                        onOpenMovie = { movie = it },
+                        onOpenSeries = { openSeries(SeriesTarget(it)) },
+                        onOpenMovie = openMovie,
                         onOpenLibrary = { library = LibraryMemory(it, libraryPrefs.load(it)) },
                         onOpenSearch = { search = SearchMemory() },
                         onOpenSettings = { settings = true },

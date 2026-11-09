@@ -17,7 +17,9 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -95,7 +97,7 @@ internal fun initialEpisodeIndex(episodes: List<BaseItemDto>, episodeId: String?
 internal fun cardTarget(seriesId: String, seasonId: String, episode: BaseItemDto): SeriesTarget =
     SeriesTarget(seriesId, seasonId = seasonId, seasonNumber = episode.parentIndexNumber, episodeId = episode.id)
 
-/** A series: its overview, a chip per season, and the season's episodes in a row. */
+/** A series: its overview, a chip per season, the season's episodes in a row, then « Titres similaires » (ADR 0063). */
 @Composable
 fun SeriesScreen(
     client: EmbyClient,
@@ -106,6 +108,8 @@ fun SeriesScreen(
     onPlay: (itemId: String, startTicks: Long) -> Unit,
     /** OK on an episode card opens its page, naming the season it was shown in (ADR 0060). */
     onOpenEpisode: (SeriesTarget) -> Unit,
+    /** OK on a similar title opens its film or series page. */
+    onOpenSimilar: (BaseItemDto) -> Unit,
     onSessionExpired: () -> Unit,
     /** Changes after each playback: the episodes' watched state is read again. */
     refresh: Int = 0,
@@ -133,6 +137,7 @@ fun SeriesScreen(
         val seasons = (data as? Load.Ready)?.value?.seasons.orEmpty()
         if (seasonId == null) seasonId = openingSeason(seasons, target)?.id
     }
+    val similar = rememberSimilar(client, userId, seriesId, ready = data is Load.Ready, onSessionExpired)
 
     Box(Modifier.fillMaxSize().background(Palette.background)) {
         when (val d = data) {
@@ -140,7 +145,11 @@ fun SeriesScreen(
             is Load.Failed -> Retry(d.message) { attempt++ }
             is Load.Ready -> {
                 Backdrop(d.value.series, client, images)
-                Column(Modifier.fillMaxSize().padding(top = 40.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Scrolls: Down from the episode row reaches the similar titles below the screen
+                Column(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = 40.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
                     Header(d.value.series)
                     if (d.value.seasons.isEmpty()) {
                         Text("Aucune saison sur le serveur.", color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp))
@@ -153,6 +162,7 @@ fun SeriesScreen(
                             Episodes(client, userId, seriesId, id, focusEpisode, d.value.series, images, onPlay, onOpenEpisode, onSessionExpired, refresh)
                         }
                     }
+                    SimilarRow(similar, client, images, onOpenSimilar)
                 }
             }
         }

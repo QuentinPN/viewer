@@ -247,6 +247,23 @@ class EmbyClient(
     }
 
     /**
+     * Films and series the server finds close to [itemId] (`/Items/{Id}/Similar`, ADR 0063),
+     * with the posters and user data of the library grid.
+     */
+    suspend fun similar(userId: String, itemId: String, limit: Int): QueryResult<BaseItemDto> {
+        val url = server.api("/Items/${segment(itemId)}/Similar").newBuilder()
+            .addQueryParameter("UserId", segment(userId))
+            .addQueryParameter("Limit", limit.toString())
+            .addQueryParameter("IncludeItemTypes", "Movie,Series")
+            .addQueryParameter("Fields", "PrimaryImageAspectRatio,ProductionYear")
+            .addQueryParameter("EnableUserData", "true")
+            .addQueryParameter("ImageTypeLimit", "1")
+            .addQueryParameter("EnableImageTypes", "Primary")
+            .build()
+        return call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
+    /**
      * One item without `Fields`, as the Windows client reads it for segments (ADR 0030):
      * Emby 4.10.2.0 then returns its `Chapters` and `ProviderIds`.
      */

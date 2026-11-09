@@ -3,13 +3,16 @@ package io.github.quentinpn.viewer.tv.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,7 +38,10 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 
-/** A film: backdrop, year, length, overview, "Reprendre" / "Lire depuis le début", and its version if it has several. */
+/**
+ * A film: backdrop, year, length, overview, "Reprendre" / "Lire depuis le début", its version
+ * if it has several, and below the screen the « Titres similaires » row (ADR 0063).
+ */
 @Composable
 fun MovieScreen(
     client: EmbyClient,
@@ -45,6 +51,8 @@ fun MovieScreen(
     versions: VersionStore,
     /** [mediaSourceId] is the version chosen here; null lets the server pick, as for a film with one version. */
     onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit,
+    /** OK on a similar title opens its film or series page. */
+    onOpenSimilar: (BaseItemDto) -> Unit,
     onSessionExpired: () -> Unit,
     /** Changes after each playback: the resume point and watched mark are read again. */
     refresh: Int = 0,
@@ -65,6 +73,7 @@ fun MovieScreen(
         }
         if (!shown || next is Load.Ready) movie = next
     }
+    val similar = rememberSimilar(client, userId, movieId, ready = movie is Load.Ready, onSessionExpired)
 
     Box(Modifier.fillMaxSize().background(Palette.background)) {
         when (val m = movie) {
@@ -72,14 +81,26 @@ fun MovieScreen(
             is Load.Failed -> Retry(m.message) { attempt++ }
             is Load.Ready -> {
                 Backdrop(m.value, client, images)
-                Details(m.value, versions, onPlay)
+                // The details fill the screen as before; Down from the buttons scrolls to the row
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val screen = maxHeight
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        Details(m.value, versions, onPlay, Modifier.height(screen))
+                        SimilarRow(similar, client, images, onOpenSimilar)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun Details(movie: BaseItemDto, versions: VersionStore, onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit) {
+private fun Details(
+    movie: BaseItemDto,
+    versions: VersionStore,
+    onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit,
+    modifier: Modifier,
+) {
     val played = movie.userData?.played == true
     val position = movie.userData?.playbackPositionTicks ?: 0
     val resume = !played && position > 0
@@ -88,7 +109,7 @@ private fun Details(movie: BaseItemDto, versions: VersionStore, onPlay: (itemId:
     val choices = remember(movie.mediaSources) { versionChoices(movie.mediaSources) }
     var version by remember(movie.id, choices) { mutableStateOf(versions.load(movie.id, choices)) }
     Column(
-        Modifier.fillMaxHeight().fillMaxWidth(0.6f).padding(horizontal = 48.dp, vertical = 56.dp),
+        modifier.fillMaxWidth(0.6f).padding(horizontal = 48.dp, vertical = 56.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Bottom),
     ) {
         Text(movie.name, style = MaterialTheme.typography.displaySmall, color = Palette.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
