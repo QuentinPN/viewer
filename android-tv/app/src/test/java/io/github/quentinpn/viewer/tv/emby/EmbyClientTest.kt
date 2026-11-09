@@ -1,0 +1,146 @@
+package io.github.quentinpn.viewer.tv.emby
+
+import kotlinx.coroutines.runBlocking
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
+import org.junit.Before
+import org.junit.Test
+
+class EmbyClientTest {
+    private val server = MockWebServer()
+    private lateinit var client: EmbyClient
+    private val device = DeviceIdentity("Shield", "dev-1", "0.1.0")
+
+    @Before
+    fun setUp() {
+        server.start()
+        // Built from the literal address: MockWebServer's host name may not look local
+        val url = ServerUrl.parse("http://127.0.0.1:${server.port}")
+        client = EmbyClient(url, device, EmbyClient.defaultHttp())
+    }
+
+    @After
+    fun tearDown() {
+        server.close()
+    }
+
+    private fun respond(code: Int, body: String = "") =
+        server.enqueue(MockResponse.Builder().code(code).body(body).build())
+
+    private fun expectError(expected: Class<out EmbyError>, block: suspend () -> Unit) {
+        try {
+            runBlocking { block() }
+            fail("expected ${expected.simpleName}")
+        } catch (e: EmbyException) {
+            assertEquals(expected, e.error::class.java)
+        }
+    }
+
+    @Test
+    fun authenticateSendsPasswordInBodyAndHeaderWithoutToken() = runBlocking {
+        respond(200, """{"User":{"Id":"u1","Name":"Quentin"},"AccessToken":"secret-token","ServerId":"s1","Extra":1}""")
+        val result = client.authenticate("Quentin", "p@ss")
+        assertEquals("u1", result.user.id)
+        assertEquals("secret-token", result.accessToken)
+        assertFalse("token redacted in logs", "secret-token" in result.toString())
+
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/emby/Users/AuthenticateByName", request.url.encodedPath)
+        assertNull(request.url.query)
+        assertEquals("""{"Username":"Quentin","Pw":"p@ss"}""", request.body?.utf8())
+        val auth = request.headers["X-Emby-Authorization"]!!
+        assertTrue(auth.startsWith("Emby Client=\"Viewer TV\", Device=\"Shield\", DeviceId=\"dev-1\""))
+        assertFalse("Token=" in auth)
+    }
+
+    @Test
+    fun wrongPasswordIsInvalidCredentials() = expectError(EmbyError.InvalidCredentials::class.java) {
+        respond(401)
+        client.authenticate("Quentin", "bad")
+    }
+
+    @Test
+    fun rejectedTokenIsSessionExpired() = expectError(EmbyError.SessionExpired::class.java) {
+        respond(401)
+        client.withToken("old").views("u1")
+    }
+
+    @Test
+    fun statusCodesMapToCategories() {
+        val authed = client.withToken("t")
+        expectError(EmbyError.Forbidden::class.java) { respond(403); authed.views("u1") }
+        expectError(EmbyError.NotFound::class.java) { respond(404); authed.views("u1") }
+        expectError(EmbyError.Server::class.java) { respond(500); authed.views("u1") }
+        expectError(EmbyError.InvalidResponse::class.java) { respond(200, "<html>"); authed.views("u1") }
+    }
+
+    @Test
+    fun redirectIsNotFollowed() = expectError(EmbyError.InvalidResponse::class.java) {
+        server.enqueue(MockResponse.Builder().code(302).addHeader("Location", "http://evil.example/").build())
+        client.withToken("t").views("u1")
+    }
+
+    @Test
+    fun unreachableServer() {
+        server.close()
+        expectError(EmbyError.Unreachable::class.java) { client.publicInfo() }
+    }
+
+    @Test
+    fun tokenCallsNeedASession() = expectError(EmbyError.NotSignedIn::class.java) { client.views("u1") }
+
+    @Test
+    fun tokenGoesInHeaderOnly() = runBlocking {
+        respond(200, """{"Items":[{"Id":"v1","Name":"Films","CollectionType":"movies"}],"TotalRecordCount":1}""")
+        val views = client.withToken("tok\"en,x").views("u1")
+        assertEquals("movies", views.items.single().collectionType)
+        val request = server.takeRequest()
+        assertEquals("/emby/Users/u1/Views", request.url.encodedPath)
+        assertNull(request.url.query)
+        assertTrue(request.headers["X-Emby-Authorization"]!!.endsWith(", Token=\"tokenx\""))
+    }
+
+    @Test
+    fun resumeAsksForVideosWithUserData() = runBlocking {
+        respond(200, """{"Items":[{"Id":"e1","Type":"Episode","UserData":{"PlaybackPositionTicks":6000000000}}]}""")
+        val items = client.withToken("t").resumeItems("u1", 12)
+        assertEquals(6_000_000_000L, items.items.single().userData?.playbackPositionTicks)
+        val url = server.takeRequest().url
+        assertEquals("/emby/Users/u1/Items/Resume", url.encodedPath)
+        assertEquals("12", url.queryParameter("Limit"))
+        assertEquals("Movie,Episode", url.queryParameter("IncludeItemTypes"))
+        assertEquals("true", url.queryParameter("EnableUserData"))
+    }
+
+    @Test
+    fun playbackInfoPostsTheDeviceProfile() = runBlocking {
+        respond(200, """{"MediaSources":[],"PlaySessionId":"ps"}""")
+        client.withToken("t").playbackInfo("u1", "i1", deviceProfile())
+        val request = server.takeRequest()
+        assertEquals("/emby/Items/i1/PlaybackInfo", request.url.encodedPath)
+        assertEquals("u1", request.url.queryParameter("UserId"))
+        val body = request.body!!.utf8()
+        assertTrue(body.contains("\"IsPlayback\":true"))
+        assertTrue(body.contains("\"MaxStreamingBitrate\":400000000"))
+        assertTrue(body.contains("\"Format\":\"ass\",\"Method\":\"External\""))
+    }
+
+    @Test
+    fun idsAreCheckedBeforeGoingIntoAPath() = expectError(EmbyError.InvalidResponse::class.java) {
+        client.withToken("t").views("../System")
+    }
+
+    @Test
+    fun imageUrlHoldsNoToken() {
+        val url = client.withToken("t").imageUrl("i1", "Primary", "abc", 300)
+        assertEquals("/emby/Items/i1/Images/Primary", url.encodedPath)
+        assertEquals("tag=abc&maxWidth=300", url.query)
+    }
+}

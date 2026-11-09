@@ -16,12 +16,18 @@ private const val VO = "gpu"
  * libmpv through mpv-android's JNI bridge (ADR 0038). libplayer.so keeps a
  * single global mpv handle and aborts the process on a second create, so only
  * one engine may be alive at a time.
+ *
+ * [headers] are set once, before `mpv_initialize`: libmpv logs every later option
+ * or property change with its value at verbose level, and libplayer copies each
+ * libmpv log line to logcat itself, before [redactSecrets] can see it. Messages
+ * emitted before init are never delivered, so the token stays out of logcat.
+ * They apply to every request of this engine, external subtitles included.
  */
-class MpvPlayerEngine(context: Context) : PlayerEngine, MPVLib.EventObserver, MPVLib.LogObserver {
+class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap()) : PlayerEngine, MPVLib.EventObserver, MPVLib.LogObserver {
     private val listeners = CopyOnWriteArrayList<PlayerListener>()
     private val released = AtomicBoolean(false)
     private var surfaceAttached = false
-    private var pending: MediaSource? = null
+    private var pending: PendingFile? = null
 
     init {
         check(alive.compareAndSet(false, true)) { "Un seul lecteur mpv peut exister à la fois" }
@@ -29,6 +35,11 @@ class MpvPlayerEngine(context: Context) : PlayerEngine, MPVLib.EventObserver, MP
         for ((name, value) in OPTIONS) {
             val rc = MPVLib.setOptionString(name, value)
             if (rc < 0) Log.w(TAG, "option $name=$value refusée ($rc)")
+        }
+        // A comma would split the list: such a header is dropped rather than mangled
+        val fields = headers.filterValues { ',' !in it }.map { (k, v) -> "$k: $v" }
+        if (fields.isNotEmpty() && MPVLib.setOptionString("http-header-fields", fields.joinToString(",")) < 0) {
+            Log.w(TAG, "option http-header-fields refusée")
         }
         MPVLib.init()
         // Must stay off until a surface exists, or VO init fails (mpv-android BaseMPVView)
@@ -51,10 +62,10 @@ class MpvPlayerEngine(context: Context) : PlayerEngine, MPVLib.EventObserver, MP
         MPVLib.attachSurface(surface)
         MPVLib.setOptionString("force-window", "yes")
         surfaceAttached = true
-        val source = pending
-        if (source != null) {
+        val file = pending
+        if (file != null) {
             pending = null
-            MPVLib.command(arrayOf("loadfile", source.uri))
+            loadNow(file)
         } else {
             MPVLib.setPropertyString("vo", VO)
         }
@@ -73,13 +84,16 @@ class MpvPlayerEngine(context: Context) : PlayerEngine, MPVLib.EventObserver, MP
         surfaceAttached = false
     }
 
-    override fun load(source: MediaSource, headers: Map<String, String>, startSeconds: Double) {
+    override fun load(source: MediaSource, startSeconds: Double) {
         if (released.get()) return
-        MPVLib.setPropertyString("start", if (startSeconds > 0) startSeconds.toString() else "none")
-        // A comma would split the list: such a header is dropped rather than mangled
-        val fields = headers.filterValues { ',' !in it }.map { (k, v) -> "$k: $v" }
-        MPVLib.setPropertyString("http-header-fields", fields.joinToString(","))
-        if (surfaceAttached) MPVLib.command(arrayOf("loadfile", source.uri)) else pending = source
+        // Per-file option: a later file does not inherit this start position
+        val start = if (startSeconds > 0) startSeconds.toString() else "none"
+        val file = PendingFile(source, "start=$start")
+        if (surfaceAttached) loadNow(file) else pending = file
+    }
+
+    private fun loadNow(file: PendingFile) {
+        MPVLib.command(arrayOf("loadfile", file.source.uri, "replace", "-1", file.options))
     }
 
     override fun addSubtitle(source: MediaSource) {
@@ -169,3 +183,6 @@ class MpvPlayerEngine(context: Context) : PlayerEngine, MPVLib.EventObserver, MP
         )
     }
 }
+
+/** A source waiting for the surface, with its loadfile options. */
+private class PendingFile(val source: MediaSource, val options: String)

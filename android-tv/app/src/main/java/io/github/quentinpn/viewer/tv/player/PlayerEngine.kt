@@ -26,8 +26,11 @@ interface PlayerEngine {
 
     fun detachSurface()
 
-    /** [headers] go in HTTP header fields, never in the URL; playback begins at [startSeconds]. */
-    fun load(source: MediaSource, headers: Map<String, String> = emptyMap(), startSeconds: Double = 0.0)
+    /**
+     * Playback begins at [startSeconds]. HTTP headers (the token) are given when the
+     * engine is created, never in the URL.
+     */
+    fun load(source: MediaSource, startSeconds: Double = 0.0)
 
     fun addSubtitle(source: MediaSource)
 

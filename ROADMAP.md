@@ -126,7 +126,8 @@ Separate native app in `android-tv/` (Kotlin, libmpv from mpv-android, ADR 0038)
 
 - VERIFIED (2026-11-09) on the NVIDIA Shield (Android 11), `docs/evidence/gate-tv1-2026-11-09.md`: HEVC 1080p 10-bit with ASS and HEVC 4K HDR10 with AC3 5.1, hardware decoding (`mediacodec`), no decoder drops, French subtitles picked by default, ASS on the picture at the next line, seek, pause, track switching, token in a header only, teardown 130–309 ms.
 - TODO: HDR output to the TV by eye; Dolby Vision, DTS and bitstream audio; AudioTrack refusing AAC 44.1 kHz stereo (OpenSL ES fallback plays); cache wait when switching subtitles on 4K; HTTPS (`tls-ca-file`); Fire TV and Nokia.
-- TODO: Emby client in Kotlin and the Compose for TV interface, after the gate.
+- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat.
+- TODO: series, seasons and episodes; details page; playback reporting (Playing / Progress / Stopped); player controls UI; Transcode with external subtitles and resume start on the real server; sign-out checked on the device.
 
 ## Work log
 
@@ -653,3 +654,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `MediaSourceTest` 3/3; six runs on the Shield over `adb reverse`, `docs/evidence/gate-tv1-2026-11-09.md`.
 - **Not verified**: HDR output to the TV, Dolby Vision, DTS, bitstream audio, HTTPS, the real Emby server, Fire TV and Nokia; picture and sound on the TV by the owner.
 - **Next**: owner check on the TV, then the Kotlin Emby client (sign-in, PlaybackInfo, direct play).
+
+### 2026-11-09 — Android TV: Emby client, first slice
+
+- **Added**: ADR 0039; Kotlin `EmbyClient` (OkHttp 5, kotlinx.serialization) with the Windows contracts and device profile; `PlaybackPlan` (Direct Play / Direct Stream / Transcode, same-origin `/videos/` URLs only, external subtitles); `SessionStore` (token encrypted by an Android Keystore AES-GCM key); Compose for TV sign-in and home screens (Coil posters, auth header only for the server origin); `PlayerActivity` (not exported) negotiating through PlaybackInfo, resume start position.
+- **Bug found and fixed**: libplayer.so copies libmpv's verbose log to logcat itself, so setting `http-header-fields` after init leaked the token ("Set property: …"); the `set` command and `loadfile` per-file options leak too. Headers are now set as an option before `mpv_initialize`, so the engine is created after PlaybackInfo.
+- **Tests**: `testDebugUnitTest` 24/24, `assembleDebug`, `lintDebug` OK; on the Shield against the real server: sign-in, session kept across restarts, home with posters, film in Direct Play with `mediacodec`, ASS subtitles on the picture, 0 token lines in logcat, `docs/evidence/tv-client-2026-11-09.md`.
+- **Not verified**: Transcode with external subtitles, resume start and sign-out on the device; default subtitle track follows mpv's `slang`, not Emby's default.
+- **Next**: series → seasons → episodes and a details page, then playback reporting.

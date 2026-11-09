@@ -1,5 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -30,6 +32,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    buildFeatures { compose = true }
+
     packaging {
         // The prebuilt mpv-android libraries are already stripped
         jniLibs.keepDebugSymbols += "**/*.so"
@@ -37,5 +41,15 @@ android {
 }
 
 dependencies {
+    implementation(libs.okhttp)
+    implementation(libs.serialization.json)
+    implementation(libs.coroutines.android)
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.foundation)
+    implementation(libs.tv.material)
+    implementation(libs.activity.compose)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.okhttp)
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
 }

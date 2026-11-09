@@ -87,9 +87,9 @@ class PlaybackPocActivity : Activity(), SurfaceHolder.Callback, PlayerListener {
         val start = intent.getStringExtra("start")?.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 } ?: 0.0
 
         val started = SystemClock.elapsedRealtime()
-        engine = MpvPlayerEngine(this).also {
+        engine = MpvPlayerEngine(this, headers).also {
             it.addListener(this)
-            it.load(source, headers, start)
+            it.load(source, start)
         }
         Log.i(TAG, "engine created in ${SystemClock.elapsedRealtime() - started} ms, source=${source::class.simpleName}")
         surface.holder.addCallback(this)

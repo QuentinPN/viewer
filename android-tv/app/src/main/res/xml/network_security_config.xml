@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Emby on the home network is usually plain HTTP (http://192.0.2.x:8096).
+  ServerUrl.parse only accepts http:// towards local addresses (loopback,
+  private, link-local, .local/.lan/.home.arpa); everything else must be https.
+  Android cannot express "private ranges only" here, hence the app-level check.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
