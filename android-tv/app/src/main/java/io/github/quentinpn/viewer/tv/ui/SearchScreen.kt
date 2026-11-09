@@ -164,7 +164,14 @@ fun SearchScreen(
 
     // Typing first, unless coming back from a page opened from the results
     LaunchedEffect(Unit) {
-        if (memory.opened != null && memory.state is SearchState.Ready) return@LaunchedEffect
+        if (memory.opened != null && memory.state is SearchState.Ready) {
+            // The field holds the focus for a frame before the card takes it, and the system
+            // keyboard opens over the results: closed once the card is focused
+            withFrameNanos {}
+            withFrameNanos {}
+            keyboard?.hide()
+            return@LaunchedEffect
+        }
         withFrameNanos {}
         runCatching { field.requestFocus() }
     }

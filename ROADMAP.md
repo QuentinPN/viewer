@@ -858,3 +858,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Deviation from Windows**: `sub-ass-override` is `yes` instead of `no` when the ASS option is off. With `no`, mpv ignored `sub-pos` for ASS subtitles, which stayed under the TV controls (seen on the Shield). `yes` keeps their font and colours; the position setting now moves them too, and the setting's text says so.
 - **Tests**: `testDebugUnitTest` 123/123 (`SubtitleOptionsTest`, `PlaybackSettingsTest`). `assembleDebug` and `lintDebug` OK. Checked on the Shield: the section shows and cycles; ASS on gives large yellow text on a dark box above the controls; ASS off keeps the file's white outlined style and, after the fix, moves above the controls. Settings and tracks reset to defaults afterwards; 0 token lines in logcat.
 - **Not verified**: text subtitles (SRT, none clearly available for a test), the "En haut" position on the device, another Emby user, the next episode in the same engine.
+
+### 2026-11-09 — Android TV: an episode found by search opens its season
+
+- **Added**: ADR 0054. An episode chosen in the search results opens its series on that episode's season (`SeasonId`, else its season number, else the default season) with the focus on its card; Back returns to the results on the same card. Home's episode cards still play.
+- **Fixed** (search, ADR 0047): coming back from a page opened from the results, the system keyboard opened over them, since the field held the focus for a frame. It is now closed once the card has the focus.
+- **Tests**: `testDebugUnitTest` 130/130 (`SeriesTargetTest` 7). `assembleDebug` and `lintDebug` OK. Checked on the Shield with "Raid": Commissaire Moulin S7·É7 opens on "Saison 7" (not the default season 1) with É7 focused; Pokémon S19·É40 opens on É40; Back returns to the focused card without the keyboard; 0 token lines in logcat.
+- **Not verified**: whether the search answer carries `SeasonId` or the season number was used (both give the same season here), a special episode.
