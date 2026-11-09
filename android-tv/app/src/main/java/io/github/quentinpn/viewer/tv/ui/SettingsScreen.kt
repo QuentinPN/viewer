@@ -23,9 +23,15 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettings
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
+import io.github.quentinpn.viewer.tv.settings.SubtitleBackground
+import io.github.quentinpn.viewer.tv.settings.SubtitleColor
+import io.github.quentinpn.viewer.tv.settings.SubtitlePosition
+import io.github.quentinpn.viewer.tv.settings.SubtitleSize
+import io.github.quentinpn.viewer.tv.settings.SubtitleStyle
 import io.github.quentinpn.viewer.tv.settings.addressNote
 import io.github.quentinpn.viewer.tv.settings.capLabel
 import io.github.quentinpn.viewer.tv.settings.nextCap
+import io.github.quentinpn.viewer.tv.settings.nextChoice
 
 /**
  * Réglages (ADR 0051): the Windows playback settings that make sense on a TV, kept
@@ -39,6 +45,8 @@ fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, version:
         settings = next
         store.save(next)
     }
+    fun change(next: SubtitleStyle) = change(settings.copy(subtitles = next))
+    val style = settings.subtitles
     LaunchedEffect(Unit) {
         withFrameNanos {}
         runCatching { first.requestFocus() }
@@ -93,6 +101,37 @@ fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, version:
             }
         }
         item { Note(addressNote(localAddress)) }
+
+        item { Section("Sous-titres") }
+        item {
+            Note(
+                "Apparence des sous-titres texte (SRT, WebVTT…). Les sous-titres en image (PGS, DVD) ne changent " +
+                    "pas. OK passe à la valeur suivante.",
+            )
+        }
+        item {
+            Choice("Taille", null, style.size.label) { change(style.copy(size = nextChoice(style.size, SubtitleSize.entries))) }
+        }
+        item {
+            Choice("Couleur", null, style.color.label) { change(style.copy(color = nextChoice(style.color, SubtitleColor.entries))) }
+        }
+        item {
+            Choice("Lisibilité", null, style.background.label) {
+                change(style.copy(background = nextChoice(style.background, SubtitleBackground.entries)))
+            }
+        }
+        item {
+            Choice("Position", "Pendant que les commandes s'affichent, les sous-titres passent au-dessus.", style.position.label) {
+                change(style.copy(position = nextChoice(style.position, SubtitlePosition.entries)))
+            }
+        }
+        item {
+            Choice(
+                "Appliquer aussi aux sous-titres stylés (ASS)",
+                "Sinon, ils gardent la police, les couleurs et la place prévues par leur auteur.",
+                onOff(style.overrideAss),
+            ) { change(style.copy(overrideAss = !style.overrideAss)) }
+        }
         item { Note("Ces réglages restent sur cet appareil et s'appliquent à la prochaine lecture.") }
 
         item { Section("À propos") }

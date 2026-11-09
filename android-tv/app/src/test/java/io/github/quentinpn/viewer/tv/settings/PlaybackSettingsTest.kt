@@ -15,6 +15,10 @@ class PlaybackSettingsTest {
         assertFalse("automatic skip off", defaults.autoSkip)
         assertNull(defaults.localCap)
         assertNull(defaults.remoteCap)
+        assertEquals(
+            SubtitleStyle(SubtitleSize.Normal, SubtitleColor.White, SubtitleBackground.Outline, SubtitlePosition.Bottom, overrideAss = false),
+            defaults.subtitles,
+        )
     }
 
     @Test
@@ -57,5 +61,31 @@ class PlaybackSettingsTest {
         assertEquals("8 Mbit/s", mbits(8_000_000))
         assertTrue(addressNote(true).contains("« Réseau local »"))
         assertTrue(addressNote(false).contains("« Accès distant »"))
+    }
+
+    @Test
+    fun subtitleChoicesAreThoseOfWindows() {
+        assertEquals(listOf("small" to "Petite", "normal" to "Normale", "large" to "Grande", "larger" to "Très grande"), SubtitleSize.entries.map { it.stored to it.label })
+        assertEquals(listOf("white" to "Blanc", "yellow" to "Jaune"), SubtitleColor.entries.map { it.stored to it.label })
+        assertEquals(listOf("outline" to "Contour", "box" to "Fond sombre"), SubtitleBackground.entries.map { it.stored to it.label })
+        assertEquals(listOf("bottom" to "En bas", "raised" to "Plus haut", "top" to "En haut"), SubtitlePosition.entries.map { it.stored to it.label })
+    }
+
+    @Test
+    fun storedSubtitleChoicesOffTheListReadAsTheDefault() {
+        assertEquals(SubtitleSize.Large, storedChoice(SubtitleSize.entries, "large", SubtitleSize.Normal))
+        assertEquals(SubtitlePosition.Top, storedChoice(SubtitlePosition.entries, "top", SubtitlePosition.Bottom))
+        for (bad in listOf(null, "", "Large", "huge", "Grande", " large")) {
+            assertEquals("$bad", SubtitleSize.Normal, storedChoice(SubtitleSize.entries, bad, SubtitleSize.Normal))
+        }
+        assertEquals(SubtitleColor.White, storedChoice(SubtitleColor.entries, "red", SubtitleColor.White))
+    }
+
+    @Test
+    fun nextChoiceStepsThroughTheListAndBack() {
+        val seen = generateSequence(SubtitleSize.Small) { nextChoice(it, SubtitleSize.entries) }.take(5).toList()
+        assertEquals(listOf(SubtitleSize.Small, SubtitleSize.Normal, SubtitleSize.Large, SubtitleSize.Larger, SubtitleSize.Small), seen)
+        assertEquals(SubtitleColor.White, nextChoice(SubtitleColor.Yellow, SubtitleColor.entries))
+        assertEquals(SubtitlePosition.Bottom, nextChoice(SubtitlePosition.Top, SubtitlePosition.entries))
     }
 }

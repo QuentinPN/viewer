@@ -3,6 +3,7 @@ package io.github.quentinpn.viewer.tv.player
 import android.content.Context
 import android.util.Log
 import android.view.Surface
+import io.github.quentinpn.viewer.tv.settings.SubtitleStyle
 import `is`.xyz.mpv.MPVLib
 import `is`.xyz.mpv.MPVLib.MpvEvent
 import `is`.xyz.mpv.MPVLib.MpvFormat
@@ -127,6 +128,12 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
 
     override fun setSubtitlePosition(percent: Int) {
         if (!released.get()) MPVLib.setPropertyString("sub-pos", percent.coerceIn(0, 100).toString())
+    }
+
+    override fun setSubtitleStyle(style: SubtitleStyle) {
+        if (released.get()) return
+        // Set as properties: they stay for the next files of this engine, and each item sets them again
+        for ((name, value) in subtitleOptions(style)) MPVLib.setPropertyString(name, value)
     }
 
     override fun property(name: String): String? = if (released.get()) null else MPVLib.getPropertyString(name)

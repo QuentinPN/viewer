@@ -36,6 +36,7 @@ import io.github.quentinpn.viewer.tv.player.TrackPreference
 import io.github.quentinpn.viewer.tv.player.TrackPreferenceStore
 import io.github.quentinpn.viewer.tv.player.TrackType
 import io.github.quentinpn.viewer.tv.player.choose
+import io.github.quentinpn.viewer.tv.player.subtitlePosition
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettings
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
 import io.github.quentinpn.viewer.tv.ui.PlayerOverlay
@@ -44,7 +45,6 @@ import io.github.quentinpn.viewer.tv.ui.UpNext
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import io.github.quentinpn.viewer.tv.ui.episodeLabel
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 private const val TAG = "ViewerTV"
 private const val TICKS_PER_SECOND = 10_000_000.0
@@ -61,7 +61,8 @@ private const val NATURAL_END_MARGIN_SECONDS = 30.0
  * At the natural end of an episode, the next one is offered and plays in the same
  * engine (ADR 0043). Intros and credits get a skip button, and the next episode is
  * offered from the start of its credits (ADR 0048). The Réglages apply from the next
- * item played: external sources, automatic skip and the streaming cap (ADR 0051).
+ * item played: external sources, automatic skip and the streaming cap (ADR 0051),
+ * and the look of subtitles (ADR 0053).
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
     private var engine: PlayerEngine? = null
@@ -129,10 +130,10 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         settingsStore = PlaybackSettingsStore(this, session.userId)
         surface.holder.addCallback(this)
 
-        // Subtitles move above the controls while they show
+        // Subtitles move above the controls while they show, never below the place chosen in Réglages
         lifecycleScope.launch {
             snapshotFlow { ui.covered }.collect { covered ->
-                engine?.setSubtitlePosition((100 * (1 - covered)).roundToInt())
+                engine?.setSubtitlePosition(subtitlePosition(settings.subtitles.position, covered))
             }
         }
 
@@ -210,6 +211,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             val chosen = plan(client.server, client.playbackInfo(userId, itemId, deviceProfile(bitrate)))
             if (current != itemId) return
             Log.i(TAG, "play method=${chosen.method} source=${chosen.mediaSourceId} subtitles=${chosen.subtitles.size} maxBitrate=$bitrate")
+            Log.i(TAG, "subtitle style=${settings.subtitles}")
             // The selected subtitle goes last: each sub-add selects its track
             subtitles = chosen.subtitles.sortedBy { it.selected }
             val source = MediaSource.parse(chosen.url) ?: throw EmbyException(EmbyError.InvalidResponse("adresse de flux refusée"))
@@ -222,6 +224,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             if (running != null) {
                 // Headers are fixed at mpv init (token out of logcat): the first file's apply
                 replacedEnds++
+                styleSubtitles(running)
                 running.load(source, startTicks / TICKS_PER_SECOND)
                 return
             }
@@ -233,10 +236,17 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
                 player.attachSurface(holder.surface)
                 holder.surfaceFrame.let { player.resizeSurface(it.width(), it.height()) }
             }
+            styleSubtitles(player)
             player.load(source, startTicks / TICKS_PER_SECOND)
         } catch (e: EmbyException) {
             ui.status = e.error.message
         }
+    }
+
+    /** The subtitle look of Réglages for this item, above the controls if they show (ADR 0053). */
+    private fun styleSubtitles(player: PlayerEngine) {
+        player.setSubtitleStyle(settings.subtitles)
+        player.setSubtitlePosition(subtitlePosition(settings.subtitles.position, ui.covered))
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {

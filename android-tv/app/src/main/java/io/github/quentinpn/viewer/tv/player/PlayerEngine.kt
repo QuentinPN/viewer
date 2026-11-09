@@ -1,6 +1,7 @@
 package io.github.quentinpn.viewer.tv.player
 
 import android.view.Surface
+import io.github.quentinpn.viewer.tv.settings.SubtitleStyle
 
 /** Events are delivered on the engine's event thread; listeners hop to the UI thread themselves. */
 interface PlayerListener {
@@ -64,6 +65,9 @@ interface PlayerEngine {
 
     /** Vertical place of subtitles, in % of the picture height: 100 is their normal place, lower moves them up. */
     fun setSubtitlePosition(percent: Int)
+
+    /** Look of text subtitles, from Réglages; [setSubtitlePosition] places them. */
+    fun setSubtitleStyle(style: SubtitleStyle)
 
     /** Diagnostics only: reads one libmpv property as text. */
     fun property(name: String): String?
