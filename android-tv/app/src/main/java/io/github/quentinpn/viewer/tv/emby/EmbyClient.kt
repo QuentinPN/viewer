@@ -72,15 +72,56 @@ class EmbyClient(
     suspend fun views(userId: String): QueryResult<BaseItemDto> =
         call(get(server.api("/Users/${segment(userId)}/Views")), QueryResult.serializer(BaseItemDto.serializer()))
 
-    /** Films and episodes started but not finished, most recent first. */
+    /**
+     * Films and episodes started but not finished, most recent first. With the Windows
+     * hero `Fields` (ADR 0015): one request serves the "Reprendre" shelf and the hero (ADR 0059).
+     */
     suspend fun resumeItems(userId: String, limit: Int): QueryResult<BaseItemDto> {
         val url = server.api("/Users/${segment(userId)}/Items/Resume").newBuilder()
             .addQueryParameter("Limit", limit.toString())
             .addQueryParameter("MediaTypes", "Video")
             .addQueryParameter("IncludeItemTypes", "Movie,Episode")
+            .addQueryParameter("Fields", HERO_FIELDS)
             .addQueryParameter("EnableUserData", "true")
             .addQueryParameter("ImageTypeLimit", "1")
             .addQueryParameter("EnableImageTypes", "Primary,Backdrop,Thumb")
+            .build()
+        return call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
+    /**
+     * Home hero (ADR 0015, 0059): films and series not watched yet that have a backdrop,
+     * most recently added first; the Windows `hero_latest` query, without the logos.
+     */
+    suspend fun heroLatest(userId: String, limit: Int): QueryResult<BaseItemDto> {
+        val url = server.api("/Users/${segment(userId)}/Items").newBuilder()
+            .addQueryParameter("Recursive", "true")
+            .addQueryParameter("IncludeItemTypes", "Movie,Series")
+            .addQueryParameter("IsPlayed", "false")
+            .addQueryParameter("ImageTypes", "Backdrop")
+            .addQueryParameter("SortBy", "DateCreated")
+            .addQueryParameter("SortOrder", "Descending")
+            .addQueryParameter("Limit", limit.toString())
+            .addQueryParameter("Fields", HERO_FIELDS)
+            .addQueryParameter("EnableUserData", "true")
+            .addQueryParameter("ImageTypeLimit", "1")
+            .addQueryParameter("EnableImageTypes", "Primary,Backdrop")
+            .build()
+        return call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
+    /**
+     * First episode of a series not watched yet, in the series' order; the Windows
+     * `first_unplayed_episode` query (ADR 0015). Unknown series: 404.
+     */
+    suspend fun firstUnplayedEpisode(userId: String, seriesId: String): QueryResult<BaseItemDto> {
+        val url = server.api("/Shows/${segment(seriesId)}/Episodes").newBuilder()
+            .addQueryParameter("UserId", segment(userId))
+            .addQueryParameter("IsPlayed", "false")
+            .addQueryParameter("Limit", "1")
+            .addQueryParameter("EnableUserData", "true")
+            .addQueryParameter("EnableImageTypes", "Primary")
+            .addQueryParameter("ImageTypeLimit", "1")
             .build()
         return call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
     }

@@ -50,6 +50,8 @@ import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
+import io.github.quentinpn.viewer.tv.emby.HeroTitle
+import io.github.quentinpn.viewer.tv.emby.homeHero
 import io.github.quentinpn.viewer.tv.emby.nextUpRow
 import io.github.quentinpn.viewer.tv.emby.withoutDuplicates
 import kotlinx.coroutines.async
@@ -60,6 +62,9 @@ private const val LATEST_LIMIT = 16
 
 /** Key of a shelf's last card, "Tout voir", in [HomeMemory.opened]. */
 private const val ALL = "*"
+
+/** "Shelf" of the hero in [HomeMemory.opened]; no shelf title starts with a control character. */
+private const val HERO = "\u0001hero"
 
 /** [library]: the library a "Derniers ajouts" shelf comes from, opened by its "Tout voir" card. */
 internal data class Shelf(
@@ -73,7 +78,8 @@ internal data class Shelf(
 internal sealed interface HomeState {
     data object Loading : HomeState
 
-    data class Ready(val shelves: List<Shelf>) : HomeState
+    /** [hero]: the titles of the hero above the shelves (ADR 0059), none to hide it. */
+    data class Ready(val shelves: List<Shelf>, val hero: List<HeroTitle> = emptyList()) : HomeState
 
     data class Failed(val message: String) : HomeState
 }
@@ -88,8 +94,12 @@ class HomeMemory {
     internal val column = LazyListState()
     internal val rows = mutableMapOf<String, LazyListState>()
 
-    /** Shelf title and item id of the card last opened. */
+    /** Shelf title and item id of the card last opened; [HERO] and a [HeroButton] name for the hero. */
     internal var opened: Pair<String, String>? = null
+
+    /** Title the hero shows, kept by id across refreshes, else by place. */
+    internal var heroId by mutableStateOf<String?>(null)
+    internal var heroIndex by mutableIntStateOf(0)
 
     /** The `refresh` value the shelves were loaded for. */
     internal var loadedFor = -1
@@ -101,7 +111,7 @@ class HomeMemory {
 /** Header buttons that open a screen and take the focus back on return. */
 internal enum class HeaderButton { Search, Settings }
 
-/** "Reprendre", "À suivre" (ADR 0056), then the latest additions of each film and series library. */
+/** The hero (ADR 0059), "Reprendre", "À suivre" (ADR 0056), then the latest additions of each film and series library. */
 @Composable
 fun HomeScreen(
     client: EmbyClient,
@@ -140,9 +150,12 @@ fun HomeScreen(
         if (shown && memory.loadedFor == refresh) return@LaunchedEffect
         if (!shown) memory.state = HomeState.Loading
         val next = try {
-            val (resume, nextUp) = coroutineScope {
+            val (resume, nextUp, hero) = coroutineScope {
                 val upcoming = async { nextUpOrNothing(client, userId) }
-                client.resumeItems(userId, RESUME_LIMIT).items to upcoming.await()
+                val resumed = async { client.resumeItems(userId, RESUME_LIMIT).items }
+                // The same "Reprendre" items feed the hero: one request for both
+                val titles = async { heroOrNothing(client, userId, resumed.await()) }
+                Triple(resumed.await(), upcoming.await(), titles.await())
             }
             val libraries = client.views(userId).items.filter { it.collectionType == "movies" || it.collectionType == "tvshows" }
             val shelves = buildList {
@@ -157,7 +170,7 @@ fun HomeScreen(
                     }
                 }
             }
-            HomeState.Ready(shelves)
+            HomeState.Ready(shelves, hero)
         } catch (e: EmbyException) {
             if (e.error == EmbyError.SessionExpired) onSessionExpired()
             HomeState.Failed(e.error.message)
@@ -204,10 +217,24 @@ fun HomeScreen(
                     memory.attempt++
                 }) { Text("Réessayer") }
             }
-            is HomeState.Ready -> if (s.shelves.isEmpty()) {
+            is HomeState.Ready -> if (s.shelves.isEmpty() && s.hero.isEmpty()) {
                 Message("Aucun film ni série dans vos bibliothèques.")
             } else {
-                Shelves(s.shelves, memory, client, images, onAll = { shelf, library ->
+                val heroActions = HeroActions(
+                    onPlay = { title ->
+                        notice = null
+                        memory.focusHeader = null
+                        memory.opened = HERO to HeroButton.Play.name
+                        title.playId?.let { onPlay(it, title.startTicks) }
+                    },
+                    onInfo = { title ->
+                        notice = null
+                        memory.focusHeader = null
+                        memory.opened = HERO to HeroButton.Info.name
+                        if (title.type == "Movie") onOpenMovie(title.id) else onOpenSeries(title.id)
+                    },
+                )
+                Shelves(s.shelves, s.hero, heroActions, memory, client, images, onAll = { shelf, library ->
                     notice = null
                     memory.focusHeader = null
                     memory.opened = shelf.title to ALL
@@ -243,6 +270,20 @@ private suspend fun nextUpOrNothing(client: EmbyClient, userId: String): List<Ba
     emptyList()
 }
 
+/**
+ * The hero's titles; none when they cannot be read, so the shelves still show. An
+ * expired session is not hidden: the whole home handles it.
+ */
+private suspend fun heroOrNothing(client: EmbyClient, userId: String, resumed: List<BaseItemDto>): List<HeroTitle> = try {
+    client.homeHero(userId, resumed)
+} catch (e: EmbyException) {
+    if (e.error == EmbyError.SessionExpired) throw e
+    emptyList()
+}
+
+/** What the hero's buttons do. */
+private class HeroActions(val onPlay: (HeroTitle) -> Unit, val onInfo: (HeroTitle) -> Unit)
+
 @Composable
 private fun Message(text: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(text, color = Palette.textSecondary) }
@@ -251,6 +292,8 @@ private fun Message(text: String) {
 @Composable
 private fun Shelves(
     shelves: List<Shelf>,
+    hero: List<HeroTitle>,
+    heroActions: HeroActions,
     memory: HomeMemory,
     client: EmbyClient,
     images: ImageLoader,
@@ -258,11 +301,16 @@ private fun Shelves(
     onOpen: (Shelf, BaseItemDto) -> Unit,
 ) {
     val first = remember { FocusRequester() }
-    // The card opened last when it is still there, else the very first one
+    // The card or hero button opened last when it is still there, else the hero's
+    // main button, else the very first card
     val target = memory.opened?.takeIf { (title, id) ->
-        shelves.any { it.title == title && (if (id == ALL) it.library != null else it.items.any { i -> i.id == id }) }
+        if (title == HERO) {
+            hero.isNotEmpty()
+        } else {
+            shelves.any { it.title == title && (if (id == ALL) it.library != null else it.items.any { i -> i.id == id }) }
+        }
     }
-        ?: shelves.first().let { it.title to it.items.first().id }
+        ?: if (hero.isNotEmpty()) HERO to HeroButton.Play.name else shelves.first().let { it.title to it.items.first().id }
     // Again when the target changes: a refresh can remove the card that had focus
     // (an episode watched to the end leaves "Reprendre"). One frame first, so the
     // new card is placed; else focus falls on "Déconnecter" at the top.
@@ -273,6 +321,21 @@ private fun Shelves(
         runCatching { first.requestFocus() }
     }
     LazyColumn(state = memory.column, contentPadding = PaddingValues(bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        // Above the shelves: Down goes to the first one, Up from it comes back here
+        if (hero.isNotEmpty()) {
+            item(key = HERO) {
+                HomeHero(
+                    hero,
+                    memory,
+                    client,
+                    images,
+                    focus = first.takeIf { target.first == HERO },
+                    focusOn = if (target.second == HeroButton.Info.name) HeroButton.Info else HeroButton.Play,
+                    onPlay = heroActions.onPlay,
+                    onInfo = heroActions.onInfo,
+                )
+            }
+        }
         items(shelves, key = { it.title }) { shelf ->
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(

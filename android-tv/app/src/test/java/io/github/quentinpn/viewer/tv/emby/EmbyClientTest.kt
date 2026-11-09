@@ -128,6 +128,8 @@ class EmbyClientTest {
         assertEquals("12", url.queryParameter("Limit"))
         assertEquals("Movie,Episode", url.queryParameter("IncludeItemTypes"))
         assertEquals("true", url.queryParameter("EnableUserData"))
+        // The hero reads the same items (ADR 0059): their overview and year come along
+        assertEquals("Overview,ProductionYear,PrimaryImageAspectRatio", url.queryParameter("Fields"))
     }
 
     @Test
