@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -56,6 +58,7 @@ import io.github.quentinpn.viewer.tv.emby.nextUpRow
 import io.github.quentinpn.viewer.tv.emby.withoutDuplicates
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 private const val RESUME_LIMIT = 12
 private const val LATEST_LIMIT = 16
@@ -65,6 +68,9 @@ private const val ALL = "*"
 
 /** "Shelf" of the hero in [HomeMemory.opened]; no shelf title starts with a control character. */
 private const val HERO = "\u0001hero"
+
+/** Column key of the header when there is no hero to carry it. */
+private const val HEADER = "\u0001header"
 
 /** [library]: the library a "Derniers ajouts" shelf comes from, opened by its "Tout voir" card. */
 internal data class Shelf(
@@ -180,35 +186,43 @@ fun HomeScreen(
         memory.loadedFor = refresh
     }
 
-    Column(Modifier.fillMaxSize().background(Palette.background)) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 28.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Accueil", style = MaterialTheme.typography.headlineMedium, color = Palette.text)
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        notice = null
-                        memory.focusHeader = HeaderButton.Search
-                        onOpenSearch()
-                    },
-                    modifier = Modifier.focusRequester(searchButton),
-                ) { Text("Rechercher") }
-                OutlinedButton(
-                    onClick = {
-                        notice = null
-                        memory.focusHeader = HeaderButton.Settings
-                        onOpenSettings()
-                    },
-                    modifier = Modifier.focusRequester(settingsButton),
-                ) { Text("Réglages") }
-                OutlinedButton(onClick = onSignOut) { Text("Déconnecter $userName") }
+    val header: @Composable () -> Unit = {
+        Column {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 28.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Accueil", style = MaterialTheme.typography.headlineMedium, color = Palette.text)
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            notice = null
+                            memory.focusHeader = HeaderButton.Search
+                            onOpenSearch()
+                        },
+                        modifier = Modifier.focusRequester(searchButton),
+                    ) { Text("Rechercher") }
+                    OutlinedButton(
+                        onClick = {
+                            notice = null
+                            memory.focusHeader = HeaderButton.Settings
+                            onOpenSettings()
+                        },
+                        modifier = Modifier.focusRequester(settingsButton),
+                    ) { Text("Réglages") }
+                    OutlinedButton(onClick = onSignOut) { Text("Déconnecter $userName") }
+                }
             }
+            notice?.let { Text(it, color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp)) }
         }
-        notice?.let { Text(it, color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp)) }
-        when (val s = memory.state) {
+    }
+
+    Column(Modifier.fillMaxSize().background(Palette.background)) {
+        val s = memory.state
+        // With shelves the header scrolls with them, laid over the hero's backdrop
+        if (s !is HomeState.Ready || (s.shelves.isEmpty() && s.hero.isEmpty())) header()
+        when (s) {
             HomeState.Loading -> Message("Chargement…")
             is HomeState.Failed -> Column(Modifier.padding(48.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(s.message, color = Palette.error)
@@ -234,7 +248,7 @@ fun HomeScreen(
                         if (title.type == "Movie") onOpenMovie(title.id) else onOpenSeries(title.id)
                     },
                 )
-                Shelves(s.shelves, s.hero, heroActions, memory, client, images, onAll = { shelf, library ->
+                Shelves(s.shelves, s.hero, heroActions, header, memory, client, images, onAll = { shelf, library ->
                     notice = null
                     memory.focusHeader = null
                     memory.opened = shelf.title to ALL
@@ -294,6 +308,8 @@ private fun Shelves(
     shelves: List<Shelf>,
     hero: List<HeroTitle>,
     heroActions: HeroActions,
+    /** The home's title and buttons, first in the column: over the hero, or alone without one. */
+    header: @Composable () -> Unit,
     memory: HomeMemory,
     client: EmbyClient,
     images: ImageLoader,
@@ -301,6 +317,7 @@ private fun Shelves(
     onOpen: (Shelf, BaseItemDto) -> Unit,
 ) {
     val first = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
     // The card or hero button opened last when it is still there, else the hero's
     // main button, else the very first card
     val target = memory.opened?.takeIf { (title, id) ->
@@ -324,7 +341,9 @@ private fun Shelves(
         // Above the shelves: Down goes to the first one, Up from it comes back here
         if (hero.isNotEmpty()) {
             item(key = HERO) {
-                HomeHero(
+                // Focus on the hero shows it whole, header included: the column goes back to its top
+                Box(Modifier.onFocusChanged { if (it.hasFocus) scope.launch { memory.column.animateScrollToItem(0) } }) {
+                    HomeHero(
                     hero,
                     memory,
                     client,
@@ -333,8 +352,12 @@ private fun Shelves(
                     focusOn = if (target.second == HeroButton.Info.name) HeroButton.Info else HeroButton.Play,
                     onPlay = heroActions.onPlay,
                     onInfo = heroActions.onInfo,
-                )
+                        header = header,
+                    )
+                }
             }
+        } else {
+            item(key = HEADER) { header() }
         }
         items(shelves, key = { it.title }) { shelf ->
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

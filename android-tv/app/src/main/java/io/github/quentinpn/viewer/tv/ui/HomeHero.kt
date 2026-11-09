@@ -31,6 +31,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,6 +44,9 @@ import coil3.compose.AsyncImage
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.HeroTitle
 import kotlinx.coroutines.launch
+
+/** Share of the screen height the hero takes, header included (ADR 0059). */
+private const val HERO_SCREEN_SHARE = 0.85f
 
 /** Hero buttons; the one opened last takes the focus back on return (ADR 0059). */
 internal enum class HeroButton { Play, Info }
@@ -96,6 +100,8 @@ internal fun HomeHero(
     focusOn: HeroButton,
     onPlay: (HeroTitle) -> Unit,
     onInfo: (HeroTitle) -> Unit,
+    /** The home's title and buttons, laid over the top of the backdrop. */
+    header: @Composable () -> Unit,
 ) {
     if (titles.isEmpty()) return
     val index = keptIndex(titles, memory.heroId, memory.heroIndex)
@@ -135,10 +141,12 @@ internal fun HomeHero(
         true
     }
 
-    Box(Modifier.fillMaxWidth().height(320.dp)) {
+    // Most of the screen, header included; the first shelf's title shows below, hinting at more
+    val height = (LocalConfiguration.current.screenHeightDp * HERO_SCREEN_SHARE).dp
+    Box(Modifier.fillMaxWidth().height(height)) {
         Crossfade(targetState = current, animationSpec = fade, label = "hero-backdrop") { title ->
             AsyncImage(
-                model = client.imageUrl(title.backdrop.itemId, "Backdrop", title.backdrop.tag, 1280).toString(),
+                model = client.imageUrl(title.backdrop.itemId, "Backdrop", title.backdrop.tag, 1920).toString(),
                 imageLoader = images,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
@@ -151,15 +159,26 @@ internal fun HomeHero(
                 Brush.horizontalGradient(0f to Palette.background.copy(alpha = 0.9f), 0.55f to Palette.background.copy(alpha = 0.45f), 1f to Color.Transparent),
             ),
         )
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Palette.background)))
+        // The header stays readable at the top; the bottom melts into the shelves
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0f to Palette.background.copy(alpha = 0.7f),
+                    0.25f to Color.Transparent,
+                    0.6f to Color.Transparent,
+                    1f to Palette.background,
+                ),
+            ),
+        )
+        Box(Modifier.align(Alignment.TopStart).fillMaxWidth()) { header() }
         Column(
-            Modifier.align(Alignment.BottomStart).fillMaxWidth(0.6f).padding(start = 48.dp, end = 24.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.align(Alignment.BottomStart).fillMaxWidth(0.55f).padding(start = 48.dp, end = 24.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Crossfade(targetState = current, animationSpec = fade, label = "hero-text") { title ->
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (title.resumed) Text("Reprendre", color = Palette.accent, style = MaterialTheme.typography.labelLarge)
-                    Text(title.name, style = MaterialTheme.typography.headlineLarge, color = Palette.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(title.name, style = MaterialTheme.typography.displayMedium, color = Palette.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     heroFacts(title).takeIf { it.isNotEmpty() }?.let {
                         Text(it, color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
