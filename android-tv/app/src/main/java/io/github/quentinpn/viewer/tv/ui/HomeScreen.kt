@@ -84,8 +84,15 @@ internal data class Shelf(
 internal sealed interface HomeState {
     data object Loading : HomeState
 
-    /** [hero]: the titles of the hero above the shelves (ADR 0059), none to hide it. */
-    data class Ready(val shelves: List<Shelf>, val hero: List<HeroTitle> = emptyList()) : HomeState
+    /**
+     * [hero]: the titles of the hero above the shelves (ADR 0059), none to hide it;
+     * [libraries]: the film and series libraries « Films » and « Séries » open (ADR 0064).
+     */
+    data class Ready(
+        val shelves: List<Shelf>,
+        val hero: List<HeroTitle> = emptyList(),
+        val libraries: List<Library> = emptyList(),
+    ) : HomeState
 
     data class Failed(val message: String) : HomeState
 }
@@ -110,12 +117,9 @@ class HomeMemory {
     /** The `refresh` value the shelves were loaded for. */
     internal var loadedFor = -1
 
-    /** Set after "Rechercher" or "Réglages": coming back puts the focus on that button, not on a card. */
-    internal var focusHeader: HeaderButton? = null
+    /** Set after an entry of the bar opened a screen: coming back puts the focus on it, not on a card. */
+    internal var focusHeader: BarItem? = null
 }
-
-/** Header buttons that open a screen and take the focus back on return. */
-internal enum class HeaderButton { Search, Settings }
 
 /** The hero (ADR 0059), "Reprendre", "À suivre" (ADR 0056), then the latest additions of each film and series library. */
 @Composable
@@ -137,18 +141,9 @@ fun HomeScreen(
     refresh: Int = 0,
 ) {
     var notice by remember { mutableStateOf<String?>(null) }
-    val searchButton = remember { FocusRequester() }
-    val settingsButton = remember { FocusRequester() }
-
-    LaunchedEffect(Unit) {
-        val button = when (memory.focusHeader) {
-            HeaderButton.Search -> searchButton
-            HeaderButton.Settings -> settingsButton
-            null -> return@LaunchedEffect
-        }
-        withFrameNanos {}
-        runCatching { button.requestFocus() }
-    }
+    // Up from the hero's buttons lands on « Accueil »; Down from the bar on the hero's main button
+    val home = remember { FocusRequester() }
+    val heroMain = remember { FocusRequester() }
 
     LaunchedEffect(memory.attempt, refresh) {
         // Already loaded: the screen is shown again after a series page
@@ -163,20 +158,21 @@ fun HomeScreen(
                 val titles = async { heroOrNothing(client, userId, resumed.await()) }
                 Triple(resumed.await(), upcoming.await(), titles.await())
             }
-            val libraries = client.views(userId).items.filter { it.collectionType == "movies" || it.collectionType == "tvshows" }
+            val libraries = client.views(userId).items
+                .filter { it.collectionType == "movies" || it.collectionType == "tvshows" }
+                .map { Library(it.id, it.name, if (it.collectionType == "movies") "Movie" else "Series") }
             val shelves = buildList {
                 if (resume.isNotEmpty()) add(Shelf("Reprendre", resume, landscape = true, resume = true))
                 val upNext = withoutDuplicates(nextUp, resume)
                 if (upNext.isNotEmpty()) add(Shelf("À suivre", upNext, landscape = true, resume = false))
                 for (library in libraries) {
                     val latest = client.latest(userId, library.id, LATEST_LIMIT)
-                    val types = if (library.collectionType == "movies") "Movie" else "Series"
                     if (latest.isNotEmpty()) {
-                        add(Shelf("Derniers ajouts · ${library.name}", latest, landscape = false, resume = false, Library(library.id, library.name, types)))
+                        add(Shelf("Derniers ajouts · ${library.name}", latest, landscape = false, resume = false, library))
                     }
                 }
             }
-            HomeState.Ready(shelves, hero)
+            HomeState.Ready(shelves, hero, libraries)
         } catch (e: EmbyException) {
             if (e.error == EmbyError.SessionExpired) onSessionExpired()
             HomeState.Failed(e.error.message)
@@ -187,33 +183,31 @@ fun HomeScreen(
     }
 
     val header: @Composable () -> Unit = {
-        Column {
-            Row(
-                Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 28.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text("Accueil", style = MaterialTheme.typography.headlineMedium, color = Palette.text)
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    OutlinedButton(
-                        onClick = {
-                            notice = null
-                            memory.focusHeader = HeaderButton.Search
-                            onOpenSearch()
-                        },
-                        modifier = Modifier.focusRequester(searchButton),
-                    ) { Text("Rechercher") }
-                    OutlinedButton(
-                        onClick = {
-                            notice = null
-                            memory.focusHeader = HeaderButton.Settings
-                            onOpenSettings()
-                        },
-                        modifier = Modifier.focusRequester(settingsButton),
-                    ) { Text("Réglages") }
-                    OutlinedButton(onClick = onSignOut) { Text("Déconnecter $userName") }
-                }
-            }
+        val ready = memory.state as? HomeState.Ready
+        val libraries = ready?.libraries.orEmpty()
+        val movies = sectionLibrary(libraries, "Movie", "Films")
+        val series = sectionLibrary(libraries, "Series", "Séries")
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            HomeBar(
+                userName = userName,
+                movies = movies,
+                series = series,
+                home = home,
+                below = heroMain.takeIf { ready?.hero?.isNotEmpty() == true },
+                focusOn = memory.focusHeader,
+                onOpen = { item ->
+                    notice = null
+                    memory.focusHeader = item
+                    when (item) {
+                        BarItem.Movies -> movies?.let(onOpenLibrary)
+                        BarItem.Series -> series?.let(onOpenLibrary)
+                        BarItem.Search -> onOpenSearch()
+                        BarItem.Settings -> onOpenSettings()
+                        BarItem.Home, BarItem.Account -> Unit
+                    }
+                },
+                onSignOut = onSignOut,
+            )
             notice?.let { Text(it, color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp)) }
         }
     }
@@ -248,7 +242,7 @@ fun HomeScreen(
                         if (title.type == "Movie") onOpenMovie(title.id) else onOpenSeries(title.id)
                     },
                 )
-                Shelves(s.shelves, s.hero, heroActions, header, memory, client, images, onAll = { shelf, library ->
+                Shelves(s.shelves, s.hero, heroActions, HeroFocus(main = heroMain, up = home), header, memory, client, images, onAll = { shelf, library ->
                     notice = null
                     memory.focusHeader = null
                     memory.opened = shelf.title to ALL
@@ -298,6 +292,9 @@ private suspend fun heroOrNothing(client: EmbyClient, userId: String, resumed: L
 /** What the hero's buttons do. */
 private class HeroActions(val onPlay: (HeroTitle) -> Unit, val onInfo: (HeroTitle) -> Unit)
 
+/** Where the bar and the hero hand the focus to each other (ADR 0064). */
+private class HeroFocus(val main: FocusRequester, val up: FocusRequester)
+
 @Composable
 private fun Message(text: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(text, color = Palette.textSecondary) }
@@ -308,7 +305,8 @@ private fun Shelves(
     shelves: List<Shelf>,
     hero: List<HeroTitle>,
     heroActions: HeroActions,
-    /** The home's title and buttons, first in the column: over the hero, or alone without one. */
+    heroFocus: HeroFocus,
+    /** The home's bar, first in the column: over the hero, or alone without one. */
     header: @Composable () -> Unit,
     memory: HomeMemory,
     client: EmbyClient,
@@ -318,6 +316,8 @@ private fun Shelves(
 ) {
     val first = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
+    // While the hero or the bar has the focus, only a strip of the first shelf's cards shows
+    var heroFocused by remember { mutableStateOf(false) }
     // The card or hero button opened last when it is still there, else the hero's
     // main button, else the very first card
     val target = memory.opened?.takeIf { (title, id) ->
@@ -341,17 +341,24 @@ private fun Shelves(
         // Above the shelves: Down goes to the first one, Up from it comes back here
         if (hero.isNotEmpty()) {
             item(key = HERO) {
-                // Focus on the hero shows it whole, header included: the column goes back to its top
-                Box(Modifier.onFocusChanged { if (it.hasFocus) scope.launch { memory.column.animateScrollToItem(0) } }) {
+                // Focus on the hero shows it whole, bar included: the column goes back to its top
+                Box(
+                    Modifier.onFocusChanged {
+                        heroFocused = it.hasFocus
+                        if (it.hasFocus) scope.launch { memory.column.animateScrollToItem(0) }
+                    },
+                ) {
                     HomeHero(
-                    hero,
-                    memory,
-                    client,
-                    images,
-                    focus = first.takeIf { target.first == HERO },
-                    focusOn = if (target.second == HeroButton.Info.name) HeroButton.Info else HeroButton.Play,
-                    onPlay = heroActions.onPlay,
-                    onInfo = heroActions.onInfo,
+                        hero,
+                        memory,
+                        client,
+                        images,
+                        focus = first.takeIf { target.first == HERO },
+                        focusOn = if (target.second == HeroButton.Info.name) HeroButton.Info else HeroButton.Play,
+                        onPlay = heroActions.onPlay,
+                        onInfo = heroActions.onInfo,
+                        main = heroFocus.main,
+                        up = heroFocus.up,
                         header = header,
                     )
                 }
@@ -361,12 +368,15 @@ private fun Shelves(
         }
         items(shelves, key = { it.title }) { shelf ->
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    shelf.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Palette.text,
-                    modifier = Modifier.padding(horizontal = 48.dp),
-                )
+                // Under the hero, the first shelf's title shows once the focus has come down
+                if (!(heroFocused && shelf === shelves.first() && hero.isNotEmpty())) {
+                    Text(
+                        shelf.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Palette.text,
+                        modifier = Modifier.padding(horizontal = 48.dp),
+                    )
+                }
                 LazyRow(
                     state = memory.rows.getOrPut(shelf.title) { LazyListState() },
                     contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp),

@@ -37,6 +37,10 @@ data class HeroTitle(
     val startTicks: Long = 0,
     /** From "Reprendre", not from the latest additions. */
     val resumed: Boolean = false,
+    /** The title's logo, shown in place of its name when it loads (ADR 0064). */
+    val logo: HeroImage? = null,
+    /** Length of what [playId] plays, for the time left under a resume point. */
+    val playLength: Long? = null,
 )
 
 /**
@@ -94,6 +98,8 @@ internal fun resumedHero(dto: BaseItemDto): HeroTitle? {
                 playId = dto.id,
                 startTicks = resumeTicks(dto),
                 resumed = true,
+                logo = image(dto.parentLogoItemId, dto.parentLogoImageTag),
+                playLength = dto.runTimeTicks,
             )
         }
         else -> null
@@ -120,18 +126,24 @@ internal fun latestHero(dto: BaseItemDto): HeroTitle? {
         overview = text(dto.overview),
         playId = dto.id.takeIf { movie },
         startTicks = if (movie) resumeTicks(dto) else 0,
+        logo = image(dto.id, dto.imageTags["Logo"]),
+        playLength = dto.runTimeTicks.takeIf { movie },
     )
 }
 
 /** The series title once its first episode not watched is known: it resumes it if started. */
 internal fun HeroTitle.withEpisode(episode: BaseItemDto): HeroTitle =
-    copy(episode = heroEpisode(episode), playId = episode.id, startTicks = resumeTicks(episode))
+    copy(episode = heroEpisode(episode), playId = episode.id, startTicks = resumeTicks(episode), playLength = episode.runTimeTicks)
 
 /** Where to start: the resume point, or the beginning of an item watched or not started. */
 internal fun resumeTicks(dto: BaseItemDto): Long {
     val data = dto.userData ?: return 0
     return if (data.played || data.playbackPositionTicks <= 0) 0 else data.playbackPositionTicks
 }
+
+/** A server image when both its item and its tag are there. */
+private fun image(itemId: String?, tag: String?): HeroImage? =
+    itemId?.takeIf(::isId)?.let { id -> tag?.takeIf { it.isNotBlank() }?.let { HeroImage(id, it) } }
 
 private fun heroEpisode(dto: BaseItemDto) = HeroEpisode(dto.name.trim(), dto.parentIndexNumber, dto.indexNumber)
 

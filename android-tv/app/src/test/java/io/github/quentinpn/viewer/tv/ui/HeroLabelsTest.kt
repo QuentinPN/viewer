@@ -31,6 +31,18 @@ class HeroLabelsTest {
     }
 
     @Test
+    fun timeLeftShowsUnderAResumePointOnly() {
+        val started = title("a").copy(startTicks = 6_000_000_000, playLength = 19_200_000_000)
+        val (fraction, label) = heroRemaining(started)!!
+        assertEquals(0.3125f, fraction, 0f)
+        assertEquals("Reste 22 min", label)
+        assertNull(heroRemaining(title("a").copy(playLength = 19_200_000_000)))
+        assertNull(heroRemaining(started.copy(playLength = null)))
+        assertNull(heroRemaining(started.copy(playLength = 0)))
+        assertNull(heroRemaining(started.copy(startTicks = 19_200_000_000)))
+    }
+
+    @Test
     fun playLabelSaysWhereItResumes() {
         assertEquals("Lecture", heroPlayLabel(title("a")))
         assertEquals("Reprendre à 1:02:15", heroPlayLabel(title("a").copy(startTicks = 37_350_000_000)))

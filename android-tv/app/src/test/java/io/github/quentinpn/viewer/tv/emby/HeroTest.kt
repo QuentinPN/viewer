@@ -89,6 +89,22 @@ class HeroTest {
     }
 
     @Test
+    fun logosComeFromTheSeriesOrTheTitleItself() {
+        val ep = episode("e1", "s1").copy(parentLogoItemId = "s1", parentLogoImageTag = "l1", runTimeTicks = 14_400_000_000)
+        assertEquals(HeroImage("s1", "l1"), resumedHero(ep)!!.logo)
+        assertEquals(14_400_000_000, resumedHero(ep)!!.playLength)
+        assertNull(resumedHero(episode("e1", "s1"))!!.logo)
+        assertNull(resumedHero(ep.copy(parentLogoItemId = "../s1"))!!.logo)
+        assertNull(resumedHero(ep.copy(parentLogoImageTag = " "))!!.logo)
+        val film = movie("m1", userData = started).copy(imageTags = mapOf("Logo" to "l2"))
+        assertEquals(HeroImage("m1", "l2"), resumedHero(film)!!.logo)
+        assertEquals(93_000_000_000, resumedHero(film)!!.playLength)
+        // A series plays nothing until its episode is known
+        assertNull(latestHero(series("s1"))!!.playLength)
+        assertEquals(1_000L, latestHero(series("s1"))!!.withEpisode(BaseItemDto(id = "e9", type = "Episode", runTimeTicks = 1_000)).playLength)
+    }
+
+    @Test
     fun aLatestSeriesWaitsForItsEpisode() {
         val title = latestHero(series("s1"))!!
         assertNull(title.playId)

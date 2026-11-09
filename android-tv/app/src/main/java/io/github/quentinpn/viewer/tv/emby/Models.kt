@@ -74,6 +74,9 @@ data class BaseItemDto(
     @SerialName("ParentBackdropImageTags") val parentBackdropImageTags: List<String> = emptyList(),
     @SerialName("ParentThumbItemId") val parentThumbItemId: String? = null,
     @SerialName("ParentThumbImageTag") val parentThumbImageTag: String? = null,
+    /** An episode's series logo, when `EnableImageTypes` holds `Logo` (ADR 0015). */
+    @SerialName("ParentLogoItemId") val parentLogoItemId: String? = null,
+    @SerialName("ParentLogoImageTag") val parentLogoImageTag: String? = null,
     @SerialName("UserData") val userData: UserItemData? = null,
     // Detail fields: `/Users/{Id}/Items/{Id}` returns them without `Fields`
     @SerialName("Genres") val genres: List<String> = emptyList(),

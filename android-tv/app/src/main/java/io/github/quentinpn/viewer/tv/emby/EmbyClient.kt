@@ -84,7 +84,7 @@ class EmbyClient(
             .addQueryParameter("Fields", HERO_FIELDS)
             .addQueryParameter("EnableUserData", "true")
             .addQueryParameter("ImageTypeLimit", "1")
-            .addQueryParameter("EnableImageTypes", "Primary,Backdrop,Thumb")
+            .addQueryParameter("EnableImageTypes", "Primary,Backdrop,Thumb,Logo")
             .build()
         return call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
     }
@@ -105,7 +105,7 @@ class EmbyClient(
             .addQueryParameter("Fields", HERO_FIELDS)
             .addQueryParameter("EnableUserData", "true")
             .addQueryParameter("ImageTypeLimit", "1")
-            .addQueryParameter("EnableImageTypes", "Primary,Backdrop")
+            .addQueryParameter("EnableImageTypes", "Primary,Backdrop,Logo")
             .build()
         return call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
     }
