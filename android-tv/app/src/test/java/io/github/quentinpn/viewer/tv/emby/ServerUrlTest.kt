@@ -49,4 +49,11 @@ class ServerUrlTest {
             assertFalse(h, ServerUrl.isLocalHost(h))
         }
     }
+
+    @Test
+    fun theAddressPicksTheStreamingCap() {
+        assertTrue(ServerUrl.parse("http://192.168.1.14:8096").isLocal)
+        assertTrue(ServerUrl.parse("https://[fd00::1]:8920").isLocal)
+        assertFalse(ServerUrl.parse("https://emby.example.com").isLocal)
+    }
 }

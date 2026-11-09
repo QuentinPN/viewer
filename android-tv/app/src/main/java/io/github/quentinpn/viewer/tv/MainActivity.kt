@@ -13,6 +13,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.session.Session
+import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
 import io.github.quentinpn.viewer.tv.ui.HomeMemory
 import io.github.quentinpn.viewer.tv.ui.HomeScreen
 import io.github.quentinpn.viewer.tv.ui.LibraryMemory
@@ -22,11 +23,12 @@ import io.github.quentinpn.viewer.tv.ui.MovieScreen
 import io.github.quentinpn.viewer.tv.ui.SearchMemory
 import io.github.quentinpn.viewer.tv.ui.SearchScreen
 import io.github.quentinpn.viewer.tv.ui.SeriesScreen
+import io.github.quentinpn.viewer.tv.ui.SettingsScreen
 import io.github.quentinpn.viewer.tv.ui.SignInScreen
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import kotlinx.coroutines.launch
 
-/** Launcher: sign-in when no session is stored, else the home shelves, a library grid or the search, the series and film pages. */
+/** Launcher: sign-in when no session is stored, else the home shelves, a library grid or the search, the settings, the series and film pages. */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,7 +53,9 @@ class MainActivity : ComponentActivity() {
                     var movie by remember(current) { mutableStateOf<String?>(null) }
                     var library by remember(current) { mutableStateOf<LibraryMemory?>(null) }
                     var search by remember(current) { mutableStateOf<SearchMemory?>(null) }
+                    var settings by remember(current) { mutableStateOf(false) }
                     val libraryPrefs = remember(current) { LibraryPreferenceStore(this, current.userId) }
+                    val settingsStore = remember(current) { PlaybackSettingsStore(this, current.userId) }
                     val home = remember(current) { HomeMemory() }
                     val refresh by AppServices.reporter.stopped.collectAsState()
                     val play = { itemId: String, startTicks: Long ->
@@ -109,6 +113,15 @@ class MainActivity : ComponentActivity() {
                         )
                         return@ViewerTheme
                     }
+                    if (settings) {
+                        BackHandler { settings = false }
+                        SettingsScreen(
+                            settingsStore,
+                            localAddress = client.server.isLocal,
+                            version = device.version,
+                        )
+                        return@ViewerTheme
+                    }
                     HomeScreen(
                         client = client,
                         userId = current.userId,
@@ -119,6 +132,7 @@ class MainActivity : ComponentActivity() {
                         onOpenMovie = { movie = it },
                         onOpenLibrary = { library = LibraryMemory(it, libraryPrefs.load(it)) },
                         onOpenSearch = { search = SearchMemory() },
+                        onOpenSettings = { settings = true },
                         onSessionExpired = expired,
                         memory = home,
                         refresh = refresh,

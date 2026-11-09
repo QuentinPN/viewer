@@ -12,6 +12,9 @@ import java.net.InetAddress
 class ServerUrl private constructor(val url: HttpUrl) {
     val isHttps: Boolean get() = url.isHttps
 
+    /** Reached through a local-network address: picks the "Réseau local" streaming cap (ADR 0051). */
+    val isLocal: Boolean get() = isLocalHost(url.host)
+
     /** Base URL without trailing slash, as shown to the user and persisted. */
     override fun toString(): String = url.toString().trimEnd('/')
 
