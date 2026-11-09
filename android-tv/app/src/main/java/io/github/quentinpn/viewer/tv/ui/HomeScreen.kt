@@ -89,6 +89,9 @@ class HomeMemory {
 
     /** The `refresh` value the shelves were loaded for. */
     internal var loadedFor = -1
+
+    /** True after "Rechercher": coming back puts the focus on that button, not on a card. */
+    internal var focusSearch = false
 }
 
 /** "Reprendre", then the latest additions of each film and series library. */
@@ -102,6 +105,7 @@ fun HomeScreen(
     onOpenSeries: (seriesId: String) -> Unit,
     onOpenMovie: (movieId: String) -> Unit,
     onOpenLibrary: (Library) -> Unit,
+    onOpenSearch: () -> Unit,
     onSessionExpired: () -> Unit,
     onSignOut: () -> Unit,
     memory: HomeMemory = remember { HomeMemory() },
@@ -109,6 +113,13 @@ fun HomeScreen(
     refresh: Int = 0,
 ) {
     var notice by remember { mutableStateOf<String?>(null) }
+    val searchButton = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        if (!memory.focusSearch) return@LaunchedEffect
+        withFrameNanos {}
+        runCatching { searchButton.requestFocus() }
+    }
 
     LaunchedEffect(memory.attempt, refresh) {
         // Already loaded: the screen is shown again after a series page
@@ -145,7 +156,17 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text("Accueil", style = MaterialTheme.typography.headlineMedium, color = Palette.text)
-            OutlinedButton(onClick = onSignOut) { Text("Déconnecter $userName") }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        notice = null
+                        memory.focusSearch = true
+                        onOpenSearch()
+                    },
+                    modifier = Modifier.focusRequester(searchButton),
+                ) { Text("Rechercher") }
+                OutlinedButton(onClick = onSignOut) { Text("Déconnecter $userName") }
+            }
         }
         notice?.let { Text(it, color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp)) }
         when (val s = memory.state) {
@@ -162,10 +183,12 @@ fun HomeScreen(
             } else {
                 Shelves(s.shelves, memory, client, images, onAll = { shelf, library ->
                     notice = null
+                    memory.focusSearch = false
                     memory.opened = shelf.title to ALL
                     onOpenLibrary(library)
                 }) { shelf, item ->
                     notice = null
+                    memory.focusSearch = false
                     memory.opened = shelf.title to item.id
                     val resume = shelf.resume
                     // "Reprendre" plays at once; elsewhere a film opens its page first
@@ -206,6 +229,8 @@ private fun Shelves(
     // (an episode watched to the end leaves "Reprendre"). One frame first, so the
     // new card is placed; else focus falls on "Déconnecter" at the top.
     LaunchedEffect(target) {
+        // Back from the search: the focus stays on "Rechercher"
+        if (memory.focusSearch) return@LaunchedEffect
         withFrameNanos {}
         runCatching { first.requestFocus() }
     }

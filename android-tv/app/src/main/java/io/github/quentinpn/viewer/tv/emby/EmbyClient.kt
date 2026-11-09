@@ -127,6 +127,26 @@ class EmbyClient(
         return call(get(builder.build()), QueryResult.serializer(BaseItemDto.serializer()))
     }
 
+    /**
+     * Films, series or episodes whose name matches [term], across every library the user
+     * can see (ADR 0011, 0020); the Windows query. [itemType] is `Movie`, `Series` or
+     * `Episode`; episodes come with the 16:9 images of the home cards.
+     */
+    suspend fun search(userId: String, term: String, itemType: String, limit: Int): QueryResult<BaseItemDto> {
+        val episode = itemType == "Episode"
+        val url = server.api("/Users/${segment(userId)}/Items").newBuilder()
+            .addQueryParameter("SearchTerm", term)
+            .addQueryParameter("Recursive", "true")
+            .addQueryParameter("IncludeItemTypes", itemType)
+            .addQueryParameter("Limit", limit.toString())
+            .addQueryParameter("Fields", if (episode) "PrimaryImageAspectRatio" else "PrimaryImageAspectRatio,ProductionYear")
+            .addQueryParameter("EnableImageTypes", if (episode) "Primary,Backdrop,Thumb" else "Primary")
+            .addQueryParameter("ImageTypeLimit", "1")
+            .addQueryParameter("EnableUserData", "true")
+            .build()
+        return call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
     /** Genre names used by a library's films or series, by name. */
     suspend fun genres(userId: String, parentId: String, itemTypes: String): List<String> {
         val url = server.api("/Genres").newBuilder()
