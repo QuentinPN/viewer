@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -44,9 +46,11 @@ import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
+import io.github.quentinpn.viewer.tv.player.Chapter
 import io.github.quentinpn.viewer.tv.player.SkipPrompt
 import io.github.quentinpn.viewer.tv.player.Track
 import io.github.quentinpn.viewer.tv.player.TrackType
+import io.github.quentinpn.viewer.tv.player.chapterIndex
 import kotlinx.coroutines.delay
 
 private const val HIDE_AFTER_MS = 5_000L
@@ -84,6 +88,19 @@ class PlayerUi {
     /** "Passer l'intro" or "Passer le générique" during a segment (ADR 0048). */
     var skip by mutableStateOf<SkipPrompt.Button?>(null)
 
+    /** Chapters of the item, none with fewer than two (ADR 0057). */
+    var chapters by mutableStateOf<List<Chapter>>(emptyList())
+
+    /** The "Chapitres" menu is open. */
+    var chapterMenu by mutableStateOf(false)
+
+    val menuOpen get() = tracks != null || chapterMenu
+
+    fun closeMenus() {
+        tracks = null
+        chapterMenu = false
+    }
+
     // Bumped on each key: restarts the hide delay
     private var shown by mutableIntStateOf(0)
 
@@ -106,6 +123,8 @@ class PlayerUi {
         tracks = null
         upNext = null
         skip = null
+        chapters = emptyList()
+        chapterMenu = false
         controls = false
     }
 
@@ -115,8 +134,8 @@ class PlayerUi {
 
     @Composable
     internal fun AutoHide() {
-        LaunchedEffect(shown, paused, tracks == null) {
-            if (controls && !paused && tracks == null) {
+        LaunchedEffect(shown, paused, menuOpen) {
+            if (controls && !paused && !menuOpen) {
                 delay(HIDE_AFTER_MS)
                 controls = false
             }
@@ -133,9 +152,16 @@ internal fun episodeLabel(season: Int?, episode: Int?, name: String): String {
     return if (code.isEmpty()) name else if (name.isEmpty()) code else "$code — $name"
 }
 
-/** Time, progress and title over the video, the audio / subtitle menu, the skip button and the next episode card. */
+/** Time, progress and title over the video, the audio / subtitle and chapter menus, the skip button and the next episode card. */
 @Composable
-fun PlayerOverlay(ui: PlayerUi, onSelect: (TrackType, Int?) -> Unit, onPlayNext: () -> Unit, onCancelNext: () -> Unit, onSkip: () -> Unit) {
+fun PlayerOverlay(
+    ui: PlayerUi,
+    onSelect: (TrackType, Int?) -> Unit,
+    onChapter: (Double) -> Unit,
+    onPlayNext: () -> Unit,
+    onCancelNext: () -> Unit,
+    onSkip: () -> Unit,
+) {
     ui.AutoHide()
     BoxWithConstraints(Modifier.fillMaxSize()) {
         ui.status?.let {
@@ -151,13 +177,14 @@ fun PlayerOverlay(ui: PlayerUi, onSelect: (TrackType, Int?) -> Unit, onPlayNext:
         val skip = ui.skip
         if (skip != null && upNext == null && ui.status == null) {
             // Above the text of the controls while they show; stays when they fade
-            SkipButton(skip, ui.tracks == null, onSkip, Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
+            SkipButton(skip, !ui.menuOpen, onSkip, Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
         }
         ui.tracks?.let { TrackMenu(it, onSelect, Modifier.align(Alignment.CenterEnd)) }
+        if (ui.chapterMenu) ChapterMenu(ui.chapters, chapterIndex(ui.chapters, ui.position), onChapter, Modifier.align(Alignment.CenterEnd))
     }
 }
 
-/** Focused when it appears or the track menu closes, never while the menu is open. */
+/** Focused when it appears or a menu closes, never while a menu is open. */
 @Composable
 private fun SkipButton(skip: SkipPrompt.Button, focus: Boolean, onSkip: () -> Unit, modifier: Modifier) {
     val requester = remember { FocusRequester() }
@@ -239,14 +266,14 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
             }
         }
         Text(
-            "OK lecture / pause  ·  ◀ ▶ 10 s  ·  ▼ audio et sous-titres",
+            "OK lecture / pause  ·  ◀ ▶ 10 s  ·  ▼ audio et sous-titres" + if (ui.chapters.isNotEmpty()) "  ·  ▲ chapitres" else "",
             color = Palette.textSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
     }
 }
 
-private fun seconds(value: Double) = clock((value.coerceAtLeast(0.0) * 10_000_000).toLong())
+internal fun seconds(value: Double) = clock((value.coerceAtLeast(0.0) * 10_000_000).toLong())
 
 private sealed interface MenuRow {
     data class Header(val text: String) : MenuRow
@@ -298,5 +325,45 @@ private fun TrackMenu(tracks: List<Track>, onSelect: (TrackType, Int?) -> Unit, 
     LaunchedEffect(Unit) {
         withFrameNanos {}
         runCatching { first.requestFocus() }
+    }
+}
+
+/**
+ * One row per chapter with its start, the playing one marked (ADR 0057). Focus
+ * starts on it, the list scrolled there, so it is composed when asked to focus.
+ */
+@Composable
+private fun ChapterMenu(chapters: List<Chapter>, current: Int, onChapter: (Double) -> Unit, modifier: Modifier) {
+    val start = remember { current.coerceAtLeast(0) }
+    val focus = remember { FocusRequester() }
+    // Row i is item i + 1, under the title: the row before stays in view
+    val state = rememberLazyListState(initialFirstVisibleItemIndex = start)
+    LazyColumn(
+        modifier.fillMaxHeight().width(460.dp).background(Palette.surface.copy(alpha = 0.95f)),
+        state = state,
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        item {
+            Text(
+                "Chapitres",
+                color = Palette.textSecondary,
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(start = 12.dp, top = 16.dp, bottom = 4.dp),
+            )
+        }
+        itemsIndexed(chapters) { i, chapter ->
+            ListItem(
+                selected = i == current,
+                onClick = { onChapter(chapter.start) },
+                headlineContent = { Text(chapter.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                trailingContent = { Text(seconds(chapter.start)) },
+                modifier = if (i == start) Modifier.focusRequester(focus) else Modifier,
+            )
+        }
+    }
+    LaunchedEffect(Unit) {
+        withFrameNanos {}
+        runCatching { focus.requestFocus() }
     }
 }
