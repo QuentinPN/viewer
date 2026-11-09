@@ -19,6 +19,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.ExternalSubtitle
+import io.github.quentinpn.viewer.tv.emby.Segment
 import io.github.quentinpn.viewer.tv.emby.deviceProfile
 import io.github.quentinpn.viewer.tv.emby.embyMarkers
 import io.github.quentinpn.viewer.tv.emby.nextEpisode
@@ -35,6 +36,8 @@ import io.github.quentinpn.viewer.tv.player.TrackPreference
 import io.github.quentinpn.viewer.tv.player.TrackPreferenceStore
 import io.github.quentinpn.viewer.tv.player.TrackType
 import io.github.quentinpn.viewer.tv.player.choose
+import io.github.quentinpn.viewer.tv.settings.PlaybackSettings
+import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
 import io.github.quentinpn.viewer.tv.ui.PlayerOverlay
 import io.github.quentinpn.viewer.tv.ui.PlayerUi
 import io.github.quentinpn.viewer.tv.ui.UpNext
@@ -57,7 +60,8 @@ private const val NATURAL_END_MARGIN_SECONDS = 30.0
  * The last audio and subtitle picked in the menu apply to the next files (ADR 0042).
  * At the natural end of an episode, the next one is offered and plays in the same
  * engine (ADR 0043). Intros and credits get a skip button, and the next episode is
- * offered from the start of its credits (ADR 0048).
+ * offered from the start of its credits (ADR 0048). The Réglages apply from the next
+ * item played: external sources, automatic skip and the streaming cap (ADR 0051).
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
     private var engine: PlayerEngine? = null
@@ -65,6 +69,10 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     private var subtitles: List<ExternalSubtitle> = emptyList()
     private var surfaceHolder: SurfaceHolder? = null
     private var preferences: TrackPreferenceStore? = null
+    private var settingsStore: PlaybackSettingsStore? = null
+
+    /** Read again for each item, so a change in Réglages applies to the next one. */
+    private var settings = PlaybackSettings()
     private lateinit var client: EmbyClient
     private lateinit var userId: String
 
@@ -118,6 +126,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         client = AppServices.client(this, session)
         userId = session.userId
         preferences = TrackPreferenceStore(this, session.userId)
+        settingsStore = PlaybackSettingsStore(this, session.userId)
         surface.holder.addCallback(this)
 
         // Subtitles move above the controls while they show
@@ -134,6 +143,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         current = itemId
         next = null
         skips = null
+        settings = settingsStore?.load() ?: PlaybackSettings()
         ui.reset()
         lifecycleScope.launch { describe(itemId) }
         lifecycleScope.launch { negotiate(itemId, startTicks) }
@@ -167,9 +177,19 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
      * button, and playback never waits for them.
      */
     private suspend fun findSegments(item: BaseItemDto) {
+        val auto = settings.autoSkip
+        // External sources turned off in Réglages: Emby's markers only, nothing leaves the app
+        val found = if (!settings.externalSegments) embyMarkers(item.chapters) else externalSegments(item) ?: return
+        if (current != item.id) return
+        Log.i(TAG, "segments=${found.joinToString { "${it.kind}@${it.start}-${it.end ?: "end"} (${it.source})" }} auto=$auto")
+        skips = SkipPlan(found, auto)
+    }
+
+    /** Emby's markers completed by IntroDB and TheIntroDB; null when another item started meanwhile. */
+    private suspend fun externalSegments(item: BaseItemDto): List<Segment>? {
         val sources = AppServices.segments(this)
         val key = "${client.server.url}|$userId|${item.id}"
-        val found = sources.cached(key) ?: run {
+        return sources.cached(key) ?: run {
             val series = item.seriesId?.takeIf { item.type == "Episode" }?.let { seriesId ->
                 try {
                     client.fullItem(userId, seriesId)
@@ -178,19 +198,18 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
                     null
                 }
             }
-            if (current != item.id) return
+            if (current != item.id) return null
             sources.lookup(key, embyMarkers(item.chapters), segmentQuery(item, series))
         }
-        if (current != item.id) return
-        Log.i(TAG, "segments=${found.joinToString { "${it.kind}@${it.start}-${it.end ?: "end"} (${it.source})" }}")
-        skips = SkipPlan(found)
     }
 
     private suspend fun negotiate(itemId: String, startTicks: Long) {
         try {
-            val chosen = plan(client.server, client.playbackInfo(userId, itemId, deviceProfile()))
+            // The cap of the server's kind of address, else the default limit (ADR 0037, 0051)
+            val bitrate = settings.maxStreamingBitrate(client.server.isLocal)
+            val chosen = plan(client.server, client.playbackInfo(userId, itemId, deviceProfile(bitrate)))
             if (current != itemId) return
-            Log.i(TAG, "play method=${chosen.method} source=${chosen.mediaSourceId} subtitles=${chosen.subtitles.size}")
+            Log.i(TAG, "play method=${chosen.method} source=${chosen.mediaSourceId} subtitles=${chosen.subtitles.size} maxBitrate=$bitrate")
             // The selected subtitle goes last: each sub-add selects its track
             subtitles = chosen.subtitles.sortedBy { it.selected }
             val source = MediaSource.parse(chosen.url) ?: throw EmbyException(EmbyError.InvalidResponse("adresse de flux refusée"))
@@ -311,18 +330,30 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             ui.upNext = UpNext(following.seriesName ?: ui.title, episodeLabel(following.parentIndexNumber, following.indexNumber, following.name), atCredits = true)
             Log.i(TAG, "up next at the credits")
         }
+        if (prompt is SkipPrompt.Auto) {
+            // Not while a menu or card is open: the button shows instead, as after a seek back
+            if (ui.tracks == null && ui.upNext == null) {
+                Log.i(TAG, "auto skip")
+                seekPast(prompt.to)
+                return
+            }
+        }
         ui.skip = prompt as? SkipPrompt.Button
     }
 
     /** Seeks past the segment; past the end of the file, mpv ends it as a natural end. */
     private fun skip() {
-        val player = engine ?: return
         val target = ui.skip?.to ?: return
+        if (seekPast(target)) ui.show()
+    }
+
+    private fun seekPast(target: Double): Boolean {
+        val player = engine ?: return false
         Log.i(TAG, "skip to $target")
         player.seekTo(target)
         ui.position = target
         ui.skip = null
-        ui.show()
+        return true
     }
 
     /** At the credits, the card goes and the credits play on; at the end, the player closes. */

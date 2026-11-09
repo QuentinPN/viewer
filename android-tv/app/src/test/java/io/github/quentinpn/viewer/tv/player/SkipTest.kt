@@ -60,6 +60,31 @@ class SkipTest {
     }
 
     @Test
+    fun autoSkipsEachSegmentOnceThenShowsTheButton() {
+        val plan = SkipPlan(segments, auto = true)
+        assertEquals(SkipPrompt.Auto(80.0), plan.at(50.0, duration, hasNext = false))
+        // Seeking back into the intro: the button, as on Windows
+        assertEquals(SkipPrompt.Button("Passer l'intro", 80.0), plan.at(55.0, duration, hasNext = false))
+        assertEquals(SkipPrompt.Auto(1435.1), plan.at(1345.0, 1500.0, hasNext = false))
+        assertEquals(SkipPrompt.Button("Passer le générique", 1435.1), plan.at(1350.0, 1500.0, hasNext = false))
+    }
+
+    @Test
+    fun autoSkipLeavesCreditsWithANextEpisodeToTheCard() {
+        val plan = SkipPlan(segments, auto = true)
+        assertEquals(SkipPrompt.UpNext, plan.at(1345.0, duration, hasNext = true))
+        // The card dismissed, the credits play on with a button, never skipped behind the user
+        assertEquals(SkipPrompt.Button("Passer le générique", 1435.1), plan.at(1346.0, duration, hasNext = true))
+    }
+
+    @Test
+    fun withoutAutoNothingSkipsOnItsOwn() {
+        val plan = SkipPlan(segments)
+        assertEquals(SkipPrompt.Button("Passer l'intro", 80.0), plan.at(50.0, duration, hasNext = false))
+        assertEquals(SkipPrompt.Button("Passer le générique", 1435.1), plan.at(1345.0, 1500.0, hasNext = false))
+    }
+
+    @Test
     fun noSegmentsNoPrompt() {
         assertNull(SkipPlan(emptyList()).at(1400.0, duration, hasNext = true))
     }

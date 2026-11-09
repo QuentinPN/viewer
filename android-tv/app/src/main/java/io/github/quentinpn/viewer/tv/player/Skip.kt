@@ -30,21 +30,29 @@ sealed interface SkipPrompt {
 
     /** The "Épisode suivant" card (ADR 0043), at the start of the credits. */
     data object UpNext : SkipPrompt
+
+    /** "Passer automatiquement" (ADR 0051): seek to [to] without waiting for a press. */
+    data class Auto(val to: Double) : SkipPrompt
 }
 
 /**
  * What to show at [position]. The up-next card comes once per credits segment and
  * playback; once dismissed, those credits get the "Passer le générique" button.
+ * With [auto], each segment is skipped once per playback, as on Windows: seeking
+ * back into it shows the button again. The up-next card counts as that skip.
  */
-class SkipPlan(private val segments: List<Segment>) {
+class SkipPlan(private val segments: List<Segment>, private val auto: Boolean = false) {
     private val offered = mutableSetOf<Segment>()
+    private val skipped = mutableSetOf<Segment>()
 
     fun at(position: Double, duration: Double, hasNext: Boolean): SkipPrompt? {
         val segment = activeSegment(segments, position, duration) ?: return null
         val end = segmentEnd(segment, duration) ?: return null
+        val intro = segment.kind == SegmentKind.Intro
         return when {
-            segment.kind == SegmentKind.Intro -> SkipPrompt.Button("Passer l'intro", end)
-            hasNext && offered.add(segment) -> SkipPrompt.UpNext
+            !intro && hasNext && offered.add(segment) -> SkipPrompt.UpNext.also { skipped += segment }
+            auto && skipped.add(segment) -> SkipPrompt.Auto(end)
+            intro -> SkipPrompt.Button("Passer l'intro", end)
             else -> SkipPrompt.Button("Passer le générique", end)
         }
     }
