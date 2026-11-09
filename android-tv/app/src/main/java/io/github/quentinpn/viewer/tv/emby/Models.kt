@@ -136,6 +136,24 @@ data class MediaSourceInfo(
     @SerialName("MediaStreams") val mediaStreams: List<MediaStreamDto> = emptyList(),
 )
 
+/**
+ * Body of `POST /Sessions/Playing`, `/Sessions/Playing/Progress` and
+ * `/Sessions/Playing/Stopped` (ADR 0008). Null fields are left out.
+ */
+@Serializable
+data class PlaybackReport(
+    @SerialName("ItemId") val itemId: String,
+    @SerialName("MediaSourceId") val mediaSourceId: String,
+    @SerialName("PlaySessionId") val playSessionId: String? = null,
+    @SerialName("PositionTicks") val positionTicks: Long,
+    @SerialName("RunTimeTicks") val runTimeTicks: Long? = null,
+    @SerialName("IsPaused") val isPaused: Boolean? = null,
+    @SerialName("CanSeek") val canSeek: Boolean? = null,
+    @SerialName("PlayMethod") val playMethod: String? = null,
+    @SerialName("EventName") val eventName: String? = null,
+    @SerialName("Failed") val failed: Boolean? = null,
+)
+
 @Serializable
 data class MediaStreamDto(
     @SerialName("Index") val index: Int,

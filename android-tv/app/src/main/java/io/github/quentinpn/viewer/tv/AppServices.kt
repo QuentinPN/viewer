@@ -15,6 +15,8 @@ import okhttp3.OkHttpClient
 object AppServices {
     val http: OkHttpClient by lazy { EmbyClient.defaultHttp() }
 
+    val reporter: PlaybackReporter by lazy { PlaybackReporter() }
+
     fun store(context: Context) = SessionStore(context)
 
     fun device(context: Context): DeviceIdentity {

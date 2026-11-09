@@ -68,6 +68,8 @@ fun SeriesScreen(
     images: ImageLoader,
     onPlay: (itemId: String, startTicks: Long) -> Unit,
     onSessionExpired: () -> Unit,
+    /** Changes after each playback: the episodes' watched state is read again. */
+    refresh: Int = 0,
 ) {
     var data by remember { mutableStateOf<Load<SeriesData>>(Load.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
@@ -101,7 +103,7 @@ fun SeriesScreen(
                     } else {
                         SeasonChips(d.value.seasons, seasonId) { seasonId = it }
                         seasonId?.let { id ->
-                            Episodes(client, userId, seriesId, id, d.value.series, images, onPlay, onSessionExpired)
+                            Episodes(client, userId, seriesId, id, d.value.series, images, onPlay, onSessionExpired, refresh)
                         }
                     }
                 }
@@ -184,19 +186,24 @@ private fun Episodes(
     images: ImageLoader,
     onPlay: (itemId: String, startTicks: Long) -> Unit,
     onSessionExpired: () -> Unit,
+    refresh: Int,
 ) {
     var episodes by remember(seasonId) { mutableStateOf<Load<List<BaseItemDto>>>(Load.Loading) }
     var attempt by remember(seasonId) { mutableIntStateOf(0) }
     var focused by remember(seasonId) { mutableStateOf<BaseItemDto?>(null) }
 
-    LaunchedEffect(seasonId, attempt) {
-        episodes = Load.Loading
-        episodes = try {
+    LaunchedEffect(seasonId, attempt, refresh) {
+        // After a playback the episodes are read again in place, focus kept
+        val shown = episodes is Load.Ready
+        if (!shown) episodes = Load.Loading
+        val next = try {
             Load.Ready(client.episodes(userId, seriesId, seasonId))
         } catch (e: EmbyException) {
             if (e.error == EmbyError.SessionExpired) onSessionExpired()
             Load.Failed(e.error.message)
         }
+        if (!shown || next is Load.Ready) episodes = next
+        focused = (next as? Load.Ready)?.value?.find { it.id == focused?.id } ?: focused
     }
 
     when (val e = episodes) {
@@ -260,28 +267,31 @@ private fun EpisodeCard(
             border = CardDefaults.border(focusedBorder = Border(BorderStroke(3.dp, Palette.accent), shape = shape)),
             colors = CardDefaults.colors(containerColor = Palette.surface),
         ) {
-            val image = episode.imageTags["Primary"]?.let { client.imageUrl(episode.id, "Primary", it, 560) }
-                ?: series.backdropImageTags.firstOrNull()?.let { client.imageUrl(series.id, "Backdrop", it, 560) }
-            if (image != null) {
-                AsyncImage(
-                    model = image.toString(),
-                    imageLoader = images,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().clip(shape),
-                )
-            }
-            if (episode.userData?.played == true) {
-                Box(Modifier.fillMaxSize().padding(8.dp), contentAlignment = Alignment.TopEnd) {
-                    Text(
-                        "Vu",
-                        color = Color.Black,
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.background(Palette.text, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
+            // A Box, not the Card's Column: the progress bar overlays the image
+            Box(Modifier.fillMaxSize()) {
+                val image = episode.imageTags["Primary"]?.let { client.imageUrl(episode.id, "Primary", it, 560) }
+                    ?: series.backdropImageTags.firstOrNull()?.let { client.imageUrl(series.id, "Backdrop", it, 560) }
+                if (image != null) {
+                    AsyncImage(
+                        model = image.toString(),
+                        imageLoader = images,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(shape),
                     )
                 }
-            } else {
-                Progress(episode)
+                if (episode.userData?.played == true) {
+                    Box(Modifier.fillMaxSize().padding(8.dp), contentAlignment = Alignment.TopEnd) {
+                        Text(
+                            "Vu",
+                            color = Color.Black,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.background(Palette.text, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
+                        )
+                    }
+                } else {
+                    Progress(episode)
+                }
             }
         }
         Text(

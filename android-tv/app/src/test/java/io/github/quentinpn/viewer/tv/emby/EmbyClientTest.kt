@@ -167,6 +167,27 @@ class EmbyClientTest {
     }
 
     @Test
+    fun stopReportIsPostedWithoutNullFields() = runBlocking {
+        respond(204)
+        val body = PlaybackReport(itemId = "i1", mediaSourceId = "ms1", playSessionId = "ps", positionTicks = 42, playMethod = "DirectPlay", failed = false)
+        client.withToken("t").reportPlayback(Report(ReportKind.Stopped, body))
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/emby/Sessions/Playing/Stopped", request.url.encodedPath)
+        assertNull(request.url.query)
+        assertEquals(
+            """{"ItemId":"i1","MediaSourceId":"ms1","PlaySessionId":"ps","PositionTicks":42,"PlayMethod":"DirectPlay","Failed":false}""",
+            request.body?.utf8(),
+        )
+        assertTrue(request.headers["X-Emby-Authorization"]!!.endsWith(", Token=\"t\""))
+    }
+
+    @Test
+    fun reportsNeedASession() = expectError(EmbyError.NotSignedIn::class.java) {
+        client.reportPlayback(Report(ReportKind.Start, PlaybackReport(itemId = "i1", mediaSourceId = "ms1", positionTicks = 0)))
+    }
+
+    @Test
     fun idsAreCheckedBeforeGoingIntoAPath() = expectError(EmbyError.InvalidResponse::class.java) {
         client.withToken("t").views("../System")
     }

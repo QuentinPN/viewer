@@ -73,6 +73,9 @@ class HomeMemory {
 
     /** Shelf title and item id of the card last opened. */
     internal var opened: Pair<String, String>? = null
+
+    /** The `refresh` value the shelves were loaded for. */
+    internal var loadedFor = -1
 }
 
 /** "Reprendre", then the latest additions of each film and series library. */
@@ -87,14 +90,17 @@ fun HomeScreen(
     onSessionExpired: () -> Unit,
     onSignOut: () -> Unit,
     memory: HomeMemory = remember { HomeMemory() },
+    /** Changes after each playback: resume points and watched marks are read again. */
+    refresh: Int = 0,
 ) {
     var notice by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(memory.attempt) {
+    LaunchedEffect(memory.attempt, refresh) {
         // Already loaded: the screen is shown again after a series page
-        if (memory.state is HomeState.Ready) return@LaunchedEffect
-        memory.state = HomeState.Loading
-        memory.state = try {
+        val shown = memory.state is HomeState.Ready
+        if (shown && memory.loadedFor == refresh) return@LaunchedEffect
+        if (!shown) memory.state = HomeState.Loading
+        val next = try {
             val resume = client.resumeItems(userId, RESUME_LIMIT).items
             val libraries = client.views(userId).items.filter { it.collectionType == "movies" || it.collectionType == "tvshows" }
             val shelves = buildList {
@@ -109,6 +115,9 @@ fun HomeScreen(
             if (e.error == EmbyError.SessionExpired) onSessionExpired()
             HomeState.Failed(e.error.message)
         }
+        // A refresh that fails keeps the shelves on screen, without their new state
+        if (!shown || next is HomeState.Ready) memory.state = next
+        memory.loadedFor = refresh
     }
 
     Column(Modifier.fillMaxSize().background(Palette.background)) {
@@ -165,7 +174,8 @@ private fun Shelves(
     // The card opened last when it is still there, else the very first one
     val target = memory.opened?.takeIf { (title, id) -> shelves.any { it.title == title && it.items.any { i -> i.id == id } } }
         ?: shelves.first().let { it.title to it.items.first().id }
-    LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+    // Again when the target changes: a refresh can remove the card that had focus
+    LaunchedEffect(target) { runCatching { first.requestFocus() } }
     LazyColumn(state = memory.column, contentPadding = PaddingValues(bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         items(shelves, key = { it.title }) { shelf ->
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -211,21 +221,24 @@ private fun ItemCard(
             border = CardDefaults.border(focusedBorder = Border(BorderStroke(3.dp, Palette.accent), shape = shape)),
             colors = CardDefaults.colors(containerColor = Palette.surface),
         ) {
-            val image = imageFor(item, landscape, client, if (landscape) 640 else 360)
-            if (image != null) {
-                AsyncImage(
-                    model = image,
-                    imageLoader = images,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().clip(shape),
-                )
-            } else {
-                Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
-                    Text(item.name, color = Palette.textSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            // A Box, not the Card's Column: the progress bar overlays the image
+            Box(Modifier.fillMaxSize()) {
+                val image = imageFor(item, landscape, client, if (landscape) 640 else 360)
+                if (image != null) {
+                    AsyncImage(
+                        model = image,
+                        imageLoader = images,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(shape),
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
+                        Text(item.name, color = Palette.textSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    }
                 }
+                if (landscape) Progress(item)
             }
-            if (landscape) Progress(item)
         }
         Text(title(item), color = Palette.text, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
         subtitle(item)?.let {

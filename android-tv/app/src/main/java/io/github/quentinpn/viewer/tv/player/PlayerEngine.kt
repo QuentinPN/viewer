@@ -9,6 +9,17 @@ interface PlayerListener {
     fun onEndOfFile() {}
 
     fun onPauseChanged(paused: Boolean) {}
+
+    /** Playback position, whole seconds: about one call per second. */
+    fun onPosition(seconds: Double) {}
+
+    fun onDuration(seconds: Double) {}
+
+    /** A seek started; [onPosition] then gives the new position. */
+    fun onSeek() {}
+
+    /** The last frame is shown: the file stays open (keep-open), playback is over. */
+    fun onEndReached() {}
 }
 
 /**

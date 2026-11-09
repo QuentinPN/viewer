@@ -47,6 +47,10 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         MPVLib.addObserver(this)
         MPVLib.addLogObserver(this)
         MPVLib.observeProperty("pause", MpvFormat.MPV_FORMAT_FLAG)
+        // As an integer: changes once per second instead of on every frame
+        MPVLib.observeProperty("time-pos", MpvFormat.MPV_FORMAT_INT64)
+        MPVLib.observeProperty("duration", MpvFormat.MPV_FORMAT_DOUBLE)
+        MPVLib.observeProperty("eof-reached", MpvFormat.MPV_FORMAT_FLAG)
     }
 
     override fun addListener(listener: PlayerListener) {
@@ -128,20 +132,28 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         when (eventId) {
             MpvEvent.MPV_EVENT_FILE_LOADED -> listeners.forEach { it.onFileLoaded() }
             MpvEvent.MPV_EVENT_END_FILE -> listeners.forEach { it.onEndOfFile() }
+            MpvEvent.MPV_EVENT_SEEK -> listeners.forEach { it.onSeek() }
         }
     }
 
     override fun eventProperty(property: String, value: Boolean) {
-        if (property == "pause") listeners.forEach { it.onPauseChanged(value) }
+        when (property) {
+            "pause" -> listeners.forEach { it.onPauseChanged(value) }
+            "eof-reached" -> if (value) listeners.forEach { it.onEndReached() }
+        }
     }
 
     override fun eventProperty(property: String) {}
 
-    override fun eventProperty(property: String, value: Long) {}
+    override fun eventProperty(property: String, value: Long) {
+        if (property == "time-pos") listeners.forEach { it.onPosition(value.toDouble()) }
+    }
 
     override fun eventProperty(property: String, value: String) {}
 
-    override fun eventProperty(property: String, value: Double) {}
+    override fun eventProperty(property: String, value: Double) {
+        if (property == "duration") listeners.forEach { it.onDuration(value) }
+    }
 
     override fun logMessage(prefix: String, level: Int, text: String) {
         val priority = when {

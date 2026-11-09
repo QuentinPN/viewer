@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +43,7 @@ class MainActivity : ComponentActivity() {
                     val images = remember(client) { AppServices.images(this, client) }
                     var series by remember(current) { mutableStateOf<String?>(null) }
                     val home = remember(current) { HomeMemory() }
+                    val refresh by AppServices.reporter.stopped.collectAsState()
                     val play = { itemId: String, startTicks: Long ->
                         startActivity(
                             Intent(this, PlayerActivity::class.java)
@@ -57,7 +59,7 @@ class MainActivity : ComponentActivity() {
                     val openSeries = series
                     if (openSeries != null) {
                         BackHandler { series = null }
-                        SeriesScreen(client, current.userId, openSeries, images, onPlay = play, onSessionExpired = expired)
+                        SeriesScreen(client, current.userId, openSeries, images, onPlay = play, onSessionExpired = expired, refresh = refresh)
                         return@ViewerTheme
                     }
                     HomeScreen(
@@ -69,6 +71,7 @@ class MainActivity : ComponentActivity() {
                         onOpenSeries = { series = it },
                         onSessionExpired = expired,
                         memory = home,
+                        refresh = refresh,
                         onSignOut = {
                             // Revoke the token on the server; signing out locally works offline too
                             scope.launch {

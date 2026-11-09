@@ -126,8 +126,8 @@ Separate native app in `android-tv/` (Kotlin, libmpv from mpv-android, ADR 0038)
 
 - VERIFIED (2026-11-09) on the NVIDIA Shield (Android 11), `docs/evidence/gate-tv1-2026-11-09.md`: HEVC 1080p 10-bit with ASS and HEVC 4K HDR10 with AC3 5.1, hardware decoding (`mediacodec`), no decoder drops, French subtitles picked by default, ASS on the picture at the next line, seek, pause, track switching, token in a header only, teardown 130–309 ms.
 - TODO: HDR output to the TV by eye; Dolby Vision, DTS and bitstream audio; AudioTrack refusing AAC 44.1 kHz stereo (OpenSL ES fallback plays); cache wait when switching subtitles on 4K; HTTPS (`tls-ca-file`); Fire TV and Nokia.
-- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return.
-- TODO: film details page; playback reporting (Playing / Progress / Stopped); player controls UI; Transcode with external subtitles and resume start on the real server; sign-out checked on the device.
+- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return; playback reporting (ADR 0040): resume row, resume start, "Vu" after the end, screens updated in place.
+- TODO: film details page; resending a stop report lost to a network cut; player controls UI; Transcode with external subtitles and resume start on the real server; sign-out checked on the device.
 
 ## Work log
 
@@ -670,3 +670,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `testDebugUnitTest` 27/27, `assembleDebug`, `lintDebug` OK; on the Shield: six series opened in a row, season switch on a two-season series, an episode played in Direct Play, back navigation.
 - **Not verified**: a season over 100 episodes on the real server, specials, resuming a started episode, the "Vu" marker.
 - **Next**: playback reporting (Playing / Progress / Stopped) so resume and watched state work, then a film details page.
+
+### 2026-11-09 — Android TV: playback reporting
+
+- **Added**: ADR 0040; `PlaybackTracker` (Kotlin port of the Windows tracker: start on load, Pause/Unpause, TimeUpdate after a seek and every 10 s, stop with `Failed` on an early end); `PlaybackReporter`, one process-wide coroutine so the stop report survives the activity; `EmbyClient.reportPlayback`; engine events `time-pos` (whole seconds), `duration`, `eof-reached`, seek; the player closes at the end of the file and when sent to the background; home and series page reload their user data in place after each stop.
+- **Bug found and fixed**: progress bars and the "Vu" badge never showed: a TV `Card` lays its content out in a `Column`, so the full-size image pushed them out. The card content is now a `Box`.
+- **Tests**: `testDebugUnitTest` 35/35 (`PlaybackTrackerTest` 6, 2 new `EmbyClientTest`), `assembleDebug`, `lintDebug` OK; on the Shield: start/progress/pause/seek/stop reports, resume row after 279 s, resume start at 279 s, bar updated in place, "Vu" after the end, 0 token lines in logcat, `docs/evidence/tv-client-2026-11-09.md`.
+- **Not verified**: a stop lost to a network cut (one retry, no later resend); Home button during playback; Transcode; a film.
+- **Next**: a film details page (Reprendre / Lire depuis le début), then player controls.

@@ -154,6 +154,13 @@ class EmbyClient(
         return call(post(url, body.toRequestBody(JSON_TYPE)), PlaybackInfoResponse.serializer())
     }
 
+    /** Playback report (ADR 0008); the server answers 204 without a body. */
+    suspend fun reportPlayback(report: Report) {
+        requireToken()
+        val body = json.encodeToString(PlaybackReport.serializer(), report.body)
+        execute(post(server.api(report.kind.path), body.toRequestBody(JSON_TYPE)), authenticated = true).close()
+    }
+
     /** Image URL on this server; fetched with [authorizationHeader] by the image loader. */
     fun imageUrl(itemId: String, type: String, tag: String, maxWidth: Int): HttpUrl =
         server.api("/Items/${segment(itemId)}/Images/${segment(type)}").newBuilder()
