@@ -52,7 +52,17 @@ import io.github.quentinpn.viewer.tv.emby.EmbyException
 private const val RESUME_LIMIT = 12
 private const val LATEST_LIMIT = 16
 
-internal data class Shelf(val title: String, val items: List<BaseItemDto>, val landscape: Boolean, val resume: Boolean)
+/** Key of a shelf's last card, "Tout voir", in [HomeMemory.opened]. */
+private const val ALL = "*"
+
+/** [library]: the library a "Derniers ajouts" shelf comes from, opened by its "Tout voir" card. */
+internal data class Shelf(
+    val title: String,
+    val items: List<BaseItemDto>,
+    val landscape: Boolean,
+    val resume: Boolean,
+    val library: Library? = null,
+)
 
 internal sealed interface HomeState {
     data object Loading : HomeState
@@ -89,6 +99,7 @@ fun HomeScreen(
     onPlay: (itemId: String, startTicks: Long) -> Unit,
     onOpenSeries: (seriesId: String) -> Unit,
     onOpenMovie: (movieId: String) -> Unit,
+    onOpenLibrary: (Library) -> Unit,
     onSessionExpired: () -> Unit,
     onSignOut: () -> Unit,
     memory: HomeMemory = remember { HomeMemory() },
@@ -109,7 +120,10 @@ fun HomeScreen(
                 if (resume.isNotEmpty()) add(Shelf("Reprendre", resume, landscape = true, resume = true))
                 for (library in libraries) {
                     val latest = client.latest(userId, library.id, LATEST_LIMIT)
-                    if (latest.isNotEmpty()) add(Shelf("Derniers ajouts · ${library.name}", latest, landscape = false, resume = false))
+                    val types = if (library.collectionType == "movies") "Movie" else "Series"
+                    if (latest.isNotEmpty()) {
+                        add(Shelf("Derniers ajouts · ${library.name}", latest, landscape = false, resume = false, Library(library.id, library.name, types)))
+                    }
                 }
             }
             HomeState.Ready(shelves)
@@ -144,7 +158,11 @@ fun HomeScreen(
             is HomeState.Ready -> if (s.shelves.isEmpty()) {
                 Message("Aucun film ni série dans vos bibliothèques.")
             } else {
-                Shelves(s.shelves, memory, client, images) { shelf, item ->
+                Shelves(s.shelves, memory, client, images, onAll = { shelf, library ->
+                    notice = null
+                    memory.opened = shelf.title to ALL
+                    onOpenLibrary(library)
+                }) { shelf, item ->
                     notice = null
                     memory.opened = shelf.title to item.id
                     val resume = shelf.resume
@@ -173,11 +191,14 @@ private fun Shelves(
     memory: HomeMemory,
     client: EmbyClient,
     images: ImageLoader,
+    onAll: (Shelf, Library) -> Unit,
     onOpen: (Shelf, BaseItemDto) -> Unit,
 ) {
     val first = remember { FocusRequester() }
     // The card opened last when it is still there, else the very first one
-    val target = memory.opened?.takeIf { (title, id) -> shelves.any { it.title == title && it.items.any { i -> i.id == id } } }
+    val target = memory.opened?.takeIf { (title, id) ->
+        shelves.any { it.title == title && (if (id == ALL) it.library != null else it.items.any { i -> i.id == id }) }
+    }
         ?: shelves.first().let { it.title to it.items.first().id }
     // Again when the target changes: a refresh can remove the card that had focus
     // (an episode watched to the end leaves "Reprendre"). One frame first, so the
@@ -204,25 +225,51 @@ private fun Shelves(
                         val focus = if (target == shelf.title to item.id) Modifier.focusRequester(first) else Modifier
                         ItemCard(item, shelf.landscape, client, images, focus) { onOpen(shelf, item) }
                     }
+                    shelf.library?.let { library ->
+                        item(key = ALL) {
+                            val focus = if (target == shelf.title to ALL) Modifier.focusRequester(first) else Modifier
+                            AllCard(focus) { onAll(shelf, library) }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
+/** Last card of a library shelf: opens the whole library as a grid. */
 @Composable
-private fun ItemCard(
+private fun AllCard(modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(10.dp)
+    Card(
+        onClick = onClick,
+        modifier = modifier.width(180.dp).aspectRatio(2f / 3f),
+        shape = CardDefaults.shape(shape),
+        scale = CardDefaults.scale(focusedScale = 1.06f),
+        border = CardDefaults.border(focusedBorder = Border(BorderStroke(3.dp, Palette.accent), shape = shape)),
+        colors = CardDefaults.colors(containerColor = Palette.surface),
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Tout voir", color = Palette.text, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+/** [fill]: as wide as its grid cell, else a fixed width for the shelves. */
+@Composable
+internal fun ItemCard(
     item: BaseItemDto,
     landscape: Boolean,
     client: EmbyClient,
     images: ImageLoader,
     modifier: Modifier,
+    fill: Boolean = false,
     onClick: () -> Unit,
 ) {
     val width: Dp = if (landscape) 320.dp else 180.dp
     val ratio = if (landscape) 16f / 9f else 2f / 3f
     val shape = RoundedCornerShape(10.dp)
-    Column(Modifier.width(width), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(if (fill) Modifier.fillMaxWidth() else Modifier.width(width), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Card(
             onClick = onClick,
             modifier = modifier.fillMaxWidth().aspectRatio(ratio),

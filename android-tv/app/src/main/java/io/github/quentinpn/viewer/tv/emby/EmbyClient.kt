@@ -97,6 +97,28 @@ class EmbyClient(
         return call(get(url), kotlinx.serialization.builtins.ListSerializer(BaseItemDto.serializer()))
     }
 
+    /**
+     * One page of a library's films or series by title, as the Windows grid asks;
+     * [itemTypes] is `Movie` or `Series`. The server ignores an unknown `ParentId`
+     * and answers the whole server: pass library ids read from [views] only.
+     */
+    suspend fun libraryItems(userId: String, parentId: String, itemTypes: String, startIndex: Int, limit: Int): QueryResult<BaseItemDto> {
+        val url = server.api("/Users/${segment(userId)}/Items").newBuilder()
+            .addQueryParameter("ParentId", segment(parentId))
+            .addQueryParameter("Recursive", "true")
+            .addQueryParameter("IncludeItemTypes", itemTypes)
+            .addQueryParameter("SortBy", "SortName")
+            .addQueryParameter("SortOrder", "Ascending")
+            .addQueryParameter("StartIndex", startIndex.toString())
+            .addQueryParameter("Limit", limit.toString())
+            .addQueryParameter("Fields", "ProductionYear")
+            .addQueryParameter("EnableUserData", "true")
+            .addQueryParameter("ImageTypeLimit", "1")
+            .addQueryParameter("EnableImageTypes", "Primary")
+            .build()
+        return call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
     /** One series or film, with its overview, length and user data. */
     suspend fun item(userId: String, itemId: String): BaseItemDto {
         val url = server.api("/Users/${segment(userId)}/Items/${segment(itemId)}").newBuilder()

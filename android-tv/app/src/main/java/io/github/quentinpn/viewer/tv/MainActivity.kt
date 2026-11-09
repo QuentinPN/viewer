@@ -15,13 +15,15 @@ import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.ui.HomeMemory
 import io.github.quentinpn.viewer.tv.ui.HomeScreen
+import io.github.quentinpn.viewer.tv.ui.LibraryMemory
+import io.github.quentinpn.viewer.tv.ui.LibraryScreen
 import io.github.quentinpn.viewer.tv.ui.MovieScreen
 import io.github.quentinpn.viewer.tv.ui.SeriesScreen
 import io.github.quentinpn.viewer.tv.ui.SignInScreen
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import kotlinx.coroutines.launch
 
-/** Launcher: sign-in when no session is stored, else the home shelves, the series and film pages. */
+/** Launcher: sign-in when no session is stored, else the home shelves, a library grid, the series and film pages. */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +46,7 @@ class MainActivity : ComponentActivity() {
                     val images = remember(client) { AppServices.images(this, client) }
                     var series by remember(current) { mutableStateOf<String?>(null) }
                     var movie by remember(current) { mutableStateOf<String?>(null) }
+                    var library by remember(current) { mutableStateOf<LibraryMemory?>(null) }
                     val home = remember(current) { HomeMemory() }
                     val refresh by AppServices.reporter.stopped.collectAsState()
                     val play = { itemId: String, startTicks: Long ->
@@ -70,6 +73,21 @@ class MainActivity : ComponentActivity() {
                         MovieScreen(client, current.userId, openMovie, images, onPlay = play, onSessionExpired = expired, refresh = refresh)
                         return@ViewerTheme
                     }
+                    // Under the film and series pages: Back from them returns to the grid
+                    val openLibrary = library
+                    if (openLibrary != null) {
+                        BackHandler { library = null }
+                        LibraryScreen(
+                            client,
+                            current.userId,
+                            images,
+                            openLibrary,
+                            onOpenSeries = { series = it },
+                            onOpenMovie = { movie = it },
+                            onSessionExpired = expired,
+                        )
+                        return@ViewerTheme
+                    }
                     HomeScreen(
                         client = client,
                         userId = current.userId,
@@ -78,6 +96,7 @@ class MainActivity : ComponentActivity() {
                         onPlay = play,
                         onOpenSeries = { series = it },
                         onOpenMovie = { movie = it },
+                        onOpenLibrary = { library = LibraryMemory(it) },
                         onSessionExpired = expired,
                         memory = home,
                         refresh = refresh,

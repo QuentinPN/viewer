@@ -126,7 +126,7 @@ Separate native app in `android-tv/` (Kotlin, libmpv from mpv-android, ADR 0038)
 
 - VERIFIED (2026-11-09) on the NVIDIA Shield (Android 11), `docs/evidence/gate-tv1-2026-11-09.md`: HEVC 1080p 10-bit with ASS and HEVC 4K HDR10 with AC3 5.1, hardware decoding (`mediacodec`), no decoder drops, French subtitles picked by default, ASS on the picture at the next line, seek, pause, track switching, token in a header only, teardown 130–309 ms.
 - TODO: HDR output to the TV by eye; Dolby Vision, DTS and bitstream audio; AudioTrack refusing AAC 44.1 kHz stereo (OpenSL ES fallback plays); cache wait when switching subtitles on 4K; HTTPS (`tls-ca-file`); Fire TV and Nokia.
-- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return; playback reporting (ADR 0040): resume row, resume start, "Vu" after the end, screens updated in place; film details page with "Reprendre à …" / "Lire depuis le début"; player controls (ADR 0041): title, progress, time, pause, ±10 s, audio and subtitle menu; last audio/subtitle choice remembered per user, subtitles moved above the controls (ADR 0042); next episode (ADR 0043): card at the natural end with a 10 s countdown, "Lire maintenant" and "Annuler", next episode played in the same player.
+- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return; playback reporting (ADR 0040): resume row, resume start, "Vu" after the end, screens updated in place; film details page with "Reprendre à …" / "Lire depuis le début"; player controls (ADR 0041): title, progress, time, pause, ±10 s, audio and subtitle menu; last audio/subtitle choice remembered per user, subtitles moved above the controls (ADR 0042); next episode (ADR 0043): card at the natural end with a 10 s countdown, "Lire maintenant" and "Annuler", next episode played in the same player; library grid (ADR 0044): "Tout voir" at the end of each latest-additions shelf, all films or series by title, paged by 60 as it scrolls.
 - TODO: track choice from the Emby account preferences; resending a stop report lost to a network cut; Transcode with external subtitles and resume start on the real server; sign-out checked on the device.
 
 ## Work log
@@ -740,3 +740,22 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - Back on the card (same `finish` as "Annuler").
 - **Side effect**: É2 to É5 of Overgeared are now watched on the test account.
 - **Next**: a full library grid per collection, or Emby's credits markers to show the card earlier.
+
+### 2026-11-09 — Android TV: library grid
+
+- **Added**: ADR 0044.
+  - `EmbyClient.libraryItems`: the Windows grid query (`/Users/{id}/Items`, `ParentId`, `Recursive`, `Movie` or `Series`, by `SortName`, `StartIndex`/`Limit`).
+  - `ui/LibraryScreen.kt`: a poster grid (`LazyVerticalGrid`, 5 columns on the Shield) with the title count, paged by 60. `shouldLoadMore` asks for the next page 18 cards before the end. `LibraryMemory` keeps pages, scroll and the opened card.
+  - Home: a "Tout voir" card at the end of each "Derniers ajouts" shelf.
+- **Tests**: `testDebugUnitTest` 54/54 (`LibraryPagingTest` 3, `EmbyClientTest` +1). `assembleDebug` and `lintDebug` OK, no new warning. Checked on the Shield:
+  - "Anime · 141 titres": scrolled to the last row, a single card ("You are Ms. Servant"), as 141 cards in rows of 5 give;
+  - "Films · 606 titres", the first rows in title order;
+  - a series (Shaman King) and a film (2 Guns) opened from the grid; Back returns to the same card, and Back again to "Tout voir";
+  - 0 token lines in logcat.
+
+  Evidence: `docs/evidence/tv-client-2026-11-09.md`.
+- **Not verified**:
+  - a burst of 20 Down keys sent by adb in one command moved fewer rows than asked; slower presses reach the end. A held key on the real remote was not tried;
+  - a page that fails mid-grid (the bottom "Réessayer");
+  - the whole 606-film grid scrolled to the end.
+- **Next**: sort and filters in the grid (ADR 0013 on Windows), or Emby's credits markers for the next-episode card.

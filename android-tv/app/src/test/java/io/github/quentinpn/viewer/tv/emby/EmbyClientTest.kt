@@ -186,6 +186,22 @@ class EmbyClientTest {
     }
 
     @Test
+    fun libraryPageIsSortedByTitle() = runBlocking {
+        respond(200, """{"Items":[{"Id":"m1","Name":"Akira","Type":"Movie"}],"TotalRecordCount":120}""")
+        val page = client.withToken("t").libraryItems("u1", "lib1", "Movie", 60, 60)
+        assertEquals(listOf("m1"), page.items.map { it.id })
+        assertEquals(120, page.totalRecordCount)
+        val url = server.takeRequest().url
+        assertEquals("/emby/Users/u1/Items", url.encodedPath)
+        for ((name, value) in listOf(
+            "ParentId" to "lib1", "Recursive" to "true", "IncludeItemTypes" to "Movie",
+            "SortBy" to "SortName", "SortOrder" to "Ascending", "StartIndex" to "60", "Limit" to "60",
+        )) {
+            assertEquals(name, value, url.queryParameter(name))
+        }
+    }
+
+    @Test
     fun emptyEpisodePageStopsPaging() = runBlocking {
         respond(200, """{"Items":[],"TotalRecordCount":5}""")
         assertTrue(client.withToken("t").episodes("u1", "ser1", "s1").isEmpty())
