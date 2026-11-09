@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -50,14 +51,28 @@ import io.github.quentinpn.viewer.tv.emby.EmbyException
 private const val RESUME_LIMIT = 12
 private const val LATEST_LIMIT = 16
 
-private data class Shelf(val title: String, val items: List<BaseItemDto>, val landscape: Boolean, val resume: Boolean)
+internal data class Shelf(val title: String, val items: List<BaseItemDto>, val landscape: Boolean, val resume: Boolean)
 
-private sealed interface HomeState {
+internal sealed interface HomeState {
     data object Loading : HomeState
 
     data class Ready(val shelves: List<Shelf>) : HomeState
 
     data class Failed(val message: String) : HomeState
+}
+
+/**
+ * Home state that outlives the screen while a series page is shown, so coming
+ * back neither reloads the shelves nor loses the scroll and the focused card.
+ */
+class HomeMemory {
+    internal var state by mutableStateOf<HomeState>(HomeState.Loading)
+    internal var attempt by mutableIntStateOf(0)
+    internal val column = LazyListState()
+    internal val rows = mutableMapOf<String, LazyListState>()
+
+    /** Shelf title and item id of the card last opened. */
+    internal var opened: Pair<String, String>? = null
 }
 
 /** "Reprendre", then the latest additions of each film and series library. */
@@ -68,16 +83,18 @@ fun HomeScreen(
     userName: String,
     images: ImageLoader,
     onPlay: (itemId: String, startTicks: Long) -> Unit,
+    onOpenSeries: (seriesId: String) -> Unit,
     onSessionExpired: () -> Unit,
     onSignOut: () -> Unit,
+    memory: HomeMemory = remember { HomeMemory() },
 ) {
-    var state by remember { mutableStateOf<HomeState>(HomeState.Loading) }
-    var attempt by remember { mutableIntStateOf(0) }
     var notice by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(attempt) {
-        state = HomeState.Loading
-        state = try {
+    LaunchedEffect(memory.attempt) {
+        // Already loaded: the screen is shown again after a series page
+        if (memory.state is HomeState.Ready) return@LaunchedEffect
+        memory.state = HomeState.Loading
+        memory.state = try {
             val resume = client.resumeItems(userId, RESUME_LIMIT).items
             val libraries = client.views(userId).items.filter { it.collectionType == "movies" || it.collectionType == "tvshows" }
             val shelves = buildList {
@@ -104,22 +121,26 @@ fun HomeScreen(
             OutlinedButton(onClick = onSignOut) { Text("Déconnecter $userName") }
         }
         notice?.let { Text(it, color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp)) }
-        when (val s = state) {
+        when (val s = memory.state) {
             HomeState.Loading -> Message("Chargement…")
             is HomeState.Failed -> Column(Modifier.padding(48.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(s.message, color = Palette.error)
-                Button(onClick = { attempt++ }) { Text("Réessayer") }
+                Button(onClick = {
+                    memory.state = HomeState.Loading
+                    memory.attempt++
+                }) { Text("Réessayer") }
             }
             is HomeState.Ready -> if (s.shelves.isEmpty()) {
                 Message("Aucun film ni série dans vos bibliothèques.")
             } else {
-                Shelves(s.shelves, client, images) { item, resume ->
+                Shelves(s.shelves, memory, client, images) { shelf, item ->
+                    notice = null
+                    memory.opened = shelf.title to item.id
+                    val resume = shelf.resume
                     when (item.type) {
-                        "Movie", "Episode" -> {
-                            notice = null
-                            onPlay(item.id, if (resume) item.userData?.playbackPositionTicks ?: 0 else 0)
-                        }
-                        else -> notice = "La navigation dans les séries arrive dans une prochaine étape."
+                        "Movie", "Episode" -> onPlay(item.id, if (resume) item.userData?.playbackPositionTicks ?: 0 else 0)
+                        "Series" -> onOpenSeries(item.id)
+                        else -> notice = "Ce type d'élément ne peut pas encore être ouvert."
                     }
                 }
             }
@@ -135,13 +156,17 @@ private fun Message(text: String) {
 @Composable
 private fun Shelves(
     shelves: List<Shelf>,
+    memory: HomeMemory,
     client: EmbyClient,
     images: ImageLoader,
-    onOpen: (BaseItemDto, resume: Boolean) -> Unit,
+    onOpen: (Shelf, BaseItemDto) -> Unit,
 ) {
     val first = remember { FocusRequester() }
+    // The card opened last when it is still there, else the very first one
+    val target = memory.opened?.takeIf { (title, id) -> shelves.any { it.title == title && it.items.any { i -> i.id == id } } }
+        ?: shelves.first().let { it.title to it.items.first().id }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
-    LazyColumn(contentPadding = PaddingValues(bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+    LazyColumn(state = memory.column, contentPadding = PaddingValues(bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         items(shelves, key = { it.title }) { shelf ->
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
@@ -151,12 +176,13 @@ private fun Shelves(
                     modifier = Modifier.padding(horizontal = 48.dp),
                 )
                 LazyRow(
+                    state = memory.rows.getOrPut(shelf.title) { LazyListState() },
                     contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     items(shelf.items, key = { it.id }) { item ->
-                        val focus = if (shelf === shelves.first() && item === shelf.items.first()) Modifier.focusRequester(first) else Modifier
-                        ItemCard(item, shelf.landscape, client, images, focus) { onOpen(item, shelf.resume) }
+                        val focus = if (target == shelf.title to item.id) Modifier.focusRequester(first) else Modifier
+                        ItemCard(item, shelf.landscape, client, images, focus) { onOpen(shelf, item) }
                     }
                 }
             }
@@ -210,7 +236,7 @@ private fun ItemCard(
 
 /** Watched part of a resumable item, as a thin bar at the bottom of the card. */
 @Composable
-private fun Progress(item: BaseItemDto) {
+internal fun Progress(item: BaseItemDto) {
     val position = item.userData?.playbackPositionTicks ?: 0
     val total = item.runTimeTicks ?: 0
     if (position <= 0 || total <= 0) return

@@ -133,6 +133,40 @@ class EmbyClientTest {
     }
 
     @Test
+    fun seasonsAreReadWithUserData() = runBlocking {
+        respond(200, """{"Items":[{"Id":"s0","Type":"Season","IndexNumber":0},{"Id":"s1","Type":"Season","IndexNumber":1}],"TotalRecordCount":2}""")
+        val seasons = client.withToken("t").seasons("u1", "ser1")
+        assertEquals(listOf("s0", "s1"), seasons.items.map { it.id })
+        val url = server.takeRequest().url
+        assertEquals("/emby/Shows/ser1/Seasons", url.encodedPath)
+        assertEquals("u1", url.queryParameter("UserId"))
+        assertEquals("true", url.queryParameter("EnableUserData"))
+    }
+
+    @Test
+    fun episodesArePagedAndOtherSeriesDropped() = runBlocking {
+        respond(200, """{"Items":[{"Id":"e1","SeriesId":"ser1","Overview":"Début"},{"Id":"e2","SeriesId":"ser1"}],"TotalRecordCount":3}""")
+        respond(200, """{"Items":[{"Id":"x9","SeriesId":"other"}],"TotalRecordCount":3}""")
+        val episodes = client.withToken("t").episodes("u1", "ser1", "s1", pageSize = 2)
+        assertEquals(listOf("e1", "e2"), episodes.map { it.id })
+        assertEquals("Début", episodes.first().overview)
+        val first = server.takeRequest().url
+        assertEquals("/emby/Shows/ser1/Episodes", first.encodedPath)
+        assertEquals("s1", first.queryParameter("SeasonId"))
+        assertEquals("0", first.queryParameter("StartIndex"))
+        assertEquals("2", first.queryParameter("Limit"))
+        assertEquals("Overview", first.queryParameter("Fields"))
+        assertEquals("2", server.takeRequest().url.queryParameter("StartIndex"))
+    }
+
+    @Test
+    fun emptyEpisodePageStopsPaging() = runBlocking {
+        respond(200, """{"Items":[],"TotalRecordCount":5}""")
+        assertTrue(client.withToken("t").episodes("u1", "ser1", "s1").isEmpty())
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
     fun idsAreCheckedBeforeGoingIntoAPath() = expectError(EmbyError.InvalidResponse::class.java) {
         client.withToken("t").views("../System")
     }

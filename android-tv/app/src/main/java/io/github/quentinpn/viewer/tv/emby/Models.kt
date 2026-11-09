@@ -47,6 +47,7 @@ data class BaseItemDto(
     @SerialName("Type") val type: String = "",
     @SerialName("CollectionType") val collectionType: String? = null,
     @SerialName("ProductionYear") val productionYear: Int? = null,
+    @SerialName("Overview") val overview: String? = null,
     @SerialName("SeriesName") val seriesName: String? = null,
     @SerialName("SeriesId") val seriesId: String? = null,
     @SerialName("ParentIndexNumber") val parentIndexNumber: Int? = null,

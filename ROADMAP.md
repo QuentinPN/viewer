@@ -126,8 +126,8 @@ Separate native app in `android-tv/` (Kotlin, libmpv from mpv-android, ADR 0038)
 
 - VERIFIED (2026-11-09) on the NVIDIA Shield (Android 11), `docs/evidence/gate-tv1-2026-11-09.md`: HEVC 1080p 10-bit with ASS and HEVC 4K HDR10 with AC3 5.1, hardware decoding (`mediacodec`), no decoder drops, French subtitles picked by default, ASS on the picture at the next line, seek, pause, track switching, token in a header only, teardown 130–309 ms.
 - TODO: HDR output to the TV by eye; Dolby Vision, DTS and bitstream audio; AudioTrack refusing AAC 44.1 kHz stereo (OpenSL ES fallback plays); cache wait when switching subtitles on 4K; HTTPS (`tls-ca-file`); Fire TV and Nokia.
-- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat.
-- TODO: series, seasons and episodes; details page; playback reporting (Playing / Progress / Stopped); player controls UI; Transcode with external subtitles and resume start on the real server; sign-out checked on the device.
+- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return.
+- TODO: film details page; playback reporting (Playing / Progress / Stopped); player controls UI; Transcode with external subtitles and resume start on the real server; sign-out checked on the device.
 
 ## Work log
 
@@ -662,3 +662,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `testDebugUnitTest` 24/24, `assembleDebug`, `lintDebug` OK; on the Shield against the real server: sign-in, session kept across restarts, home with posters, film in Direct Play with `mediacodec`, ASS subtitles on the picture, 0 token lines in logcat, `docs/evidence/tv-client-2026-11-09.md`.
 - **Not verified**: Transcode with external subtitles, resume start and sign-out on the device; default subtitle track follows mpv's `slang`, not Emby's default.
 - **Next**: series → seasons → episodes and a details page, then playback reporting.
+
+### 2026-11-09 — Android TV: series, seasons and episodes
+
+- **Added**: `EmbyClient.item`, `seasons`, `episodes` (paged by 100, other series dropped); `SeriesScreen` (overview, backdrop, one button per season, episode row with progress or "Vu", focused episode overview); series cards on the home open it, back returns.
+- **Bug found and fixed**: back from a series reloaded the home and reset focus to the first card; `HomeMemory` keeps the shelves, scroll and opened card.
+- **Tests**: `testDebugUnitTest` 27/27, `assembleDebug`, `lintDebug` OK; on the Shield: six series opened in a row, season switch on a two-season series, an episode played in Direct Play, back navigation.
+- **Not verified**: a season over 100 episodes on the real server, specials, resuming a started episode, the "Vu" marker.
+- **Next**: playback reporting (Playing / Progress / Stopped) so resume and watched state work, then a film details page.

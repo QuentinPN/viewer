@@ -97,6 +97,50 @@ class EmbyClient(
         return call(get(url), kotlinx.serialization.builtins.ListSerializer(BaseItemDto.serializer()))
     }
 
+    /** One series, for the series page header. */
+    suspend fun item(userId: String, itemId: String): BaseItemDto {
+        val url = server.api("/Users/${segment(userId)}/Items/${segment(itemId)}").newBuilder()
+            .addQueryParameter("Fields", "Overview")
+            .build()
+        return call(get(url), BaseItemDto.serializer())
+    }
+
+    /** Seasons of a series, in order (`0` = specials). Unknown series: 404. */
+    suspend fun seasons(userId: String, seriesId: String): QueryResult<BaseItemDto> {
+        val url = server.api("/Shows/${segment(seriesId)}/Seasons").newBuilder()
+            .addQueryParameter("UserId", segment(userId))
+            .addQueryParameter("EnableUserData", "true")
+            .addQueryParameter("EnableImageTypes", "Primary")
+            .addQueryParameter("ImageTypeLimit", "1")
+            .build()
+        return call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
+    /**
+     * All episodes of a season, page by page. Emby 4.10.1.0 trusts `SeasonId` over
+     * the series id, so episodes of another series are dropped.
+     */
+    suspend fun episodes(userId: String, seriesId: String, seasonId: String, pageSize: Int = 100): List<BaseItemDto> {
+        val all = mutableListOf<BaseItemDto>()
+        while (true) {
+            val url = server.api("/Shows/${segment(seriesId)}/Episodes").newBuilder()
+                .addQueryParameter("UserId", segment(userId))
+                .addQueryParameter("SeasonId", segment(seasonId))
+                .addQueryParameter("StartIndex", all.size.toString())
+                .addQueryParameter("Limit", pageSize.toString())
+                // Without it episodes come without their overview
+                .addQueryParameter("Fields", "Overview")
+                .addQueryParameter("EnableUserData", "true")
+                .addQueryParameter("EnableImageTypes", "Primary")
+                .addQueryParameter("ImageTypeLimit", "1")
+                .build()
+            val page = call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
+            all += page.items
+            if (page.items.isEmpty() || all.size >= page.totalRecordCount) break
+        }
+        return all.filter { it.seriesId == null || it.seriesId == seriesId }
+    }
+
     /** Playback negotiation (ADR 0007): the server answers with its sources for this profile. */
     suspend fun playbackInfo(userId: String, itemId: String, profile: DeviceProfile): PlaybackInfoResponse {
         val id = segment(userId)
