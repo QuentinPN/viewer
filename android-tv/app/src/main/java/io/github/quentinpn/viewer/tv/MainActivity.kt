@@ -15,12 +15,13 @@ import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.ui.HomeMemory
 import io.github.quentinpn.viewer.tv.ui.HomeScreen
+import io.github.quentinpn.viewer.tv.ui.MovieScreen
 import io.github.quentinpn.viewer.tv.ui.SeriesScreen
 import io.github.quentinpn.viewer.tv.ui.SignInScreen
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import kotlinx.coroutines.launch
 
-/** Launcher: sign-in when no session is stored, else the home shelves and the series pages. */
+/** Launcher: sign-in when no session is stored, else the home shelves, the series and film pages. */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,6 +43,7 @@ class MainActivity : ComponentActivity() {
                     val client = remember(current) { AppServices.client(this, current) }
                     val images = remember(client) { AppServices.images(this, client) }
                     var series by remember(current) { mutableStateOf<String?>(null) }
+                    var movie by remember(current) { mutableStateOf<String?>(null) }
                     val home = remember(current) { HomeMemory() }
                     val refresh by AppServices.reporter.stopped.collectAsState()
                     val play = { itemId: String, startTicks: Long ->
@@ -62,6 +64,12 @@ class MainActivity : ComponentActivity() {
                         SeriesScreen(client, current.userId, openSeries, images, onPlay = play, onSessionExpired = expired, refresh = refresh)
                         return@ViewerTheme
                     }
+                    val openMovie = movie
+                    if (openMovie != null) {
+                        BackHandler { movie = null }
+                        MovieScreen(client, current.userId, openMovie, images, onPlay = play, onSessionExpired = expired, refresh = refresh)
+                        return@ViewerTheme
+                    }
                     HomeScreen(
                         client = client,
                         userId = current.userId,
@@ -69,6 +77,7 @@ class MainActivity : ComponentActivity() {
                         images = images,
                         onPlay = play,
                         onOpenSeries = { series = it },
+                        onOpenMovie = { movie = it },
                         onSessionExpired = expired,
                         memory = home,
                         refresh = refresh,

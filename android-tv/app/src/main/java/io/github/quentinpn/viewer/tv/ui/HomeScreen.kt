@@ -87,6 +87,7 @@ fun HomeScreen(
     images: ImageLoader,
     onPlay: (itemId: String, startTicks: Long) -> Unit,
     onOpenSeries: (seriesId: String) -> Unit,
+    onOpenMovie: (movieId: String) -> Unit,
     onSessionExpired: () -> Unit,
     onSignOut: () -> Unit,
     memory: HomeMemory = remember { HomeMemory() },
@@ -146,9 +147,12 @@ fun HomeScreen(
                     notice = null
                     memory.opened = shelf.title to item.id
                     val resume = shelf.resume
-                    when (item.type) {
-                        "Movie", "Episode" -> onPlay(item.id, if (resume) item.userData?.playbackPositionTicks ?: 0 else 0)
-                        "Series" -> onOpenSeries(item.id)
+                    // "Reprendre" plays at once; elsewhere a film opens its page first
+                    when {
+                        resume && (item.type == "Movie" || item.type == "Episode") -> onPlay(item.id, item.userData?.playbackPositionTicks ?: 0)
+                        item.type == "Movie" -> onOpenMovie(item.id)
+                        item.type == "Episode" -> onPlay(item.id, 0)
+                        item.type == "Series" -> onOpenSeries(item.id)
                         else -> notice = "Ce type d'élément ne peut pas encore être ouvert."
                     }
                 }

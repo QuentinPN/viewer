@@ -97,7 +97,7 @@ class EmbyClient(
         return call(get(url), kotlinx.serialization.builtins.ListSerializer(BaseItemDto.serializer()))
     }
 
-    /** One series, for the series page header. */
+    /** One series or film, with its overview, length and user data. */
     suspend fun item(userId: String, itemId: String): BaseItemDto {
         val url = server.api("/Users/${segment(userId)}/Items/${segment(itemId)}").newBuilder()
             .addQueryParameter("Fields", "Overview")

@@ -126,8 +126,8 @@ Separate native app in `android-tv/` (Kotlin, libmpv from mpv-android, ADR 0038)
 
 - VERIFIED (2026-11-09) on the NVIDIA Shield (Android 11), `docs/evidence/gate-tv1-2026-11-09.md`: HEVC 1080p 10-bit with ASS and HEVC 4K HDR10 with AC3 5.1, hardware decoding (`mediacodec`), no decoder drops, French subtitles picked by default, ASS on the picture at the next line, seek, pause, track switching, token in a header only, teardown 130–309 ms.
 - TODO: HDR output to the TV by eye; Dolby Vision, DTS and bitstream audio; AudioTrack refusing AAC 44.1 kHz stereo (OpenSL ES fallback plays); cache wait when switching subtitles on 4K; HTTPS (`tls-ca-file`); Fire TV and Nokia.
-- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return; playback reporting (ADR 0040): resume row, resume start, "Vu" after the end, screens updated in place.
-- TODO: film details page; resending a stop report lost to a network cut; player controls UI; Transcode with external subtitles and resume start on the real server; sign-out checked on the device.
+- VERIFIED (2026-11-09) against the real server, `docs/evidence/tv-client-2026-11-09.md` (ADR 0039): sign-in, token in the Android Keystore, home with posters (latest additions per film and series library), film played through PlaybackInfo (Direct Play, hardware decoding), token absent from logcat; series page with seasons and episodes, episode playback, home focus kept on return; playback reporting (ADR 0040): resume row, resume start, "Vu" after the end, screens updated in place; film details page with "Reprendre à …" / "Lire depuis le début".
+- TODO: player controls UI; resending a stop report lost to a network cut; Transcode with external subtitles and resume start on the real server; sign-out checked on the device.
 
 ## Work log
 
@@ -678,3 +678,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `testDebugUnitTest` 35/35 (`PlaybackTrackerTest` 6, 2 new `EmbyClientTest`), `assembleDebug`, `lintDebug` OK; on the Shield: start/progress/pause/seek/stop reports, resume row after 279 s, resume start at 279 s, bar updated in place, "Vu" after the end, 0 token lines in logcat, `docs/evidence/tv-client-2026-11-09.md`.
 - **Not verified**: a stop lost to a network cut (one retry, no later resend); Home button during playback; Transcode; a film.
 - **Next**: a film details page (Reprendre / Lire depuis le début), then player controls.
+
+### 2026-11-09 — Android TV: film details page
+
+- **Added**: `MovieScreen`: backdrop, title, year, length, "Vu" badge, overview; "Reprendre à h:mm:ss" (focused) and "Lire depuis le début" when a resume point exists, else "Lire"; reloaded in place after each stop. Film posters of the latest-additions rows open it; cards of the "Reprendre" row still play at once. The series page helpers (`Load`, `Backdrop`, `Retry`, `Centered`) are shared.
+- **Bug found and fixed**: after "Lire depuis le début" and a short stop, the reload removed the focused button and nothing had focus. The first button now stays in place and takes focus again one frame after the resume state changes.
+- **Tests**: `testDebugUnitTest` 38/38 (`DurationLabelsTest` 2, 1 new `EmbyClientTest`), `assembleDebug`, `lintDebug` OK; on the Shield with a 1 h 36 film: page shown, stop at 473–495 s → "Reprendre à 7:53" focused, resume start at 495 s, start over at 0, stop at 68 s clears the resume point ("Lire" focused), back to home with focus on the same poster, 0 token lines in logcat, `docs/evidence/tv-client-2026-11-09.md`.
+- **Not verified**: a film already watched ("Vu" badge); a film without backdrop or overview.
+- **Next**: player controls (progress bar, time, track menus).

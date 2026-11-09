@@ -49,7 +49,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 
-private sealed interface Load<out T> {
+internal sealed interface Load<out T> {
     data object Loading : Load<Nothing>
 
     data class Ready<T>(val value: T) : Load<T>
@@ -113,12 +113,12 @@ fun SeriesScreen(
 }
 
 @Composable
-private fun Centered(text: String) {
+internal fun Centered(text: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(text, color = Palette.textSecondary) }
 }
 
 @Composable
-private fun Retry(message: String, onRetry: () -> Unit) {
+internal fun Retry(message: String, onRetry: () -> Unit) {
     Column(Modifier.padding(48.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(message, color = Palette.error)
         Button(onClick = onRetry) { Text("Réessayer") }
@@ -127,7 +127,7 @@ private fun Retry(message: String, onRetry: () -> Unit) {
 
 /** The series backdrop, faded into the black canvas so the text stays readable. */
 @Composable
-private fun Backdrop(series: BaseItemDto, client: EmbyClient, images: ImageLoader) {
+internal fun Backdrop(series: BaseItemDto, client: EmbyClient, images: ImageLoader) {
     val tag = series.backdropImageTags.firstOrNull() ?: return
     Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
         AsyncImage(

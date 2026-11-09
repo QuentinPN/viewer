@@ -133,6 +133,18 @@ class EmbyClientTest {
     }
 
     @Test
+    fun itemComesWithOverviewLengthAndUserData() = runBlocking {
+        respond(200, """{"Id":"m1","Type":"Movie","Overview":"Résumé","RunTimeTicks":67200000000,"UserData":{"Played":false,"PlaybackPositionTicks":27670000000}}""")
+        val movie = client.withToken("t").item("u1", "m1")
+        assertEquals("Résumé", movie.overview)
+        assertEquals(67_200_000_000L, movie.runTimeTicks)
+        assertEquals(27_670_000_000L, movie.userData?.playbackPositionTicks)
+        val url = server.takeRequest().url
+        assertEquals("/emby/Users/u1/Items/m1", url.encodedPath)
+        assertEquals("Overview", url.queryParameter("Fields"))
+    }
+
+    @Test
     fun seasonsAreReadWithUserData() = runBlocking {
         respond(200, """{"Items":[{"Id":"s0","Type":"Season","IndexNumber":0},{"Id":"s1","Type":"Season","IndexNumber":1}],"TotalRecordCount":2}""")
         val seasons = client.withToken("t").seasons("u1", "ser1")
