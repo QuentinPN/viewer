@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android TV launcher banner (320x180 dp): placeholder mark until the TV visual direction exists -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path
+        android:fillColor="#FF101114"
+        android:pathData="M0,0h320v180h-320z" />
+    <path
+        android:fillColor="#FFF2F2F2"
+        android:pathData="M140,62L188,90L140,118Z" />
+</vector>

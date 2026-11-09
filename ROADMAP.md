@@ -120,6 +120,14 @@ Redistribution/license audit, release build, Windows installer, clean-machine sm
 - VERIFIED (2026-11-07): installed on the owner's PC, the release build signs in, plays a film directly and seeks; release-only behaviors hold (bundled frontend, prototype refused, `VIEWER_*` ignored); uninstall removes files, entry and shortcuts, `docs/evidence/gate5-installation-2026-11-07.md`. Reinstalled for use.
 - TODO: clean-machine smoke test; picture, sound and subtitles by eye and ear with the release build.
 
+## Gate TV-1 — Android TV playback feasibility [IN PROGRESS · libmpv on the Shield VERIFIED]
+
+Separate native app in `android-tv/` (Kotlin, libmpv from mpv-android, ADR 0038), for the TV where the official Emby app shows ASS subtitles minutes late.
+
+- VERIFIED (2026-11-09) on the NVIDIA Shield (Android 11), `docs/evidence/gate-tv1-2026-11-09.md`: HEVC 1080p 10-bit with ASS and HEVC 4K HDR10 with AC3 5.1, hardware decoding (`mediacodec`), no decoder drops, French subtitles picked by default, ASS on the picture at the next line, seek, pause, track switching, token in a header only, teardown 130–309 ms.
+- TODO: HDR output to the TV by eye; Dolby Vision, DTS and bitstream audio; AudioTrack refusing AAC 44.1 kHz stereo (OpenSL ES fallback plays); cache wait when switching subtitles on 4K; HTTPS (`tls-ca-file`); Fire TV and Nokia.
+- TODO: Emby client in Kotlin and the Compose for TV interface, after the gate.
+
 ## Work log
 
 For each completed slice record date, changed behavior, tests executed, outcomes, blockers and next step. Do not fabricate progress.
@@ -637,3 +645,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Fixed**: `PlayerView.svelte` renders the title bar outside the chrome; it fades with it but always takes clicks.
 - **Tests**: `gate3-player` all passed with the new check `caption_buttons_take_clicks_when_faded` (hit test of the three buttons while the controls are hidden); `npm run verify:web` exit 0 (157 tests). After the merge of the five 1.0 sessions: `verify:rust` exit 0 (163 passed), 25 of 26 scenarios passed; `gate2-ui` fails only on `no_app_credential_left`, the old leftover credential the owner keeps; `gate4-pause` failed once on an early end of file after the server reset the connection at resume, then passed in full on a rerun.
 - **Next**: release 1.0.0.
+
+### 2026-11-09 — Gate TV-1: libmpv on Android TV
+
+- **Why**: on the LG TV the official Emby app shows ASS subtitles up to about 5 minutes late. One Android TV app covers the Shield, Fire TV and the Nokia TV.
+- **Added**: ADR 0038; `android-tv/` Gradle project (AGP 9.5.1, Gradle 9.9.0, SDK 37, minSdk 28, arm64-v8a); `MPVLib` from mpv-android (MIT); `PlayerEngine` / `MpvPlayerEngine` with the Windows hardening, token in `http-header-fields`, log redaction, French subtitles by default; `PlaybackPocActivity` driven by the remote with a diagnostics overlay; `scripts/fetch-libmpv-android.ps1` (pinned release, SHA-256 checked, native libraries not in git); `scripts/spike/run-gate-tv1.ps1`.
+- **Tests**: `MediaSourceTest` 3/3; six runs on the Shield over `adb reverse`, `docs/evidence/gate-tv1-2026-11-09.md`.
+- **Not verified**: HDR output to the TV, Dolby Vision, DTS, bitstream audio, HTTPS, the real Emby server, Fire TV and Nokia; picture and sound on the TV by the owner.
+- **Next**: owner check on the TV, then the Kotlin Emby client (sign-in, PlaybackInfo, direct play).

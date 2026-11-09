@@ -1,0 +1,3 @@
+# libplayer.so looks up is.xyz.mpv.MPVLib and its static callbacks by name (ADR 0038)
+-keep class is.xyz.mpv.MPVLib { *; }
+-keep interface is.xyz.mpv.MPVLib$* { *; }
