@@ -85,6 +85,41 @@ class EmbyClient(
         return call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
     }
 
+    /** Next episode to watch of each series in progress (`/Shows/NextUp`), the Windows query (ADR 0010). */
+    suspend fun nextUp(userId: String, limit: Int): QueryResult<BaseItemDto> {
+        val url = server.api("/Shows/NextUp").newBuilder()
+            .addQueryParameter("UserId", segment(userId))
+            .addQueryParameter("Limit", limit.toString())
+            .addQueryParameter("Fields", "PrimaryImageAspectRatio")
+            .addQueryParameter("EnableUserData", "true")
+            .addQueryParameter("ImageTypeLimit", "1")
+            .addQueryParameter("EnableImageTypes", "Primary,Backdrop,Thumb")
+            .build()
+        return call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
+    /** Sections of the user's home screen (`/Users/{Id}/HomeSections`, a bare array on Emby 4.10.1.0). */
+    suspend fun homeSections(userId: String): List<HomeSectionDto> =
+        call(
+            get(server.api("/Users/${segment(userId)}/HomeSections")),
+            kotlinx.serialization.builtins.ListSerializer(HomeSectionDto.serializer()),
+        )
+
+    /**
+     * Items of one home section (`/Users/{Id}/Sections/{Id}/Items`). On Emby 4.10.1.0 the
+     * "resume" section holds the next episodes `/Shows/NextUp` omits (ADR 0010).
+     */
+    suspend fun sectionItems(userId: String, sectionId: String, limit: Int): QueryResult<BaseItemDto> {
+        val url = server.api("/Users/${segment(userId)}/Sections/${segment(sectionId)}/Items").newBuilder()
+            .addQueryParameter("Limit", limit.toString())
+            .addQueryParameter("Fields", "PrimaryImageAspectRatio")
+            .addQueryParameter("EnableUserData", "true")
+            .addQueryParameter("ImageTypeLimit", "1")
+            .addQueryParameter("EnableImageTypes", "Primary,Backdrop,Thumb")
+            .build()
+        return call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
     /** Most recently added films or series of a library. */
     suspend fun latest(userId: String, parentId: String, limit: Int): List<BaseItemDto> {
         val url = server.api("/Users/${segment(userId)}/Items/Latest").newBuilder()

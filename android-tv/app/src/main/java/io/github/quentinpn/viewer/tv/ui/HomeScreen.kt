@@ -50,6 +50,10 @@ import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
+import io.github.quentinpn.viewer.tv.emby.nextUpRow
+import io.github.quentinpn.viewer.tv.emby.withoutDuplicates
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 private const val RESUME_LIMIT = 12
 private const val LATEST_LIMIT = 16
@@ -97,7 +101,7 @@ class HomeMemory {
 /** Header buttons that open a screen and take the focus back on return. */
 internal enum class HeaderButton { Search, Settings }
 
-/** "Reprendre", then the latest additions of each film and series library. */
+/** "Reprendre", "À suivre" (ADR 0056), then the latest additions of each film and series library. */
 @Composable
 fun HomeScreen(
     client: EmbyClient,
@@ -136,10 +140,15 @@ fun HomeScreen(
         if (shown && memory.loadedFor == refresh) return@LaunchedEffect
         if (!shown) memory.state = HomeState.Loading
         val next = try {
-            val resume = client.resumeItems(userId, RESUME_LIMIT).items
+            val (resume, nextUp) = coroutineScope {
+                val upcoming = async { nextUpOrNothing(client, userId) }
+                client.resumeItems(userId, RESUME_LIMIT).items to upcoming.await()
+            }
             val libraries = client.views(userId).items.filter { it.collectionType == "movies" || it.collectionType == "tvshows" }
             val shelves = buildList {
                 if (resume.isNotEmpty()) add(Shelf("Reprendre", resume, landscape = true, resume = true))
+                val upNext = withoutDuplicates(nextUp, resume)
+                if (upNext.isNotEmpty()) add(Shelf("À suivre", upNext, landscape = true, resume = false))
                 for (library in libraries) {
                     val latest = client.latest(userId, library.id, LATEST_LIMIT)
                     val types = if (library.collectionType == "movies") "Movie" else "Series"
@@ -208,7 +217,8 @@ fun HomeScreen(
                     memory.focusHeader = null
                     memory.opened = shelf.title to item.id
                     val resume = shelf.resume
-                    // "Reprendre" plays at once; elsewhere a film opens its page first
+                    // "Reprendre" plays at once; elsewhere a film opens its page first.
+                    // An "À suivre" episode is not started: it plays from the beginning.
                     when {
                         resume && (item.type == "Movie" || item.type == "Episode") -> onPlay(item.id, item.userData?.playbackPositionTicks ?: 0)
                         item.type == "Movie" -> onOpenMovie(item.id)
@@ -220,6 +230,17 @@ fun HomeScreen(
             }
         }
     }
+}
+
+/**
+ * The "À suivre" episodes; none when they cannot be read, so the rest of the home
+ * still shows. An expired session is not hidden: the whole home handles it.
+ */
+private suspend fun nextUpOrNothing(client: EmbyClient, userId: String): List<BaseItemDto> = try {
+    client.nextUpRow(userId)
+} catch (e: EmbyException) {
+    if (e.error == EmbyError.SessionExpired) throw e
+    emptyList()
 }
 
 @Composable

@@ -40,6 +40,15 @@ data class QueryResult<T>(
     @SerialName("TotalRecordCount") val totalRecordCount: Int = 0,
 )
 
+/** One section of the user's home screen as the server composes it (`/Users/{Id}/HomeSections`). */
+@Serializable
+data class HomeSectionDto(
+    @SerialName("Id") val id: String,
+    @SerialName("SectionType") val sectionType: String = "",
+    /** The "resume" section also lists the next episode of each series in progress. */
+    @SerialName("IncludeNextUpInResume") val includeNextUpInResume: Boolean = false,
+)
+
 @Serializable
 data class BaseItemDto(
     @SerialName("Id") val id: String,
