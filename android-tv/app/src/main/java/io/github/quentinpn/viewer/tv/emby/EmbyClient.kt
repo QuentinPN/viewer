@@ -18,6 +18,9 @@ import java.io.IOException
 private const val CLIENT_NAME = "Viewer TV"
 private val JSON_TYPE = "application/json".toMediaType()
 
+/** A download larger than the caller's cap, stopped there (ADR 0069). */
+class TooLargeException(limit: Int) : Exception("larger than $limit bytes")
+
 /** Sent with every request; [id] is a random id kept per installation. */
 data class DeviceIdentity(val name: String, val id: String, val version: String)
 
@@ -378,6 +381,40 @@ class EmbyClient(
         requireToken()
         val body = json.encodeToString(PlaybackReport.serializer(), report.body)
         execute(post(server.api(report.kind.path), body.toRequestBody(JSON_TYPE)), authenticated = true).close()
+    }
+
+    /**
+     * Seek thumbnails of an item (ADR 0069): `GET /Videos/{Id}/index.bif?Width=`, a Roku BIF
+     * file, read whole into memory. Null on 404, the answer of a server that has extracted
+     * none. A file announced or read beyond [maxBytes] throws [TooLargeException] without
+     * reading the rest.
+     */
+    suspend fun thumbnailBif(itemId: String, width: Int, maxBytes: Int): ByteArray? {
+        requireToken()
+        val url = server.api("/Videos/${segment(itemId)}/index.bif").newBuilder()
+            .addQueryParameter("Width", width.toString())
+            .build()
+        val res = try {
+            execute(request(url).header("Accept", "application/octet-stream").get().build(), authenticated = true)
+        } catch (e: EmbyException) {
+            if (e.error == EmbyError.NotFound) return null
+            throw e
+        }
+        return res.use { r ->
+            if (r.body.contentLength() > maxBytes) throw TooLargeException(maxBytes)
+            try {
+                withContext(Dispatchers.IO) {
+                    val source = r.body.source()
+                    val buffer = okio.Buffer()
+                    while (source.read(buffer, 64 * 1024L) != -1L) {
+                        if (buffer.size > maxBytes) throw TooLargeException(maxBytes)
+                    }
+                    buffer.readByteArray()
+                }
+            } catch (e: IOException) {
+                throw EmbyException(EmbyError.Unreachable, e)
+            }
+        }
     }
 
     /** Image URL on this server; fetched with [authorizationHeader] by the image loader. */
