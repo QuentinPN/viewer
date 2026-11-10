@@ -72,6 +72,24 @@ class EmbyClientTest {
     }
 
     @Test
+    fun localTrailersAreListedWithTheTokenInTheHeaderOnly() = runBlocking {
+        respond(200, """[{"Id":"t1","Name":"Bande-annonce","Type":"Trailer"}]""")
+        val trailers = client.withToken("secret-token").localTrailers("u1", "m1")
+        assertEquals("t1", trailers.single().id)
+        val request = server.takeRequest()
+        assertEquals("GET", request.method)
+        assertEquals("/emby/Users/u1/Items/m1/LocalTrailers", request.url.encodedPath)
+        assertEquals("false", request.url.queryParameter("EnableImages"))
+        assertFalse("no token in the URL", "secret-token" in request.url.toString())
+        assertTrue("Token=\"secret-token\"" in request.headers["X-Emby-Authorization"]!!)
+    }
+
+    @Test
+    fun localTrailersRejectAnIdThatWouldChangeThePath() = expectError(EmbyError.InvalidResponse::class.java) {
+        client.withToken("t").localTrailers("u1", "../Users")
+    }
+
+    @Test
     fun wrongPasswordIsInvalidCredentials() = expectError(EmbyError.InvalidCredentials::class.java) {
         respond(401)
         client.authenticate("Quentin", "bad")

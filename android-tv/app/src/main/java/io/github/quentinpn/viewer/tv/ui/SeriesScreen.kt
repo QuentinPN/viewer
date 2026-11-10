@@ -51,6 +51,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.startTicks
+import io.github.quentinpn.viewer.tv.emby.trailerChoices
 
 internal sealed interface Load<out T> {
     data object Loading : Load<Nothing>
@@ -97,7 +98,7 @@ internal fun cardTarget(seriesId: String, seasonId: String, episode: BaseItemDto
     SeriesTarget(seriesId, seasonId = seasonId, seasonNumber = episode.parentIndexNumber, episodeId = episode.id)
 
 /**
- * A series: its overview, a chip per season, the season's episodes in a row, then
+ * A series: its overview, « Bande-annonce » (ADR 0083), a chip per season, the season's episodes in a row, then
  * « Distribution » (ADR 0068) and « Titres similaires » (ADR 0063).
  */
 @Composable
@@ -123,6 +124,8 @@ fun SeriesScreen(
     onOpenGenre: ((String) -> Unit)? = null,
     /** The genre chip a grid was opened from: focused instead of an episode card. */
     focusGenre: String? = null,
+    /** « Bande-annonce » under the genres (ADR 0083); null hides it. */
+    trailers: TrailerHandlers? = null,
 ) {
     var data by remember { mutableStateOf<Load<SeriesData>>(Load.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
@@ -165,7 +168,9 @@ fun SeriesScreen(
                     val chips = remember(d.value.series.genres, onOpenGenre != null) { if (onOpenGenre != null) genreChips(d.value.series) else emptyList() }
                     // The chip if the series still has that genre, else the episode row as usual
                     val genreFocus = chipFocus?.takeIf { it in chips }
-                    Header(d.value.series, chips, genreFocus) { onOpenGenre?.invoke(it) }
+                    Header(d.value.series, chips, genreFocus, { onOpenGenre?.invoke(it) }) { onMessage ->
+                        trailers?.let { TrailerButton(d.value.series, client, userId, it, onSessionExpired, onMessage) }
+                    }
                     if (d.value.seasons.isEmpty()) {
                         Text("Aucune saison sur le serveur.", color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp))
                     } else {
@@ -225,7 +230,15 @@ internal fun Backdrop(series: BaseItemDto, client: EmbyClient, images: ImageLoad
 }
 
 @Composable
-private fun Header(series: BaseItemDto, chips: List<String>, focusGenre: String?, onOpenGenre: (String) -> Unit) {
+private fun Header(
+    series: BaseItemDto,
+    chips: List<String>,
+    focusGenre: String?,
+    onOpenGenre: (String) -> Unit,
+    /** The trailer button (ADR 0083): no play row on a series, so its own line, never focused first. */
+    trailer: @Composable (onMessage: (String?) -> Unit) -> Unit,
+) {
+    var trailerMessage by remember { mutableStateOf<String?>(null) }
     Column(Modifier.padding(horizontal = 48.dp).fillMaxWidth(0.6f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(series.name, style = MaterialTheme.typography.displaySmall, color = Palette.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
         // Year, the age rating badge, then genres and scores; the text ends in an ellipsis, not the badge
@@ -242,6 +255,13 @@ private fun Header(series: BaseItemDto, chips: List<String>, focusGenre: String?
         // Two lines at most: the episodes row needs the room
         Facts(series, limit = 2)
         GenreChips(chips, focusGenre, onOpenGenre)
+        // No line at all without a trailer: the episode row stays where it was
+        if (trailerChoices(series).isNotEmpty()) {
+            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                trailer { trailerMessage = it }
+                trailerMessage?.let { Text(it, color = Palette.error) }
+            }
+        }
     }
 }
 

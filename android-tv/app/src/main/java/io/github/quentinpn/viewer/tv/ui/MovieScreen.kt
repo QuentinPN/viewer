@@ -38,7 +38,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 
 /**
- * A film: backdrop, year, length, overview, "Reprendre" / "Lire depuis le début", its version
+ * A film: backdrop, year, length, overview, "Reprendre" / "Lire depuis le début", « Bande-annonce » (ADR 0083), its version
  * if it has several, and below the screen the « Distribution » (ADR 0068), « Collection »
  * (ADR 0071) and « Titres similaires » (ADR 0063) rows.
  */
@@ -68,6 +68,8 @@ fun MovieScreen(
     onOpenGenre: ((String) -> Unit)? = null,
     /** The genre chip a grid was opened from: focused instead of the play button. */
     focusGenre: String? = null,
+    /** « Bande-annonce » beside the play buttons (ADR 0083); null hides it. */
+    trailers: TrailerHandlers? = null,
 ) {
     var movie by remember { mutableStateOf<Load<BaseItemDto>>(Load.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
@@ -107,7 +109,9 @@ fun MovieScreen(
                     val scroll = rememberScrollState()
                     ScrollingPage(scroll, Modifier.fillMaxSize()) {
                         // Back on the buttons, the film's title shows again
-                        Details(m.value, versions, onPlay, takeFocus, chips, genreFocus, { onOpenGenre?.invoke(it) }, Modifier.height(screen).topOnFocus(scroll))
+                        Details(m.value, versions, onPlay, takeFocus, chips, genreFocus, { onOpenGenre?.invoke(it) }, Modifier.height(screen).topOnFocus(scroll)) { onMessage ->
+                            trailers?.let { TrailerButton(m.value, client, userId, it, onSessionExpired, onMessage) }
+                        }
                         val cast = remember(m.value.people) { castMembers(m.value) }
                         CastRow(cast, client, images, focusPerson, onOpenPerson)
                         // Under the cast, read after the page: a late row does not push a focused card away
@@ -134,6 +138,8 @@ private fun Details(
     focusGenre: String?,
     onOpenGenre: (String) -> Unit,
     modifier: Modifier,
+    /** The trailer button, last of the play row (ADR 0083); its message shows under the row. */
+    trailer: @Composable (onMessage: (String?) -> Unit) -> Unit,
 ) {
     val played = movie.userData?.played == true
     val position = movie.userData?.playbackPositionTicks ?: 0
@@ -142,6 +148,7 @@ private fun Details(
     // Empty with fewer than two versions: no button, and nothing sent to the server (ADR 0058)
     val choices = remember(movie.mediaSources) { versionChoices(movie.mediaSources) }
     var version by remember(movie.id, choices) { mutableStateOf(versions.load(movie.id, choices)) }
+    var trailerMessage by remember { mutableStateOf<String?>(null) }
     Column(
         modifier.fillMaxWidth(0.6f).padding(horizontal = 48.dp, vertical = 56.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Bottom),
@@ -176,7 +183,9 @@ private fun Details(
                 Text(if (resume) "Reprendre à ${clock(position)}" else "Lire")
             }
             if (resume) OutlinedButton(onClick = { onPlay(movie.id, 0, version) }) { Text("Lire depuis le début") }
+            trailer { trailerMessage = it }
         }
+        trailerMessage?.let { Text(it, color = Palette.error) }
         choices.firstOrNull { it.id == version }?.let { chosen ->
             // OK goes to the next version, as the choices of Réglages
             OutlinedButton(

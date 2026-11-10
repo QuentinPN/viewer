@@ -1,5 +1,6 @@
 package io.github.quentinpn.viewer.tv
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -13,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.core.net.toUri
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.session.SearchHistoryStore
@@ -35,6 +37,7 @@ import io.github.quentinpn.viewer.tv.ui.SeriesScreen
 import io.github.quentinpn.viewer.tv.ui.SeriesTarget
 import io.github.quentinpn.viewer.tv.ui.SettingsScreen
 import io.github.quentinpn.viewer.tv.ui.SignInScreen
+import io.github.quentinpn.viewer.tv.ui.TrailerHandlers
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import io.github.quentinpn.viewer.tv.ui.VersionStore
 import io.github.quentinpn.viewer.tv.ui.backFromEpisode
@@ -98,6 +101,24 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     val play = { itemId: String, startTicks: Long -> playSource(itemId, startTicks, null) }
+                    // A local trailer plays without reports; a checked web address opens outside the app, as is (ADR 0083)
+                    val trailers = TrailerHandlers(
+                        play = { itemId ->
+                            startActivity(
+                                Intent(this, PlayerActivity::class.java)
+                                    .putExtra(PlayerActivity.EXTRA_ITEM_ID, itemId)
+                                    .putExtra(PlayerActivity.EXTRA_TRAILER, true),
+                            )
+                        },
+                        open = { url ->
+                            try {
+                                startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                                true
+                            } catch (_: ActivityNotFoundException) {
+                                false
+                            }
+                        },
+                    )
                     val expired = {
                         reporter.signedOut()
                         store.clear()
@@ -167,6 +188,7 @@ class MainActivity : ComponentActivity() {
                                     focusPerson = page.person,
                                     onOpenGenre = genreOpener("Series"),
                                     focusGenre = page.genre,
+                                    trailers = trailers,
                                 )
                                 is DetailPage.Movie -> MovieScreen(
                                     client,
@@ -185,6 +207,7 @@ class MainActivity : ComponentActivity() {
                                     focusCollection = page.collection,
                                     onOpenGenre = genreOpener("Movie"),
                                     focusGenre = page.genre,
+                                    trailers = trailers,
                                 )
                             }
                         }

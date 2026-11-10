@@ -555,4 +555,16 @@ class EmbyClient(
         val url = randomPick(libraryQuery(userId, parentId, itemTypes, options)).build()
         return call(get(url), QueryResult.serializer(BaseItemDto.serializer())).items.firstOrNull()
     }
+
+    /**
+     * The trailer files of a film or series (ADR 0083): `GET /Users/{Id}/Items/{Id}/LocalTrailers`,
+     * documented as a bare `BaseItemDto[]`. Each trailer is an item of its own, played by its id.
+     */
+    suspend fun localTrailers(userId: String, itemId: String): List<BaseItemDto> {
+        val url = server.api("/Users/${segment(userId)}/Items/${segment(itemId)}/LocalTrailers").newBuilder()
+            .addQueryParameter("EnableImages", "false")
+            .addQueryParameter("EnableUserData", "false")
+            .build()
+        return call(get(url), kotlinx.serialization.builtins.ListSerializer(BaseItemDto.serializer()))
+    }
 }
