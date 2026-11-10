@@ -11,6 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -41,8 +42,8 @@ import io.github.quentinpn.viewer.tv.ui.SignInScreen
 import io.github.quentinpn.viewer.tv.ui.TrailerHandlers
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import io.github.quentinpn.viewer.tv.ui.VersionStore
+import io.github.quentinpn.viewer.tv.ui.ancestorIdsOrNull
 import io.github.quentinpn.viewer.tv.ui.backFromEpisode
-import io.github.quentinpn.viewer.tv.ui.genreLibrary
 import io.github.quentinpn.viewer.tv.ui.genreOptions
 import io.github.quentinpn.viewer.tv.ui.openFromCollection
 import io.github.quentinpn.viewer.tv.ui.openGenre
@@ -53,6 +54,7 @@ import io.github.quentinpn.viewer.tv.ui.playlistEntryPage
 import io.github.quentinpn.viewer.tv.ui.replaceTop
 import io.github.quentinpn.viewer.tv.ui.similarPage
 import io.github.quentinpn.viewer.tv.ui.studioOptions
+import io.github.quentinpn.viewer.tv.ui.titleLibrary
 import kotlinx.coroutines.launch
 
 /** Launcher: sign-in when no session is stored, else the home shelves, a library grid or the search, the settings, the series and film pages. */
@@ -129,16 +131,16 @@ class MainActivity : ComponentActivity() {
                         notice = "Session expirée. Reconnectez-vous."
                         session = null
                     }
-                    // A genre chip opens the library « Films » or « Séries » of the home bar on that genre (ADR 0079)
+                    // A genre chip opens the library holding the title on that genre (ADR 0079, 0093)
                     val libraries = (home.state as? HomeState.Ready)?.libraries.orEmpty()
-                    val genreOpener: (String) -> ((String) -> Unit)? = { itemType ->
-                        genreLibrary(libraries, itemType)?.let { library ->
+                    val genreOpener: (String, List<String>?) -> ((String) -> Unit)? = { itemType, ancestors ->
+                        titleLibrary(libraries, itemType, ancestors)?.let { library ->
                             { genre -> genreOptions(libraryPrefs.load(library), genre)?.let { pages = openGenre(pages, DetailPage.Grid(LibraryMemory(library, it)), genre) } }
                         }
                     }
                     // A studio chip opens that same library on the studio, by name (ADR 0087)
-                    val studioOpener: (String) -> ((String) -> Unit)? = { itemType ->
-                        genreLibrary(libraries, itemType)?.let { library ->
+                    val studioOpener: (String, List<String>?) -> ((String) -> Unit)? = { itemType, ancestors ->
+                        titleLibrary(libraries, itemType, ancestors)?.let { library ->
                             { studio -> studioOptions(libraryPrefs.load(library), studio)?.let { pages = openStudio(pages, DetailPage.Grid(LibraryMemory(library, it)), studio) } }
                         }
                     }
@@ -148,6 +150,15 @@ class MainActivity : ComponentActivity() {
                         BackHandler { pages = pages.dropLast(1) }
                         // Fresh state per page: a similar series replaces this one at the same place
                         key(pages.size, pageKey(page)) {
+                            // Read with the page, cancelled with it; until then the chips open sectionLibrary's choice (ADR 0093)
+                            val titleId = when (page) {
+                                is DetailPage.Movie -> page.id
+                                is DetailPage.Series -> page.target.seriesId
+                                else -> null
+                            }
+                            val ancestors by produceState<List<String>?>(null, titleId) {
+                                value = titleId?.let { ancestorIdsOrNull(client, current.userId, it) }
+                            }
                             when (page) {
                                 // Over the series page: Back shows it again, on the episode's season and card (ADR 0060)
                                 is DetailPage.Episode -> EpisodeScreen(
@@ -205,10 +216,10 @@ class MainActivity : ComponentActivity() {
                                     onSessionExpired = expired,
                                     refresh = refresh,
                                     focusPerson = page.person,
-                                    onOpenGenre = genreOpener("Series"),
+                                    onOpenGenre = genreOpener("Series", ancestors),
                                     focusGenre = page.genre,
                                     trailers = trailers,
-                                    onOpenStudio = studioOpener("Series"),
+                                    onOpenStudio = studioOpener("Series", ancestors),
                                     focusStudio = page.studio,
                                 )
                                 is DetailPage.Movie -> MovieScreen(
@@ -226,10 +237,10 @@ class MainActivity : ComponentActivity() {
                                     refresh = refresh,
                                     focusPerson = page.person,
                                     focusCollection = page.collection,
-                                    onOpenGenre = genreOpener("Movie"),
+                                    onOpenGenre = genreOpener("Movie", ancestors),
                                     focusGenre = page.genre,
                                     trailers = trailers,
-                                    onOpenStudio = studioOpener("Movie"),
+                                    onOpenStudio = studioOpener("Movie", ancestors),
                                     focusStudio = page.studio,
                                 )
                             }

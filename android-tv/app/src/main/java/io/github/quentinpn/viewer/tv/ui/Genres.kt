@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
+import io.github.quentinpn.viewer.tv.emby.EmbyClient
+import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.ItemsOptions
 import io.github.quentinpn.viewer.tv.emby.isUsableGenre
 
@@ -41,6 +43,27 @@ internal fun genreLibrary(libraries: List<Library>, itemType: String): Library? 
     "Movie" -> sectionLibrary(libraries, "Movie", "Films")
     "Series" -> sectionLibrary(libraries, "Series", "Séries")
     else -> null
+}
+
+/**
+ * The library a genre or studio of a title opens (ADR 0093): the one of [itemType] among
+ * [ancestorIds], the parents of the title, so an anime opens « Anime » and not « Séries TV »;
+ * else, ancestors unknown or none of them a home library, [genreLibrary]'s choice.
+ */
+internal fun titleLibrary(libraries: List<Library>, itemType: String, ancestorIds: List<String>?): Library? {
+    val fallback = genreLibrary(libraries, itemType) ?: return null
+    val ids = ancestorIds?.toSet() ?: return fallback
+    return libraries.firstOrNull { it.itemTypes == fallback.itemTypes && it.id in ids } ?: fallback
+}
+
+/**
+ * The ids of [itemId]'s parents (ADR 0093), or null when they cannot be read: the chips then
+ * open [genreLibrary]'s choice. An expired session is left to the page, which reads it too.
+ */
+internal suspend fun ancestorIdsOrNull(client: EmbyClient, userId: String, itemId: String): List<String>? = try {
+    client.ancestors(userId, itemId).map { it.id }
+} catch (_: EmbyException) {
+    null
 }
 
 /**

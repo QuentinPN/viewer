@@ -48,6 +48,29 @@ class GenresTest {
         assertNull(genreLibrary(emptyList(), "Movie"))
     }
 
+    // The owner's four libraries (ADR 0092, 0093)
+    private val anime = Library("a", "Anime", "Series")
+    private val filmsAnime = Library("fa", "Films Anime", "Movie")
+    private val owner = listOf(anime, Library("f", "Films", "Movie"), filmsAnime, Library("st", "Séries TV", "Series"))
+
+    @Test
+    fun aTitleOpensTheLibraryThatHoldsIt() {
+        assertEquals(anime, titleLibrary(owner, "Series", listOf("season", "a", "root")))
+        assertEquals("st", titleLibrary(owner, "Series", listOf("st"))?.id)
+        assertEquals(filmsAnime, titleLibrary(owner, "Movie", listOf("root", "fa")))
+    }
+
+    @Test
+    fun withoutAMatchingAncestorTheBarChoiceStays() {
+        // Unknown ancestors, none a home library, or a library of the other type
+        assertEquals(genreLibrary(owner, "Series"), titleLibrary(owner, "Series", null))
+        assertEquals(genreLibrary(owner, "Series"), titleLibrary(owner, "Series", listOf("root", "elsewhere")))
+        assertEquals(genreLibrary(owner, "Movie"), titleLibrary(owner, "Movie", listOf("a")))
+        assertEquals(genreLibrary(owner, "Movie"), titleLibrary(owner, "Movie", emptyList()))
+        assertNull(titleLibrary(owner, "Episode", listOf("a")))
+        assertNull(titleLibrary(emptyList(), "Series", listOf("a")))
+    }
+
     @Test
     fun theGridKeepsTheSavedSortButNoOtherFilter() {
         val saved = ItemsOptions(SortKey.Year, descending = true, watch = WatchFilter.Unplayed, favorites = true, genre = "Western")

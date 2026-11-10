@@ -311,6 +311,17 @@ class EmbyClient(
     }
 
     /**
+     * Every parent of [itemId] (ADR 0093): `GET /Items/{Id}/Ancestors?UserId=`, documented as
+     * a bare `BaseItemDto[]`; the library holding the title is among them.
+     */
+    suspend fun ancestors(userId: String, itemId: String): List<BaseItemDto> {
+        val url = server.api("/Items/${segment(itemId)}/Ancestors").newBuilder()
+            .addQueryParameter("UserId", segment(userId))
+            .build()
+        return call(get(url), kotlinx.serialization.builtins.ListSerializer(BaseItemDto.serializer()))
+    }
+
+    /**
      * Films and series the server finds close to [itemId] (`/Items/{Id}/Similar`, ADR 0063),
      * with the posters and user data of the library grid.
      */

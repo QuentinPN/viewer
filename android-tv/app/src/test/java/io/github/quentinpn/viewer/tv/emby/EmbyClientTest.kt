@@ -1,5 +1,6 @@
 package io.github.quentinpn.viewer.tv.emby
 
+import io.github.quentinpn.viewer.tv.ui.ancestorIdsOrNull
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -87,6 +88,39 @@ class EmbyClientTest {
     @Test
     fun localTrailersRejectAnIdThatWouldChangeThePath() = expectError(EmbyError.InvalidResponse::class.java) {
         client.withToken("t").localTrailers("u1", "../Users")
+    }
+
+    @Test
+    fun ancestorsAreAskedForTheUserWithTheTokenInTheHeaderOnly() = runBlocking {
+        respond(200, """[{"Id":"f9","Name":"Saison 1","Type":"Folder"},{"Id":"lib2","Name":"Anime","Type":"CollectionFolder","CollectionType":"tvshows"},{"Id":"root","Type":"AggregateFolder"}]""")
+        val parents = client.withToken("secret-token").ancestors("u1", "s1")
+        assertEquals(listOf("f9", "lib2", "root"), parents.map { it.id })
+        val request = server.takeRequest()
+        assertEquals("GET", request.method)
+        assertEquals("/emby/Items/s1/Ancestors", request.url.encodedPath)
+        assertEquals("UserId=u1", request.url.query)
+        assertFalse("no token in the URL", "secret-token" in request.url.toString())
+        assertTrue("Token=\"secret-token\"" in request.headers["X-Emby-Authorization"]!!)
+    }
+
+    @Test
+    fun ancestorsRejectAnIdThatWouldChangeThePath() = expectError(EmbyError.InvalidResponse::class.java) {
+        client.withToken("t").ancestors("u1", "../Users")
+    }
+
+    @Test
+    fun unreadableAncestorsAreNoneSoTheChipsKeepTheBarChoice() = runBlocking {
+        val signedIn = client.withToken("t")
+        respond(200, """[{"Id":"lib2"}]""")
+        assertEquals(listOf("lib2"), ancestorIdsOrNull(signedIn, "u1", "s1"))
+        respond(500)
+        assertNull(ancestorIdsOrNull(signedIn, "u1", "s1"))
+        respond(404)
+        assertNull(ancestorIdsOrNull(signedIn, "u1", "s1"))
+        respond(200, "not json")
+        assertNull(ancestorIdsOrNull(signedIn, "u1", "s1"))
+        respond(401)
+        assertNull("the page handles an expired session", ancestorIdsOrNull(signedIn, "u1", "s1"))
     }
 
     @Test
