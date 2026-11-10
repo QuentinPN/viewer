@@ -1077,3 +1077,14 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `SkipTest` (Android TV), `segments.test.ts` (desktop). `testDebugUnitTest` 449/449, `assembleDebug` and `lintDebug` OK.
 - **Checked on the Shield**: Overgeared S1E7 from the start, intro 40–128 s (IntroDb): the button shows at about 44 s, is gone at about 58 s once the controls have faded; OK at 1:16 shows the controls and the button again without skipping. Stop report on exit. Logcat: 0 token line, no crash.
 - **Not verified**: the desktop part (the owner is using the desktop app; not launched).
+
+### 2026-11-10 — Android TV: accelerated seek and favourites row
+
+- **Changed**: ADR 0090. A held ◀ ▶ (or rewind / fast-forward) seeks 10 s for about the first second, then 30 s, then 60 s from about 3 s; only every 4th key repeat seeks (about 5 mpv seeks a second instead of 20). A fresh press starts again at 10 s.
+- **Added**: ADR 0091. A « Favoris » home row after « À suivre »: the user's favourite films and series, A → Z, 16 at most (`/Users/{Id}/Items?Filters=IsFavorite&Recursive=true&IncludeItemTypes=Movie,Series`, the Windows query of ADR 0014). Hidden when empty or on error; OK opens the film or series page. Read-only: nothing adds or removes a favourite.
+- **Tests**: `SeekStepsTest`, `FavoritesTest`, `FavoriteShelfTest`. `testDebugUnitTest` 459/459, `assembleDebug` and `lintDebug` OK.
+- **Checked on the Shield**:
+  - Overgeared S1E7, paused: one ▶ press goes from 2:55 to 3:05; `input keyevent --longpress` (a press plus one repeat) goes from 3:05 to 3:16, one seek instead of two. Stop report on exit.
+  - Home: no « Favoris » row, the account « claude » showing none; « Reprendre » then « Derniers ajouts » as before.
+  - Logcat: 0 token line, no crash.
+- **Not verified**: a real hold reaching 30 s and 60 s steps (adb cannot hold a key; the owner checks it with the remote); the row with favourites, its posters and Back to the opened card (no favourite added for testing).
