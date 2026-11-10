@@ -118,6 +118,9 @@ class HomeMemory {
     /** The `refresh` value the shelves were loaded for. */
     internal var loadedFor = -1
 
+    /** The rows shown when the shelves were loaded (ADR 0094): a change in Réglages loads them again. */
+    internal var loadedRows: HomeRowVisibility? = null
+
     /** Set after an entry of the bar opened a screen: coming back puts the focus on it, not on a card. */
     internal var focusHeader: BarItem? = null
     internal var focusLibrary: String? = null
@@ -142,46 +145,38 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onSessionExpired: () -> Unit,
     onSignOut: () -> Unit,
+    /** Rows hidden in Réglages › Accueil (ADR 0094), read again each time the home is shown. */
+    rowStore: HomeRowStore,
     memory: HomeMemory = remember { HomeMemory() },
     /** Changes after each playback: resume points and watched marks are read again. */
     refresh: Int = 0,
 ) {
     var notice by remember { mutableStateOf<String?>(null) }
+    // Read on each return from Réglages: the home leaves the composition while they show
+    val rows = remember(rowStore) { rowStore.load() }
     // Up from the hero's buttons lands on « Accueil »; Down from the bar on the hero's main button
     val home = remember { FocusRequester() }
     val heroMain = remember { FocusRequester() }
 
-    LaunchedEffect(memory.attempt, refresh) {
+    LaunchedEffect(memory.attempt, refresh, rows) {
         // Already loaded: the screen is shown again after a series page
         val shown = memory.state is HomeState.Ready
-        if (shown && memory.loadedFor == refresh) return@LaunchedEffect
+        if (shown && memory.loadedFor == refresh && memory.loadedRows == rows) return@LaunchedEffect
         if (!shown) memory.state = HomeState.Loading
         val next = try {
+            // A hidden row is not requested; "Reprendre" still is, for the hero
             val (resume, nextUp, hero, favorites) = coroutineScope {
-                val upcoming = async { nextUpOrNothing(client, userId) }
+                val upcoming = async { if (rows.shows(NEXT_UP_ROW)) nextUpOrNothing(client, userId) else emptyList() }
                 val resumed = async { client.resumeItems(userId, RESUME_LIMIT).items }
                 // The same "Reprendre" items feed the hero: one request for both
                 val titles = async { heroOrNothing(client, userId, resumed.await()) }
-                val favored = async { favoritesOrNothing(client, userId) }
+                val favored = async { if (rows.shows(FAVORITES_ROW)) favoritesOrNothing(client, userId) else emptyList() }
                 FirstRows(resumed.await(), upcoming.await(), titles.await(), favored.await())
             }
-            val libraries = client.views(userId).items
-                .filter { it.collectionType == "movies" || it.collectionType == "tvshows" }
-                .map { Library(it.id, it.name, if (it.collectionType == "movies") "Movie" else "Series") }
-            val shelves = buildList {
-                if (resume.isNotEmpty()) add(Shelf("Reprendre", resume, landscape = true, resume = true))
-                val upNext = withoutDuplicates(nextUp, resume)
-                if (upNext.isNotEmpty()) add(Shelf("À suivre", upNext, landscape = true, resume = false))
-                favoriteShelf(favorites)?.let(::add)
-                for (library in libraries) {
-                    val latest = client.latest(userId, library.id, LATEST_LIMIT)
-                    if (latest.isNotEmpty()) {
-                        add(Shelf("Derniers ajouts · ${library.name}", latest, landscape = false, resume = false, library))
-                    }
-                }
-                playlistShelf(playlistsOrNothing(client, userId))?.let(::add)
-            }
-            HomeState.Ready(shelves, hero, libraries)
+            val libraries = homeLibraries(client.views(userId).items)
+            val latest = rows.latestLibraries(libraries).map { it to client.latest(userId, it.id, LATEST_LIMIT) }
+            val playlists = if (rows.shows(PLAYLISTS_ROW)) playlistsOrNothing(client, userId) else emptyList()
+            HomeState.Ready(homeShelves(rows, resume, nextUp, favorites, latest, playlists), hero, libraries)
         } catch (e: EmbyException) {
             if (e.error == EmbyError.SessionExpired) onSessionExpired()
             HomeState.Failed(e.error.message)
@@ -189,6 +184,7 @@ fun HomeScreen(
         // A refresh that fails keeps the shelves on screen, without their new state
         if (!shown || next is HomeState.Ready) memory.state = next
         memory.loadedFor = refresh
+        memory.loadedRows = rows
     }
 
     val header: @Composable () -> Unit = {
@@ -224,7 +220,8 @@ fun HomeScreen(
     }
 
     Column(Modifier.fillMaxSize().background(Palette.background)) {
-        val s = memory.state
+        // A row hidden since the last load leaves at once, before the shelves are read again
+        val s = memory.state.let { if (it is HomeState.Ready) it.copy(shelves = rows.visibleShelves(it.shelves)) else it }
         // With shelves the header scrolls with them, laid over the hero's backdrop
         if (s !is HomeState.Ready || (s.shelves.isEmpty() && s.hero.isEmpty())) header()
         when (s) {
@@ -237,7 +234,13 @@ fun HomeScreen(
                 }) { Text("Réessayer") }
             }
             is HomeState.Ready -> if (s.shelves.isEmpty() && s.hero.isEmpty()) {
-                Message("Aucun film ni série dans vos bibliothèques.")
+                Message(
+                    if (rows.hidden.isEmpty()) {
+                        "Aucun film ni série dans vos bibliothèques."
+                    } else {
+                        "Rien à afficher. Les rangées masquées se rétablissent dans Réglages › Accueil."
+                    },
+                )
             } else {
                 val heroActions = HeroActions(
                     onPlay = { title ->
@@ -300,6 +303,32 @@ private suspend fun heroOrNothing(client: EmbyClient, userId: String, resumed: L
     if (e.error == EmbyError.SessionExpired) throw e
     emptyList()
 }
+
+/**
+ * The home's shelves in their order, without the rows [rows] hides (ADR 0094) and without the
+ * empty ones. [latest]: each library with its latest additions.
+ */
+internal fun homeShelves(
+    rows: HomeRowVisibility,
+    resume: List<BaseItemDto>,
+    nextUp: List<BaseItemDto>,
+    favorites: List<BaseItemDto>,
+    latest: List<Pair<Library, List<BaseItemDto>>>,
+    playlists: List<BaseItemDto>,
+): List<Shelf> = rows.visibleShelves(
+    buildList {
+        val resumeShown = rows.shows(RESUME_ROW)
+        if (resumeShown && resume.isNotEmpty()) add(Shelf(RESUME_SHELF, resume, landscape = true, resume = true))
+        // With "Reprendre" hidden, its episodes are not on screen: "À suivre" keeps them
+        val upNext = if (resumeShown) withoutDuplicates(nextUp, resume) else nextUp
+        if (upNext.isNotEmpty()) add(Shelf(NEXT_UP_SHELF, upNext, landscape = true, resume = false))
+        favoriteShelf(favorites)?.let(::add)
+        for ((library, items) in latest) {
+            if (items.isNotEmpty()) add(Shelf(latestShelfTitle(library), items, landscape = false, resume = false, library))
+        }
+        playlistShelf(playlists)?.let(::add)
+    },
+)
 
 /** What the home reads in parallel before the libraries. */
 private data class FirstRows(

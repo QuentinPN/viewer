@@ -24,6 +24,7 @@ import io.github.quentinpn.viewer.tv.ui.CastMember
 import io.github.quentinpn.viewer.tv.ui.DetailPage
 import io.github.quentinpn.viewer.tv.ui.EpisodeScreen
 import io.github.quentinpn.viewer.tv.ui.HomeMemory
+import io.github.quentinpn.viewer.tv.ui.HomeRowStore
 import io.github.quentinpn.viewer.tv.ui.HomeScreen
 import io.github.quentinpn.viewer.tv.ui.HomeState
 import io.github.quentinpn.viewer.tv.ui.LibraryMemory
@@ -89,6 +90,7 @@ class MainActivity : ComponentActivity() {
                     var settings by remember(current) { mutableStateOf(false) }
                     val libraryPrefs = remember(current) { LibraryPreferenceStore(this, current.userId) }
                     val settingsStore = remember(current) { PlaybackSettingsStore(this, current.userId) }
+                    val homeRows = remember(current) { HomeRowStore(this, current.userId) }
                     val searchHistory = remember(current) { SearchHistoryStore(this, current.server, current.userId) }
                     val home = remember(current) { HomeMemory() }
                     // Sign-in or restored session: stop reports lost to the network go out now (ADR 0066)
@@ -275,6 +277,8 @@ class MainActivity : ComponentActivity() {
                             localAddress = client.server.isLocal,
                             client = client,
                             images = images,
+                            userId = current.userId,
+                            rowStore = homeRows,
                         )
                         return@ViewerTheme
                     }
@@ -291,6 +295,7 @@ class MainActivity : ComponentActivity() {
                         onOpenSearch = { search = SearchMemory() },
                         onOpenSettings = { settings = true },
                         onSessionExpired = expired,
+                        rowStore = homeRows,
                         memory = home,
                         refresh = refresh,
                         onSignOut = {
