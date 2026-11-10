@@ -406,13 +406,15 @@ class EmbyClient(
 
     /**
      * Playback negotiation (ADR 0007): the server answers with its sources for this profile,
-     * only [mediaSourceId]'s when one version is asked for (ADR 0058).
+     * only [mediaSourceId]'s when one version is asked for (ADR 0058). [startTicks]: the
+     * position playback goes on from, when the quality changes in the player (ADR 0081).
      */
     suspend fun playbackInfo(
         userId: String,
         itemId: String,
         profile: DeviceProfile,
         mediaSourceId: String? = null,
+        startTicks: Long? = null,
     ): PlaybackInfoResponse {
         if (mediaSourceId != null && !isSourceId(mediaSourceId)) {
             throw EmbyException(EmbyError.InvalidResponse("version invalide"))
@@ -428,9 +430,26 @@ class EmbyClient(
                 maxStreamingBitrate = profile.maxStreamingBitrate,
                 deviceProfile = profile,
                 mediaSourceId = mediaSourceId,
+                startTimeTicks = startTicks?.coerceAtLeast(0),
             ),
         )
         return call(post(url, body.toRequestBody(JSON_TYPE)), PlaybackInfoResponse.serializer())
+    }
+
+    /**
+     * Ends the server's transcode of a replaced stream (ADR 0081):
+     * `DELETE /Videos/ActiveEncodings?DeviceId=&PlaySessionId=`, both documented as
+     * required. Neither is a secret; the token stays in the header. An id outside the
+     * shape of source ids is never sent.
+     */
+    suspend fun stopEncoding(playSessionId: String) {
+        requireToken()
+        if (!isSourceId(playSessionId)) throw EmbyException(EmbyError.InvalidResponse("session de lecture invalide"))
+        val url = server.api("/Videos/ActiveEncodings").newBuilder()
+            .addQueryParameter("DeviceId", device.id)
+            .addQueryParameter("PlaySessionId", playSessionId)
+            .build()
+        execute(request(url).delete().build(), authenticated = true).close()
     }
 
     /** Playback report (ADR 0008); the server answers 204 without a body. */

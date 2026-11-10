@@ -67,6 +67,8 @@ import io.github.quentinpn.viewer.tv.player.Delays
 import io.github.quentinpn.viewer.tv.player.FitChange
 import io.github.quentinpn.viewer.tv.player.InfoRow
 import io.github.quentinpn.viewer.tv.player.NORMAL_SPEED
+import io.github.quentinpn.viewer.tv.player.Quality
+import io.github.quentinpn.viewer.tv.player.QualityChange
 import io.github.quentinpn.viewer.tv.player.Night
 import io.github.quentinpn.viewer.tv.player.SleepChange
 import io.github.quentinpn.viewer.tv.player.SleepChoice
@@ -84,6 +86,8 @@ import io.github.quentinpn.viewer.tv.player.formatDelay
 import io.github.quentinpn.viewer.tv.player.formatSpeed
 import io.github.quentinpn.viewer.tv.player.nightNote
 import io.github.quentinpn.viewer.tv.player.nightValue
+import io.github.quentinpn.viewer.tv.player.qualityNote
+import io.github.quentinpn.viewer.tv.player.qualityValue
 import io.github.quentinpn.viewer.tv.player.sleepBadge
 import io.github.quentinpn.viewer.tv.player.sleepValue
 import io.github.quentinpn.viewer.tv.player.speedBadge
@@ -151,6 +155,9 @@ class PlayerUi {
     /** How the picture fills the screen, as mpv holds it; this playback only (ADR 0078). */
     var fit by mutableStateOf(VideoFit.Original)
 
+    /** Streaming cap of this playback, from Réglages or the menu (ADR 0081). */
+    var quality by mutableStateOf(Quality())
+
     /** Night mode, from Réglages or the menu (ADR 0072). */
     var night by mutableStateOf(Night())
 
@@ -217,6 +224,7 @@ class PlayerUi {
         delays = Delays()
         speed = NORMAL_SPEED
         fit = VideoFit.Original
+        quality = Quality()
         item = null
         notice = null
         seekTarget = null
@@ -272,6 +280,8 @@ fun PlayerOverlay(
     onFit: (FitChange) -> Unit,
     onNight: () -> Unit,
     onSleep: (SleepChange) -> Unit,
+    onQualityStep: (QualityChange) -> Unit,
+    onQualityApply: () -> Unit,
 ) {
     ui.AutoHide()
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -300,7 +310,7 @@ fun PlayerOverlay(
             SkipButton(skip, !ui.menuOpen, onSkip, Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
         }
         ui.tracks?.let {
-            TrackMenu(it, MenuState(ui.delays, ui.speed, ui.fit, ui.night, ui.sleep.choice, ui.item), MenuActions(onSelect, onDelay, onSpeed, onFit, onNight, onSleep, onInfo), Modifier.align(Alignment.CenterEnd))
+            TrackMenu(it, MenuState(ui.delays, ui.speed, ui.fit, ui.night, ui.sleep.choice, ui.item, ui.quality), MenuActions(onSelect, onDelay, onSpeed, onFit, onNight, onSleep, onInfo, onQualityStep, onQualityApply), Modifier.align(Alignment.CenterEnd))
         }
         ui.info?.let { InfoMenu(it, Modifier.align(Alignment.CenterEnd)) }
         if (ui.chapterMenu) ChapterMenu(ui.chapters, chapterIndex(ui.chapters, ui.position), onChapter, Modifier.align(Alignment.CenterEnd))
@@ -428,7 +438,7 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
             }
         }
         Text(
-            "OK lecture / pause  ·  ◀ ▶ 10 s  ·  ▼ audio, sous-titres, vitesse, format, minuterie et infos" + if (ui.chapters.isNotEmpty()) "  ·  ▲ chapitres" else "",
+            "OK lecture / pause  ·  ◀ ▶ 10 s  ·  ▼ audio, sous-titres, qualité, vitesse, format, minuterie et infos" + if (ui.chapters.isNotEmpty()) "  ·  ▲ chapitres" else "",
             color = Palette.textSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -470,6 +480,9 @@ private sealed interface MenuRow {
     /** ◀ ▶ shift by a tenth of a second, OK goes back to none (ADR 0062). */
     data class Delay(val kind: DelayKind, val seconds: Double) : MenuRow
 
+    /** ◀ ▶ pick a streaming cap, OK applies it to this playback (ADR 0081). */
+    data class QualityRow(val quality: Quality) : MenuRow
+
     /** ◀ ▶ step through the offered speeds, OK goes back to « Normale » (ADR 0072). */
     data class Speed(val speed: Double) : MenuRow
 
@@ -487,7 +500,7 @@ private sealed interface MenuRow {
 }
 
 /** What the rows of the track menu show beyond the tracks. */
-private class MenuState(val delays: Delays, val speed: Double, val fit: VideoFit, val night: Night, val sleep: SleepChoice, val item: SleepItem?)
+private class MenuState(val delays: Delays, val speed: Double, val fit: VideoFit, val night: Night, val sleep: SleepChoice, val item: SleepItem?, val quality: Quality)
 
 private class MenuActions(
     val select: (TrackType, Int?) -> Unit,
@@ -497,6 +510,8 @@ private class MenuActions(
     val night: () -> Unit,
     val sleep: (SleepChange) -> Unit,
     val info: () -> Unit,
+    val qualityStep: (QualityChange) -> Unit,
+    val qualityApply: () -> Unit,
 )
 
 /** ◀ and ▶ on a row: [left] or [right], held down they repeat; other keys go on as usual. */
@@ -527,6 +542,7 @@ private fun menuRows(tracks: List<Track>, state: MenuState): List<MenuRow> = bui
     if (subs.any { it.selected }) add(MenuRow.Delay(DelayKind.Subtitle, delays.subtitle))
     add(MenuRow.Delay(DelayKind.Audio, delays.audio))
     add(MenuRow.Header("Lecture"))
+    add(MenuRow.QualityRow(state.quality))
     add(MenuRow.Speed(state.speed))
     add(MenuRow.Fit(state.fit))
     add(MenuRow.NightMode(state.night))
@@ -568,6 +584,15 @@ private fun TrackMenu(tracks: List<Track>, state: MenuState, actions: MenuAction
                     trailingContent = { Text(formatDelay(row.seconds)) },
                     // Held down, the key repeats: one tenth per repeat; ▲ ▼ still move between rows
                     modifier = Modifier.leftRight(DelayChange.Earlier, DelayChange.Later) { actions.delay(row.kind, it) },
+                )
+                is MenuRow.QualityRow -> ListItem(
+                    selected = false,
+                    onClick = actions.qualityApply,
+                    headlineContent = { Text("Qualité", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = { Text(qualityNote(row.quality), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                    trailingContent = { Text(qualityValue(row.quality)) },
+                    // ◀ ▶ only pick: one reload, on OK, however many steps were taken (ADR 0081)
+                    modifier = Modifier.leftRight(QualityChange.Lower, QualityChange.Higher, actions.qualityStep),
                 )
                 is MenuRow.Speed -> ListItem(
                     selected = false,

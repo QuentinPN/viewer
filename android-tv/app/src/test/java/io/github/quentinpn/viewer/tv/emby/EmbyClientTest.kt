@@ -175,6 +175,41 @@ class EmbyClientTest {
     }
 
     @Test
+    fun qualityChangeAsksFromThePlayingPosition() = runBlocking {
+        respond(200, """{"MediaSources":[],"PlaySessionId":"ps"}""")
+        respond(200, """{"MediaSources":[],"PlaySessionId":"ps"}""")
+        client.withToken("t").playbackInfo("u1", "i1", deviceProfile())
+        assertFalse(server.takeRequest().body!!.utf8().contains("StartTimeTicks"))
+        client.withToken("t").playbackInfo("u1", "i1", deviceProfile(), "mediasource_30501", 1_200_000_000)
+        val request = server.takeRequest()
+        assertNull(request.url.queryParameter("StartTimeTicks"))
+        val body = request.body!!.utf8()
+        assertTrue(body.contains("\"StartTimeTicks\":1200000000"))
+        assertTrue(body.contains("\"MediaSourceId\":\"mediasource_30501\""))
+    }
+
+    @Test
+    fun stopEncodingDeletesTheReplacedTranscode() = runBlocking {
+        respond(204)
+        client.withToken("secret-token").stopEncoding("ps-old1")
+        val request = server.takeRequest()
+        assertEquals("DELETE", request.method)
+        assertEquals("/emby/Videos/ActiveEncodings", request.url.encodedPath)
+        assertEquals("dev-1", request.url.queryParameter("DeviceId"))
+        assertEquals("ps-old1", request.url.queryParameter("PlaySessionId"))
+        assertNull(request.url.queryParameter("api_key"))
+        assertFalse(request.url.toString().contains("secret-token"))
+        assertTrue(request.headers["X-Emby-Authorization"]!!.endsWith(", Token=\"secret-token\""))
+    }
+
+    @Test
+    fun invalidSessionIsNeverStopped() {
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").stopEncoding("a/b") }
+        expectError(EmbyError.NotSignedIn::class.java) { client.stopEncoding("ps1") }
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
     fun invalidVersionIsNeverSent() {
         expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").playbackInfo("u1", "i1", deviceProfile(), "a/b") }
         assertEquals(0, server.requestCount)
