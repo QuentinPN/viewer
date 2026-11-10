@@ -96,7 +96,7 @@ internal fun initials(name: String): String {
  * page, or on a person page the title opened from it. Null brings back its usual focus.
  */
 internal fun remembering(page: DetailPage, focus: String?): DetailPage = when (page) {
-    is DetailPage.Movie -> page.copy(person = focus)
+    is DetailPage.Movie -> page.copy(person = focus, collection = null)
     is DetailPage.Series -> page.copy(person = focus)
     is DetailPage.Episode -> page.copy(person = focus)
     is DetailPage.Person -> page.copy(opened = focus)

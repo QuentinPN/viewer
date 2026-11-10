@@ -111,6 +111,11 @@ data class BaseItemDto(
     @SerialName("Chapters") val chapters: List<ChapterInfo> = emptyList(),
     /** The versions of a film or episode (ADR 0058); PlaybackInfo decides how each one plays. */
     @SerialName("MediaSources") val mediaSources: List<MediaSourceDto> = emptyList(),
+    /**
+     * The BoxSets holding the item, documented as `NameLongIdPair[]` (ADR 0071). Kept raw and
+     * read by [collectionRefs]: a shape the client does not expect hides the row, not the film.
+     */
+    @SerialName("Collections") val rawCollections: JsonElement? = null,
 )
 
 /** One version in an item's detail, as `MediaSourceDto` on Windows (ADR 0036). */
