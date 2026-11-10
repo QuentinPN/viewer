@@ -30,7 +30,7 @@ Aucun autre endpoint n'est utilisé.
 
 ## Non vérifié
 Rien n'a été essayé sur le vrai serveur dans ce changement. En particulier :
-- que marquer une série ou une saison marque aussi ses épisodes (la cascade n'est pas documentée ; l'app relit les épisodes après coup) ;
+- que marquer une série ou une saison marque aussi ses épisodes depuis le desktop (la cascade n'est pas documentée ; l'app relit les épisodes après coup). Le même appel depuis Android TV l'a montrée sur le serveur réel, voir l'ADR 0097 ;
 - ce que `HideFromResume` fait de la position de reprise, et si l'item quitte bien `/Users/{u}/Items/Resume` ;
 - le rendu et le parcours au clavier dans l'app (seuls svelte-check, Biome et Vitest sont passés).
 
