@@ -56,12 +56,29 @@ import kotlinx.coroutines.withContext
 /**
  * Réglages (ADR 0051): the Windows playback settings that make sense on a TV, kept
  * on the device for this Emby user. Each row changes on OK and is saved at once.
- * « Stockage » shows and clears the image cache (ADR 0080); « À propos » ends it with
- * read-only diagnostics (ADR 0076).
+ * « Accueil » shows or hides each home row (ADR 0094). « Stockage » shows and clears the
+ * image cache (ADR 0080); « À propos » ends it with read-only diagnostics (ADR 0076).
  */
 @Composable
-fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, client: EmbyClient, images: ImageLoader) {
+fun SettingsScreen(
+    store: PlaybackSettingsStore,
+    localAddress: Boolean,
+    client: EmbyClient,
+    images: ImageLoader,
+    userId: String,
+    rowStore: HomeRowStore,
+) {
     var settings by remember { mutableStateOf(store.load()) }
+    var rows by remember { mutableStateOf(rowStore.load()) }
+    // The libraries of the home's « Derniers ajouts » rows, from the same views query
+    val homeRowList by produceState<HomeRowList>(HomeRowList.Loading, client, userId) {
+        value = try {
+            HomeRowList.Loaded(homeRows(homeLibraries(client.views(userId).items)))
+        } catch (e: EmbyException) {
+            // The fixed rows can still be set; only the libraries' rows are missing
+            HomeRowList.Failed(homeRows(emptyList()), e.error.message)
+        }
+    }
     val context = LocalContext.current
     val app = remember { DeviceReport.appRows(context) }
     val device = remember { DeviceReport.deviceRows() }
@@ -187,6 +204,23 @@ fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, client: 
         }
         item { Note("Ces réglages restent sur cet appareil et s'appliquent à la prochaine lecture.") }
 
+        item { Section("Accueil") }
+        item {
+            Note(
+                "Les rangées affichées sur l'accueil, sous le bandeau. OK affiche ou masque une rangée ; une rangée " +
+                    "masquée n'est plus demandée au serveur. Le changement s'applique au retour à l'accueil.",
+            )
+        }
+        when (val list = homeRowList) {
+            HomeRowList.Loading -> item { Info(InfoRow("Bibliothèques", "Chargement…")) }
+            is HomeRowList.Loaded, is HomeRowList.Failed -> {
+                items(list.rows, key = { "home-" + it.key }) { row ->
+                    Choice(row.label, null, rowLabel(rows.shows(row.key))) { rows = rowStore.toggle(row.key) }
+                }
+                if (list is HomeRowList.Failed) item { Note("Bibliothèques illisibles : " + list.message) }
+            }
+        }
+
         item { Section("Stockage") }
         item {
             Note(
@@ -237,6 +271,19 @@ fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, client: 
 }
 
 private fun onOff(on: Boolean) = if (on) "Activé" else "Désactivé"
+
+/** The rows of « Accueil »: those of the libraries come from the server. */
+private sealed interface HomeRowList {
+    val rows: List<HomeRow>
+
+    data object Loading : HomeRowList {
+        override val rows = emptyList<HomeRow>()
+    }
+
+    data class Loaded(override val rows: List<HomeRow>) : HomeRowList
+
+    data class Failed(override val rows: List<HomeRow>, val message: String) : HomeRowList
+}
 
 /** Blocking disk read: call it on [Dispatchers.IO]. */
 private fun measure(images: ImageLoader): ImageCacheUsage {
