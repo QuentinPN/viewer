@@ -202,6 +202,7 @@ class MainActivity : ComponentActivity() {
                             settingsStore,
                             localAddress = client.server.isLocal,
                             client = client,
+                            images = images,
                         )
                         return@ViewerTheme
                     }

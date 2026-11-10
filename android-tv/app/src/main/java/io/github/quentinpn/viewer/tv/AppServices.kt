@@ -3,6 +3,7 @@ package io.github.quentinpn.viewer.tv
 import android.content.Context
 import android.os.Build
 import coil3.ImageLoader
+import coil3.disk.DiskCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import io.github.quentinpn.viewer.tv.emby.DeviceIdentity
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
@@ -14,7 +15,10 @@ import io.github.quentinpn.viewer.tv.player.accountTracks
 import io.github.quentinpn.viewer.tv.session.PendingStopStore
 import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.session.SessionStore
+import io.github.quentinpn.viewer.tv.settings.IMAGE_CACHE_DIRECTORY
+import io.github.quentinpn.viewer.tv.settings.IMAGE_CACHE_MAX_BYTES
 import okhttp3.OkHttpClient
+import okio.Path.Companion.toOkioPath
 
 /** Process-wide objects: one HTTP client (shared connection pool) and the session store. */
 object AppServices {
@@ -77,8 +81,24 @@ object AppServices {
             val sameOrigin = request.url.scheme == base.scheme && request.url.host == base.host && request.url.port == base.port
             chain.proceed(if (sameOrigin) request.newBuilder().header("X-Emby-Authorization", header).build() else request)
         }.build()
+        val app = context.applicationContext
         return ImageLoader.Builder(context)
             .components { add(OkHttpNetworkFetcherFactory(callFactory = { imagesHttp })) }
+            .diskCache { imageDiskCache(app) }
             .build()
     }
+
+    /**
+     * One disk cache per process, shared by every loader (one per session): two caches
+     * on the same directory would corrupt its journal. Bounded to 256 Mo (ADR 0080).
+     */
+    private fun imageDiskCache(context: Context): DiskCache = imageCache ?: synchronized(this) {
+        imageCache ?: DiskCache.Builder()
+            .directory(context.cacheDir.toOkioPath() / IMAGE_CACHE_DIRECTORY)
+            .maxSizeBytes(IMAGE_CACHE_MAX_BYTES)
+            .build()
+            .also { imageCache = it }
+    }
+
+    @Volatile private var imageCache: DiskCache? = null
 }
