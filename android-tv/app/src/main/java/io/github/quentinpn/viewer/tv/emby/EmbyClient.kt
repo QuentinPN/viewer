@@ -320,6 +320,16 @@ class EmbyClient(
     }
 
     /**
+     * The titles of one collection (BoxSet, ADR 0071): the items query with the BoxSet as
+     * `ParentId`, built by [collectionItemsQuery].
+     */
+    suspend fun collectionItems(userId: String, collectionId: String, limit: Int = COLLECTION_TITLES_LIMIT): QueryResult<BaseItemDto> {
+        val builder = server.api("/Users/${segment(userId)}/Items").newBuilder()
+        collectionItemsQuery(segment(collectionId), limit).forEach { (name, value) -> builder.addQueryParameter(name, value) }
+        return call(get(builder.build()), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
+    /**
      * One item without `Fields`, as the Windows client reads it for segments (ADR 0030):
      * Emby 4.10.2.0 then returns its `Chapters` and `ProviderIds`.
      */

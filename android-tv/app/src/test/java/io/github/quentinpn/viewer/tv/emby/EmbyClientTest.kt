@@ -264,6 +264,33 @@ class EmbyClientTest {
     }
 
     @Test
+    fun collectionItemsAsksForTheTitlesOfOneBoxSet() = runBlocking {
+        respond(200, """{"Items":[{"Id":"m1","Name":"Dune","Type":"Movie","PremiereDate":"2021-09-15T00:00:00.0000000Z"}],"TotalRecordCount":1}""")
+        val titles = client.withToken("secret-token").collectionItems("u1", "120034")
+        assertEquals(listOf("m1"), titles.items.map { it.id })
+        val request = server.takeRequest()
+        assertEquals("GET", request.method)
+        val url = request.url
+        assertEquals("/emby/Users/u1/Items", url.encodedPath)
+        for ((name, value) in listOf(
+            "ParentId" to "120034", "SortBy" to "PremiereDate,ProductionYear,SortName", "SortOrder" to "Ascending",
+            "Limit" to "100", "EnableUserData" to "true", "ImageTypeLimit" to "1", "EnableImageTypes" to "Primary",
+        )) {
+            assertEquals(name, value, url.queryParameter(name))
+        }
+        assertFalse("no token in the URL", "secret-token" in url.toString())
+        assertNull(url.queryParameter("api_key"))
+        assertNull(request.headers["X-Emby-Token"])
+        assertTrue("Token=\"secret-token\"" in request.headers["X-Emby-Authorization"]!!)
+    }
+
+    @Test
+    fun collectionItemsRejectsAnIdThatWouldChangeThePath() {
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").collectionItems("u1", "../Users") }
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
     fun peopleOfAnItemCarryTheirIdRoleAndPhoto() = runBlocking {
         respond(
             200,

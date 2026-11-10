@@ -39,8 +39,8 @@ import io.github.quentinpn.viewer.tv.emby.EmbyException
 
 /**
  * A film: backdrop, year, length, overview, "Reprendre" / "Lire depuis le début", its version
- * if it has several, and below the screen the « Distribution » (ADR 0068) and « Titres
- * similaires » (ADR 0063) rows.
+ * if it has several, and below the screen the « Distribution » (ADR 0068), « Collection »
+ * (ADR 0071) and « Titres similaires » (ADR 0063) rows.
  */
 @Composable
 fun MovieScreen(
@@ -55,9 +55,13 @@ fun MovieScreen(
     onOpenSimilar: (BaseItemDto) -> Unit,
     /** OK on a « Distribution » card opens that person's page (ADR 0068). */
     onOpenPerson: (CastMember) -> Unit,
+    /** OK on a poster of a « Collection » row opens its page (ADR 0071). */
+    onOpenCollectionItem: (BaseItemDto) -> Unit,
     onSessionExpired: () -> Unit,
     /** The card a person page was opened from: focused instead of the play button. */
     focusPerson: String? = null,
+    /** The collection poster a film was opened from: focused instead of the play button once found. */
+    focusCollection: String? = null,
     /** Changes after each playback: the resume point and watched mark are read again. */
     refresh: Int = 0,
 ) {
@@ -78,6 +82,10 @@ fun MovieScreen(
         if (!shown || next is Load.Ready) movie = next
     }
     val similar = rememberSimilar(client, userId, movieId, ready = movie is Load.Ready, onSessionExpired)
+    val collections = rememberCollections(client, userId, (movie as? Load.Ready)?.value, onSessionExpired)
+    // Back from a collection poster: its row takes the focus, the play button if it is gone
+    val focusedShelf = collections?.let { focusedShelf(it, focusCollection) } ?: -1
+    val takeFocus = focusPerson == null && (focusCollection == null || collections != null && focusedShelf < 0)
 
     Box(Modifier.fillMaxSize().background(Palette.background)) {
         when (val m = movie) {
@@ -91,9 +99,13 @@ fun MovieScreen(
                     val scroll = rememberScrollState()
                     ScrollingPage(scroll, Modifier.fillMaxSize()) {
                         // Back on the buttons, the film's title shows again
-                        Details(m.value, versions, onPlay, focusPerson == null, Modifier.height(screen).topOnFocus(scroll))
+                        Details(m.value, versions, onPlay, takeFocus, Modifier.height(screen).topOnFocus(scroll))
                         val cast = remember(m.value.people) { castMembers(m.value) }
                         CastRow(cast, client, images, focusPerson, onOpenPerson)
+                        // Under the cast, read after the page: a late row does not push a focused card away
+                        collections?.forEachIndexed { index, shelf ->
+                            CollectionRow(shelf, m.value.id, client, images, focusCollection.takeIf { index == focusedShelf }, onOpenCollectionItem)
+                        }
                         SimilarRow(similar, client, images, onOpenSimilar)
                     }
                 }
@@ -107,7 +119,7 @@ private fun Details(
     movie: BaseItemDto,
     versions: VersionStore,
     onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit,
-    /** False when the « Distribution » row takes the first focus. */
+    /** False when the « Distribution » or a « Collection » row takes the first focus; may turn true later. */
     takeFocus: Boolean,
     modifier: Modifier,
 ) {
@@ -163,8 +175,9 @@ private fun Details(
     }
     // Also after a reload removed the focused "Lire depuis le début"; one frame later, once laid out
     var skip by remember { mutableStateOf(!takeFocus) }
-    LaunchedEffect(resume) {
-        // Only the first time: a reload that removes "Lire depuis le début" still moves the focus
+    LaunchedEffect(resume, takeFocus) {
+        // Only the first time: a reload that removes "Lire depuis le début" still moves the focus,
+        // as a collection poster to focus again that is no longer there (takeFocus turning true)
         if (skip) {
             skip = false
             return@LaunchedEffect

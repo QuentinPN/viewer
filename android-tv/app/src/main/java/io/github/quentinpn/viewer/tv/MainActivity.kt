@@ -36,6 +36,7 @@ import io.github.quentinpn.viewer.tv.ui.SignInScreen
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import io.github.quentinpn.viewer.tv.ui.VersionStore
 import io.github.quentinpn.viewer.tv.ui.backFromEpisode
+import io.github.quentinpn.viewer.tv.ui.openFromCollection
 import io.github.quentinpn.viewer.tv.ui.openOver
 import io.github.quentinpn.viewer.tv.ui.pageKey
 import io.github.quentinpn.viewer.tv.ui.replaceTop
@@ -150,9 +151,12 @@ class MainActivity : ComponentActivity() {
                                     onPlay = playSource,
                                     onOpenSimilar = openSimilar,
                                     onOpenPerson = openPerson,
+                                    // The film remembers the poster, focused again on Back (ADR 0071)
+                                    onOpenCollectionItem = { item -> similarPage(item)?.let { pages = openFromCollection(pages, it, item.id) } },
                                     onSessionExpired = expired,
                                     refresh = refresh,
                                     focusPerson = page.person,
+                                    focusCollection = page.collection,
                                 )
                             }
                         }
