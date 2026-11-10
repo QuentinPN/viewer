@@ -994,3 +994,18 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - the critics' score, since no film checked has one;
   - the timer running out, both after minutes and at the credits. Reaching the credits would bring the episode near 90 % and could mark it watched on the test account.
   - the up-next card held back.
+
+### 2026-11-10 ? Android TV: recent searches, about page and random pick
+
+- **Added**: ADR 0075. Search shows up to the last searches as chips when the field is empty, per server and user (SharedPreferences, never the server). OK on a chip runs that search again and moves it to the front; ? Effacer l'historique ? clears the list and puts the focus back on the field.
+- **Added**: ADR 0076. R?glages has an ? ? propos ? section: app version and build, device and Android version, server name, Emby version and address (`GET /System/Info/Public`), and what the device decodes (HEVC, AV1, VP9, H.264, HDR, Dolby Vision) from `MediaCodecList` and the display's HDR modes.
+- **Added**: ADR 0077. The Films and S?ries grids have an ? Au hasard ? pill, the last one in the row. It opens one random title of the library with the current filters (`SortBy=Random`, `Limit=1`). Back returns to the grid with the focus on the pill.
+- **Fixed**: on detail pages the scores now come before the genres, so a long line cuts the genres (? Com?die, Dra? ?) and never a score or ? Vu ?. Before this, Moxie showed ? 70 % critiques ? cut to ? 7? ?. ADR 0074 is updated.
+- **Tests**: `SearchHistoryTest`, `AboutTest`, `RandomPickTest`, `FactsTest`, `EmbyClientTest`. `testDebugUnitTest` 353/353, `assembleDebug` and `lintDebug` OK.
+- **Checked on the Shield**:
+  - Recent searches: the ? dune ? and ? luther ? chips appear. OK on ? luther ? runs it and moves it first. ? Effacer l'historique ? empties the list and focuses the field, with the keyboard still hidden.
+  - ? propos: version 0.1.0 (1), D?bogage; NVIDIA SHIELD Android TV, Android 11 (API 30); ServeurSouarez, Emby 4.10.2.0, http://192.0.2.14:8096. HEVC: Mat?riel ? 10 bits ? HDR10 (OMX.Nvidia.h265.decode). AV1: Aucun d?codeur. VP9 and H.264: Mat?riel. Dolby Vision: Non annonc?. ?cran: HDR10.
+  - Au hasard in Films opened Moxie; Back returned to the grid with the focus on the pill; OK again opened La Chute de Londres.
+  - La Chute de Londres shows ? 2016 1 h 38 [FR-12] ? 5,9 27 % critiques Action, Thriller ?; Moxie shows ? 2021 1 h 51 [PG-13] ? 6,7 70 % critiques Com?die, Dra? ?.
+  - Logcat: 0 token line, no crash.
+- **Not verified**: ? Au hasard ? with filters on, and in S?ries.
