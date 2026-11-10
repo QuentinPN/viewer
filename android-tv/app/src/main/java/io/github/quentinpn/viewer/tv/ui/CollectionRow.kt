@@ -55,7 +55,7 @@ internal fun focusedShelf(shelves: List<CollectionShelf>, focus: String?): Int =
  */
 internal fun openFromCollection(pages: List<DetailPage>, page: DetailPage, itemId: String): List<DetailPage> {
     val below = pages.lastOrNull()
-    val kept = if (below is DetailPage.Movie) replaceTop(pages, below.copy(person = null, collection = itemId)) else pages
+    val kept = if (below is DetailPage.Movie) replaceTop(pages, below.copy(person = null, collection = itemId, genre = null)) else pages
     return pushPage(kept, page)
 }
 

@@ -23,6 +23,7 @@ import io.github.quentinpn.viewer.tv.ui.DetailPage
 import io.github.quentinpn.viewer.tv.ui.EpisodeScreen
 import io.github.quentinpn.viewer.tv.ui.HomeMemory
 import io.github.quentinpn.viewer.tv.ui.HomeScreen
+import io.github.quentinpn.viewer.tv.ui.HomeState
 import io.github.quentinpn.viewer.tv.ui.LibraryMemory
 import io.github.quentinpn.viewer.tv.ui.LibraryPreferenceStore
 import io.github.quentinpn.viewer.tv.ui.LibraryScreen
@@ -37,7 +38,10 @@ import io.github.quentinpn.viewer.tv.ui.SignInScreen
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import io.github.quentinpn.viewer.tv.ui.VersionStore
 import io.github.quentinpn.viewer.tv.ui.backFromEpisode
+import io.github.quentinpn.viewer.tv.ui.genreLibrary
+import io.github.quentinpn.viewer.tv.ui.genreOptions
 import io.github.quentinpn.viewer.tv.ui.openFromCollection
+import io.github.quentinpn.viewer.tv.ui.openGenre
 import io.github.quentinpn.viewer.tv.ui.openOver
 import io.github.quentinpn.viewer.tv.ui.pageKey
 import io.github.quentinpn.viewer.tv.ui.replaceTop
@@ -100,6 +104,13 @@ class MainActivity : ComponentActivity() {
                         notice = "Session expirée. Reconnectez-vous."
                         session = null
                     }
+                    // A genre chip opens the library « Films » or « Séries » of the home bar on that genre (ADR 0079)
+                    val libraries = (home.state as? HomeState.Ready)?.libraries.orEmpty()
+                    val genreOpener: (String) -> ((String) -> Unit)? = { itemType ->
+                        genreLibrary(libraries, itemType)?.let { library ->
+                            { genre -> genreOptions(libraryPrefs.load(library), genre)?.let { pages = openGenre(pages, DetailPage.Grid(LibraryMemory(library, it)), genre) } }
+                        }
+                    }
                     val page = pages.lastOrNull()
                     if (page != null) {
                         // Back shows the page below: the film or series a similar title was opened from
@@ -122,6 +133,17 @@ class MainActivity : ComponentActivity() {
                                     refresh = refresh,
                                     focusPerson = page.person,
                                 )
+                                is DetailPage.Grid -> LibraryScreen(
+                                    client,
+                                    current.userId,
+                                    images,
+                                    page.memory,
+                                    // Not saved: the grid of the home bar keeps its own choices (ADR 0079)
+                                    onOptionsChanged = {},
+                                    onOpenSeries = { pages = openOver(pages, DetailPage.Series(SeriesTarget(it))) },
+                                    onOpenMovie = { pages = openOver(pages, DetailPage.Movie(it)) },
+                                    onSessionExpired = expired,
+                                )
                                 is DetailPage.Person -> PersonScreen(
                                     client,
                                     current.userId,
@@ -143,6 +165,8 @@ class MainActivity : ComponentActivity() {
                                     onSessionExpired = expired,
                                     refresh = refresh,
                                     focusPerson = page.person,
+                                    onOpenGenre = genreOpener("Series"),
+                                    focusGenre = page.genre,
                                 )
                                 is DetailPage.Movie -> MovieScreen(
                                     client,
@@ -159,6 +183,8 @@ class MainActivity : ComponentActivity() {
                                     refresh = refresh,
                                     focusPerson = page.person,
                                     focusCollection = page.collection,
+                                    onOpenGenre = genreOpener("Movie"),
+                                    focusGenre = page.genre,
                                 )
                             }
                         }

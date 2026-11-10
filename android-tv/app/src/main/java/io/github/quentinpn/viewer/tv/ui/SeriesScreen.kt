@@ -119,6 +119,10 @@ fun SeriesScreen(
     refresh: Int = 0,
     /** The card a person page was opened from: focused instead of an episode card. */
     focusPerson: String? = null,
+    /** OK on a genre chip opens the series library on it (ADR 0079); null hides the chips. */
+    onOpenGenre: ((String) -> Unit)? = null,
+    /** The genre chip a grid was opened from: focused instead of an episode card. */
+    focusGenre: String? = null,
 ) {
     var data by remember { mutableStateOf<Load<SeriesData>>(Load.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
@@ -127,6 +131,8 @@ fun SeriesScreen(
     var focusEpisode by remember { mutableStateOf(target.episodeId) }
     // Back from a person page: the episode row leaves the focus to the cast until another season is chosen
     var castFocus by remember { mutableStateOf(focusPerson) }
+    // Back from a genre's grid: the chip keeps the focus likewise (ADR 0079)
+    var chipFocus by remember { mutableStateOf(focusGenre) }
     val seriesId = target.seriesId
 
     suspend fun <T> load(block: suspend () -> T): Load<T> = try {
@@ -156,7 +162,10 @@ fun SeriesScreen(
                 // Scrolls: Down from the episode row reaches the similar titles below the screen
                 val scroll = rememberScrollState()
                 ScrollingPage(scroll, Modifier.fillMaxSize(), Modifier.padding(top = 40.dp), Arrangement.spacedBy(16.dp)) {
-                    Header(d.value.series)
+                    val chips = remember(d.value.series.genres, onOpenGenre != null) { if (onOpenGenre != null) genreChips(d.value.series) else emptyList() }
+                    // The chip if the series still has that genre, else the episode row as usual
+                    val genreFocus = chipFocus?.takeIf { it in chips }
+                    Header(d.value.series, chips, genreFocus) { onOpenGenre?.invoke(it) }
                     if (d.value.seasons.isEmpty()) {
                         Text("Aucune saison sur le serveur.", color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp))
                     } else {
@@ -166,10 +175,11 @@ fun SeriesScreen(
                                 seasonId = it
                                 focusEpisode = null
                                 castFocus = null
+                                chipFocus = null
                             }
                         }
                         seasonId?.let { id ->
-                            Episodes(client, userId, seriesId, id, focusEpisode, castFocus == null, d.value.series, images, onPlay, onOpenEpisode, onSessionExpired, refresh)
+                            Episodes(client, userId, seriesId, id, focusEpisode, castFocus == null && genreFocus == null, d.value.series, images, onPlay, onOpenEpisode, onSessionExpired, refresh)
                         }
                     }
                     val cast = remember(d.value.series.people) { castMembers(d.value.series) }
@@ -215,14 +225,15 @@ internal fun Backdrop(series: BaseItemDto, client: EmbyClient, images: ImageLoad
 }
 
 @Composable
-private fun Header(series: BaseItemDto) {
+private fun Header(series: BaseItemDto, chips: List<String>, focusGenre: String?, onOpenGenre: (String) -> Unit) {
     Column(Modifier.padding(horizontal = 48.dp).fillMaxWidth(0.6f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(series.name, style = MaterialTheme.typography.displaySmall, color = Palette.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
         // Year, the age rating badge, then genres and scores; the text ends in an ellipsis, not the badge
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             series.productionYear?.let { Text(it.toString(), color = Palette.textSecondary) }
             RatingBadge(series)
-            val line = tags(series)
+            // The genres are the chips below when they open a grid (ADR 0079)
+            val line = scores(series) + listOfNotNull(yearLineGenres(series, chips))
             if (line.isNotEmpty()) Text(line.joinToString("  ·  "), color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         series.overview?.let {
@@ -230,6 +241,7 @@ private fun Header(series: BaseItemDto) {
         }
         // Two lines at most: the episodes row needs the room
         Facts(series, limit = 2)
+        GenreChips(chips, focusGenre, onOpenGenre)
     }
 }
 

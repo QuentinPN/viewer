@@ -64,6 +64,10 @@ fun MovieScreen(
     focusCollection: String? = null,
     /** Changes after each playback: the resume point and watched mark are read again. */
     refresh: Int = 0,
+    /** OK on a genre chip opens the films library on it (ADR 0079); null hides the chips. */
+    onOpenGenre: ((String) -> Unit)? = null,
+    /** The genre chip a grid was opened from: focused instead of the play button. */
+    focusGenre: String? = null,
 ) {
     var movie by remember { mutableStateOf<Load<BaseItemDto>>(Load.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
@@ -85,7 +89,11 @@ fun MovieScreen(
     val collections = rememberCollections(client, userId, (movie as? Load.Ready)?.value, onSessionExpired)
     // Back from a collection poster: its row takes the focus, the play button if it is gone
     val focusedShelf = collections?.let { focusedShelf(it, focusCollection) } ?: -1
-    val takeFocus = focusPerson == null && (focusCollection == null || collections != null && focusedShelf < 0)
+    val movieValue = (movie as? Load.Ready)?.value
+    val chips = remember(movieValue?.genres, onOpenGenre != null) { if (onOpenGenre != null && movieValue != null) genreChips(movieValue) else emptyList() }
+    // Back from a genre's grid: its chip, the play button if the film lost that genre
+    val genreFocus = focusGenre?.takeIf { it in chips }
+    val takeFocus = focusPerson == null && genreFocus == null && (focusCollection == null || collections != null && focusedShelf < 0)
 
     Box(Modifier.fillMaxSize().background(Palette.background)) {
         when (val m = movie) {
@@ -99,7 +107,7 @@ fun MovieScreen(
                     val scroll = rememberScrollState()
                     ScrollingPage(scroll, Modifier.fillMaxSize()) {
                         // Back on the buttons, the film's title shows again
-                        Details(m.value, versions, onPlay, takeFocus, Modifier.height(screen).topOnFocus(scroll))
+                        Details(m.value, versions, onPlay, takeFocus, chips, genreFocus, { onOpenGenre?.invoke(it) }, Modifier.height(screen).topOnFocus(scroll))
                         val cast = remember(m.value.people) { castMembers(m.value) }
                         CastRow(cast, client, images, focusPerson, onOpenPerson)
                         // Under the cast, read after the page: a late row does not push a focused card away
@@ -121,6 +129,10 @@ private fun Details(
     onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit,
     /** False when the « Distribution » or a « Collection » row takes the first focus; may turn true later. */
     takeFocus: Boolean,
+    /** Genres to open (ADR 0079); empty leaves them on the year line. */
+    chips: List<String>,
+    focusGenre: String?,
+    onOpenGenre: (String) -> Unit,
     modifier: Modifier,
 ) {
     val played = movie.userData?.played == true
@@ -141,7 +153,7 @@ private fun Details(
             RatingBadge(movie)
             scores(movie).forEach { Text(it, color = Palette.textSecondary, maxLines = 1) }
             // Measured last: a long line cuts the genres, never a score nor « Vu »
-            genres(movie)?.let {
+            yearLineGenres(movie, chips)?.let {
                 Text(it, color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
             }
             if (played) {
@@ -157,6 +169,7 @@ private fun Details(
             Text(it, color = Palette.textSecondary, maxLines = 5, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
         }
         Facts(movie)
+        GenreChips(chips, focusGenre, onOpenGenre)
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // One first button whatever the resume state, so a reload does not drop its focus
             Button(onClick = { onPlay(movie.id, if (resume) position else 0, version) }, modifier = Modifier.focusRequester(first)) {
