@@ -13,17 +13,26 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -37,6 +46,7 @@ import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 // The « Distribution » row of the film, series and episode pages, and the navigation to a
@@ -153,16 +163,33 @@ internal fun CastRow(
     // Starts scrolled to that card: an item off screen cannot take focus
     val row = remember { LazyListState(firstVisibleItemIndex = start.coerceAtLeast(0)) }
     val requester = remember { FocusRequester() }
+    // Back from a person page, the rows above load after the focus and push the card off screen:
+    // it is brought into view again at each move until the focus leaves it (seen on a series page)
+    val bring = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+    var settling by remember { mutableStateOf(start >= 0) }
+    var held by remember { mutableStateOf(false) }
     val still = reducedMotion()
     Column(Modifier.padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Distribution", style = MaterialTheme.typography.titleLarge, color = Palette.text, modifier = Modifier.padding(horizontal = 48.dp))
-        LazyRow(state = row, contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        // Entered from above or below: the card focused last, else the first one, not the nearest one
+        LazyRow(state = row, modifier = Modifier.focusRestorer(requester), contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             itemsIndexed(people, key = { _, it -> it.id }) { index, member ->
                 Column(Modifier.width(132.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     // The ring and scale of the glass controls (ADR 0067), the size kept with reduced motion
                     Surface(
                         onClick = { onOpen(member) },
-                        modifier = (if (index == start) Modifier.focusRequester(requester) else Modifier).size(112.dp),
+                        modifier = (if (index == start.coerceAtLeast(0)) Modifier.focusRequester(requester) else Modifier)
+                            .then(
+                                if (index != start) {
+                                    Modifier
+                                } else {
+                                    Modifier.bringIntoViewRequester(bring)
+                                        .onFocusChanged { if (it.isFocused) held = true else if (held) settling = false }
+                                        .onGloballyPositioned { if (settling && held) scope.launch { bring.bringIntoView() } }
+                                },
+                            )
+                            .size(112.dp),
                         shape = ClickableSurfaceDefaults.shape(CircleShape),
                         colors = ClickableSurfaceDefaults.colors(containerColor = Palette.surface, focusedContainerColor = Palette.surface),
                         scale = ClickableSurfaceDefaults.scale(focusedScale = if (still) 1f else 1.06f),
