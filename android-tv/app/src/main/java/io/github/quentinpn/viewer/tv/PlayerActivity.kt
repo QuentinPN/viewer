@@ -100,6 +100,7 @@ import io.github.quentinpn.viewer.tv.ui.episodeLabel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -189,6 +190,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     // END_FILE events of a file replaced by the next episode: not the end of playback
     @Volatile private var replacedEnds = 0
+
+    /** External subtitles of the loaded file being added, off mpv's event thread (ADR 0085). */
+    @Volatile private var subtitleJob: Job? = null
     private val reporter by lazy { AppServices.reporter(this) }
 
     /** A trailer (ADR 0083): nothing reported to the server, no segments, no next episode. */
@@ -372,7 +376,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
                 replacedEnds++
                 styleSubtitles(running)
                 applyNightMode(running)
-                running.load(source, startTicks / TICKS_PER_SECOND)
+                play(running, source, startTicks / TICKS_PER_SECOND)
                 return
             }
             // Created once the headers are known: they can only be set before mpv init
@@ -385,7 +389,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             }
             styleSubtitles(player)
             applyNightMode(player)
-            player.load(source, startTicks / TICKS_PER_SECOND)
+            play(player, source, startTicks / TICKS_PER_SECOND)
         } catch (e: EmbyException) {
             ui.status = e.error.message
         }
@@ -487,6 +491,12 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         ui.quality = ui.quality.applied(chosen.method)
         ui.status = "Changement de qualité…"
         replacedEnds++
+        play(player, source, at)
+    }
+
+    /** Loads a file; subtitles still being added to the replaced one are dropped (ADR 0085). */
+    private fun play(player: PlayerEngine, source: MediaSource, at: Double) {
+        subtitleJob?.cancel()
         player.load(source, at)
     }
 
@@ -546,11 +556,33 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             ui.status = null
             ui.show()
         }
-        // Named as the server describes them: the files themselves carry no title nor language (ADR 0084)
-        subtitles.forEach { sub -> MediaSource.parse(sub.url)?.let { engine?.addSubtitle(it, sub.selected, sub.title, sub.language) } }
         // The tracks chosen in the menu are remembered: a quality change keeps them the same way
         applyTracks()
         engine?.let(::restoreAdjustments)
+        addSubtitles(subtitles)
+    }
+
+    /**
+     * `sub-add` waits for the whole file: the first time, the server may take minutes to
+     * extract it. Added on their own thread, never on mpv's event thread, which would stop
+     * positions and reports meanwhile; the tracks are then chosen again, an external one
+     * may be the remembered choice (ADR 0085). A new file cancels the rest.
+     */
+    private fun addSubtitles(added: List<ExternalSubtitle>) {
+        subtitleJob?.cancel()
+        if (added.isEmpty()) return
+        subtitleJob = lifecycleScope.launch(Dispatchers.IO) {
+            val started = System.currentTimeMillis()
+            // Named as the server describes them: the files themselves carry no title nor language (ADR 0084)
+            for (sub in added) {
+                val source = MediaSource.parse(sub.url) ?: continue
+                ensureActive()
+                engine?.addSubtitle(source, sub.selected, sub.title, sub.language)
+            }
+            ensureActive()
+            Log.i(TAG, "subtitles added=${added.size} in ${System.currentTimeMillis() - started} ms")
+            applyTracks()
+        }
     }
 
     /**

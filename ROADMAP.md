@@ -1051,3 +1051,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - Logcat: 0 token line, no crash; the stop report went out.
 - **Known issue**, fixed next (ADR 0085): `sub-add` is synchronous and runs on mpv's event thread. The first time the server extracts a file's subtitles it can block for minutes (about 4 min on Overgeared E7): no subtitle, no position or progress update meanwhile (the progress reports kept the old position). Later tries took about 1.6 s.
 - **Not verified**: the second PlaybackInfo on a first load in transcode (remembered audio); why « Qualité » reads « Transcodage · raison non précisée » on PSYREN and E7.
+
+### 2026-11-10 — Android TV: subtitles added off mpv's thread
+
+- **Fixed**: ADR 0085. External subtitles are added on their own thread, no longer on mpv's event thread; the tracks are chosen again once they are in. A new file cancels the adds still waiting. `release()` sends `stop`, waits up to 2 s for a call in progress, else destroys mpv on its own thread once that call returns.
+- **Tests**: `testDebugUnitTest` 422/422, `assembleDebug` and `lintDebug` OK.
+- **Checked on the Shield**: Overgeared S1E7, switch to a 1,5 Mbit/s transcode: `quality restored` 1.6 s after the request, then `subtitles added=3 in 811 ms` on another thread and the tracks chosen again (Japanese audio, 3 French subtitles in the menu). Progress reports go on, the stop report goes out on exit. Logcat: 0 token line, no crash.
+- **Not verified**: a real block of several minutes (this episode's subtitles were already extracted), `stop` aborting a `sub-add`, mpv destroyed on its own thread.

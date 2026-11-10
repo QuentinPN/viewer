@@ -8,7 +8,11 @@ import `is`.xyz.mpv.MPVLib
 import `is`.xyz.mpv.MPVLib.MpvEvent
 import `is`.xyz.mpv.MPVLib.MpvFormat
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.thread
 
 private const val TAG = "ViewerMpv"
 private const val VO = "gpu"
@@ -28,6 +32,9 @@ private const val VO = "gpu"
 class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap()) : PlayerEngine, MPVLib.EventObserver, MPVLib.LogObserver {
     private val listeners = CopyOnWriteArrayList<PlayerListener>()
     private val released = AtomicBoolean(false)
+
+    // Held by calls that may come from another thread than the UI's: mpv is destroyed only once they return
+    private val calls = ReentrantReadWriteLock()
     private var surfaceAttached = false
     private var pending: PendingFile? = null
 
@@ -114,8 +121,9 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         MPVLib.command(arrayOf("loadfile", file.source.uri, "replace", "-1", file.options))
     }
 
-    override fun addSubtitle(source: MediaSource, select: Boolean, title: String?, lang: String?) {
-        if (released.get()) return
+    /** Blocks until mpv has read the whole file: called off the UI and event threads (ADR 0085). */
+    override fun addSubtitle(source: MediaSource, select: Boolean, title: String?, lang: String?) = calls.read {
+        if (released.get()) return@read
         // `auto` adds the track without selecting it, as on Windows (ADR 0009); title and
         // language as Windows passes them, else mpv only knows the file name (ADR 0084)
         MPVLib.command(arrayOf("sub-add", source.uri, if (select) "select" else "auto", title.orEmpty(), lang.orEmpty()))
@@ -131,9 +139,9 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
 
     override fun cycleAudio() = command("cycle", "audio")
 
-    override fun tracks(): List<Track> = if (released.get()) emptyList() else readTracks { MPVLib.getPropertyString(it) }
+    override fun tracks(): List<Track> = calls.read { if (released.get()) emptyList() else readTracks { MPVLib.getPropertyString(it) } }
 
-    override fun selectTrack(type: TrackType, id: Int?) {
+    override fun selectTrack(type: TrackType, id: Int?) = calls.read {
         if (!released.get()) MPVLib.setPropertyString(type.property, id?.toString() ?: "no")
     }
 
@@ -176,15 +184,38 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
     override fun audioPassthrough(): Boolean = !released.get() &&
         (isPassthrough(MPVLib.getPropertyString("audio-params/format")) || isPassthrough(MPVLib.getPropertyString("audio-out-params/format")))
 
-    override fun property(name: String): String? = if (released.get()) null else MPVLib.getPropertyString(name)
+    override fun property(name: String): String? = calls.read { if (released.get()) null else MPVLib.getPropertyString(name) }
 
+    /**
+     * `stop` ends a subtitle still loading (mpv aborts `sub-add` when playback ends); if
+     * one does not return in time, mpv is destroyed on its own thread once it has, so the
+     * UI thread never waits on the server (ADR 0085).
+     */
     override fun release() {
         if (!released.compareAndSet(false, true)) return
         MPVLib.removeObserver(this)
         MPVLib.removeLogObserver(this)
-        MPVLib.destroy()
         surfaceAttached = false
-        alive.set(false)
+        MPVLib.command(arrayOf("stop"))
+        val lock = calls.writeLock()
+        if (lock.tryLock(RELEASE_WAIT_MS, TimeUnit.MILLISECONDS)) {
+            destroy(lock)
+        } else {
+            Log.w(TAG, "release waits for a subtitle")
+            thread(name = "viewer-mpv-release") {
+                lock.lock()
+                destroy(lock)
+            }
+        }
+    }
+
+    private fun destroy(lock: java.util.concurrent.locks.Lock) {
+        try {
+            MPVLib.destroy()
+        } finally {
+            lock.unlock()
+            alive.set(false)
+        }
     }
 
     private fun command(vararg args: String) {
@@ -230,6 +261,8 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
 
     private companion object {
         val alive = AtomicBoolean(false)
+
+        const val RELEASE_WAIT_MS = 2_000L
 
         // Same hardening as Windows (ADR 0002, 0025); render/decode settings from mpv-android.
         val OPTIONS = listOf(
