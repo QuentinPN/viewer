@@ -232,7 +232,7 @@ private fun strokeIcon(name: String, vararg paths: String): ImageVector =
         }
     }.build()
 
-private val SearchIcon = strokeIcon("search", "M18 11a7 7 0 1 1-14 0a7 7 0 1 1 14 0z", "M20 20l-3.5-3.5")
+internal val SearchIcon =strokeIcon("search", "M18 11a7 7 0 1 1-14 0a7 7 0 1 1 14 0z", "M20 20l-3.5-3.5")
 
 private val SettingsIcon = strokeIcon(
     "settings",

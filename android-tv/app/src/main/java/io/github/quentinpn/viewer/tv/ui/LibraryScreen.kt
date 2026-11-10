@@ -34,12 +34,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
+import androidx.compose.ui.unit.sp
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import coil3.ImageLoader
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
@@ -225,7 +227,7 @@ private fun watchLabel(watch: WatchFilter) = when (watch) {
     WatchFilter.InProgress -> "En cours"
 }
 
-/** Each button steps through its choices; filled when it narrows the grid. */
+/** Glass pills in the home's style (ADR 0067); each steps through its choices, white when it narrows the grid. */
 @Composable
 private fun Toolbar(
     options: ItemsOptions,
@@ -235,36 +237,28 @@ private fun Toolbar(
     onPickGenre: () -> Unit,
 ) {
     Row(
-        Modifier.horizontalScroll(rememberScrollState()).padding(start = 48.dp, end = 48.dp, top = 8.dp, bottom = 8.dp),
+        Modifier.horizontalScroll(rememberScrollState()).padding(start = 48.dp, end = 48.dp, top = 10.dp, bottom = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        OutlinedButton(onClick = { onChange(options.nextSort()) }) { Text("Tri : ${sortLabel(options.sort)}") }
-        OutlinedButton(onClick = { onChange(options.copy(descending = !options.descending)) }) { Text(directionLabel(options)) }
+        GlassButton(onClick = { onChange(options.nextSort()) }) { PillText("Tri : ${sortLabel(options.sort)}") }
+        GlassButton(onClick = { onChange(options.copy(descending = !options.descending)) }) { PillText(directionLabel(options)) }
         Toggle(options.watch != WatchFilter.All, "Visionnage : ${watchLabel(options.watch)}") { onChange(options.nextWatch(itemTypes)) }
         Toggle(options.favorites, "Favoris") { onChange(options.copy(favorites = !options.favorites)) }
         Toggle(options.genre != null, "Genre : ${options.genre ?: "Tous"}", Modifier.focusRequester(genreButton), onPickGenre)
-        OutlinedButton(onClick = { onChange(ItemsOptions()) }) { Text("Réinitialiser") }
+        GlassButton(onClick = { onChange(ItemsOptions()) }) { PillText("Réinitialiser") }
     }
 }
 
+/** One pill whether on or off, so the focus stays on it when it changes. */
 @Composable
 private fun Toggle(on: Boolean, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    // Filled and outlined are two buttons: the pressed one takes the focus back once swapped
-    val requester = remember { FocusRequester() }
-    var pressed by remember { mutableStateOf(false) }
-    LaunchedEffect(on) {
-        if (!pressed) return@LaunchedEffect
-        pressed = false
-        withFrameNanos {}
-        runCatching { requester.requestFocus() }
-    }
-    val click = {
-        pressed = true
-        onClick()
-    }
-    val text = @Composable { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-    val target = modifier.focusRequester(requester)
-    if (on) Button(onClick = click, modifier = target) { text() } else OutlinedButton(onClick = click, modifier = target) { text() }
+    GlassButton(onClick = onClick, modifier = modifier.semantics { selected = on }, selected = on) { PillText(label) }
+}
+
+@Composable
+private fun PillText(text: String) {
+    Text(text, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
 /** A picked genre; [value] null means every genre. */

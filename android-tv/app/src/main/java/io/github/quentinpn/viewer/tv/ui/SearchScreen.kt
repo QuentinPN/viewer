@@ -8,14 +8,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -44,8 +47,10 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.ImageLoader
@@ -216,38 +221,58 @@ fun SearchScreen(
     }
 }
 
+/**
+ * The term, in a glass pill like the home's controls (ADR 0067): white with black text and
+ * ringed in the accent while typing. The ring sits in reserved space, so nothing moves.
+ */
 @Composable
 private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Modifier, onSearch: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val focusManager = LocalFocusManager.current
-    val shape = RoundedCornerShape(8.dp)
-    Box(
-        Modifier.padding(horizontal = 48.dp, vertical = 8.dp).fillMaxWidth(0.6f)
-            .background(Palette.surface, shape)
-            .border(if (focused) 3.dp else 1.dp, if (focused) Palette.accent else Palette.surfaceRaised, shape)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+    val ink = if (focused) Color.Black else Palette.text
+    // The ring's stroke and gap stand outside the margin, so the pill itself starts on it
+    val ring = RING_GAP + 2.dp
+    Row(
+        Modifier.padding(start = 48.dp - ring, end = 48.dp, top = 8.dp, bottom = 8.dp).fillMaxWidth(0.6f)
+            .border(2.dp, if (focused) Palette.accent else Color.Transparent, CircleShape)
+            .padding(ring)
+            .background(if (focused) Palette.text else Glass, CircleShape)
+            .padding(horizontal = 20.dp, vertical = 11.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (value.isEmpty()) Text("Titre d'un film, d'une série ou d'un épisode", color = Palette.textSecondary, fontSize = 20.sp)
-        BasicTextField(
-            value = value,
-            onValueChange = onChange,
-            singleLine = true,
-            interactionSource = interaction,
-            textStyle = TextStyle(color = Palette.text, fontSize = 20.sp),
-            cursorBrush = SolidColor(Palette.accent),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-            // A text field keeps the D-pad for its cursor: Down goes on to the results
-            modifier = modifier.fillMaxWidth().onPreviewKeyEvent {
-                if (it.key == Key.DirectionDown && it.type == KeyEventType.KeyDown) {
-                    focusManager.moveFocus(FocusDirection.Down)
-                    true
-                } else {
-                    false
-                }
-            },
-        )
+        Icon(SearchIcon, contentDescription = null, tint = if (focused) Color.Black else Palette.textSecondary, modifier = Modifier.size(18.dp))
+        Box(Modifier.weight(1f)) {
+            if (value.isEmpty()) {
+                Text(
+                    "Titre d'un film, d'une série ou d'un épisode",
+                    color = if (focused) Color(0x99000000) else Palette.textSecondary,
+                    fontSize = 18.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            BasicTextField(
+                value = value,
+                onValueChange = onChange,
+                singleLine = true,
+                interactionSource = interaction,
+                textStyle = TextStyle(color = ink, fontSize = 18.sp),
+                cursorBrush = SolidColor(ink),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                // A text field keeps the D-pad for its cursor: Down goes on to the results
+                modifier = modifier.fillMaxWidth().onPreviewKeyEvent {
+                    if (it.key == Key.DirectionDown && it.type == KeyEventType.KeyDown) {
+                        focusManager.moveFocus(FocusDirection.Down)
+                        true
+                    } else {
+                        false
+                    }
+                },
+            )
+        }
     }
 }
 
@@ -270,12 +295,7 @@ private fun Results(
     LazyColumn(state = memory.column, contentPadding = PaddingValues(top = 16.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         items(groups, key = { it.title }) { group ->
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "${group.title} · ${group.items.size}",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Palette.text,
-                    modifier = Modifier.padding(horizontal = 48.dp),
-                )
+                SectionHeader(group.title, group.items.size, Modifier.padding(horizontal = 48.dp))
                 LazyRow(
                     state = memory.rows.getOrPut(group.title) { LazyListState() },
                     contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp),
