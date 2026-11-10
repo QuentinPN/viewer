@@ -10,7 +10,7 @@
     <application
         android:allowBackup="false"
         android:banner="@drawable/banner"
-        android:icon="@drawable/banner"
+        android:icon="@drawable/icon"
         android:label="Viewer"
         android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"

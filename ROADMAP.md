@@ -1113,3 +1113,8 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Added**: `docs/android-tv-owner-checklist.md`, every Android TV point still unverified that needs the owner's remote, eyes, ears or account data (79 items).
 - **Tests**: `testDebugUnitTest` 476/476; `assembleDebug`, `lintDebug`, `assembleRelease`, `lintRelease` OK.
 - **Checked on the Shield** (release build): the home shows, « Reprendre à 3:16 » plays Overgeared S1E7, ▼ lists the audio tracks, Back sends `report Stopped`. Logcat: 0 token line, 0 `FATAL EXCEPTION`. The release build is left installed.
+
+### 2026-11-10 — Android TV: the desktop logo
+
+- **Changed**: the launcher banner was still the Gate TV-1 placeholder (a white triangle). The banner and the app icon now draw the desktop logo (`src-tauri/icons/source/logo.svg`) as Android vectors: the "U" holding the blue play triangle, on the tile's gradient.
+- **Checked on the Shield** (release build): after a launcher restart (it caches banners), « Applications favorites » shows the U and play mark. `testDebugUnitTest`, `lintDebug`, `assembleRelease`, `lintRelease` OK.
