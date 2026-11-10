@@ -100,6 +100,7 @@ internal fun remembering(page: DetailPage, focus: String?): DetailPage = when (p
     is DetailPage.Series -> page.copy(person = focus, genre = null)
     is DetailPage.Episode -> page.copy(person = focus)
     is DetailPage.Person -> page.copy(opened = focus)
+    is DetailPage.Playlist -> page.copy(opened = focus)
     // The grid keeps the card opened from it in its memory
     is DetailPage.Grid -> page
 }
@@ -113,9 +114,13 @@ internal fun openOver(pages: List<DetailPage>, page: DetailPage, focus: String? 
     return pushPage(below, page)
 }
 
-/** Back from an episode: its series page, on the [target] season and card, pages below kept (ADR 0060). */
+/**
+ * Back from an episode: its series page, on the [target] season and card, pages below kept
+ * (ADR 0060); the playlist it was opened from, when there is one below (ADR 0088).
+ */
 internal fun backFromEpisode(pages: List<DetailPage>, target: SeriesTarget): List<DetailPage> {
     val below = pages.dropLast(1)
+    if (below.lastOrNull() is DetailPage.Playlist) return below
     return if (below.lastOrNull() is DetailPage.Series) replaceTop(below, DetailPage.Series(target)) else below + DetailPage.Series(target)
 }
 

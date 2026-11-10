@@ -31,6 +31,7 @@ import io.github.quentinpn.viewer.tv.ui.LibraryPreferenceStore
 import io.github.quentinpn.viewer.tv.ui.LibraryScreen
 import io.github.quentinpn.viewer.tv.ui.MovieScreen
 import io.github.quentinpn.viewer.tv.ui.PersonScreen
+import io.github.quentinpn.viewer.tv.ui.PlaylistScreen
 import io.github.quentinpn.viewer.tv.ui.SearchMemory
 import io.github.quentinpn.viewer.tv.ui.SearchScreen
 import io.github.quentinpn.viewer.tv.ui.SeriesScreen
@@ -47,6 +48,7 @@ import io.github.quentinpn.viewer.tv.ui.openFromCollection
 import io.github.quentinpn.viewer.tv.ui.openGenre
 import io.github.quentinpn.viewer.tv.ui.openOver
 import io.github.quentinpn.viewer.tv.ui.pageKey
+import io.github.quentinpn.viewer.tv.ui.playlistEntryPage
 import io.github.quentinpn.viewer.tv.ui.replaceTop
 import io.github.quentinpn.viewer.tv.ui.similarPage
 import kotlinx.coroutines.launch
@@ -174,6 +176,15 @@ class MainActivity : ComponentActivity() {
                                     onOpen = { item -> similarPage(item)?.let { pages = openOver(pages, it, item.id) } },
                                     onSessionExpired = expired,
                                 )
+                                is DetailPage.Playlist -> PlaylistScreen(
+                                    client,
+                                    current.userId,
+                                    page,
+                                    images,
+                                    // The playlist remembers the entry, focused again on Back (ADR 0088)
+                                    onOpen = { item -> playlistEntryPage(item)?.let { pages = openOver(pages, it, item.id) } },
+                                    onSessionExpired = expired,
+                                )
                                 is DetailPage.Series -> SeriesScreen(
                                     client,
                                     current.userId,
@@ -263,6 +274,7 @@ class MainActivity : ComponentActivity() {
                         onPlay = play,
                         onOpenSeries = { openSeries(SeriesTarget(it)) },
                         onOpenMovie = openMovie,
+                        onOpenPlaylist = { pages = listOf(DetailPage.Playlist(it.id, it.name)) },
                         onOpenLibrary = { library = LibraryMemory(it, libraryPrefs.load(it)) },
                         onOpenSearch = { search = SearchMemory() },
                         onOpenSettings = { settings = true },

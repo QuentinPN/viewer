@@ -590,4 +590,18 @@ class EmbyClient(
             .build()
         return call(get(url), kotlinx.serialization.builtins.ListSerializer(BaseItemDto.serializer()))
     }
+
+    /** The user's playlists (ADR 0088): the items query built by [playlistsQuery]. */
+    suspend fun playlists(userId: String, limit: Int = PLAYLISTS_LIMIT): QueryResult<BaseItemDto> {
+        val builder = server.api("/Users/${segment(userId)}/Items").newBuilder()
+        playlistsQuery(limit).forEach { (name, value) -> builder.addQueryParameter(name, value) }
+        return call(get(builder.build()), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
+    /** The entries of one playlist, in its order (ADR 0088): `GET /Playlists/{Id}/Items`, built by [playlistItemsQuery]. */
+    suspend fun playlistItems(userId: String, playlistId: String, limit: Int = PLAYLIST_ITEMS_LIMIT): QueryResult<BaseItemDto> {
+        val builder = server.api("/Playlists/${segment(playlistId)}/Items").newBuilder()
+        playlistItemsQuery(segment(userId), limit).forEach { (name, value) -> builder.addQueryParameter(name, value) }
+        return call(get(builder.build()), QueryResult.serializer(BaseItemDto.serializer()))
+    }
 }
