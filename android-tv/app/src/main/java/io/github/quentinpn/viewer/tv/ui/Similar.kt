@@ -33,14 +33,21 @@ internal const val MAX_PAGES = 10
  * episode and a person (ADR 0068). [person] names the « Distribution » card a page left for a
  * person page, so Back from it focuses that card again on the page read anew; [Movie.collection]
  * likewise names the poster of a collection row a film was opened from (ADR 0071), and
- * [Movie.genre] / [Series.genre] the genre chip a library grid was opened from (ADR 0079).
+ * [Movie.genre] / [Series.genre] the genre chip a library grid was opened from (ADR 0079), and
+ * [Movie.studio] / [Series.studio] its studio chip (ADR 0087).
  */
 internal sealed interface DetailPage {
-    data class Movie(val id: String, val person: String? = null, val collection: String? = null, val genre: String? = null) : DetailPage
+    data class Movie(
+        val id: String,
+        val person: String? = null,
+        val collection: String? = null,
+        val genre: String? = null,
+        val studio: String? = null,
+    ) : DetailPage
 
-    data class Series(val target: SeriesTarget, val person: String? = null, val genre: String? = null) : DetailPage
+    data class Series(val target: SeriesTarget, val person: String? = null, val genre: String? = null, val studio: String? = null) : DetailPage
 
-    /** A library grid on one genre, opened from a film or series page (ADR 0079); [memory] keeps its scroll and focus. */
+    /** A library grid on one genre or studio, opened from a film or series page (ADR 0079, 0087); [memory] keeps its scroll and focus. */
     data class Grid(val memory: LibraryMemory) : DetailPage
 
     /** Over its series page; Back names that page's season and card (ADR 0060). */

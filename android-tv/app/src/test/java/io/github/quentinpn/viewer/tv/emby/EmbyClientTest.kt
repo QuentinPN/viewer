@@ -514,6 +514,37 @@ class EmbyClientTest {
     }
 
     @Test
+    fun studioFiltersTheGridItsLettersAndItsRandomPickByName() = runBlocking {
+        val options = ItemsOptions(studio = "Les Films du Losange")
+        respond(200, """{"Items":[],"TotalRecordCount":0}""")
+        client.withToken("t").libraryItems("u1", "lib1", "Movie", 0, 60, options)
+        respond(200, """{"Items":[],"TotalRecordCount":0}""")
+        client.withToken("t").sortNames("u1", "lib1", "Movie", options)
+        respond(200, """{"Items":[],"TotalRecordCount":0}""")
+        client.withToken("t").randomLibraryItem("u1", "lib1", "Movie", options)
+        repeat(3) {
+            val url = server.takeRequest().url
+            assertEquals("Les Films du Losange", url.queryParameter("Studios"))
+            assertNull(url.queryParameter("StudioIds"))
+        }
+    }
+
+    @Test
+    fun aStudioWithTheSeparatorIsNeverSent() = runBlocking {
+        respond(200, """{"Items":[],"TotalRecordCount":0}""")
+        client.withToken("t").libraryItems("u1", "lib1", "Series", 0, 60, ItemsOptions(studio = "HBO|Max"))
+        assertNull(server.takeRequest().url.queryParameter("Studios"))
+    }
+
+    @Test
+    fun numericStudioIdsLeaveTheItemReadable() = runBlocking {
+        // Emby 4.10 sends `Studios[].Id` as a number: only the name is read
+        respond(200, """{"Items":[{"Id":"m1","Name":"Dune","Type":"Movie","Studios":[{"Name":"Legendary","Id":4321}]}],"TotalRecordCount":1}""")
+        val page = client.withToken("t").libraryItems("u1", "lib1", "Movie", 0, 60)
+        assertEquals(listOf("Legendary"), page.items.single().studios.map { it.name })
+    }
+
+    @Test
     fun decadeFiltersTheGridItsLettersAndItsRandomPick() = runBlocking {
         val options = ItemsOptions(genre = "Drame", decade = 1990)
         val years = "1990,1991,1992,1993,1994,1995,1996,1997,1998,1999"

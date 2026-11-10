@@ -70,6 +70,10 @@ fun MovieScreen(
     focusGenre: String? = null,
     /** « Bande-annonce » beside the play buttons (ADR 0083); null hides it. */
     trailers: TrailerHandlers? = null,
+    /** OK on a studio chip opens the films library on it (ADR 0087); null hides the chips. */
+    onOpenStudio: ((String) -> Unit)? = null,
+    /** The studio chip a grid was opened from: focused instead of the play button. */
+    focusStudio: String? = null,
 ) {
     var movie by remember { mutableStateOf<Load<BaseItemDto>>(Load.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
@@ -95,7 +99,10 @@ fun MovieScreen(
     val chips = remember(movieValue?.genres, onOpenGenre != null) { if (onOpenGenre != null && movieValue != null) genreChips(movieValue) else emptyList() }
     // Back from a genre's grid: its chip, the play button if the film lost that genre
     val genreFocus = focusGenre?.takeIf { it in chips }
-    val takeFocus = focusPerson == null && genreFocus == null && (focusCollection == null || collections != null && focusedShelf < 0)
+    val studios = remember(movieValue?.studios, onOpenStudio != null) { if (onOpenStudio != null && movieValue != null) studioChips(movieValue) else emptyList() }
+    // Likewise from a studio's grid (ADR 0087)
+    val studioFocus = focusStudio?.takeIf { it in studios }
+    val takeFocus = focusPerson == null && genreFocus == null && studioFocus == null && (focusCollection == null || collections != null && focusedShelf < 0)
 
     Box(Modifier.fillMaxSize().background(Palette.background)) {
         when (val m = movie) {
@@ -109,7 +116,14 @@ fun MovieScreen(
                     val scroll = rememberScrollState()
                     ScrollingPage(scroll, Modifier.fillMaxSize()) {
                         // Back on the buttons, the film's title shows again
-                        Details(m.value, versions, onPlay, takeFocus, chips, genreFocus, { onOpenGenre?.invoke(it) }, Modifier.height(screen).topOnFocus(scroll)) { onMessage ->
+                        Details(
+                            m.value,
+                            versions,
+                            onPlay,
+                            takeFocus,
+                            ChipLines(chips, genreFocus, { onOpenGenre?.invoke(it) }, studios, studioFocus) { onOpenStudio?.invoke(it) },
+                            Modifier.height(screen).topOnFocus(scroll),
+                        ) { onMessage ->
                             trailers?.let { TrailerButton(m.value, client, userId, it, onSessionExpired, onMessage) }
                         }
                         val cast = remember(m.value.people) { castMembers(m.value) }
@@ -133,10 +147,8 @@ private fun Details(
     onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit,
     /** False when the « Distribution » or a « Collection » row takes the first focus; may turn true later. */
     takeFocus: Boolean,
-    /** Genres to open (ADR 0079); empty leaves them on the year line. */
-    chips: List<String>,
-    focusGenre: String?,
-    onOpenGenre: (String) -> Unit,
+    /** Genres and studios to open (ADR 0079, 0087); empty leaves them on the year line and in the facts. */
+    chips: ChipLines,
     modifier: Modifier,
     /** The trailer button, last of the play row (ADR 0083); its message shows under the row. */
     trailer: @Composable (onMessage: (String?) -> Unit) -> Unit,
@@ -160,7 +172,7 @@ private fun Details(
             RatingBadge(movie)
             scores(movie).forEach { Text(it, color = Palette.textSecondary, maxLines = 1) }
             // Measured last: a long line cuts the genres, never a score nor « Vu »
-            yearLineGenres(movie, chips)?.let {
+            yearLineGenres(movie, chips.genres)?.let {
                 Text(it, color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
             }
             if (played) {
@@ -175,8 +187,9 @@ private fun Details(
         movie.overview?.let {
             Text(it, color = Palette.textSecondary, maxLines = 5, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
         }
-        Facts(movie)
-        GenreChips(chips, focusGenre, onOpenGenre)
+        Facts(movie, studios = chips.studios.isEmpty())
+        GenreChips(chips.genres, chips.focusGenre, chips.onOpenGenre)
+        StudioChips(movie, chips.studios, chips.focusStudio, chips.onOpenStudio)
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // One first button whatever the resume state, so a reload does not drop its focus
             Button(onClick = { onPlay(movie.id, if (resume) position else 0, version) }, modifier = Modifier.focusRequester(first)) {

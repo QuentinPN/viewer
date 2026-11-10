@@ -29,6 +29,8 @@ data class ItemsOptions(
     val genre: String? = null,
     /** First year of the decade shown, e.g. 1990 (ADR 0082); null for every year. */
     val decade: Int? = null,
+    /** Studio or network the grid was opened on from a detail page (ADR 0087); never saved. */
+    val studio: String? = null,
 ) {
     /** The `Filters` value, or null when nothing filters. */
     fun filters(): String? =
@@ -38,9 +40,15 @@ data class ItemsOptions(
     fun years(): String? = decade?.takeIf(::isUsableDecade)?.let(::decadeYears)
 
     /** True when something narrows the library, so an empty answer means "no match". */
-    val narrowed get() = watch != WatchFilter.All || favorites || genre != null || decade != null
+    val narrowed get() = watch != WatchFilter.All || favorites || genre != null || decade != null || studio != null
 }
 
 /** A genre name the server can be asked for: `|` separates genres in the query. */
 fun isUsableGenre(name: String): Boolean =
     name.isNotBlank() && name.length <= 100 && name.none { it == '|' || it.isISOControl() }
+
+/**
+ * A studio name the `Studios` filter can be asked for (ADR 0087): `|` separates studios there
+ * and has no escape, so such a name, like a blank, long or control one, is never sent.
+ */
+fun isUsableStudio(name: String): Boolean = isUsableGenre(name)

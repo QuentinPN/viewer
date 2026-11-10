@@ -53,12 +53,12 @@ internal fun genreOptions(saved: ItemsOptions, genre: String): ItemsOptions? =
 
 /**
  * The [grid] over [pages], the film or series below remembering the chip [genre] so Back
- * focuses it again; a person card or collection poster remembered earlier is forgotten.
+ * focuses it again; a person card, collection poster or studio chip remembered earlier is forgotten.
  */
 internal fun openGenre(pages: List<DetailPage>, grid: DetailPage.Grid, genre: String): List<DetailPage> {
     val below = when (val top = pages.lastOrNull()) {
-        is DetailPage.Movie -> replaceTop(pages, top.copy(person = null, collection = null, genre = genre))
-        is DetailPage.Series -> replaceTop(pages, top.copy(person = null, genre = genre))
+        is DetailPage.Movie -> replaceTop(pages, top.copy(person = null, collection = null, genre = genre, studio = null))
+        is DetailPage.Series -> replaceTop(pages, top.copy(person = null, genre = genre, studio = null))
         else -> pages
     }
     return pushPage(below, grid)
@@ -69,16 +69,24 @@ internal fun openGenre(pages: List<DetailPage>, grid: DetailPage.Grid, genre: St
  * library's grid on it. [focus] takes the focus once placed, as Back from that grid.
  */
 @Composable
-internal fun GenreChips(chips: List<String>, focus: String?, onOpen: (String) -> Unit) {
+internal fun GenreChips(chips: List<String>, focus: String?, onOpen: (String) -> Unit) =
+    ChipLine("Genres", chips, focus, { "Genre $it : voir les titres" }, onOpen)
+
+/**
+ * A [label] in the facts' column then a glass pill per name of [chips], each opening a grid;
+ * shared by genres and studios (ADR 0079, 0087). [focus] takes the focus once placed.
+ */
+@Composable
+internal fun ChipLine(label: String, chips: List<String>, focus: String?, describe: (String) -> String, onOpen: (String) -> Unit) {
     if (chips.isEmpty()) return
     val requesters = remember(chips) { chips.associateWith { FocusRequester() } }
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("Genres", color = Palette.textSecondary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(100.dp))
-        chips.forEach { genre ->
+        Text(label, color = Palette.textSecondary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(100.dp))
+        chips.forEach { name ->
             GlassButton(
-                onClick = { onOpen(genre) },
-                modifier = Modifier.focusRequester(requesters.getValue(genre)).semantics { contentDescription = "Genre $genre : voir les titres" },
-            ) { PillText(genre) }
+                onClick = { onOpen(name) },
+                modifier = Modifier.focusRequester(requesters.getValue(name)).semantics { contentDescription = describe(name) },
+            ) { PillText(name) }
         }
     }
     LaunchedEffect(requesters, focus) {
