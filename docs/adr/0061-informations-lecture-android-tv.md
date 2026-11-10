@@ -34,7 +34,7 @@ Touches du lecteur : OK lecture / pause, ◀ ▶ 10 s, ▲ chapitres quand il y 
   | Mémoire tampon | `demuxer-cache-duration` (« 12 s d'avance ») |
 - **Nombres en français** : virgule décimale, zéros inutiles retirés, unités `kb/s`, `Mb/s`, `i/s`, `kHz`, `s`.
 - **Secrets** : ni le jeton ni l'URL du flux ne sont affichés ou journalisés ; seul le paramètre `TranscodeReasons` est lu dans l'URL, puis l'URL est oubliée par le panneau.
-- **Aide des commandes** : « ▼ audio, sous-titres et infos ».
+- **Aide des commandes** : « ▼ audio, sous-titres et infos », raccourcie depuis en « ▼ options » : la liste s'allongeait à chaque réglage ajouté au menu.
 
 ## Alternatives
 - **INFO seule** : la télécommande du Shield n'en a pas ; le panneau serait inaccessible sur l'appareil de test. Rejeté.

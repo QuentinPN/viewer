@@ -438,7 +438,7 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
             }
         }
         Text(
-            "OK lecture / pause  ·  ◀ ▶ 10 s  ·  ▼ audio, sous-titres, qualité, vitesse, format, minuterie et infos" + if (ui.chapters.isNotEmpty()) "  ·  ▲ chapitres" else "",
+            "OK lecture / pause  ·  ◀ ▶ 10 s  ·  ▼ options" + if (ui.chapters.isNotEmpty()) "  ·  ▲ chapitres" else "",
             color = Palette.textSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
