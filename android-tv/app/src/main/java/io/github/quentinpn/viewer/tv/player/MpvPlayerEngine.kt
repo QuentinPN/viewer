@@ -114,10 +114,11 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         MPVLib.command(arrayOf("loadfile", file.source.uri, "replace", "-1", file.options))
     }
 
-    override fun addSubtitle(source: MediaSource, select: Boolean) {
+    override fun addSubtitle(source: MediaSource, select: Boolean, title: String?, lang: String?) {
         if (released.get()) return
-        // `auto` adds the track without selecting it, as on Windows (ADR 0009)
-        MPVLib.command(arrayOf("sub-add", source.uri, if (select) "select" else "auto"))
+        // `auto` adds the track without selecting it, as on Windows (ADR 0009); title and
+        // language as Windows passes them, else mpv only knows the file name (ADR 0084)
+        MPVLib.command(arrayOf("sub-add", source.uri, if (select) "select" else "auto", title.orEmpty(), lang.orEmpty()))
     }
 
     override fun togglePause() = command("cycle", "pause")

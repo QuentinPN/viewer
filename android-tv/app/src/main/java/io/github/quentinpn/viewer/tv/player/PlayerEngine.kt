@@ -44,8 +44,11 @@ interface PlayerEngine {
      */
     fun load(source: MediaSource, startSeconds: Double = 0.0)
 
-    /** Adds an external subtitle file to the loaded one; [select] makes it the shown track. */
-    fun addSubtitle(source: MediaSource, select: Boolean = true)
+    /**
+     * Adds an external subtitle file to the loaded one; [select] makes it the shown track.
+     * [title] and [lang] name the track, as the server describes it (ADR 0084).
+     */
+    fun addSubtitle(source: MediaSource, select: Boolean = true, title: String? = null, lang: String? = null)
 
     fun togglePause()
 

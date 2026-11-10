@@ -189,6 +189,35 @@ class EmbyClientTest {
     }
 
     @Test
+    fun theAudioToCarryGoesInTheBodyWithTheVersion() = runBlocking {
+        repeat(3) { respond(200, """{"MediaSources":[],"PlaySessionId":"ps"}""") }
+        client.withToken("secret-token").playbackInfo("u1", "i1", deviceProfile(), "mediasource_30501", 1_200_000_000, 2)
+        val request = server.takeRequest()
+        assertNull(request.url.queryParameter("AudioStreamIndex"))
+        assertNull(request.url.queryParameter("api_key"))
+        assertFalse("secret-token" in request.url.toString())
+        val body = request.body!!.utf8()
+        assertTrue(body.contains("\"AudioStreamIndex\":2"))
+        assertTrue(body.contains("\"MediaSourceId\":\"mediasource_30501\""))
+        assertFalse("secret-token" in body)
+        assertTrue(request.headers["X-Emby-Authorization"]!!.contains("secret-token"))
+        // Ignored by the server without a version (ADR 0035): never sent alone, nor a negative index
+        client.withToken("t").playbackInfo("u1", "i1", deviceProfile(), audioStreamIndex = 2)
+        assertFalse(server.takeRequest().body!!.utf8().contains("AudioStreamIndex"))
+        client.withToken("t").playbackInfo("u1", "i1", deviceProfile(), "mediasource_30501", audioStreamIndex = -1)
+        assertFalse(server.takeRequest().body!!.utf8().contains("AudioStreamIndex"))
+    }
+
+    @Test
+    fun noAudioIsAskedForByDefault() = runBlocking {
+        respond(200, """{"MediaSources":[],"PlaySessionId":"ps"}""")
+        client.withToken("t").playbackInfo("u1", "i1", deviceProfile(), "mediasource_30501", 1_200_000_000)
+        val body = server.takeRequest().body!!.utf8()
+        assertFalse(body.contains("AudioStreamIndex"))
+        assertFalse(body.contains("SubtitleStreamIndex"))
+    }
+
+    @Test
     fun stopEncodingDeletesTheReplacedTranscode() = runBlocking {
         respond(204)
         client.withToken("secret-token").stopEncoding("ps-old1")

@@ -209,6 +209,11 @@ internal data class PlaybackInfoRequest(
     @SerialName("MediaSourceId") val mediaSourceId: String? = null,
     /** Where playback goes on, when the quality changes mid-playback (ADR 0081); left out otherwise. */
     @SerialName("StartTimeTicks") val startTimeTicks: Long? = null,
+    /**
+     * Emby `Index` of the audio a transcode must carry (ADR 0084); left out otherwise.
+     * Only sent with [mediaSourceId]: Emby 4.10.1.0 ignores it without (ADR 0035).
+     */
+    @SerialName("AudioStreamIndex") val audioStreamIndex: Int? = null,
 )
 
 @Serializable
@@ -299,4 +304,7 @@ data class MediaStreamDto(
     @SerialName("DeliveryUrl") val deliveryUrl: String? = null,
     /** A file beside the media (`.srt`…), not one of its own streams. */
     @SerialName("IsExternal") val isExternal: Boolean = false,
+    /** Named in a transcode's subtitle files, which carry no title of their own (ADR 0084). */
+    @SerialName("IsForced") val isForced: Boolean = false,
+    @SerialName("IsHearingImpaired") val isHearingImpaired: Boolean = false,
 )

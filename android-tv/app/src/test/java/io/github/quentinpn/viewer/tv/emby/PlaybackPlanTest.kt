@@ -109,6 +109,43 @@ class PlaybackPlanTest {
     }
 
     @Test
+    fun transcodeSubtitlesAreNamedFromTheServerStreams() {
+        // Overgeared S1E6 at 1,5 Mbit/s (ADR 0084): three French ASS files
+        val plan = plan(
+            server,
+            response(
+                """{"MediaSources":[{"Id":"m1","SupportsTranscoding":true,"TranscodingUrl":"/videos/i1/master.m3u8",
+                "DefaultAudioStreamIndex":2,"MediaStreams":[
+                  {"Index":1,"Type":"Audio","Language":"fre"},
+                  {"Index":2,"Type":"Audio","Language":"jpn","Title":"VO"},
+                  {"Index":3,"Type":"Subtitle","Language":"fre","Title":"Forced","IsForced":true,"DeliveryMethod":"External","DeliveryUrl":"/videos/i1/m1/Subtitles/3/0/Stream.ass"},
+                  {"Index":4,"Type":"Subtitle","Language":"fre","DeliveryMethod":"External","DeliveryUrl":"/videos/i1/m1/Subtitles/4/0/Stream.ass"},
+                  {"Index":5,"Type":"Subtitle","Language":"fre","Title":"CC","IsHearingImpaired":true,"DeliveryMethod":"External","DeliveryUrl":"/videos/i1/m1/Subtitles/5/0/Stream.ass"},
+                  {"Index":9,"Type":"Audio","Language":"eng","IsExternal":true}]}]}""",
+            ),
+        )
+        assertEquals(listOf("Forced" to "fre", null to "fre", "CC" to "fre"), plan.subtitles.map { it.title to it.language })
+        // The source's own audio streams, an external file left out
+        assertEquals(listOf(SourceAudio(1, "fre", null), SourceAudio(2, "jpn", "VO")), plan.audio)
+        assertEquals(2, plan.serverTracks.audio)
+    }
+
+    @Test
+    fun subtitleTitleSaysWhatTheFlagsSay() {
+        fun title(title: String?, forced: Boolean = false, hearing: Boolean = false) =
+            subtitleTitle(MediaStreamDto(3, "Subtitle", title = title, isForced = forced, isHearingImpaired = hearing))
+        assertEquals("Forced", title("Forced", forced = true))
+        assertEquals("FR forcés", title("FR forcés", forced = true))
+        assertEquals("Forcés", title(null, forced = true))
+        assertEquals("Signs, Forcés", title("Signs", forced = true))
+        assertEquals("CC", title("CC", hearing = true))
+        assertEquals("SDH", title(" ", hearing = true))
+        assertEquals("Forcés, SDH", title(null, forced = true, hearing = true))
+        assertEquals("Complets", title("Complets"))
+        assertEquals(null, title(null))
+    }
+
+    @Test
     fun serverRefusals() {
         expectError(EmbyError.PlaybackRefused::class.java) { plan(server, response("""{"ErrorCode":"NotAllowed"}""")) }
         expectError(EmbyError.PlaybackRefused::class.java) { plan(server, response("""{"ErrorCode":"RateLimitExceeded"}""")) }
