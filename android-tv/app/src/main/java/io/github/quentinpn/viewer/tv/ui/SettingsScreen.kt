@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -24,9 +25,12 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import coil3.ImageLoader
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyException
+import io.github.quentinpn.viewer.tv.settings.CacheClearing
 import io.github.quentinpn.viewer.tv.settings.DeviceReport
+import io.github.quentinpn.viewer.tv.settings.ImageCacheUsage
 import io.github.quentinpn.viewer.tv.settings.InfoRow
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettings
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
@@ -44,16 +48,19 @@ import io.github.quentinpn.viewer.tv.settings.nextCap
 import io.github.quentinpn.viewer.tv.settings.nextChoice
 import io.github.quentinpn.viewer.tv.settings.serverAddress
 import io.github.quentinpn.viewer.tv.settings.serverRows
+import io.github.quentinpn.viewer.tv.settings.usageLabel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
  * Réglages (ADR 0051): the Windows playback settings that make sense on a TV, kept
  * on the device for this Emby user. Each row changes on OK and is saved at once.
- * « À propos » ends it with read-only diagnostics (ADR 0076).
+ * « Stockage » shows and clears the image cache (ADR 0080); « À propos » ends it with
+ * read-only diagnostics (ADR 0076).
  */
 @Composable
-fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, client: EmbyClient) {
+fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, client: EmbyClient, images: ImageLoader) {
     var settings by remember { mutableStateOf(store.load()) }
     val context = LocalContext.current
     val app = remember { DeviceReport.appRows(context) }
@@ -73,6 +80,11 @@ fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, client: 
                 .getOrElse { listOf(InfoRow("Décodeurs", "Liste illisible sur cet appareil")) }
         }
     }
+    // Disk reads stay off the main thread: the cache's journal is read on first use
+    var cache by remember { mutableStateOf<ImageCacheUsage>(ImageCacheUsage.Measuring) }
+    var clearing by remember { mutableStateOf(CacheClearing.Idle) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(images) { cache = withContext(Dispatchers.IO) { measure(images) } }
     val first = remember { FocusRequester() }
     fun change(next: PlaybackSettings) {
         settings = next
@@ -175,6 +187,32 @@ fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, client: 
         }
         item { Note("Ces réglages restent sur cet appareil et s'appliquent à la prochaine lecture.") }
 
+        item { Section("Stockage") }
+        item {
+            Note(
+                "Les affiches et images de fond déjà affichées restent sur l'appareil pour revenir plus vite. Les " +
+                    "vider ne change rien sur le serveur Emby : elles seront de nouveau téléchargées à l'affichage.",
+            )
+        }
+        item { Info(InfoRow("Cache des images", usageLabel(cache))) }
+        item {
+            Choice("Vider le cache", "Images sur l'appareil et en mémoire.", clearing.label) {
+                if (clearing != CacheClearing.Running) {
+                    clearing = CacheClearing.Running
+                    scope.launch {
+                        val cleared = withContext(Dispatchers.IO) {
+                            runCatching {
+                                images.memoryCache?.clear()
+                                images.diskCache?.clear()
+                            }.isSuccess
+                        }
+                        cache = withContext(Dispatchers.IO) { measure(images) }
+                        clearing = if (cleared) CacheClearing.Done else CacheClearing.Failed
+                    }
+                }
+            }
+        }
+
         item { Section("À propos") }
         item { Subsection("Application") }
         items(app, key = { "app-" + it.label }) { Info(it) }
@@ -199,6 +237,12 @@ fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, client: 
 }
 
 private fun onOff(on: Boolean) = if (on) "Activé" else "Désactivé"
+
+/** Blocking disk read: call it on [Dispatchers.IO]. */
+private fun measure(images: ImageLoader): ImageCacheUsage {
+    val disk = images.diskCache ?: return ImageCacheUsage.Unavailable
+    return runCatching { ImageCacheUsage.Measured(disk.size, disk.maxSize) }.getOrDefault(ImageCacheUsage.Unavailable)
+}
 
 @Composable
 private fun Section(title: String) {
