@@ -118,6 +118,17 @@ data class BaseItemDto(
      * read by [collectionRefs]: a shape the client does not expect hides the row, not the film.
      */
     @SerialName("Collections") val rawCollections: JsonElement? = null,
+    /** Trailers on the web (`MediaUrl[]`, ADR 0083), usually YouTube; opened outside the app once checked by [trailerUrl]. */
+    @SerialName("RemoteTrailers") val remoteTrailers: List<MediaUrlDto> = emptyList(),
+    /** Trailer files on the server (ADR 0083), listed by [EmbyClient.localTrailers]. */
+    @SerialName("LocalTrailerCount") val localTrailerCount: Int? = null,
+)
+
+/** `MediaUrl` of `RemoteTrailers`: both fields optional, so an incomplete entry is skipped, not the item. */
+@Serializable
+data class MediaUrlDto(
+    @SerialName("Url") val url: String? = null,
+    @SerialName("Name") val name: String? = null,
 )
 
 /** One version in an item's detail, as `MediaSourceDto` on Windows (ADR 0036). */

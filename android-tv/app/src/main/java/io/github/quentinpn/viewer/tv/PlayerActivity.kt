@@ -22,6 +22,8 @@ import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.ExternalSubtitle
 import io.github.quentinpn.viewer.tv.emby.PlayMethod
+import io.github.quentinpn.viewer.tv.emby.PlaybackTracker
+import io.github.quentinpn.viewer.tv.emby.Report
 import io.github.quentinpn.viewer.tv.emby.Segment
 import io.github.quentinpn.viewer.tv.emby.ServerTracks
 import io.github.quentinpn.viewer.tv.emby.deviceProfile
@@ -116,6 +118,7 @@ private const val INFO_REFRESH_MS = 1_000L
  * The controls show the time and when playback ends; the track menu's « Minuterie » pauses
  * playback after a while, or at the credits, for this player session only (ADR 0073).
  * Its « Format » crops or stretches the picture to the screen, for the current file only (ADR 0078).
+ * A local trailer ([EXTRA_TRAILER]) plays without any report, segment lookup or next episode (ADR 0083).
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
     private var engine: PlayerEngine? = null
@@ -162,6 +165,14 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     @Volatile private var replacedEnds = 0
     private val reporter by lazy { AppServices.reporter(this) }
 
+    /** A trailer (ADR 0083): nothing reported to the server, no segments, no next episode. */
+    private var trailer = false
+
+    /** A player event for the tracker, unless a trailer plays: it never reaches the server. */
+    private fun report(apply: PlaybackTracker.(now: Long) -> List<Report>) {
+        if (!trailer) reporter.event(apply)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -196,6 +207,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             return
         }
         val startTicks = intent.getLongExtra(EXTRA_START_TICKS, 0).coerceAtLeast(0)
+        trailer = intent.getBooleanExtra(EXTRA_TRAILER, false)
         client = AppServices.client(this, session)
         userId = session.userId
         preferences = TrackPreferenceStore(this, session.userId)
@@ -254,8 +266,8 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             if (current != itemId) return
             ui.chapters = chapters(item.chapters, item.runTimeTicks)
             ui.item = SleepItem.of(item.type)
-            lifecycleScope.launch { findSegments(item) }
-            if (item.type == "Episode") {
+            if (!trailer) lifecycleScope.launch { findSegments(item) }
+            if (item.type == "Episode" && !trailer) {
                 ui.title = item.seriesName ?: item.name
                 ui.detail = episodeLabel(item.parentIndexNumber, item.indexNumber, item.name)
                 val seriesId = item.seriesId ?: return
@@ -325,8 +337,8 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
                 cap = (settings.capFor(local)?.let(::mbits) ?: "Maximale") + if (local) " · réseau local" else " · accès distant",
             )
             val source = MediaSource.parse(chosen.url) ?: throw EmbyException(EmbyError.InvalidResponse("adresse de flux refusée"))
-            // Reported once the file is loaded; never if loading fails
-            reporter.begin(
+            // Reported once the file is loaded; never if loading fails, never for a trailer
+            if (!trailer) reporter.begin(
                 client,
                 userId,
                 ActivePlayback(itemId, chosen.mediaSourceId, chosen.playSessionId, chosen.method, chosen.runTimeTicks, startTicks),
@@ -383,7 +395,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     }
 
     override fun onFileLoaded() {
-        reporter.event { fileLoaded(it) }
+        report { fileLoaded(it) }
         runOnUiThread {
             ui.status = null
             ui.show()
@@ -416,7 +428,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     }
 
     override fun onPosition(seconds: Double) {
-        reporter.event { position(seconds, it) }
+        report { position(seconds, it) }
         runOnUiThread {
             ui.position = seconds
             ui.now = System.currentTimeMillis()
@@ -426,12 +438,12 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     }
 
     override fun onDuration(seconds: Double) {
-        reporter.event { duration(seconds); emptyList() }
+        report { duration(seconds); emptyList() }
         runOnUiThread { ui.duration = seconds }
     }
 
     override fun onPauseChanged(paused: Boolean) {
-        reporter.event { paused(paused, it) }
+        report { paused(paused, it) }
         runOnUiThread {
             ui.paused = paused
             if (!paused) resumed()
@@ -451,10 +463,10 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         }
     }
 
-    override fun onSeek() = reporter.event { seeked(); emptyList() }
+    override fun onSeek() = report { seeked(); emptyList() }
 
     override fun onEndReached() {
-        reporter.event { ended(it) }
+        report { ended(it) }
         runOnUiThread {
             // « Fin de l'épisode » not caught by a position: the player stays, without the next one
             if (ui.sleep.holdsNext && ui.upNext == null) {
@@ -479,7 +491,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             Log.i(TAG, "end of the replaced file")
             return
         }
-        reporter.event { ended(it) }
+        report { ended(it) }
         runOnUiThread { finish() }
     }
 
@@ -740,7 +752,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     override fun onDestroy() {
         // Before release: the tracker keeps the last position mpv reported
-        reporter.event { closed(it) }
+        report { closed(it) }
         dropThumbnails()
         engine?.release()
         engine = null
@@ -751,5 +763,8 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         const val EXTRA_ITEM_ID = "itemId"
         const val EXTRA_START_TICKS = "startTicks"
         const val EXTRA_MEDIA_SOURCE_ID = "mediaSourceId"
+
+        /** True for a local trailer (ADR 0083): played without any report. */
+        const val EXTRA_TRAILER = "trailer"
     }
 }
