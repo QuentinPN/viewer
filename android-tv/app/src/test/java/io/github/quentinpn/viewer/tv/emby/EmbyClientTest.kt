@@ -236,6 +236,48 @@ class EmbyClientTest {
     }
 
     @Test
+    fun personItemsAsksForTheFilmsAndSeriesOfOnePerson() = runBlocking {
+        respond(200, """{"Items":[{"Id":"m2","Name":"Dune","Type":"Movie","ProductionYear":2021}],"TotalRecordCount":1}""")
+        val titles = client.withToken("secret-token").personItems("u1", "30209")
+        assertEquals(listOf("m2"), titles.items.map { it.id })
+        val request = server.takeRequest()
+        assertEquals("GET", request.method)
+        val url = request.url
+        assertEquals("/emby/Users/u1/Items", url.encodedPath)
+        for ((name, value) in listOf(
+            "PersonIds" to "30209", "Recursive" to "true", "IncludeItemTypes" to "Movie,Series",
+            "SortBy" to "ProductionYear,SortName", "SortOrder" to "Descending", "Limit" to "100",
+            "EnableUserData" to "true", "ImageTypeLimit" to "1", "EnableImageTypes" to "Primary",
+        )) {
+            assertEquals(name, value, url.queryParameter(name))
+        }
+        assertFalse("no token in the URL", "secret-token" in url.toString())
+        assertNull(url.queryParameter("api_key"))
+        assertNull(request.headers["X-Emby-Token"])
+        assertTrue("Token=\"secret-token\"" in request.headers["X-Emby-Authorization"]!!)
+    }
+
+    @Test
+    fun personItemsRejectsAnIdThatWouldChangeThePath() {
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").personItems("u1", "../Users") }
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun peopleOfAnItemCarryTheirIdRoleAndPhoto() = runBlocking {
+        respond(
+            200,
+            """{"Id":"m1","Type":"Movie","People":[{"Name":"Jacob Elordi","Id":"30209","Role":"Chris","Type":"Actor","PrimaryImageTag":"4b8a"},""" +
+                """{"Name":"Lance Hool","Id":30300,"Type":"Director"},{"Name":"Sans id","Type":"Actor"}]}""",
+        )
+        val people = client.withToken("t").fullItem("u1", "m1").people
+        assertEquals(listOf("30209", "30300", null), people.map { it.id })
+        assertEquals("Chris", people[0].role)
+        assertEquals("4b8a", people[0].primaryImageTag)
+        assertNull(people[1].primaryImageTag)
+    }
+
+    @Test
     fun userConfigurationReadsTheTrackPreferences() = runBlocking {
         respond(
             200,

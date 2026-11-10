@@ -96,7 +96,10 @@ internal fun initialEpisodeIndex(episodes: List<BaseItemDto>, episodeId: String?
 internal fun cardTarget(seriesId: String, seasonId: String, episode: BaseItemDto): SeriesTarget =
     SeriesTarget(seriesId, seasonId = seasonId, seasonNumber = episode.parentIndexNumber, episodeId = episode.id)
 
-/** A series: its overview, a chip per season, the season's episodes in a row, then « Titres similaires » (ADR 0063). */
+/**
+ * A series: its overview, a chip per season, the season's episodes in a row, then
+ * « Distribution » (ADR 0068) and « Titres similaires » (ADR 0063).
+ */
 @Composable
 fun SeriesScreen(
     client: EmbyClient,
@@ -109,15 +112,21 @@ fun SeriesScreen(
     onOpenEpisode: (SeriesTarget) -> Unit,
     /** OK on a similar title opens its film or series page. */
     onOpenSimilar: (BaseItemDto) -> Unit,
+    /** OK on a « Distribution » card opens that person's page (ADR 0068). */
+    onOpenPerson: (CastMember) -> Unit,
     onSessionExpired: () -> Unit,
     /** Changes after each playback: the episodes' watched state is read again. */
     refresh: Int = 0,
+    /** The card a person page was opened from: focused instead of an episode card. */
+    focusPerson: String? = null,
 ) {
     var data by remember { mutableStateOf<Load<SeriesData>>(Load.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
     var seasonId by remember { mutableStateOf<String?>(null) }
     // The searched episode is focused until another season is chosen
     var focusEpisode by remember { mutableStateOf(target.episodeId) }
+    // Back from a person page: the episode row leaves the focus to the cast until another season is chosen
+    var castFocus by remember { mutableStateOf(focusPerson) }
     val seriesId = target.seriesId
 
     suspend fun <T> load(block: suspend () -> T): Load<T> = try {
@@ -156,12 +165,15 @@ fun SeriesScreen(
                             SeasonChips(d.value.seasons, seasonId) {
                                 seasonId = it
                                 focusEpisode = null
+                                castFocus = null
                             }
                         }
                         seasonId?.let { id ->
-                            Episodes(client, userId, seriesId, id, focusEpisode, d.value.series, images, onPlay, onOpenEpisode, onSessionExpired, refresh)
+                            Episodes(client, userId, seriesId, id, focusEpisode, castFocus == null, d.value.series, images, onPlay, onOpenEpisode, onSessionExpired, refresh)
                         }
                     }
+                    val cast = remember(d.value.series.people) { castMembers(d.value.series) }
+                    CastRow(cast, client, images, focusPerson, onOpenPerson)
                     SimilarRow(similar, client, images, onOpenSimilar)
                 }
             }
@@ -272,6 +284,8 @@ private fun Episodes(
     seriesId: String,
     seasonId: String,
     focusEpisode: String?,
+    /** False when the « Distribution » row takes the first focus (ADR 0068). */
+    takeFocus: Boolean,
     series: BaseItemDto,
     images: ImageLoader,
     onPlay: (itemId: String, startTicks: Long) -> Unit,
@@ -340,7 +354,7 @@ private fun Episodes(
                 }
             }
             LaunchedEffect(seasonId) {
-                runCatching { first.requestFocus() }
+                if (takeFocus) runCatching { first.requestFocus() }
             }
         }
     }

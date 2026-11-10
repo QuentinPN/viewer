@@ -20,7 +20,6 @@ class FactsTest {
             listOf(
                 Fact("Réalisation", "Denis Villeneuve"),
                 Fact("Scénario", "Jon Spaihts"),
-                Fact("Avec", "Acteur 1, Acteur 2, Acteur 3, Acteur 4, Acteur 5, Acteur 6"),
                 Fact("Studio", "Legendary"),
             ),
             facts(film),
@@ -28,9 +27,10 @@ class FactsTest {
     }
 
     @Test
-    fun seriesShowNoWriterAndABroadcaster() {
+    fun seriesShowNoWriterNorCastAndABroadcaster() {
         val series = BaseItemDto(id = "s", type = "Series", people = people.drop(1).take(3), studios = listOf(NameDto("Crunchyroll")))
-        assertEquals(listOf(Fact("Avec", "Acteur 1"), Fact("Diffusion", "Crunchyroll")), facts(series))
+        // The cast is the « Distribution » row now (ADR 0068)
+        assertEquals(listOf(Fact("Diffusion", "Crunchyroll")), facts(series))
         assertEquals(emptyList<Fact>(), facts(BaseItemDto(id = "e")))
     }
 

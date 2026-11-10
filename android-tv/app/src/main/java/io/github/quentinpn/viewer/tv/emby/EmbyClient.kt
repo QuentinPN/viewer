@@ -287,6 +287,17 @@ class EmbyClient(
     }
 
     /**
+     * The films and series of one person in the user's library (ADR 0068): the items query
+     * filtered by `PersonIds`, built by [personItemsQuery]. A person is an item too: its
+     * overview comes from [item] with the person's id.
+     */
+    suspend fun personItems(userId: String, personId: String, limit: Int = PERSON_TITLES_LIMIT): QueryResult<BaseItemDto> {
+        val builder = server.api("/Users/${segment(userId)}/Items").newBuilder()
+        personItemsQuery(segment(personId), limit).forEach { (name, value) -> builder.addQueryParameter(name, value) }
+        return call(get(builder.build()), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
+    /**
      * One item without `Fields`, as the Windows client reads it for segments (ADR 0030):
      * Emby 4.10.2.0 then returns its `Chapters` and `ProviderIds`.
      */

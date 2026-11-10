@@ -3,6 +3,7 @@ package io.github.quentinpn.viewer.tv.ui
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.PersonDto
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -93,13 +94,17 @@ class EpisodePageTest {
     }
 
     @Test
-    fun episodeCreditsShowGuestStars() {
-        val people = listOf(PersonDto("Réalisatrice", "Director"), PersonDto("Acteur", "Actor"), PersonDto("Invitée", "GuestStar"))
-        assertEquals(
-            listOf(Fact("Réalisation", "Réalisatrice"), Fact("Invités", "Invitée")),
-            facts(BaseItemDto(id = "e", type = "Episode", people = people)),
+    fun episodeCreditsLeaveGuestStarsToTheCastRow() {
+        val people = listOf(
+            PersonDto("Réalisatrice", "Director"),
+            PersonDto("Acteur", "Actor", rawId = JsonPrimitive("1")),
+            PersonDto("Invitée", "GuestStar", rawId = JsonPrimitive("2")),
         )
-        assertEquals(Fact("Avec", "Acteur"), facts(BaseItemDto(id = "m", type = "Movie", people = people))[1])
+        val episode = BaseItemDto(id = "e", type = "Episode", people = people)
+        // The « Invités » line is the « Distribution » row now (ADR 0068)
+        assertEquals(listOf(Fact("Réalisation", "Réalisatrice")), facts(episode))
+        assertEquals(listOf("Invitée"), castMembers(episode).map { it.name })
+        assertEquals(listOf("Acteur"), castMembers(BaseItemDto(id = "m", type = "Movie", people = people)).map { it.name })
     }
 
     @Test

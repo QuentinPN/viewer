@@ -17,6 +17,7 @@ import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
+import io.github.quentinpn.viewer.tv.ui.CastMember
 import io.github.quentinpn.viewer.tv.ui.DetailPage
 import io.github.quentinpn.viewer.tv.ui.EpisodeScreen
 import io.github.quentinpn.viewer.tv.ui.HomeMemory
@@ -25,6 +26,7 @@ import io.github.quentinpn.viewer.tv.ui.LibraryMemory
 import io.github.quentinpn.viewer.tv.ui.LibraryPreferenceStore
 import io.github.quentinpn.viewer.tv.ui.LibraryScreen
 import io.github.quentinpn.viewer.tv.ui.MovieScreen
+import io.github.quentinpn.viewer.tv.ui.PersonScreen
 import io.github.quentinpn.viewer.tv.ui.SearchMemory
 import io.github.quentinpn.viewer.tv.ui.SearchScreen
 import io.github.quentinpn.viewer.tv.ui.SeriesScreen
@@ -33,7 +35,9 @@ import io.github.quentinpn.viewer.tv.ui.SettingsScreen
 import io.github.quentinpn.viewer.tv.ui.SignInScreen
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import io.github.quentinpn.viewer.tv.ui.VersionStore
-import io.github.quentinpn.viewer.tv.ui.pushPage
+import io.github.quentinpn.viewer.tv.ui.backFromEpisode
+import io.github.quentinpn.viewer.tv.ui.openOver
+import io.github.quentinpn.viewer.tv.ui.pageKey
 import io.github.quentinpn.viewer.tv.ui.replaceTop
 import io.github.quentinpn.viewer.tv.ui.similarPage
 import kotlinx.coroutines.launch
@@ -60,12 +64,13 @@ class MainActivity : ComponentActivity() {
                 } else {
                     val client = remember(current) { AppServices.client(this, current) }
                     val images = remember(client) { AppServices.images(this, client) }
-                    // Film and series pages, the shown one last: a similar title stacks its page (ADR 0063)
+                    // Detail pages, the shown one last: a similar title, an episode, a person and their titles stack theirs (ADR 0063, 0068)
                     var pages by remember(current) { mutableStateOf<List<DetailPage>>(emptyList()) }
-                    var episode by remember(current) { mutableStateOf<SeriesTarget?>(null) }
                     val openSeries = { target: SeriesTarget -> pages = listOf(DetailPage.Series(target)) }
                     val openMovie = { id: String -> pages = listOf(DetailPage.Movie(id)) }
-                    val openSimilar: (BaseItemDto) -> Unit = { item -> similarPage(item)?.let { pages = pushPage(pages, it) } }
+                    val openSimilar: (BaseItemDto) -> Unit = { item -> similarPage(item)?.let { pages = openOver(pages, it) } }
+                    // The page below remembers the card, focused again on Back
+                    val openPerson: (CastMember) -> Unit = { member -> pages = openOver(pages, DetailPage.Person(member), member.id) }
                     var library by remember(current) { mutableStateOf<LibraryMemory?>(null) }
                     var search by remember(current) { mutableStateOf<SearchMemory?>(null) }
                     var settings by remember(current) { mutableStateOf(false) }
@@ -92,43 +97,49 @@ class MainActivity : ComponentActivity() {
                         notice = "Session expirée. Reconnectez-vous."
                         session = null
                     }
-                    // Over the series page: Back shows it again, on the episode's season and card (ADR 0060)
-                    val openEpisode = episode
-                    if (openEpisode != null) {
-                        EpisodeScreen(
-                            client,
-                            current.userId,
-                            openEpisode,
-                            images,
-                            versions,
-                            onPlay = playSource,
-                            onNavigate = { episode = it },
-                            onBack = {
-                                pages = replaceTop(pages, DetailPage.Series(it))
-                                episode = null
-                            },
-                            onSessionExpired = expired,
-                            refresh = refresh,
-                        )
-                        return@ViewerTheme
-                    }
                     val page = pages.lastOrNull()
                     if (page != null) {
                         // Back shows the page below: the film or series a similar title was opened from
                         BackHandler { pages = pages.dropLast(1) }
                         // Fresh state per page: a similar series replaces this one at the same place
-                        key(pages.size, page) {
+                        key(pages.size, pageKey(page)) {
                             when (page) {
+                                // Over the series page: Back shows it again, on the episode's season and card (ADR 0060)
+                                is DetailPage.Episode -> EpisodeScreen(
+                                    client,
+                                    current.userId,
+                                    page.target,
+                                    images,
+                                    versions,
+                                    onPlay = playSource,
+                                    onNavigate = { pages = replaceTop(pages, DetailPage.Episode(it)) },
+                                    onBack = { pages = backFromEpisode(pages, it) },
+                                    onOpenPerson = openPerson,
+                                    onSessionExpired = expired,
+                                    refresh = refresh,
+                                    focusPerson = page.person,
+                                )
+                                is DetailPage.Person -> PersonScreen(
+                                    client,
+                                    current.userId,
+                                    page,
+                                    images,
+                                    // The person page remembers the title, focused again on Back
+                                    onOpen = { item -> similarPage(item)?.let { pages = openOver(pages, it, item.id) } },
+                                    onSessionExpired = expired,
+                                )
                                 is DetailPage.Series -> SeriesScreen(
                                     client,
                                     current.userId,
                                     page.target,
                                     images,
                                     onPlay = play,
-                                    onOpenEpisode = { episode = it },
+                                    onOpenEpisode = { pages = openOver(pages, DetailPage.Episode(it)) },
                                     onOpenSimilar = openSimilar,
+                                    onOpenPerson = openPerson,
                                     onSessionExpired = expired,
                                     refresh = refresh,
+                                    focusPerson = page.person,
                                 )
                                 is DetailPage.Movie -> MovieScreen(
                                     client,
@@ -138,8 +149,10 @@ class MainActivity : ComponentActivity() {
                                     versions,
                                     onPlay = playSource,
                                     onOpenSimilar = openSimilar,
+                                    onOpenPerson = openPerson,
                                     onSessionExpired = expired,
                                     refresh = refresh,
+                                    focusPerson = page.person,
                                 )
                             }
                         }
