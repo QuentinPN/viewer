@@ -1040,3 +1040,14 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - Logcat: 0 token line, no crash.
 - **Known issue**, fixed next (ADR 0084): after the switch to a transcode, the audio menu lists only the French track (the Japanese one being played is lost) and the external subtitles are named « Stream.ass ».
 - **Not verified**: a quality change from one transcode to another (the `DELETE` of the old transcode), a local trailer, the « Années » pill in Séries, « Réinitialiser » clearing the decade.
+
+### 2026-11-10 — Android TV: tracks kept in transcode
+
+- **Fixed**: ADR 0084. A transcode asks PlaybackInfo with `AudioStreamIndex`, the audio track being played (or the one remembered for the series): the server builds the HLS stream on that track instead of the default one. The audio menu lists the source's tracks, not only the one in the stream. External subtitles are added with their title and language (« Français — SDH », « Forcés ») instead of their file name (« Stream.ass »).
+- **Tests**: `TranscodeAudioTest`, `PlaybackPlanTest`, `TracksTest`, `EmbyClientTest`. `testDebugUnitTest` 422/422, `assembleDebug` and `lintDebug` OK.
+- **Checked on the Shield**:
+  - Overgeared S1E7, Japanese audio, « Qualité » set to 1,5 Mbit/s: log `quality method=Transcode ... audio=2 answered=2`; mpv plays the `jpn` track and the menu shows « Japonais · AAC stéréo ». The 3 subtitles read « Français », « Français — SDH », « Français — Forced », all « ASS (externe) ».
+  - PSYREN: the external subtitle reads « Français · ASS (externe) ».
+  - Logcat: 0 token line, no crash; the stop report went out.
+- **Known issue**, fixed next (ADR 0085): `sub-add` is synchronous and runs on mpv's event thread. The first time the server extracts a file's subtitles it can block for minutes (about 4 min on Overgeared E7): no subtitle, no position or progress update meanwhile (the progress reports kept the old position). Later tries took about 1.6 s.
+- **Not verified**: the second PlaybackInfo on a first load in transcode (remembered audio); why « Qualité » reads « Transcodage · raison non précisée » on PSYREN and E7.
