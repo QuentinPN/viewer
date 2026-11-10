@@ -39,12 +39,14 @@ internal fun facts(item: BaseItemDto): List<Fact> {
 }
 
 /**
- * Genres and scores after the year: "Action, Fantastique · ★ 7,4 · 87 % critiques". The age
- * rating is the [RatingBadge] before them (ADR 0074).
+ * Scores then genres after the year: "★ 7,4 · 87 % critiques · Action, Fantastique". The age
+ * rating is the [RatingBadge] before them; a long line cuts the genres, not a score (ADR 0074).
  */
-internal fun tags(item: BaseItemDto): List<String> = listOfNotNull(
-    item.genres.filter { it.isNotBlank() }.take(3).takeIf { it.isNotEmpty() }?.joinToString(", "),
-) + scores(item)
+internal fun tags(item: BaseItemDto): List<String> = scores(item) + listOfNotNull(genres(item))
+
+/** At most three genres: "Action, Fantastique, Animation". */
+internal fun genres(item: BaseItemDto): String? =
+    item.genres.filter { it.isNotBlank() }.take(3).takeIf { it.isNotEmpty() }?.joinToString(", ")
 
 /** The public's and the critics' scores, the ones the server has (ADR 0074). */
 internal fun scores(item: BaseItemDto): List<String> =

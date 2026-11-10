@@ -11,7 +11,7 @@ Ce que renvoie le serveur, vérifié sur le code et non sur un nouvel appel :
 - `BaseItemDto` Android ne lisait pas `CriticRating` : ajouté en `Double?`, qui accepte l'entier comme un décimal.
 
 ## Décision
-- **Ligne de l'année** des trois pages, dans cet ordre : année (date de diffusion pour un épisode), durée, badge de classification, genres (film et série), « ★ 7,4 », « 87 % critiques », puis « Vu ».
+- **Ligne de l'année** des trois pages, dans cet ordre : année (date de diffusion pour un épisode), durée, badge de classification, « ★ 7,4 », « 87 % critiques », genres (film et série), puis « Vu ». Les genres viennent après les notes : sur une ligne trop longue, ce sont eux qui sont coupés (« Comédie, Dra… »), jamais une note ni « Vu » (vu sur Moxie, où « 70 % critiques » était tronqué en « 7… » quand les genres passaient devant).
 - **Classification** : badge à contour fin (1 dp, `Palette.textSecondary`, coins de 6 dp), texte du serveur tel quel (« 12 », « TV-MA »). Plus discret que la pastille pleine « Vu ». Lu « Classification 12 » par l'accessibilité.
 - **Note du public** : une décimale, virgule française ; cachée si absente ou à 0 (non notée), comme sur Windows.
 - **Note des critiques** : arrondie à l'entier, « 87 % critiques » avec une espace insécable avant « % » ; cachée si absente ou hors de 0–100. 0 % reste affiché : c'est une vraie note.

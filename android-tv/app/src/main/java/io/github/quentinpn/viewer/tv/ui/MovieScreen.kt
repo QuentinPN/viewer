@@ -139,7 +139,11 @@ private fun Details(
             movie.productionYear?.let { Text(it.toString(), color = Palette.textSecondary) }
             movie.runTimeTicks?.let { Text(length(it), color = Palette.textSecondary) }
             RatingBadge(movie)
-            tags(movie).forEach { Text(it, color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            scores(movie).forEach { Text(it, color = Palette.textSecondary, maxLines = 1) }
+            // Measured last: a long line cuts the genres, never a score nor « Vu »
+            genres(movie)?.let {
+                Text(it, color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            }
             if (played) {
                 Text(
                     "Vu",

@@ -44,7 +44,7 @@ class FactsTest {
             criticRating = 87.0,
         )
         // The age rating is the badge now (ADR 0074)
-        assertEquals(listOf("Action, Fantastique, Animation", "★ 7,4", "87 % critiques"), tags(item))
+        assertEquals(listOf("★ 7,4", "87 % critiques", "Action, Fantastique, Animation"), tags(item))
         assertEquals(listOf("★ 7,4", "87 % critiques"), scores(item))
         assertEquals(emptyList<String>(), tags(BaseItemDto(id = "j", officialRating = "12", communityRating = 0.0)))
     }
