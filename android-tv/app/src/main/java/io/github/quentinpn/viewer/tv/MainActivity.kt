@@ -198,7 +198,7 @@ class MainActivity : ComponentActivity() {
                         SettingsScreen(
                             settingsStore,
                             localAddress = client.server.isLocal,
-                            version = device.version,
+                            client = client,
                         )
                         return@ViewerTheme
                     }
