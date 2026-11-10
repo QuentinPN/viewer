@@ -106,6 +106,8 @@ data class BaseItemDto(
     @SerialName("People") val people: List<PersonDto> = emptyList(),
     @SerialName("OfficialRating") val officialRating: String? = null,
     @SerialName("CommunityRating") val communityRating: Double? = null,
+    /** Out of 100; sent as an integer (`17`) by Emby 4.10, documented as a number (ADR 0074). */
+    @SerialName("CriticRating") val criticRating: Double? = null,
     /** Key case varies (`Imdb` on an episode, `IMDB` on its series): sent to the intro services only (ADR 0048). */
     @SerialName("ProviderIds") val providerIds: Map<String, String> = emptyMap(),
     @SerialName("Chapters") val chapters: List<ChapterInfo> = emptyList(),

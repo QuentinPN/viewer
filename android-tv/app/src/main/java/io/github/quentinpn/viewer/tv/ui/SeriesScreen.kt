@@ -218,8 +218,13 @@ internal fun Backdrop(series: BaseItemDto, client: EmbyClient, images: ImageLoad
 private fun Header(series: BaseItemDto) {
     Column(Modifier.padding(horizontal = 48.dp).fillMaxWidth(0.6f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(series.name, style = MaterialTheme.typography.displaySmall, color = Palette.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        val line = listOfNotNull(series.productionYear?.toString()) + tags(series)
-        if (line.isNotEmpty()) Text(line.joinToString("  ·  "), color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // Year, the age rating badge, then genres and scores; the text ends in an ellipsis, not the badge
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            series.productionYear?.let { Text(it.toString(), color = Palette.textSecondary) }
+            RatingBadge(series)
+            val line = tags(series)
+            if (line.isNotEmpty()) Text(line.joinToString("  ·  "), color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
         series.overview?.let {
             Text(it, color = Palette.textSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
         }

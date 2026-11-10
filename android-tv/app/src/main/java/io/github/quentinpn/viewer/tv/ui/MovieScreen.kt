@@ -138,6 +138,7 @@ private fun Details(
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             movie.productionYear?.let { Text(it.toString(), color = Palette.textSecondary) }
             movie.runTimeTicks?.let { Text(length(it), color = Palette.textSecondary) }
+            RatingBadge(movie)
             tags(movie).forEach { Text(it, color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             if (played) {
                 Text(

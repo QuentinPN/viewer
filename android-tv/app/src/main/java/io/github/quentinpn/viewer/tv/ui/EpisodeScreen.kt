@@ -317,6 +317,9 @@ private fun Details(
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             airDate(episode.premiereDate)?.let { Text(it, color = Palette.textSecondary) }
             episode.runTimeTicks?.let { Text(length(it), color = Palette.textSecondary) }
+            // No genres here: an episode rarely has its own (ADR 0074)
+            RatingBadge(episode)
+            scores(episode).forEach { Text(it, color = Palette.textSecondary, maxLines = 1) }
             if (played) {
                 Text(
                     "Vu",

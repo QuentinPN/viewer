@@ -1,17 +1,24 @@
 package io.github.quentinpn.viewer.tv.ui
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
-import java.util.Locale
+import io.github.quentinpn.viewer.tv.emby.ageRatingLabel
+import io.github.quentinpn.viewer.tv.emby.communityRatingLabel
+import io.github.quentinpn.viewer.tv.emby.criticRatingLabel
 
 /** A labelled line of the detail page, as in the Windows facts list. */
 internal data class Fact(val label: String, val value: String)
@@ -31,12 +38,33 @@ internal fun facts(item: BaseItemDto): List<Fact> {
     )
 }
 
-/** Rating, genres and score after the year: "TV-14 · Action, Fantastique · ★ 7,4". */
+/**
+ * Genres and scores after the year: "Action, Fantastique · ★ 7,4 · 87 % critiques". The age
+ * rating is the [RatingBadge] before them (ADR 0074).
+ */
 internal fun tags(item: BaseItemDto): List<String> = listOfNotNull(
-    item.officialRating?.trim()?.takeIf { it.isNotEmpty() },
     item.genres.filter { it.isNotBlank() }.take(3).takeIf { it.isNotEmpty() }?.joinToString(", "),
-    item.communityRating?.takeIf { it > 0 }?.let { "★ " + String.format(Locale.FRANCE, "%.1f", it) },
-)
+) + scores(item)
+
+/** The public's and the critics' scores, the ones the server has (ADR 0074). */
+internal fun scores(item: BaseItemDto): List<String> =
+    listOfNotNull(communityRatingLabel(item.communityRating), criticRatingLabel(item.criticRating))
+
+/** The age rating (« 12 », « TV-MA ») in a thin outline, quieter than the filled « Vu ». */
+@Composable
+internal fun RatingBadge(item: BaseItemDto) {
+    val rating = ageRatingLabel(item.officialRating) ?: return
+    Text(
+        rating,
+        color = Palette.textSecondary,
+        style = MaterialTheme.typography.labelMedium,
+        maxLines = 1,
+        modifier = Modifier
+            .border(1.dp, Palette.textSecondary, RoundedCornerShape(6.dp))
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .semantics { contentDescription = "Classification $rating" },
+    )
+}
 
 @Composable
 internal fun Facts(item: BaseItemDto, limit: Int = Int.MAX_VALUE) {
