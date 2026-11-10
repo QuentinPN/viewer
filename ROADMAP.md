@@ -1070,3 +1070,10 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - Overgeared page: « Diffusion » shows J.C.STAFF, Tokyo MX, Pony Canyon. « J.C.STAFF » opens a « J.C.STAFF · 6 titres » grid of that studio's series on the real server; Back puts the focus on the pill again.
   - Logcat: 0 token line, no crash.
 - **Not verified**: a film's « Studio » pills; studio names with accents, `&` or `+`; the playlist row and page (the account « claude » has no playlist; the real response shapes are not seen).
+
+### 2026-11-10 — Skip button hides after 10 s (Android TV and desktop)
+
+- **Changed**: ADR 0089. « Passer l'intro » (and the other skip buttons) hides 10 s after it appears, unless the controls are shown or playback is paused; showing the controls brings it back. On Android TV, OK skips only while the button is visible, else it shows the controls.
+- **Tests**: `SkipTest` (Android TV), `segments.test.ts` (desktop). `testDebugUnitTest` 449/449, `assembleDebug` and `lintDebug` OK.
+- **Checked on the Shield**: Overgeared S1E7 from the start, intro 40–128 s (IntroDb): the button shows at about 44 s, is gone at about 58 s once the controls have faded; OK at 1:16 shows the controls and the button again without skipping. Stop report on exit. Logcat: 0 token line, no crash.
+- **Not verified**: the desktop part (the owner is using the desktop app; not launched).
