@@ -953,3 +953,21 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Added**: ADR 0066. A stop report lost to the network or to a 5xx error is kept on disk, in private SharedPreferences, per server and user. The token is never stored. It is sent again between playbacks with a backoff (5, 10, 20, 40 s, then every 60 s), at app start and at every sign-in. At most 5 entries are kept, one per item. They expire after 6 h. Any newer report or playback of the item drops its entry. After a 401 the entry waits for the same user to sign in again. Any other 4xx drops it. This replaces the in-memory resend that kept one report for one hour.
 - **Tests**: `PendingStopsTest` 7, `StopResenderTest` 7 (MockWebServer, the token only in the header), `PlaybackTrackerTest` updated. Checked on the Shield: start, progress and stop reports of a normal playback still go out (`report Stopped position=6090000000`). No entry was kept, since nothing failed.
 - **Not verified**: the resend itself on the Shield. Cutting the network also cuts adb, so the owner has to check it by hand: cut the network during playback, leave the player, force-stop the app, restore the network and reopen the app. Logcat should show `stop report kept for later`, then `1 kept stop report(s) sent`. Also not verified: whether Emby accepts a `PlaySessionId` several hours old.
+
+### 2026-11-10 — Android TV: cast row and person page
+
+- **Added**: ADR 0068. Film, series and episode pages show a « Distribution » row: round photos, or initials when there is none, with the name and the role. OK on a member opens their page: photo, overview and « Dans la bibliothèque », the films and series of the library they appear in, newest first (`GET /Users/{Id}/Items` with `PersonIds`, at most 100). The episode page joined the page stack, so Back goes person → episode → series. The « Avec » and « Invités » lines left the facts. When the first row of the person page takes the focus, the grid goes back to the top so the header stays in view.
+- **Tests**: `PeopleTest`, `EmbyClientTest`. `testDebugUnitTest` 295/295 with the two slices below. `assembleDebug` and `lintDebug` OK. Checked on the Shield: on Luther : Soleil déchu, the row shows Idris Elba, Cynthia Erivo and others with their roles. Idris Elba's page shows his photo, overview and « Dans la bibliothèque 16 », from Zootopie 2 (2025) down, with the header in view and the focus on the first poster. Opening Tyler Rake 2 from the second row and pressing Back brings the focus back to it. Back from the person page returns to the film with the focus on the Idris card, then to the Films grid on Luther.
+- **Not verified**: the row from a series or an episode page, and Back to the right season; the initials fallback.
+
+### 2026-11-10 — Android TV: seek thumbnails
+
+- **Added**: ADR 0069. While seeking, the player shows the image of the target time over the progress bar, read from the server's BIF (`GET /Videos/{Id}/index.bif?Width=320`, the token in the header, at most 30 MB). A BIF with no image, which the server answers for an item it has extracted none for, is logged as `none extracted on the server`. An unreadable answer is logged with its size and its first 16 bytes in hex.
+- **Tests**: `BifTest`, `SeekThumbnailsTest`. Checked on the Shield: the server answers a well-formed BIF of 72 bytes with no image for the Overgeared episode, logged as `seek thumbnails: none (none extracted on the server)`. Seeking works without the preview.
+- **Not verified**: the preview itself. Thumbnail extraction is off on the server, and turning it on is a server change for the owner to decide.
+
+### 2026-11-10 — Android TV: jump to a letter
+
+- **Added**: ADR 0070. When a library is sorted by title, a « Lettre » pill follows « A → Z ». It opens an « Aller à la lettre » panel with « # » and A–Z. Letters with no title are dimmed. The letters come from the server's `SortName`, so leading articles are dropped.
+- **Tests**: `LettersTest`, `EmbyClientTest`. Checked on the Shield, in Films: Q, X and Y are dimmed. Choosing M focuses « Madame Web », and Up shows the L titles, « A Line of Fire » among them, since its sort name drops the article.
+- **Not verified**: Z → A and the letter jump with a filter on.

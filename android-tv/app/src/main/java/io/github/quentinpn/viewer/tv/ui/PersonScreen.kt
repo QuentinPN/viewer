@@ -118,6 +118,13 @@ internal fun PersonScreen(
             if (index > 0) grid.scrollToItem(index + HEADER_ITEMS)
             withFrameNanos {}
             runCatching { focus.requestFocus() }
+            // A title in the first row: focusing it scrolls the header off, so the page goes back to the top
+            val placed = grid.layoutInfo.visibleItemsInfo
+            val firstRow = placed.firstOrNull { it.index == HEADER_ITEMS }?.row
+            if (firstRow != null && placed.firstOrNull { it.index == index + HEADER_ITEMS }?.row == firstRow) {
+                withFrameNanos {}
+                grid.scrollToItem(0)
+            }
         }
     }
 }
