@@ -51,12 +51,15 @@ internal fun GlassButton(
     selected: Boolean = false,
     shape: Shape = CircleShape,
     height: Dp = 36.dp,
+    /** False leaves it dimmed and out of the focus path. */
+    enabled: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
     val still = reducedMotion()
     Surface(
         onClick = onClick,
         modifier = modifier.height(height),
+        enabled = enabled,
         shape = ClickableSurfaceDefaults.shape(shape),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (selected) Palette.text else Glass,
@@ -65,6 +68,8 @@ internal fun GlassButton(
             focusedContentColor = Color.Black,
             pressedContainerColor = Palette.text,
             pressedContentColor = Color.Black,
+            disabledContainerColor = Glass.copy(alpha = 0.12f),
+            disabledContentColor = Palette.textSecondary.copy(alpha = 0.45f),
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = if (still) 1f else 1.06f),
         border = ClickableSurfaceDefaults.border(focusedBorder = Border(BorderStroke(2.dp, Palette.accent), inset = -RING_GAP, shape = shape)),
