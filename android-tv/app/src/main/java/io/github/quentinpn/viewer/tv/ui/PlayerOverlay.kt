@@ -1,5 +1,6 @@
 package io.github.quentinpn.viewer.tv.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,12 +9,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -32,15 +36,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
@@ -71,6 +78,13 @@ private const val NEXT_COUNTDOWN = 10
 
 // Fade above the text of the controls: the picture shows through it
 private val FADE = 96.dp
+
+/** The seek thumbnail stays this long after the last ◀ ▶ (ADR 0069). */
+private const val SEEK_PREVIEW_MS = 1_500L
+
+// Seek thumbnail: about a quarter of a 960 dp wide TV screen, above the bar's thumb
+private val PREVIEW_WIDTH = 240.dp
+private val PREVIEW_GAP = 14.dp
 
 /** What the player screen shows; written on the UI thread by the player activity. */
 class PlayerUi {
@@ -111,6 +125,21 @@ class PlayerUi {
     /** Subtitle and audio delays, as mpv holds them; this playback only (ADR 0062). */
     var delays by mutableStateOf(Delays())
 
+    /** Target of the last ◀ ▶ seek while its thumbnail may show (ADR 0069); null once the seek settles. */
+    var seekTarget by mutableStateOf<Double?>(null)
+        private set
+
+    /** The thumbnail nearest [seekTarget], once decoded; none when the server has none. */
+    var seekFrame by mutableStateOf<SeekFrame?>(null)
+
+    // Bumped on each seek: restarts the delay before the thumbnail goes
+    private var seeks by mutableIntStateOf(0)
+
+    fun seeking(target: Double) {
+        seekTarget = target
+        seeks++
+    }
+
     val menuOpen get() = tracks != null || chapterMenu || info != null
 
     fun closeMenus() {
@@ -145,6 +174,8 @@ class PlayerUi {
         chapterMenu = false
         info = null
         delays = Delays()
+        seekTarget = null
+        seekFrame = null
         controls = false
     }
 
@@ -160,8 +191,17 @@ class PlayerUi {
                 controls = false
             }
         }
+        LaunchedEffect(seeks) {
+            if (seekTarget != null) {
+                delay(SEEK_PREVIEW_MS)
+                seekTarget = null
+            }
+        }
     }
 }
+
+/** A decoded seek thumbnail; [index] is its BIF image, so the same one is not decoded twice (ADR 0069). */
+class SeekFrame(val index: Int, val image: ImageBitmap)
 
 /** The episode offered at the end of the current one, or from the start of its credits ([atCredits]). */
 data class UpNext(val series: String, val label: String, val atCredits: Boolean = false)
@@ -270,8 +310,22 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
         Text(ui.title, color = Palette.text, style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         ui.detail?.let { Text(it, color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         val fraction = if (ui.duration > 0) (ui.position / ui.duration).coerceIn(0.0, 1.0).toFloat() else 0f
-        Box(Modifier.padding(top = 6.dp).fillMaxWidth().height(6.dp).background(Color.White.copy(alpha = 0.25f), RoundedCornerShape(3.dp))) {
+        BoxWithConstraints(Modifier.padding(top = 6.dp).fillMaxWidth().height(6.dp).background(Color.White.copy(alpha = 0.25f), RoundedCornerShape(3.dp))) {
             Box(Modifier.fillMaxWidth(fraction).height(6.dp).background(Palette.text, RoundedCornerShape(3.dp)))
+            val target = ui.seekTarget
+            val frame = ui.seekFrame
+            if (target != null && frame != null && ui.duration > 0) {
+                val at = (target / ui.duration).coerceIn(0.0, 1.0).toFloat()
+                val start = previewStart(at, maxWidth.value, PREVIEW_WIDTH.value).dp
+                // Drawn over the title above the bar, without moving it; no animation, it jumps with the thumb
+                SeekPreview(
+                    frame,
+                    seconds(target),
+                    Modifier.align(Alignment.BottomStart)
+                        .wrapContentSize(Alignment.BottomStart, unbounded = true)
+                        .offset(x = start, y = -(6.dp + PREVIEW_GAP)),
+                )
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(seconds(ui.position), color = Palette.text, style = MaterialTheme.typography.bodyLarge)
@@ -296,7 +350,32 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
     }
 }
 
-internal fun seconds(value: Double) = clock((value.coerceAtLeast(0.0) * 10_000_000).toLong())
+/** The thumbnail at the seek target, its time under it, rounded as the menus (ADR 0069). */
+@Composable
+private fun SeekPreview(frame: SeekFrame, time: String, modifier: Modifier) {
+    val ratio = frame.image.width.toFloat() / frame.image.height.coerceAtLeast(1)
+    Column(
+        modifier.width(PREVIEW_WIDTH).background(Palette.surface.copy(alpha = 0.92f), RoundedCornerShape(10.dp)).padding(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Image(
+            frame.image,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxWidth().aspectRatio(ratio.takeIf { it > 0f } ?: (16f / 9f)).clip(RoundedCornerShape(7.dp)),
+        )
+        Text(time, color = Palette.text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp, bottom = 2.dp))
+    }
+}
+
+/**
+ * Left edge of the seek thumbnail, centred on [fraction] of a bar [bar] wide and kept
+ * within it; all three in the same unit.
+ */
+internal fun previewStart(fraction: Float, bar: Float, preview: Float): Float =
+    (fraction.coerceIn(0f, 1f) * bar - preview / 2).coerceIn(0f, (bar - preview).coerceAtLeast(0f))
+
+internal fun seconds(value: Double) =clock((value.coerceAtLeast(0.0) * 10_000_000).toLong())
 
 private sealed interface MenuRow {
     data class Header(val text: String) : MenuRow

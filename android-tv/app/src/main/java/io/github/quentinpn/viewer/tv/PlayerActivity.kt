@@ -1,5 +1,6 @@
 package io.github.quentinpn.viewer.tv
 
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
@@ -11,6 +12,7 @@ import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.lifecycleScope
 import io.github.quentinpn.viewer.tv.emby.ActivePlayback
@@ -36,6 +38,7 @@ import io.github.quentinpn.viewer.tv.player.MpvPlayerEngine
 import io.github.quentinpn.viewer.tv.player.PlaybackFacts
 import io.github.quentinpn.viewer.tv.player.PlayerEngine
 import io.github.quentinpn.viewer.tv.player.PlayerListener
+import io.github.quentinpn.viewer.tv.player.SeekThumbnails
 import io.github.quentinpn.viewer.tv.player.SkipPlan
 import io.github.quentinpn.viewer.tv.player.SkipPrompt
 import io.github.quentinpn.viewer.tv.player.TrackPreference
@@ -46,21 +49,27 @@ import io.github.quentinpn.viewer.tv.player.changeDelay
 import io.github.quentinpn.viewer.tv.player.chapters
 import io.github.quentinpn.viewer.tv.player.decide
 import io.github.quentinpn.viewer.tv.player.describeTrack
+import io.github.quentinpn.viewer.tv.player.downloadThumbnails
 import io.github.quentinpn.viewer.tv.player.playbackInfo
 import io.github.quentinpn.viewer.tv.player.playingAudioLanguage
 import io.github.quentinpn.viewer.tv.player.subtitlePosition
+import io.github.quentinpn.viewer.tv.player.thumbnailsLog
 import io.github.quentinpn.viewer.tv.player.transcodeReasons
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettings
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
 import io.github.quentinpn.viewer.tv.settings.mbits
 import io.github.quentinpn.viewer.tv.ui.PlayerOverlay
 import io.github.quentinpn.viewer.tv.ui.PlayerUi
+import io.github.quentinpn.viewer.tv.ui.SeekFrame
 import io.github.quentinpn.viewer.tv.ui.UpNext
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import io.github.quentinpn.viewer.tv.ui.episodeLabel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val TAG = "ViewerTV"
 private const val TICKS_PER_SECOND = 10_000_000.0
@@ -86,6 +95,7 @@ private const val INFO_REFRESH_MS = 1_000L
  * and the look of subtitles (ADR 0053). UP lists the item's chapters, if it has some (ADR 0057).
  * "Informations de lecture" opens from the last row of the track menu, or the INFO key (ADR 0061).
  * Subtitles and audio can be shifted from the track menu, for the current file only (ADR 0062).
+ * ◀ ▶ show the server's thumbnail of the target above the bar, when it has extracted some (ADR 0069).
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
     private var engine: PlayerEngine? = null
@@ -118,6 +128,12 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     /** Intro and credits of the current item, once known (ADR 0048). */
     private var skips: SkipPlan? = null
+
+    /** Seek thumbnails of the file being played, fetched at its first seek (ADR 0069). */
+    private var thumbnails: SeekThumbnails? = null
+
+    /** Lookup and decoding of the thumbnail at the last seek target; a newer seek replaces it. */
+    private var previewJob: Job? = null
 
     // END_FILE events of a file replaced by the next episode: not the end of playback
     @Volatile private var replacedEnds = 0
@@ -196,6 +212,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         next = null
         skips = null
         facts = null
+        dropThumbnails()
         settings = settingsStore?.load() ?: PlaybackSettings()
         ui.reset()
         lifecycleScope.launch { describe(itemId) }
@@ -265,6 +282,8 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             if (current != itemId) return
             Log.i(TAG, "play method=${chosen.method} source=${chosen.mediaSourceId} subtitles=${chosen.subtitles.size} maxBitrate=$bitrate")
             Log.i(TAG, "subtitle style=${settings.subtitles}")
+            // Nothing fetched yet: the first seek asks for them, playback never waits (ADR 0069)
+            thumbnails = SeekThumbnails(lifecycleScope, { downloadThumbnails(client, itemId) }) { Log.i(TAG, thumbnailsLog(it)) }
             // The server's subtitle goes last, added selected; the others are added without (ADR 0055)
             subtitles = chosen.subtitles.sortedBy { it.selected }
             serverTracks = chosen.serverTracks
@@ -500,7 +519,36 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         // Shown at once; mpv's next position replaces it
         val end = if (ui.duration > 0) ui.duration else Double.MAX_VALUE
         ui.position = (ui.position + seconds).coerceIn(0.0, end)
+        ui.seeking(ui.position)
+        preview(ui.position)
         ui.show()
+    }
+
+    /**
+     * The thumbnail at [target] above the bar (ADR 0069): the BIF image nearest before it,
+     * decoded off the main thread, unless it is the one already shown. Without thumbnails
+     * for this file, nothing shows.
+     */
+    private fun preview(target: Double) {
+        val thumbs = thumbnails ?: return
+        previewJob?.cancel()
+        previewJob = lifecycleScope.launch {
+            val frame = thumbs.frameAt(target) ?: return@launch
+            if (ui.seekFrame?.index == frame.index) return@launch
+            val bitmap = withContext(Dispatchers.Default) {
+                BitmapFactory.decodeByteArray(frame.bytes, frame.offset, frame.length)
+            } ?: return@launch
+            // Another file may have started during the decoding
+            if (thumbnails === thumbs) ui.seekFrame = SeekFrame(frame.index, bitmap.asImageBitmap())
+        }
+    }
+
+    /** Before another file and at teardown: the thumbnails of this one are dropped from memory. */
+    private fun dropThumbnails() {
+        previewJob?.cancel()
+        previewJob = null
+        thumbnails?.close()
+        thumbnails = null
     }
 
     /** A row of the chapter menu: playback goes to its start and the menu closes. */
@@ -554,6 +602,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     override fun onDestroy() {
         // Before release: the tracker keeps the last position mpv reported
         reporter.event { closed(it) }
+        dropThumbnails()
         engine?.release()
         engine = null
         super.onDestroy()
