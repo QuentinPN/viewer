@@ -15,6 +15,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyException
+import io.github.quentinpn.viewer.tv.session.SearchHistoryStore
 import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
 import io.github.quentinpn.viewer.tv.ui.CastMember
@@ -77,6 +78,7 @@ class MainActivity : ComponentActivity() {
                     var settings by remember(current) { mutableStateOf(false) }
                     val libraryPrefs = remember(current) { LibraryPreferenceStore(this, current.userId) }
                     val settingsStore = remember(current) { PlaybackSettingsStore(this, current.userId) }
+                    val searchHistory = remember(current) { SearchHistoryStore(this, current.server, current.userId) }
                     val home = remember(current) { HomeMemory() }
                     // Sign-in or restored session: stop reports lost to the network go out now (ADR 0066)
                     LaunchedEffect(client) { reporter.signedIn(client, current.userId) }
@@ -187,6 +189,7 @@ class MainActivity : ComponentActivity() {
                             current.userId,
                             images,
                             openSearch,
+                            searchHistory,
                             onOpenSeries = openSeries,
                             onOpenMovie = openMovie,
                             onSessionExpired = expired,

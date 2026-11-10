@@ -42,7 +42,10 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -62,6 +65,7 @@ import io.github.quentinpn.viewer.tv.emby.SearchResults
 import io.github.quentinpn.viewer.tv.emby.cleanSearch
 import io.github.quentinpn.viewer.tv.emby.isSearchable
 import io.github.quentinpn.viewer.tv.emby.searchTitles
+import io.github.quentinpn.viewer.tv.session.SearchHistoryStore
 import kotlinx.coroutines.delay
 
 /** Delay after the last key before searching; the keyboard's search key searches at once. */
@@ -125,13 +129,17 @@ class SearchMemory {
     internal var immediate = false
 }
 
-/** A text field, then the films, series and episodes whose title starts with the term. */
+/**
+ * A text field, then the films, series and episodes whose title starts with the term;
+ * while the field is empty, the recent searches kept on the device (ADR 0075).
+ */
 @Composable
 fun SearchScreen(
     client: EmbyClient,
     userId: String,
     images: ImageLoader,
     memory: SearchMemory,
+    history: SearchHistoryStore,
     onOpenSeries: (SeriesTarget) -> Unit,
     onOpenMovie: (movieId: String) -> Unit,
     onSessionExpired: () -> Unit,
@@ -139,6 +147,21 @@ fun SearchScreen(
     val query = cleanSearch(memory.text)
     val field = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    var recent by remember { mutableStateOf(history.load()) }
+    // Kept when submitted or when a result is opened, not at every letter
+    val record = { term: String -> recent = history.add(term) }
+    // Bumped when the focused recent search or "Effacer" leaves the screen: the field takes the focus back
+    var refocus by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(refocus) {
+        if (refocus == 0) return@LaunchedEffect
+        withFrameNanos {}
+        runCatching { field.requestFocus() }
+        // Focusing the field opens the system keyboard, closed as after the search key
+        withFrameNanos {}
+        withFrameNanos {}
+        keyboard?.hide()
+    }
 
     LaunchedEffect(query, memory.attempt, memory.flush) {
         val now = memory.immediate
@@ -191,6 +214,25 @@ fun SearchScreen(
             memory.immediate = true
             memory.flush++
             keyboard?.hide()
+            record(memory.text)
+        }
+        if (query.isEmpty() && recent.isNotEmpty()) {
+            RecentSearches(
+                recent,
+                onSearch = { term ->
+                    memory.text = term
+                    memory.immediate = true
+                    memory.flush++
+                    record(term)
+                    refocus++
+                },
+                onClear = {
+                    history.clear()
+                    recent = emptyList()
+                    refocus++
+                },
+            )
+            return@Column
         }
         when (val s = memory.state) {
             SearchState.Idle -> Centered("Saisissez au moins deux lettres d'un titre de film, de série ou d'épisode.")
@@ -207,6 +249,7 @@ fun SearchScreen(
                 }
             } else {
                 Results(searchGroups(s.results), memory, client, images) { group, item ->
+                    record(s.results.query)
                     memory.opened = group.title to item.id
                     when (item.type) {
                         "Movie" -> onOpenMovie(item.id)
@@ -272,6 +315,34 @@ private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Mod
             )
         }
     }
+}
+
+/**
+ * The last searches as glass pills, newest first, then « Effacer l'historique » on its own
+ * line: Down from the field reaches the pills, Down again the button (ADR 0075).
+ */
+@Composable
+private fun RecentSearches(terms: List<String>, onSearch: (String) -> Unit, onClear: () -> Unit) {
+    Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SectionHeader("Recherches récentes", null, Modifier.padding(horizontal = 48.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 48.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(terms, key = { it }) { term ->
+                GlassButton(onClick = { onSearch(term) }, modifier = Modifier.semantics { contentDescription = "Rechercher « $term »" }) {
+                    Icon(SearchIcon, contentDescription = null, modifier = Modifier.size(14.dp))
+                    PillLabel(term)
+                }
+            }
+        }
+        GlassButton(onClick = onClear, modifier = Modifier.padding(horizontal = 48.dp)) { PillLabel("Effacer l'historique") }
+    }
+}
+
+@Composable
+private fun PillLabel(text: String) {
+    Text(text, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable

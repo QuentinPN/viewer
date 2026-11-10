@@ -81,8 +81,8 @@ private val ACCENTED = listOf(
     "źżž" to 'z',
 )
 
-/** Lower case without the accents of Latin letters: `É` and `é` become `e`; `œ` stays. */
-private fun fold(text: String): String = buildString {
+/** Lower case without the accents of Latin letters: `É` and `é` become `e`; `œ` stays. Also compares recent searches. */
+internal fun fold(text: String): String = buildString {
     for (c in text.lowercase(Locale.ROOT)) append(ACCENTED.firstOrNull { c in it.first }?.second ?: c)
 }
 
