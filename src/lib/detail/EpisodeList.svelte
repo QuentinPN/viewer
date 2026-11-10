@@ -11,6 +11,7 @@ import type {
 import { formatMinutes } from "../format/duration";
 import { appendPage, emptyPager } from "../library/pager";
 import { defaultSeason, episodeNumber, formatDate } from "./format";
+import { changePlayed, playedAction } from "./watched";
 
 interface Props {
   seriesId: string;
@@ -37,6 +38,9 @@ let pager = $state(emptyPager<Episode>());
 let loading = $state(false);
 let pageError = $state<EmbyError | null>(null);
 let root = $state<HTMLElement | null>(null);
+/** Episodes and seasons whose watched change waits for the server (ADR 0096). */
+let saving = $state<Record<string, true>>({});
+let playedError = $state<{ name: string; error: EmbyError } | null>(null);
 // Bumped on every season switch: answers for a previous season are dropped.
 let generation = 0;
 
@@ -128,14 +132,8 @@ function episodeMeta(e: Episode): string {
     .join(" · ");
 }
 
-/** New state of a played episode (ADR 0008), patched in place: the list, its
- * scroll position and the focused episode stay as they are. */
-function onStopped(state: PlaybackStopped) {
-  const episode = pager.items.find((e) => e.id === state.itemId);
-  if (!episode) return;
-  episode.played = state.played;
-  episode.resume = state.resume;
-  // Unwatched counts of the seasons changed too.
+/** Unwatched counts of the seasons, read again in place. */
+function refreshSeasons() {
   embyApi
     .seasons(seriesId)
     .then((fresh) => {
@@ -148,6 +146,93 @@ function onStopped(state: PlaybackStopped) {
       }
     })
     .catch(() => {});
+}
+
+/** Watched state of the episodes shown, read again in place. */
+async function refreshEpisodes() {
+  const season = selected;
+  if (!season || pager.items.length === 0) return;
+  const gen = generation;
+  try {
+    const page = await embyApi.episodes(
+      seriesId,
+      season.id,
+      0,
+      Math.min(pager.items.length, 200),
+    );
+    if (gen !== generation) return;
+    for (const fresh of page.items) {
+      const e = pager.items.find((x) => x.id === fresh.id);
+      if (e) {
+        e.played = fresh.played;
+        e.resume = fresh.resume;
+      }
+    }
+  } catch {
+    // The list keeps what it showed; the next change or reload corrects it.
+  }
+}
+
+/** New state of a played episode (ADR 0008), patched in place: the list, its
+ * scroll position and the focused episode stay as they are. A whole season or
+ * the series marked (ADR 0096): its episodes are read again. */
+function onStopped(state: PlaybackStopped) {
+  const episode = pager.items.find((e) => e.id === state.itemId);
+  if (episode) {
+    episode.played = state.played;
+    episode.resume = state.resume;
+    // Unwatched counts of the seasons changed too.
+    refreshSeasons();
+  } else if (
+    state.itemId === seriesId ||
+    seasons?.some((s) => s.id === state.itemId)
+  ) {
+    refreshSeasons();
+    void refreshEpisodes();
+  }
+}
+
+/** Marks an episode played or unplayed (ADR 0096); its thumbnail does not play. */
+async function toggleEpisode(e: Episode) {
+  if (saving[e.id]) return;
+  saving[e.id] = true;
+  playedError = null;
+  const before = e.resume;
+  try {
+    const state = await changePlayed(
+      !e.played,
+      (p) => {
+        e.played = p;
+        e.resume = p ? null : before;
+      },
+      (p) => embyApi.setPlayed(e.id, p),
+    );
+    e.resume = state.resume;
+  } catch (err) {
+    playedError = { name: e.name, error: onError(toEmbyError(err)) };
+  } finally {
+    delete saving[e.id];
+  }
+}
+
+/** Marks the season shown played or unplayed; its episodes follow on the event. */
+async function toggleSeason(season: Season) {
+  if (saving[season.id]) return;
+  saving[season.id] = true;
+  playedError = null;
+  try {
+    await changePlayed(
+      !season.played,
+      (p) => {
+        season.played = p;
+      },
+      (p) => embyApi.setPlayed(season.id, p),
+    );
+  } catch (err) {
+    playedError = { name: season.name, error: onError(toEmbyError(err)) };
+  } finally {
+    delete saving[season.id];
+  }
 }
 
 onMount(() => {
@@ -192,6 +277,21 @@ onMount(() => {
     {:else if selected}
       <p class="season-name">{selected.name}</p>
     {/if}
+    {#if selected}
+      {@const season = selected}
+      <button
+        type="button"
+        class="season-played"
+        aria-pressed={season.played}
+        aria-disabled={saving[season.id] === true}
+        aria-label={`Saison « ${season.name} » vue`}
+        title={playedAction(season.played, season.name)}
+        onclick={() => toggleSeason(season)}
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" /></svg>
+        Saison vue
+      </button>
+    {/if}
 
     <ol class="list" aria-label={selected?.name} aria-busy={loading}>
       {#each pager.items as e (e.id)}
@@ -216,13 +316,6 @@ onMount(() => {
                 decoding="async"
               />
             {/if}
-            {#if e.played}
-              <span class="badge" title="Déjà vu">
-                <svg viewBox="0 0 16 16" aria-hidden="true"
-                  ><path d="M3 8.5 6.5 12 13 4.5" /></svg
-                >
-              </span>
-            {/if}
             {#if e.resume?.fraction}
               <span class="progress" aria-hidden="true"
                 ><span style:width="{Math.round(e.resume.fraction * 100)}%"></span></span
@@ -235,6 +328,19 @@ onMount(() => {
                 <svg viewBox="0 0 16 16"><path d="M4.5 2.8v10.4L13 8z" /></svg>
               {/if}
             </span>
+          </button>
+          <!-- Beside the thumbnail, not in it: a button in a button is not valid. -->
+          <button
+            type="button"
+            class="badge"
+            class:played={e.played}
+            aria-pressed={e.played}
+            aria-disabled={saving[e.id] === true}
+            aria-label={`« ${e.name} » vu`}
+            title={playedAction(e.played)}
+            onclick={() => toggleEpisode(e)}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" /></svg>
           </button>
           <div class="body">
             <p class="kicker">{[number, meta].filter(Boolean).join(" · ")}</p>
@@ -264,6 +370,14 @@ onMount(() => {
         {/each}
       {/if}
     </ol>
+
+    {#if playedError}
+      <div class="state played-error" role="alert">
+        <p>« {playedError.name} » : statut « vu » non modifié. {playedError.error.message}</p>
+        {#if errorHint(playedError.error)}<p class="hint">{errorHint(playedError.error)}</p>{/if}
+        <button type="button" class="more" onclick={() => (playedError = null)}>Fermer</button>
+      </div>
+    {/if}
 
     {#if pageError}
       <div class="state" role="alert">
@@ -346,6 +460,7 @@ onMount(() => {
     gap: 32px 28px;
   }
   .episode {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -445,18 +560,86 @@ onMount(() => {
     object-fit: cover;
     display: block;
   }
+  /* Over the thumbnail's top right corner; a watched episode always shows it,
+     the others on hover or keyboard focus (Tab reaches it after the thumbnail). */
   .badge {
     position: absolute;
+    z-index: 1;
     top: var(--space-2);
     right: var(--space-2);
-    width: 24px;
-    height: 24px;
-    border-radius: 12px;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 14px;
     display: grid;
     place-items: center;
     background: rgb(0 0 0 / 55%);
     backdrop-filter: blur(12px);
     color: #fff;
+    font: inherit;
+    cursor: pointer;
+    opacity: 0;
+    transition:
+      opacity var(--motion-fast),
+      background var(--motion-fast);
+  }
+  .badge.played,
+  .episode:hover .badge,
+  .badge:focus-visible {
+    opacity: 1;
+  }
+  .badge:hover {
+    background: rgb(0 0 0 / 75%);
+  }
+  .badge:not(.played) svg {
+    opacity: 0.7;
+  }
+  .badge[aria-disabled="true"] {
+    cursor: progress;
+  }
+  .season-played {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: calc(-1 * var(--space-3)) 0 var(--space-6);
+    height: 32px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--fill-glass);
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background var(--motion-fast);
+  }
+  .season-played:hover {
+    background: var(--fill-glass-hover);
+    color: var(--color-text);
+  }
+  .season-played svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.55;
+  }
+  .season-played[aria-pressed="true"] {
+    color: var(--color-text);
+  }
+  .season-played[aria-pressed="true"] svg {
+    stroke: var(--color-accent);
+    opacity: 1;
+  }
+  .season-played[aria-disabled="true"] {
+    cursor: progress;
+  }
+  .played-error {
+    margin-bottom: var(--space-4);
   }
   .badge svg {
     width: 13px;

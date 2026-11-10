@@ -732,6 +732,56 @@ impl EmbyService {
         Ok(data.is_favorite)
     }
 
+    /// Marks a film, episode, season or series played or unplayed (ADR 0096), then
+    /// reads back what the server holds. For a season or series, whether Emby
+    /// applies it to the episodes is not documented: callers read them again.
+    pub async fn set_played(
+        &self,
+        item_id: &str,
+        played: bool,
+    ) -> Result<PlaybackStopped, EmbyError> {
+        if !is_id(item_id) {
+            return Err(EmbyError::InvalidResponse("identifiant invalide".into()));
+        }
+        let (client, user_id) = self.session()?;
+        let date = played.then(super::client::date_played_now);
+        let data = self.expire_on_401(
+            &client,
+            client.set_played(&user_id, item_id, date.as_deref()).await,
+        )?;
+        Ok(self.state_after_change(item_id, data).await)
+    }
+
+    /// Takes a film or episode out of "Reprendre" (ADR 0096); the resume point
+    /// is the server's business afterwards, read back as for `set_played`.
+    pub async fn hide_from_resume(&self, item_id: &str) -> Result<PlaybackStopped, EmbyError> {
+        if !is_id(item_id) {
+            return Err(EmbyError::InvalidResponse("identifiant invalide".into()));
+        }
+        let (client, user_id) = self.session()?;
+        let data = self.expire_on_401(
+            &client,
+            client.hide_from_resume(&user_id, item_id, true).await,
+        )?;
+        Ok(self.state_after_change(item_id, data).await)
+    }
+
+    /// State of an item the server just changed: read again for the resume
+    /// fraction, else taken from the user data it answered (the change is made).
+    async fn state_after_change(&self, item_id: &str, data: UserItemData) -> PlaybackStopped {
+        match self.playback_state(item_id).await {
+            Ok(state) => state,
+            Err(e) => {
+                log::warn!("state after a watched change not read: {}", e.kind());
+                PlaybackStopped {
+                    item_id: item_id.to_owned(),
+                    played: data.played,
+                    resume: resume(&data, None),
+                }
+            }
+        }
+    }
+
     /// Detail page of a film, series or episode. Other item types are refused.
     /// An episode also gets its neighbours in the series (ADR 0016).
     pub async fn item_detail(&self, item_id: &str) -> Result<ItemDetail, EmbyError> {

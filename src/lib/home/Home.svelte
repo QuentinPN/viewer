@@ -3,8 +3,10 @@
 // and "À suivre" play at once, then favorites (ADR 0014) and the latest additions
 // of each library open their detail page. Rows load in parallel; the hero,
 // "Reprendre" and "À suivre" are read again after every playback, "Favoris" after
-// every favorite change.
-import { onMount, untrack } from "svelte";
+// every favorite change. A "Reprendre" card can be taken out of the row, or
+// marked played (ADR 0096).
+import { onMount, tick, untrack } from "svelte";
+import { patchPlayed, restoreItem, withoutItem } from "../detail/watched";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
 import type {
   EmbyError,
@@ -12,6 +14,7 @@ import type {
   Library,
   MediaItem,
   PlaybackStart,
+  PlaybackStopped,
   WatchItem,
 } from "../emby/types";
 import PosterCard from "../library/PosterCard.svelte";
@@ -61,6 +64,14 @@ let favorites = $state<RowState<MediaItem>>(loadingRow());
 let latest = $state<Record<string, RowState<MediaItem>>>({});
 let starting = $state<string | null>(null);
 let playError = $state<{ title: string; error: EmbyError } | null>(null);
+/** "Reprendre" card being taken out: one at a time (ADR 0096). */
+let removing = $state<string | null>(null);
+let removeError = $state<{
+  title: string;
+  played: boolean;
+  error: EmbyError;
+} | null>(null);
+let resumeList = $state<HTMLElement | null>(null);
 // Bumped by every reload of the watch rows: older answers are dropped.
 let watchGeneration = 0;
 let favoritesGeneration = 0;
@@ -145,6 +156,54 @@ function play(item: WatchItem) {
   void start(item.id, item.resume !== null, watchTitle(item));
 }
 
+/**
+ * Takes a card out of "Reprendre" at once, then asks the server: hidden from
+ * resume, or marked played. On failure the card comes back where it was. The
+ * event that follows reads the row again, so the server has the last word.
+ */
+async function takeOut(item: WatchItem, played: boolean) {
+  const shown = inProgress.items;
+  if (removing || !shown) return;
+  const { items, removed } = withoutItem(shown, item.id);
+  if (!removed) return;
+  removing = item.id;
+  removeError = null;
+  const neighbour = shown[removed.index + 1] ?? shown[removed.index - 1];
+  const hadFocus = resumeList?.contains(document.activeElement) ?? false;
+  inProgress = { items, error: null };
+  if (hadFocus && neighbour) {
+    await tick();
+    resumeList
+      ?.querySelector<HTMLElement>(
+        `button.card[data-item-id="${CSS.escape(neighbour.id)}"]`,
+      )
+      ?.focus();
+  }
+  try {
+    if (played) await embyApi.setPlayed(item.id, true);
+    else await embyApi.hideFromResume(item.id);
+  } catch (e) {
+    if (inProgress.items) {
+      inProgress = {
+        items: restoreItem(inProgress.items, removed),
+        error: null,
+      };
+    }
+    removeError = { title: watchTitle(item), played, error: onError(e) };
+  } finally {
+    removing = null;
+  }
+}
+
+/** Watched state changed: the watch rows are read again, posters patched. */
+function onStopped(state: PlaybackStopped) {
+  loadWatchRows();
+  if (favorites.items) patchPlayed(favorites.items, state);
+  for (const row of Object.values(latest)) {
+    if (row.items) patchPlayed(row.items, state);
+  }
+}
+
 function playHero(item: HeroItem) {
   if (item.playId)
     void start(item.playId, item.resume !== null, item.detail.name);
@@ -180,7 +239,7 @@ onMount(() => {
   loadWatchRows();
   loadFavorites();
   for (const library of libraries) loadLatest(library);
-  const unlisten = embyApi.onPlaybackStopped(() => loadWatchRows());
+  const unlisten = embyApi.onPlaybackStopped(onStopped);
   return () => {
     void unlisten.then((stop) => stop());
   };
@@ -220,6 +279,19 @@ onMount(() => {
     </div>
   {/if}
 
+  {#if removeError}
+    <div class="play-error" role="alert">
+      <p class="error-title">
+        {removeError.played
+          ? `« ${removeError.title} » n'a pas été marqué comme vu`
+          : `« ${removeError.title} » n'a pas été retiré de Reprendre`}
+      </p>
+      <p>{removeError.error.message}</p>
+      {#if errorHint(removeError.error)}<p class="hint">{errorHint(removeError.error)}</p>{/if}
+      <button type="button" class="secondary" onclick={() => (removeError = null)}>Fermer</button>
+    </div>
+  {/if}
+
   {#if hero.error}
     <section class="row-failed" aria-labelledby="hero-failed">
       <h2 id="hero-failed">À la une</h2>
@@ -242,18 +314,44 @@ onMount(() => {
         {@render rowError(inProgress.error, loadWatchRows)}
       </section>
     {:else if inProgress.items?.length}
-      <Row title="Reprendre" id="row-resume" wide>
-        {#each inProgress.items as item (item.id)}
-          <li>
-            <WatchCard
-              {item}
-              busy={starting === item.id}
-              disabled={starting !== null}
-              onPlay={play}
-            />
-          </li>
-        {/each}
-      </Row>
+      <div class="resume-row" bind:this={resumeList}>
+        <Row title="Reprendre" id="row-resume" wide>
+          {#each inProgress.items as item (item.id)}
+            {@const title = watchTitle(item)}
+            <li class="resume-card">
+              <WatchCard
+                {item}
+                busy={starting === item.id}
+                disabled={starting !== null}
+                onPlay={play}
+              />
+              <!-- Shown on hover and keyboard focus; Tab reaches them after the card. -->
+              <div class="card-actions">
+                <button
+                  type="button"
+                  class="card-action"
+                  aria-label={`Marquer « ${title} » comme vu`}
+                  title="Marquer comme vu"
+                  aria-disabled={removing !== null}
+                  onclick={() => takeOut(item, true)}
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" /></svg>
+                </button>
+                <button
+                  type="button"
+                  class="card-action"
+                  aria-label={`Retirer « ${title} » de Reprendre`}
+                  title="Retirer de Reprendre"
+                  aria-disabled={removing !== null}
+                  onclick={() => takeOut(item, false)}
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7m0-7-7 7" /></svg>
+                </button>
+              </div>
+            </li>
+          {/each}
+        </Row>
+      </div>
     {/if}
 
     {#if nextUp.error}
@@ -384,6 +482,52 @@ onMount(() => {
   }
   button.secondary:hover {
     background: var(--fill-glass-hover);
+  }
+  .resume-card {
+    position: relative;
+  }
+  .card-actions {
+    position: absolute;
+    z-index: 1;
+    top: var(--space-2);
+    right: var(--space-2);
+    display: flex;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity var(--motion-fast);
+  }
+  .resume-card:hover .card-actions,
+  .resume-card:focus-within .card-actions {
+    opacity: 1;
+  }
+  .card-action {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgb(0 0 0 / 60%);
+    backdrop-filter: blur(12px);
+    color: #fff;
+    cursor: pointer;
+    transition: background var(--motion-fast);
+  }
+  .card-action:hover {
+    background: rgb(0 0 0 / 80%);
+  }
+  .card-action[aria-disabled="true"] {
+    cursor: progress;
+  }
+  .card-action svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .see-all {
     background: transparent;
