@@ -408,6 +408,8 @@ class EmbyClient(
      * Playback negotiation (ADR 0007): the server answers with its sources for this profile,
      * only [mediaSourceId]'s when one version is asked for (ADR 0058). [startTicks]: the
      * position playback goes on from, when the quality changes in the player (ADR 0081).
+     * [audioStreamIndex]: the audio a transcode must carry (ADR 0084), only sent with
+     * [mediaSourceId], as the server ignores it without (ADR 0035).
      */
     suspend fun playbackInfo(
         userId: String,
@@ -415,6 +417,7 @@ class EmbyClient(
         profile: DeviceProfile,
         mediaSourceId: String? = null,
         startTicks: Long? = null,
+        audioStreamIndex: Int? = null,
     ): PlaybackInfoResponse {
         if (mediaSourceId != null && !isSourceId(mediaSourceId)) {
             throw EmbyException(EmbyError.InvalidResponse("version invalide"))
@@ -431,6 +434,7 @@ class EmbyClient(
                 deviceProfile = profile,
                 mediaSourceId = mediaSourceId,
                 startTimeTicks = startTicks?.coerceAtLeast(0),
+                audioStreamIndex = audioStreamIndex?.takeIf { mediaSourceId != null && it >= 0 },
             ),
         )
         return call(post(url, body.toRequestBody(JSON_TYPE)), PlaybackInfoResponse.serializer())

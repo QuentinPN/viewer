@@ -36,9 +36,9 @@ fun readTracks(get: (String) -> String?): List<Track> {
         fun prop(name: String) = get("track-list/$i/$name")?.takeIf { it.isNotEmpty() }
         val type = TrackType.entries.find { it.mpv == prop("type") } ?: return@mapNotNull null
         val id = prop("id")?.toIntOrNull() ?: return@mapNotNull null
-        val title = prop("title")
-        val lang = prop("lang")
         val external = prop("external") == "yes"
+        val title = prop("title")?.takeUnless { external && isFileName(it, prop("external-filename")) }
+        val lang = prop("lang")
         val label = trackLabel(
             type = type,
             title = title,
@@ -54,6 +54,15 @@ fun readTracks(get: (String) -> String?): List<Track> {
             hearingImpaired = prop("hearing-impaired") == "yes",
         )
     }
+}
+
+/**
+ * mpv titles an external file it was given no title for by its file name ("Stream.ass"
+ * for a transcode's subtitles, ADR 0084): that names nothing, the language says more.
+ */
+internal fun isFileName(title: String, externalFilename: String?): Boolean {
+    val name = externalFilename?.substringBefore('?')?.substringAfterLast('/') ?: return false
+    return name.isNotEmpty() && title == name
 }
 
 /** "Français · AC3 5.1", "Anglais · ASS (externe)"; the track title comes first when the file has one. */

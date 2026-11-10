@@ -1,6 +1,8 @@
 package io.github.quentinpn.viewer.tv.player
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -29,6 +31,41 @@ class TracksTest {
             ),
             readTracks { props[it] },
         )
+    }
+
+    @Test
+    fun aTranscodeSubtitleIsNamedByTheServerNotByItsFileName() {
+        // The bug seen on the Shield (ADR 0084): mpv titles an untitled file "Stream.ass"
+        val url = "http://192.168.1.14:8096/emby/videos/1/m1/Subtitles/3/0/Stream.ass"
+        fun sub(title: String?, lang: String?) = readTracks {
+            mapOf(
+                "track-list/count" to "1", "track-list/0/type" to "sub", "track-list/0/id" to "3", "track-list/0/codec" to "ass",
+                "track-list/0/external" to "yes", "track-list/0/external-filename" to url,
+                "track-list/0/title" to title, "track-list/0/lang" to lang,
+            )[it]
+        }.single()
+        assertEquals("Français — Forced · ASS (externe)", sub("Forced", "fre").label)
+        assertEquals("Français — CC · ASS (externe)", sub("CC", "fre").label)
+        // No title from the server: the language alone, as for an untitled track of the file
+        val untitled = sub("Stream.ass", "fre")
+        assertEquals("Français · ASS (externe)", untitled.label)
+        assertNull(untitled.title)
+    }
+
+    @Test
+    fun onlyTheExternalFileNameIsDropped() {
+        assertTrue(isFileName("Stream.ass", "http://h/emby/videos/1/Subtitles/3/0/Stream.ass"))
+        assertTrue(isFileName("Stream.ass", "http://h/emby/videos/1/Subtitles/3/0/Stream.ass?a=1"))
+        assertFalse(isFileName("Forced", "http://h/emby/videos/1/Subtitles/3/0/Stream.ass"))
+        assertFalse(isFileName("Stream.ass", null))
+        // A track of the file itself keeps its title, whatever it says
+        val own = readTracks {
+            mapOf(
+                "track-list/count" to "1", "track-list/0/type" to "sub", "track-list/0/id" to "1",
+                "track-list/0/title" to "Stream.ass", "track-list/0/external-filename" to "x/Stream.ass",
+            )[it]
+        }.single()
+        assertEquals("Stream.ass", own.title)
     }
 
     @Test

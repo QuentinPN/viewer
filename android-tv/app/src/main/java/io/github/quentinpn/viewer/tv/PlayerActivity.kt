@@ -78,8 +78,11 @@ import io.github.quentinpn.viewer.tv.player.describeTrack
 import io.github.quentinpn.viewer.tv.player.downloadThumbnails
 import io.github.quentinpn.viewer.tv.player.failed
 import io.github.quentinpn.viewer.tv.player.hasStartParameter
+import io.github.quentinpn.viewer.tv.player.keepsAudioRequest
 import io.github.quentinpn.viewer.tv.player.playbackInfo
+import io.github.quentinpn.viewer.tv.player.playingAudioIndex
 import io.github.quentinpn.viewer.tv.player.playingAudioLanguage
+import io.github.quentinpn.viewer.tv.player.rememberedAudioIndex
 import io.github.quentinpn.viewer.tv.player.sleepDue
 import io.github.quentinpn.viewer.tv.player.sleepTimer
 import io.github.quentinpn.viewer.tv.player.step
@@ -345,7 +348,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         try {
             // The cap of the server's kind of address, else the default limit (ADR 0037, 0051)
             val bitrate = settings.maxStreamingBitrate(client.server.isLocal)
-            val chosen = plan(client.server, client.playbackInfo(userId, itemId, deviceProfile(bitrate), mediaSourceId), mediaSourceId)
+            val first = plan(client.server, client.playbackInfo(userId, itemId, deviceProfile(bitrate), mediaSourceId), mediaSourceId)
+            if (current != itemId) return
+            val chosen = withRememberedAudio(itemId, first, bitrate)
             if (current != itemId) return
             Log.i(TAG, "play method=${chosen.method} source=${chosen.mediaSourceId} subtitles=${chosen.subtitles.size} maxBitrate=$bitrate")
             Log.i(TAG, "subtitle style=${settings.subtitles}")
@@ -386,6 +391,25 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         }
     }
 
+    /**
+     * A transcode carries one audio, the server's default: when the remembered choice
+     * names another of the source's audio streams, the server is asked again for it, as
+     * on Windows (ADR 0035, 0084). Kept only if it stays a transcode of the same version;
+     * a refusal keeps the first answer.
+     */
+    private suspend fun withRememberedAudio(itemId: String, first: PlaybackPlan, bitrate: Long): PlaybackPlan {
+        val audio = rememberedAudioIndex(first, preferences?.load(TrackType.Audio)) ?: return first
+        val second = try {
+            plan(client.server, client.playbackInfo(userId, itemId, deviceProfile(bitrate), first.mediaSourceId, audioStreamIndex = audio), first.mediaSourceId)
+        } catch (e: EmbyException) {
+            Log.w(TAG, "remembered audio=$audio refused: ${e.error.message}")
+            return first
+        }
+        val kept = keepsAudioRequest(first, second)
+        Log.i(TAG, "remembered audio=$audio server=${first.serverTracks.audio} kept=$kept answered=${second.serverTracks.audio}")
+        return if (kept) second else first
+    }
+
     /** What the player keeps of a negotiated stream, at its first load or after a quality change (ADR 0081). */
     private fun adopt(chosen: PlaybackPlan, cap: Long?, chosenInPlayer: Boolean) {
         // The server's subtitle goes last, added selected; the others are added without (ADR 0055)
@@ -418,16 +442,18 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         val cap = ui.quality.chosen
         ui.quality = ui.quality.applying()
         val from = ui.position
-        lifecycleScope.launch { requalify(itemId, playing, cap, from) }
+        // The audio heard now: a transcode would otherwise carry the server's default (ADR 0084)
+        val audio = engine?.let { playingAudioIndex(playing, it.tracks()) }
+        lifecycleScope.launch { requalify(itemId, playing, cap, from, audio) }
     }
 
-    private suspend fun requalify(itemId: String, playing: PlaybackPlan, cap: Long?, from: Double) {
+    private suspend fun requalify(itemId: String, playing: PlaybackPlan, cap: Long?, from: Double, audio: Int?) {
         val bitrate = cap ?: MAX_STREAMING_BITRATE
         val startTicks = (from * TICKS_PER_SECOND).roundToLong()
         val chosen = try {
             plan(
                 client.server,
-                client.playbackInfo(userId, itemId, deviceProfile(bitrate), playing.mediaSourceId, startTicks),
+                client.playbackInfo(userId, itemId, deviceProfile(bitrate), playing.mediaSourceId, startTicks, audio),
                 playing.mediaSourceId,
             )
         } catch (e: EmbyException) {
@@ -446,7 +472,8 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             return
         }
         Log.i(TAG, "quality method=${chosen.method} source=${chosen.mediaSourceId} subtitles=${chosen.subtitles.size} maxBitrate=$bitrate " +
-            "from=${playing.method} newSession=${chosen.playSessionId != playing.playSessionId} startInUrl=${hasStartParameter(chosen.url)}")
+            "from=${playing.method} newSession=${chosen.playSessionId != playing.playSessionId} startInUrl=${hasStartParameter(chosen.url)} " +
+            "audio=${audio ?: "-"} answered=${chosen.serverTracks.audio ?: "-"}")
         // The replaced transcode is ended once the new file plays, never before: mpv still reads it
         replacedEncoding = playing.playSessionId?.takeIf { playing.method == PlayMethod.Transcode && it != chosen.playSessionId }
         adopt(chosen, cap, chosenInPlayer = cap != settings.capFor(client.server.isLocal))
@@ -519,7 +546,8 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             ui.status = null
             ui.show()
         }
-        subtitles.forEach { sub -> MediaSource.parse(sub.url)?.let { engine?.addSubtitle(it, sub.selected) } }
+        // Named as the server describes them: the files themselves carry no title nor language (ADR 0084)
+        subtitles.forEach { sub -> MediaSource.parse(sub.url)?.let { engine?.addSubtitle(it, sub.selected, sub.title, sub.language) } }
         // The tracks chosen in the menu are remembered: a quality change keeps them the same way
         applyTracks()
         engine?.let(::restoreAdjustments)

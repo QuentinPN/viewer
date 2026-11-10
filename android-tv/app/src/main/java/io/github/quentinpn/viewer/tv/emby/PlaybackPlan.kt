@@ -18,8 +18,14 @@ private val TOKEN_PARAMS = setOf("api_key", "apikey", "x-emby-token", "accesstok
 
 enum class PlayMethod { DirectPlay, DirectStream, Transcode }
 
-/** An external subtitle file, URL without token. */
+/**
+ * An external subtitle file, URL without token. [title] and [language] come from the
+ * server's `MediaStreams` and are handed to mpv: the file itself names nothing (ADR 0084).
+ */
 data class ExternalSubtitle(val url: String, val title: String?, val language: String?, val selected: Boolean)
+
+/** One of the source's own audio streams: its Emby `Index`, language and title (ADR 0084). */
+data class SourceAudio(val index: Int, val language: String?, val title: String?)
 
 /** The source chosen for the player. [url] holds no token. */
 data class PlaybackPlan(
@@ -33,7 +39,30 @@ data class PlaybackPlan(
     val subtitles: List<ExternalSubtitle>,
     /** Tracks the server picked from the account's preferences, that this playback can show. */
     val serverTracks: ServerTracks = ServerTracks(),
+    /** The source's own audio streams, for the `AudioStreamIndex` of a transcode (ADR 0084). */
+    val audio: List<SourceAudio> = emptyList(),
 )
+
+/**
+ * The title mpv shows for a subtitle file of a transcode: the stream's `Title`, with
+ * « Forcés » or « SDH » added when `IsForced` / `IsHearingImpaired` say so and the
+ * title does not already ("Forced", "CC"). Null when there is nothing to say: the
+ * label is then the language alone, as for an untitled track of the file.
+ */
+internal fun subtitleTitle(stream: MediaStreamDto): String? {
+    val title = stream.title?.trim()?.takeIf { it.isNotEmpty() }
+    val text = title.orEmpty()
+    val saysForced = text.contains("forced", ignoreCase = true) || text.contains("forcé", ignoreCase = true)
+    val saysHearing = HEARING_WORDS.containsMatchIn(text)
+    return listOfNotNull(
+        title,
+        "Forcés".takeIf { stream.isForced && !saysForced },
+        "SDH".takeIf { stream.isHearingImpaired && !saysHearing },
+    ).joinToString(", ").ifEmpty { null }
+}
+
+// What a title already says of a hearing-impaired track
+private val HEARING_WORDS = Regex("\\b(SDH|CC)\\b|malentendant", RegexOption.IGNORE_CASE)
 
 /**
  * Emby `Index` of the audio and subtitle the server picked (`DefaultAudioStreamIndex`,
@@ -121,8 +150,8 @@ fun plan(server: ServerUrl, response: PlaybackInfoResponse, mediaSourceId: Strin
             .map {
                 ExternalSubtitle(
                     url = streamUrl(server, it.deliveryUrl!!),
-                    title = it.title,
-                    language = it.language,
+                    title = subtitleTitle(it),
+                    language = it.language?.takeIf { lang -> lang.isNotBlank() },
                     selected = it.index == source.defaultSubtitleStreamIndex,
                 )
             }
@@ -138,6 +167,7 @@ fun plan(server: ServerUrl, response: PlaybackInfoResponse, mediaSourceId: Strin
         runTimeTicks = source.runTimeTicks?.takeIf { it > 0 },
         subtitles = subtitles,
         serverTracks = serverTracks(source, method),
+        audio = source.mediaStreams.filter { it.type == "Audio" && !it.isExternal }.map { SourceAudio(it.index, it.language, it.title) },
     )
 }
 
