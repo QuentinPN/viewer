@@ -57,3 +57,21 @@ class SkipPlan(private val segments: List<Segment>, private val auto: Boolean = 
         }
     }
 }
+
+/** How long the button shows on its own once its segment starts (ADR 0089), as on Windows. */
+const val SKIP_SHOWN_MS = 10_000L
+
+/**
+ * When [button] appeared. It is null outside any segment and while the up-next card
+ * shows, so leaving a segment (its end, or a seek before its start) and entering
+ * another start a new countdown.
+ */
+data class SkipShown(val button: SkipPrompt.Button? = null, val since: Long = 0L)
+
+/** The countdown for [button] at [now]; unchanged within the same segment. */
+fun trackSkipShown(prev: SkipShown, button: SkipPrompt.Button?, now: Long): SkipShown =
+    if (button == prev.button) prev else SkipShown(button, now)
+
+/** Whether the button shows: for [SKIP_SHOWN_MS] after it appeared, then only with the [controls], until the segment ends. */
+fun skipShown(shown: SkipShown, now: Long, controls: Boolean): Boolean =
+    shown.button != null && (controls || now - shown.since < SKIP_SHOWN_MS)

@@ -3,13 +3,55 @@ import type { Segment } from "../emby/types";
 import {
   activeSegment,
   DEFAULT_SKIP,
+  NO_SKIP_SHOWN,
   offersNextToo,
   readSkip,
   SKIP_KEY,
+  SKIP_SHOWN_MS,
   saveSkip,
   segmentEnd,
   skipAction,
+  skipHidesIn,
+  skipShown,
+  trackSkipShown,
 } from "./segments";
+
+describe("skip button hiding (ADR 0089)", () => {
+  it("shows for ten seconds once its segment starts, then hides", () => {
+    const shown = trackSkipShown(NO_SKIP_SHOWN, "intro@50", 1_000);
+    expect(skipShown(shown, 1_000, false)).toBe(true);
+    expect(skipShown(shown, 1_000 + SKIP_SHOWN_MS - 1, false)).toBe(true);
+    expect(skipShown(shown, 1_000 + SKIP_SHOWN_MS, false)).toBe(false);
+    expect(skipHidesIn(shown, 4_000)).toBe(SKIP_SHOWN_MS - 3_000);
+    expect(skipHidesIn(shown, 1_000 + SKIP_SHOWN_MS)).toBeNull();
+  });
+
+  it("comes back with the controls once hidden", () => {
+    const shown = trackSkipShown(NO_SKIP_SHOWN, "intro@50", 0);
+    expect(skipShown(shown, 30_000, true)).toBe(true);
+    expect(skipShown(shown, 30_001, false)).toBe(false);
+  });
+
+  it("keeps its countdown within the same segment", () => {
+    const first = trackSkipShown(NO_SKIP_SHOWN, "intro@50", 0);
+    const later = trackSkipShown(first, "intro@50", 20_000);
+    expect(later).toBe(first);
+    expect(skipShown(later, 20_000, false)).toBe(false);
+  });
+
+  it("restarts for the next segment, or after leaving this one", () => {
+    const intro = trackSkipShown(NO_SKIP_SHOWN, "intro@50", 0);
+    const credits = trackSkipShown(intro, "credits@1345", 60_000);
+    expect(skipShown(credits, 60_000, false)).toBe(true);
+    // A seek before the intro's start, then playback back into it
+    const out = trackSkipShown(intro, null, 20_000);
+    expect(skipShown(out, 20_000, true)).toBe(false);
+    expect(skipHidesIn(out, 20_000)).toBeNull();
+    const again = trackSkipShown(out, "intro@50", 25_000);
+    expect(skipShown(again, 25_000, false)).toBe(true);
+    expect(skipHidesIn(again, 25_000)).toBe(SKIP_SHOWN_MS);
+  });
+});
 
 function memoryStorage(initial: Record<string, string> = {}): Storage {
   const data = new Map(Object.entries(initial));

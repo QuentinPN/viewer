@@ -5,7 +5,7 @@
 // At the end of an episode, a card offers the next one (ADR 0018). During an
 // intro or the credits, a button skips them (ADR 0030). Chapters are marked on
 // the seek bar and listed in their own panel (ADR 0034).
-import { onDestroy, onMount, tick } from "svelte";
+import { onDestroy, onMount, tick, untrack } from "svelte";
 import { embyApi } from "../emby/api";
 import type {
   Chapter,
@@ -30,11 +30,16 @@ import {
 import { mapPlayerKey } from "./keyboard";
 import {
   activeSegment,
+  NO_SKIP_SHOWN,
   offersNextToo,
   readSkip,
   type SkipAction,
+  type SkipShown,
   segmentKey,
   skipAction,
+  skipHidesIn,
+  skipShown,
+  trackSkipShown,
 } from "./segments";
 import type {
   EndReason,
@@ -132,6 +137,11 @@ let segments = $state<Segment[]>([]);
 let skipSetting = readSkip(storage());
 /** Segments already skipped on their own: once per playback. */
 let autoSkipped = new Set<string>();
+/** When the button of the segment being played appeared (ADR 0089). */
+let skipSince = $state<SkipShown>(NO_SKIP_SHOWN);
+/** Clock of `skipVisible`: set when a segment starts and when its button hides. */
+let skipNow = $state(0);
+let skipTimer: ReturnType<typeof setTimeout> | undefined;
 /** Chapters of this playback; empty until the lookup answers, or with fewer than two. */
 let chapters = $state<Chapter[]>([]);
 
@@ -156,6 +166,12 @@ const skip = $derived(
 const skipAlsoNext = $derived(
   segment ? offersNextToo(segment, duration, nextEpisode !== null) : false,
 );
+// The countdown follows the position only: a panel or the up-next card over
+// the segment do not restart it.
+const skipKey = $derived.by(() => {
+  const playing = active ? activeSegment(segments, position, duration) : null;
+  return playing ? `${playback.itemId}:${segmentKey(playing)}` : null;
+});
 const decision = $derived(playMethodLabel(playback));
 const chapterNow = $derived(chapterIndex(chapters, position));
 const chapterName = $derived(chapters[chapterNow]?.name ?? null);
@@ -177,6 +193,10 @@ const chromeVisible = $derived(
     panel !== null ||
     upNext !== null ||
     error !== null,
+);
+// Ten seconds on its own, then only with the controls (ADR 0089).
+const skipVisible = $derived(
+  skip !== null && skipShown(skipSince, skipNow, chromeVisible),
 );
 
 // Each episode looks up its successor; an answer for an older one is dropped.
@@ -238,6 +258,26 @@ $effect(() => {
   // Credits up to the end start the countdown, so it can still be cancelled.
   if (skip.kind === "next") void offerNext();
   else runSkip(skip);
+});
+
+// Each segment entered starts the button's countdown; leaving it, by its end or
+// a seek before its start, clears it.
+$effect(() => {
+  const key = skipKey;
+  const now = Date.now();
+  const shown = trackSkipShown(
+    untrack(() => skipSince),
+    key,
+    now,
+  );
+  skipSince = shown;
+  skipNow = now;
+  clearTimeout(skipTimer);
+  const left = skipHidesIn(shown, now);
+  if (left !== null)
+    skipTimer = setTimeout(() => {
+      skipNow = Date.now();
+    }, left);
 });
 
 let unlisten: (() => void) | undefined;
@@ -342,6 +382,7 @@ onDestroy(() => {
   unlisten?.();
   clearInterval(diagTimer);
   clearTimeout(hideTimer);
+  clearTimeout(skipTimer);
 });
 
 async function run(command: PlayerCommand) {
@@ -502,10 +543,12 @@ function onKeydown(e: KeyboardEvent) {
   if (inRadio && (e.key === " " || e.key.startsWith("Arrow"))) return;
   const inTextField =
     target instanceof HTMLInputElement && target.type === "text";
-  // Enter skips while the button shows, whatever control has the focus.
+  // Enter skips while the button shows, whatever control has the focus. Once
+  // it hid, Enter only brings it back with the controls (ADR 0089).
   if (e.key === "Enter" && skip && !inTextField) {
     e.preventDefault();
-    runSkip(skip);
+    if (skipVisible) runSkip(skip);
+    else wake();
     return;
   }
   const action = mapPlayerKey(e.key, { inTextField, shift: e.shiftKey });
@@ -678,7 +721,7 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     {/if}
     {#if error}<p class="error floating" role="alert">{error}</p>{/if}
 
-    {#if skip}
+    {#if skip && skipVisible}
       <div class="skip" role="group" aria-label={skip.label}>
         {#if skipAlsoNext}
           <button type="button" class="skip-next" onclick={() => playNext()}>Épisode suivant</button>
@@ -1497,8 +1540,8 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     height: 18px;
   }
 
-  /* Skip intro or credits (ADR 0030): above the controls, and still there when
-     they fade. */
+  /* Skip intro or credits (ADR 0030): above the controls, and still there for
+     10 s when they fade (ADR 0089). */
   .skip {
     position: absolute;
     right: clamp(var(--space-4), 5vw, 80px);

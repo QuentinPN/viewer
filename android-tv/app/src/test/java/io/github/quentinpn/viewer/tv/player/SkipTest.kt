@@ -4,7 +4,10 @@ import io.github.quentinpn.viewer.tv.emby.Segment
 import io.github.quentinpn.viewer.tv.emby.SegmentKind
 import io.github.quentinpn.viewer.tv.emby.SegmentSource
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SkipTest {
@@ -87,5 +90,57 @@ class SkipTest {
     @Test
     fun noSegmentsNoPrompt() {
         assertNull(SkipPlan(emptyList()).at(1400.0, duration, hasNext = true))
+    }
+
+    // ADR 0089: the button hides 10 s after it appears, as on Windows
+    private val introButton = SkipPrompt.Button("Passer l'intro", 80.0)
+    private val creditsButton = SkipPrompt.Button("Passer le générique", 1435.1)
+
+    @Test
+    fun buttonShowsTenSecondsThenHides() {
+        val shown = trackSkipShown(SkipShown(), introButton, 1_000)
+        assertTrue(skipShown(shown, 1_000, controls = false))
+        assertTrue(skipShown(shown, 1_000 + SKIP_SHOWN_MS - 1, controls = false))
+        assertFalse(skipShown(shown, 1_000 + SKIP_SHOWN_MS, controls = false))
+    }
+
+    @Test
+    fun hiddenButtonComesBackWithTheControls() {
+        val shown = trackSkipShown(SkipShown(), introButton, 0)
+        assertTrue(skipShown(shown, 30_000, controls = true))
+        assertFalse(skipShown(shown, 30_001, controls = false))
+    }
+
+    @Test
+    fun countdownKeptWithinTheSegment() {
+        val first = trackSkipShown(SkipShown(), introButton, 0)
+        val later = trackSkipShown(first, SkipPrompt.Button("Passer l'intro", 80.0), 20_000)
+        assertSame(first, later)
+        assertFalse(skipShown(later, 20_000, controls = false))
+    }
+
+    @Test
+    fun countdownRestartsForTheNextSegmentOrAfterLeavingIt() {
+        val intro = trackSkipShown(SkipShown(), introButton, 0)
+        assertTrue(skipShown(trackSkipShown(intro, creditsButton, 60_000), 60_000, controls = false))
+        // A seek before the intro's start, then playback back into it
+        val out = trackSkipShown(intro, null, 20_000)
+        assertFalse(skipShown(out, 20_000, controls = true))
+        assertTrue(skipShown(trackSkipShown(out, introButton, 25_000), 25_000, controls = false))
+    }
+
+    @Test
+    fun planPositionsDriveTheCountdown() {
+        val plan = SkipPlan(segments)
+        var shown = SkipShown()
+        fun at(position: Double, now: Long): Boolean {
+            shown = trackSkipShown(shown, plan.at(position, duration, hasNext = false) as? SkipPrompt.Button, now)
+            return skipShown(shown, now, controls = false)
+        }
+        assertTrue(at(50.0, 0))
+        assertTrue(at(59.0, 9_000))
+        assertFalse(at(61.0, 11_000))
+        assertFalse(at(45.0, 12_000))
+        assertTrue("back into the intro", at(50.0, 17_000))
     }
 }

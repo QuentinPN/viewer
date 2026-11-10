@@ -76,6 +76,7 @@ import io.github.quentinpn.viewer.tv.player.SleepItem
 import io.github.quentinpn.viewer.tv.player.SleepTimer
 import io.github.quentinpn.viewer.tv.player.SpeedChange
 import io.github.quentinpn.viewer.tv.player.SkipPrompt
+import io.github.quentinpn.viewer.tv.player.SkipShown
 import io.github.quentinpn.viewer.tv.player.Track
 import io.github.quentinpn.viewer.tv.player.TrackType
 import io.github.quentinpn.viewer.tv.player.VideoFit
@@ -89,6 +90,7 @@ import io.github.quentinpn.viewer.tv.player.nightValue
 import io.github.quentinpn.viewer.tv.player.qualityNote
 import io.github.quentinpn.viewer.tv.player.qualityValue
 import io.github.quentinpn.viewer.tv.player.sleepBadge
+import io.github.quentinpn.viewer.tv.player.skipShown
 import io.github.quentinpn.viewer.tv.player.sleepValue
 import io.github.quentinpn.viewer.tv.player.speedBadge
 import io.github.quentinpn.viewer.tv.player.untilNextMinute
@@ -136,6 +138,12 @@ class PlayerUi {
 
     /** "Passer l'intro" or "Passer le générique" during a segment (ADR 0048). */
     var skip by mutableStateOf<SkipPrompt.Button?>(null)
+
+    /** When [skip] appeared: it shows 10 s on its own, then only with the controls (ADR 0089). */
+    var skipSince by mutableStateOf(SkipShown())
+
+    /** [skip] is on screen; read again at each position, through [now]. */
+    val skipVisible get() = skip != null && skipShown(skipSince, now, controls || paused)
 
     /** Chapters of the item, none with fewer than two (ADR 0057). */
     var chapters by mutableStateOf<List<Chapter>>(emptyList())
@@ -218,6 +226,7 @@ class PlayerUi {
         tracks = null
         upNext = null
         skip = null
+        skipSince = SkipShown()
         chapters = emptyList()
         chapterMenu = false
         info = null
@@ -305,8 +314,9 @@ fun PlayerOverlay(
             Controls(ui, Modifier.align(Alignment.BottomCenter))
         }
         val skip = ui.skip
-        if (skip != null && upNext == null && ui.status == null) {
-            // Above the text of the controls while they show; stays when they fade
+        if (skip != null && upNext == null && ui.status == null && ui.skipVisible) {
+            // Above the text of the controls while they show; stays 10 s when they fade (ADR 0089).
+            // Gone while focused, the focus goes back to the player: OK then shows it again
             SkipButton(skip, !ui.menuOpen, onSkip, Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
         }
         ui.tracks?.let {
