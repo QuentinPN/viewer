@@ -1009,3 +1009,19 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - La Chute de Londres shows ? 2016 1 h 38 [FR-12] ? 5,9 27 % critiques Action, Thriller ?; Moxie shows ? 2021 1 h 51 [PG-13] ? 6,7 70 % critiques Com?die, Dra? ?.
   - Logcat: 0 token line, no crash.
 - **Not verified**: ? Au hasard ? with filters on, and in S?ries.
+
+### 2026-11-10 — Android TV: picture format, genres to open and image cache
+
+- **Added**: ADR 0078. The ▼ menu's « Lecture » section has « Format », under « Vitesse »: « Original », « Remplir l'écran » (mpv `panscan=1`) or « Étirer » (`keepaspect=no`). Both properties are always set together and read back. A badge « Remplir » or « Étiré » shows in the controls. The format is for the current file only and goes back to « Original » for each new item.
+- **Added**: ADR 0079. Film and series pages have a « Genres » line of pills, at most three. OK opens the « Films » or « Séries » grid of the home bar on that genre, with the saved sort, no watch or favourite filter, and nothing saved. The year line drops the genres when the pills show them. Back returns to the page with the focus on the pill.
+- **Added**: ADR 0080. The Coil disk cache is now explicit: one per process, in `cacheDir/coil3_disk_cache` (the directory Coil already used), with a fixed 256 Mo limit. Before, the limit was 2 % of free space, from 10 to 250 Mo. Réglages has a « Stockage » section: « Cache des images » shows « N Mo sur 256 Mo », and « Vider le cache » clears the memory and disk caches. Image URLs carry no token; the header is added only for the server's origin.
+- **Tests**: `VideoFitTest`, `GenresTest`, `ImageCacheTest`. `testDebugUnitTest` 376/376, `assembleDebug` and `lintDebug` OK.
+- **Checked on the Shield**:
+  - In the player (Overgeared S1E6), « Format » steps to « Remplir l'écran », then « Étirer » with the « Étiré » badge. OK goes back to « Original ». mpv read back `panscan=1.000000 keepaspect=yes`, then `panscan=0.000000 keepaspect=no`, then `panscan=0.000000 keepaspect=yes`. The stop report went out at 15:11.
+  - On Overgeared, the pills read « Fantasy », « Animation », « Action », and the year line no longer lists genres. « Animation » opened the Anime library on « Genre : Animation », with 137 titles. Back focused the « Animation » pill again.
+  - Réglages showed « 68 Mo sur 256 Mo »: the images the old default cache had stored were kept. « Vider le cache » then showed « Vidé » and « 0 Mo sur 256 Mo », and the home images loaded again.
+  - Logcat: 0 token line, no crash.
+- **Not verified**:
+  - « Format » on a film that is not 16:9: Overgeared fills the screen, so cropping and stretching change nothing visible. Subtitles in a cropped or stretched picture.
+  - Genres on a film page; with several film or series libraries; a genre name with accents.
+  - A change of sort inside a genre grid leaving the saved grid choices untouched (code only).
