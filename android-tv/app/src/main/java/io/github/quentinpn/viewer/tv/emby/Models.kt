@@ -122,6 +122,10 @@ data class BaseItemDto(
     @SerialName("RemoteTrailers") val remoteTrailers: List<MediaUrlDto> = emptyList(),
     /** Trailer files on the server (ADR 0083), listed by [EmbyClient.localTrailers]. */
     @SerialName("LocalTrailerCount") val localTrailerCount: Int? = null,
+    /** `Video` or `Audio` on a playlist (ADR 0088): audio playlists are left out. */
+    @SerialName("MediaType") val mediaType: String? = null,
+    /** The entries of a playlist, with `Fields=ChildCount` (ADR 0088). */
+    @SerialName("ChildCount") val childCount: Int? = null,
 )
 
 /** `MediaUrl` of `RemoteTrailers`: both fields optional, so an incomplete entry is skipped, not the item. */

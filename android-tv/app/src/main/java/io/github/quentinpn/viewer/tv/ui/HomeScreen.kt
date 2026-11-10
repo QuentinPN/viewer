@@ -121,7 +121,10 @@ class HomeMemory {
     internal var focusHeader: BarItem? = null
 }
 
-/** The hero (ADR 0059), "Reprendre", "À suivre" (ADR 0056), then the latest additions of each film and series library. */
+/**
+ * The hero (ADR 0059), "Reprendre", "À suivre" (ADR 0056), then the latest additions of each
+ * film and series library and, last, the user's playlists (ADR 0088).
+ */
 @Composable
 fun HomeScreen(
     client: EmbyClient,
@@ -131,6 +134,7 @@ fun HomeScreen(
     onPlay: (itemId: String, startTicks: Long) -> Unit,
     onOpenSeries: (seriesId: String) -> Unit,
     onOpenMovie: (movieId: String) -> Unit,
+    onOpenPlaylist: (playlist: BaseItemDto) -> Unit,
     onOpenLibrary: (Library) -> Unit,
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -171,6 +175,7 @@ fun HomeScreen(
                         add(Shelf("Derniers ajouts · ${library.name}", latest, landscape = false, resume = false, library))
                     }
                 }
+                playlistShelf(playlistsOrNothing(client, userId))?.let(::add)
             }
             HomeState.Ready(shelves, hero, libraries)
         } catch (e: EmbyException) {
@@ -259,6 +264,7 @@ fun HomeScreen(
                         item.type == "Movie" -> onOpenMovie(item.id)
                         item.type == "Episode" -> onPlay(item.id, 0)
                         item.type == "Series" -> onOpenSeries(item.id)
+                        item.type == "Playlist" -> onOpenPlaylist(item)
                         else -> notice = "Ce type d'élément ne peut pas encore être ouvert."
                     }
                 }
@@ -284,6 +290,17 @@ private suspend fun nextUpOrNothing(client: EmbyClient, userId: String): List<Ba
  */
 private suspend fun heroOrNothing(client: EmbyClient, userId: String, resumed: List<BaseItemDto>): List<HeroTitle> = try {
     client.homeHero(userId, resumed)
+} catch (e: EmbyException) {
+    if (e.error == EmbyError.SessionExpired) throw e
+    emptyList()
+}
+
+/**
+ * The user's playlists (ADR 0088); none when they cannot be read, so the row hides and the
+ * rest of the home still shows. An expired session is not hidden: the whole home handles it.
+ */
+private suspend fun playlistsOrNothing(client: EmbyClient, userId: String): List<BaseItemDto> = try {
+    client.playlists(userId).items
 } catch (e: EmbyException) {
     if (e.error == EmbyError.SessionExpired) throw e
     emptyList()
@@ -516,6 +533,7 @@ private fun subtitle(item: BaseItemDto): String? = when (item.type) {
         item.parentIndexNumber?.let { s -> item.indexNumber?.let { e -> "S$s · É$e" } },
         item.name,
     ).joinToString(" — ")
+    "Playlist" -> item.childCount?.let(::titlesLabel)
     else -> item.productionYear?.toString()
 }
 

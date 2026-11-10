@@ -55,6 +55,9 @@ internal sealed interface DetailPage {
 
     /** [opened]: the title last opened from it, focused again on Back. */
     data class Person(val member: CastMember, val opened: String? = null) : DetailPage
+
+    /** A playlist opened from the home (ADR 0088); [opened]: the entry last opened from it, focused again on Back. */
+    data class Playlist(val id: String, val name: String, val opened: String? = null) : DetailPage
 }
 
 /** [page] over [pages], Back going down to the one below. */
