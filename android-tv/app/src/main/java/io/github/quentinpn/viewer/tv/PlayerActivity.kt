@@ -121,7 +121,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     // END_FILE events of a file replaced by the next episode: not the end of playback
     @Volatile private var replacedEnds = 0
-    private val reporter = AppServices.reporter
+    private val reporter by lazy { AppServices.reporter(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -280,6 +280,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             // Reported once the file is loaded; never if loading fails
             reporter.begin(
                 client,
+                userId,
                 ActivePlayback(itemId, chosen.mediaSourceId, chosen.playSessionId, chosen.method, chosen.runTimeTicks, startTicks),
             )
             val running = engine

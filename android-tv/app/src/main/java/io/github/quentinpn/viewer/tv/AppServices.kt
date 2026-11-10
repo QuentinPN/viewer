@@ -11,6 +11,7 @@ import io.github.quentinpn.viewer.tv.emby.SegmentSources
 import io.github.quentinpn.viewer.tv.emby.ServerUrl
 import io.github.quentinpn.viewer.tv.player.AccountTracks
 import io.github.quentinpn.viewer.tv.player.accountTracks
+import io.github.quentinpn.viewer.tv.session.PendingStopStore
 import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.session.SessionStore
 import okhttp3.OkHttpClient
@@ -19,7 +20,12 @@ import okhttp3.OkHttpClient
 object AppServices {
     val http: OkHttpClient by lazy { EmbyClient.defaultHttp() }
 
-    val reporter: PlaybackReporter by lazy { PlaybackReporter() }
+    /** Playback reports, with the stop reports kept on disk when the network fails (ADR 0040, 0066). */
+    fun reporter(context: Context): PlaybackReporter = playbackReporter ?: synchronized(this) {
+        playbackReporter ?: PlaybackReporter(PendingStopStore(context)).also { playbackReporter = it }
+    }
+
+    @Volatile private var playbackReporter: PlaybackReporter? = null
 
     /** Intro and credits sources, with their in-memory cache (ADR 0048). */
     fun segments(context: Context): SegmentSources = segmentSources ?: synchronized(this) {
