@@ -46,9 +46,11 @@ import io.github.quentinpn.viewer.tv.ui.genreOptions
 import io.github.quentinpn.viewer.tv.ui.openFromCollection
 import io.github.quentinpn.viewer.tv.ui.openGenre
 import io.github.quentinpn.viewer.tv.ui.openOver
+import io.github.quentinpn.viewer.tv.ui.openStudio
 import io.github.quentinpn.viewer.tv.ui.pageKey
 import io.github.quentinpn.viewer.tv.ui.replaceTop
 import io.github.quentinpn.viewer.tv.ui.similarPage
+import io.github.quentinpn.viewer.tv.ui.studioOptions
 import kotlinx.coroutines.launch
 
 /** Launcher: sign-in when no session is stored, else the home shelves, a library grid or the search, the settings, the series and film pages. */
@@ -132,6 +134,12 @@ class MainActivity : ComponentActivity() {
                             { genre -> genreOptions(libraryPrefs.load(library), genre)?.let { pages = openGenre(pages, DetailPage.Grid(LibraryMemory(library, it)), genre) } }
                         }
                     }
+                    // A studio chip opens that same library on the studio, by name (ADR 0087)
+                    val studioOpener: (String) -> ((String) -> Unit)? = { itemType ->
+                        genreLibrary(libraries, itemType)?.let { library ->
+                            { studio -> studioOptions(libraryPrefs.load(library), studio)?.let { pages = openStudio(pages, DetailPage.Grid(LibraryMemory(library, it)), studio) } }
+                        }
+                    }
                     val page = pages.lastOrNull()
                     if (page != null) {
                         // Back shows the page below: the film or series a similar title was opened from
@@ -159,7 +167,7 @@ class MainActivity : ComponentActivity() {
                                     current.userId,
                                     images,
                                     page.memory,
-                                    // Not saved: the grid of the home bar keeps its own choices (ADR 0079)
+                                    // Not saved: the grid of the home bar keeps its own choices (ADR 0079, 0087)
                                     onOptionsChanged = {},
                                     onOpenSeries = { pages = openOver(pages, DetailPage.Series(SeriesTarget(it))) },
                                     onOpenMovie = { pages = openOver(pages, DetailPage.Movie(it)) },
@@ -189,6 +197,8 @@ class MainActivity : ComponentActivity() {
                                     onOpenGenre = genreOpener("Series"),
                                     focusGenre = page.genre,
                                     trailers = trailers,
+                                    onOpenStudio = studioOpener("Series"),
+                                    focusStudio = page.studio,
                                 )
                                 is DetailPage.Movie -> MovieScreen(
                                     client,
@@ -208,6 +218,8 @@ class MainActivity : ComponentActivity() {
                                     onOpenGenre = genreOpener("Movie"),
                                     focusGenre = page.genre,
                                     trailers = trailers,
+                                    onOpenStudio = studioOpener("Movie"),
+                                    focusStudio = page.studio,
                                 )
                             }
                         }

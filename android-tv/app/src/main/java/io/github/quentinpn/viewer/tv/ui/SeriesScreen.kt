@@ -126,6 +126,10 @@ fun SeriesScreen(
     focusGenre: String? = null,
     /** « Bande-annonce » under the genres (ADR 0083); null hides it. */
     trailers: TrailerHandlers? = null,
+    /** OK on a studio chip opens the series library on it (ADR 0087); null hides the chips. */
+    onOpenStudio: ((String) -> Unit)? = null,
+    /** The studio chip a grid was opened from: focused instead of an episode card. */
+    focusStudio: String? = null,
 ) {
     var data by remember { mutableStateOf<Load<SeriesData>>(Load.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
@@ -136,6 +140,8 @@ fun SeriesScreen(
     var castFocus by remember { mutableStateOf(focusPerson) }
     // Back from a genre's grid: the chip keeps the focus likewise (ADR 0079)
     var chipFocus by remember { mutableStateOf(focusGenre) }
+    // And from a studio's grid (ADR 0087)
+    var studioChipFocus by remember { mutableStateOf(focusStudio) }
     val seriesId = target.seriesId
 
     suspend fun <T> load(block: suspend () -> T): Load<T> = try {
@@ -168,7 +174,10 @@ fun SeriesScreen(
                     val chips = remember(d.value.series.genres, onOpenGenre != null) { if (onOpenGenre != null) genreChips(d.value.series) else emptyList() }
                     // The chip if the series still has that genre, else the episode row as usual
                     val genreFocus = chipFocus?.takeIf { it in chips }
-                    Header(d.value.series, chips, genreFocus, { onOpenGenre?.invoke(it) }) { onMessage ->
+                    val studios = remember(d.value.series.studios, onOpenStudio != null) { if (onOpenStudio != null) studioChips(d.value.series) else emptyList() }
+                    val studioFocus = studioChipFocus?.takeIf { it in studios }
+                    val lines = ChipLines(chips, genreFocus, { onOpenGenre?.invoke(it) }, studios, studioFocus) { onOpenStudio?.invoke(it) }
+                    Header(d.value.series, lines) { onMessage ->
                         trailers?.let { TrailerButton(d.value.series, client, userId, it, onSessionExpired, onMessage) }
                     }
                     if (d.value.seasons.isEmpty()) {
@@ -181,10 +190,11 @@ fun SeriesScreen(
                                 focusEpisode = null
                                 castFocus = null
                                 chipFocus = null
+                                studioChipFocus = null
                             }
                         }
                         seasonId?.let { id ->
-                            Episodes(client, userId, seriesId, id, focusEpisode, castFocus == null && genreFocus == null, d.value.series, images, onPlay, onOpenEpisode, onSessionExpired, refresh)
+                            Episodes(client, userId, seriesId, id, focusEpisode, castFocus == null && genreFocus == null && studioFocus == null, d.value.series, images, onPlay, onOpenEpisode, onSessionExpired, refresh)
                         }
                     }
                     val cast = remember(d.value.series.people) { castMembers(d.value.series) }
@@ -232,9 +242,8 @@ internal fun Backdrop(series: BaseItemDto, client: EmbyClient, images: ImageLoad
 @Composable
 private fun Header(
     series: BaseItemDto,
-    chips: List<String>,
-    focusGenre: String?,
-    onOpenGenre: (String) -> Unit,
+    /** Genres and networks to open (ADR 0079, 0087). */
+    chips: ChipLines,
     /** The trailer button (ADR 0083): no play row on a series, so its own line, never focused first. */
     trailer: @Composable (onMessage: (String?) -> Unit) -> Unit,
 ) {
@@ -246,15 +255,17 @@ private fun Header(
             series.productionYear?.let { Text(it.toString(), color = Palette.textSecondary) }
             RatingBadge(series)
             // The genres are the chips below when they open a grid (ADR 0079)
-            val line = scores(series) + listOfNotNull(yearLineGenres(series, chips))
+            val line = scores(series) + listOfNotNull(yearLineGenres(series, chips.genres))
             if (line.isNotEmpty()) Text(line.joinToString("  ·  "), color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         series.overview?.let {
             Text(it, color = Palette.textSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
         }
         // Two lines at most: the episodes row needs the room
-        Facts(series, limit = 2)
-        GenreChips(chips, focusGenre, onOpenGenre)
+        // The networks are the chips below when they open a grid (ADR 0087)
+        Facts(series, limit = 2, studios = chips.studios.isEmpty())
+        GenreChips(chips.genres, chips.focusGenre, chips.onOpenGenre)
+        StudioChips(series, chips.studios, chips.focusStudio, chips.onOpenStudio)
         // No line at all without a trailer: the episode row stays where it was
         if (trailerChoices(series).isNotEmpty()) {
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {

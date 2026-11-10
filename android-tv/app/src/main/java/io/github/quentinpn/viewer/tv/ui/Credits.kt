@@ -25,18 +25,22 @@ internal data class Fact(val label: String, val value: String)
 
 /**
  * Director, writer and studio of a film, series or episode; empty ones left out. The cast,
- * once an « Avec » / « Invités » line, is the « Distribution » row now (ADR 0068).
+ * once an « Avec » / « Invités » line, is the « Distribution » row now (ADR 0068). Without
+ * [studios], the studio line is left to the chips that open it (ADR 0087).
  */
-internal fun facts(item: BaseItemDto): List<Fact> {
+internal fun facts(item: BaseItemDto, studios: Boolean = true): List<Fact> {
     val series = item.type == "Series"
     fun people(type: String) = item.people.filter { it.type == type }.map { it.name.trim() }.filter { it.isNotEmpty() }
     return listOfNotNull(
         people("Director").takeIf { it.isNotEmpty() }?.let { Fact("Réalisation", it.joinToString(", ")) },
         people("Writer").takeIf { it.isNotEmpty() && !series }?.let { Fact("Scénario", it.joinToString(", ")) },
-        item.studios.map { it.name.trim() }.filter { it.isNotEmpty() }.takeIf { it.isNotEmpty() }
-            ?.let { Fact(if (series) "Diffusion" else "Studio", it.joinToString(", ")) },
+        item.studios.map { it.name.trim() }.filter { it.isNotEmpty() }.takeIf { it.isNotEmpty() && studios }
+            ?.let { Fact(studioLabel(item), it.joinToString(", ")) },
     )
 }
+
+/** « Diffusion » for a series' networks, « Studio » otherwise. */
+internal fun studioLabel(item: BaseItemDto): String = if (item.type == "Series") "Diffusion" else "Studio"
 
 /**
  * Scores then genres after the year: "★ 7,4 · 87 % critiques · Action, Fantastique". The age
@@ -69,8 +73,8 @@ internal fun RatingBadge(item: BaseItemDto) {
 }
 
 @Composable
-internal fun Facts(item: BaseItemDto, limit: Int = Int.MAX_VALUE) {
-    val shown = facts(item).take(limit)
+internal fun Facts(item: BaseItemDto, limit: Int = Int.MAX_VALUE, studios: Boolean = true) {
+    val shown = facts(item, studios).take(limit)
     if (shown.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         shown.forEach { fact ->

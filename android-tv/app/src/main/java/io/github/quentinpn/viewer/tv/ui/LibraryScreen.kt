@@ -259,7 +259,8 @@ fun LibraryScreen(
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text(memory.library.name, style = MaterialTheme.typography.headlineMedium, color = Palette.text)
+                // A studio's grid is named after it (ADR 0087)
+                Text(gridTitle(memory.library, memory.options), style = MaterialTheme.typography.headlineMedium, color = Palette.text)
                 if (memory.total >= 0) {
                     val count = memory.total
                     Text(if (count > 1) "$count titres" else "$count titre", color = Palette.textSecondary, modifier = Modifier.padding(bottom = 4.dp))
@@ -389,7 +390,7 @@ private fun Toolbar(
         Toggle(options.genre != null, "Genre : ${options.genre ?: "Tous"}", Modifier.focusRequester(focus.genre), onPickGenre)
         // Filled while a decade narrows the grid (ADR 0082)
         Toggle(options.decade != null, decadePillLabel(options.decade), Modifier.focusRequester(focus.decade), onPickDecade)
-        GlassButton(onClick = { onChange(ItemsOptions()) }) { PillText("Réinitialiser") }
+        GlassButton(onClick = { onChange(resetOptions(options)) }) { PillText("Réinitialiser") }
         // Opens one title drawn among those the filters keep (ADR 0077)
         GlassButton(
             onClick = onPickRandom,

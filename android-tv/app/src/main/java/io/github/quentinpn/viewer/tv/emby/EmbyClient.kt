@@ -246,6 +246,8 @@ class EmbyClient(
         options.filters()?.let { builder.addQueryParameter("Filters", it) }
         options.genre?.takeIf(::isUsableGenre)?.let { builder.addQueryParameter("Genres", it) }
         options.years()?.let { builder.addQueryParameter("Years", it) }
+        // By name: `StudioIds` would need `Studios[].Id`, a number on Emby 4.10 (ADR 0087)
+        options.studio?.takeIf(::isUsableStudio)?.let { builder.addQueryParameter("Studios", it) }
         return builder
     }
 
