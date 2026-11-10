@@ -222,10 +222,11 @@ fun HomeScreen(
     Column(Modifier.fillMaxSize().background(Palette.background)) {
         // A row hidden since the last load leaves at once, before the shelves are read again
         val s = memory.state.let { if (it is HomeState.Ready) it.copy(shelves = rows.visibleShelves(it.shelves)) else it }
-        // With shelves the header scrolls with them, laid over the hero's backdrop
-        if (s !is HomeState.Ready || (s.shelves.isEmpty() && s.hero.isEmpty())) header()
+        // With shelves the header scrolls with them, laid over the hero's backdrop; the first
+        // load shows the loading screen alone
+        if (s is HomeState.Failed || (s is HomeState.Ready && s.shelves.isEmpty() && s.hero.isEmpty())) header()
         when (s) {
-            HomeState.Loading -> Message("Chargement…")
+            HomeState.Loading -> LoadingScreen()
             is HomeState.Failed -> Column(Modifier.padding(48.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(s.message, color = Palette.error)
                 Button(onClick = {

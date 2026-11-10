@@ -1118,3 +1118,9 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 
 - **Changed**: the launcher banner was still the Gate TV-1 placeholder (a white triangle). The banner and the app icon now draw the desktop logo (`src-tauri/icons/source/logo.svg`) as Android vectors: the "U" holding the blue play triangle, on the tile's gradient.
 - **Checked on the Shield** (release build): after a launcher restart (it caches banners), « Applications favorites » shows the U and play mark. `testDebugUnitTest`, `lintDebug`, `assembleRelease`, `lintRelease` OK.
+
+### 2026-11-10 — Android TV: loading screen
+
+- **Added**: while the home is first read (start-up, « Réessayer »), a loading screen replaces the empty bar and the bare « Chargement… »: the app logo, a ring with an accent arc turning once a second (`Spinner`, still when the system turns animations off), then « Chargement… ». A refresh after playback keeps the shelves on screen, as before.
+- **Checked on the Shield** (release build): a capture 0.6 s after launch shows the logo, the ring and the text; once loaded, OK on the focused hero button resumes Overgeared S1E7 (focus lands on the hero as before). Logcat: 0 token line, 0 `FATAL EXCEPTION`, stop report sent. `testDebugUnitTest`, `lintDebug`, `assembleRelease`, `lintRelease` OK.
+- **Not verified**: the ring turning (a still capture only shows one frame).
