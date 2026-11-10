@@ -84,6 +84,8 @@ import io.github.quentinpn.viewer.tv.player.playbackInfo
 import io.github.quentinpn.viewer.tv.player.playingAudioIndex
 import io.github.quentinpn.viewer.tv.player.playingAudioLanguage
 import io.github.quentinpn.viewer.tv.player.rememberedAudioIndex
+import io.github.quentinpn.viewer.tv.player.seekStep
+import io.github.quentinpn.viewer.tv.player.seeksOnRepeat
 import io.github.quentinpn.viewer.tv.player.sleepDue
 import io.github.quentinpn.viewer.tv.player.sleepTimer
 import io.github.quentinpn.viewer.tv.player.step
@@ -109,7 +111,6 @@ import kotlin.math.roundToLong
 
 private const val TAG = "ViewerTV"
 private const val TICKS_PER_SECOND = 10_000_000.0
-private const val SEEK_SECONDS = 10.0
 
 /** As the tracker (ADR 0012): an end further than this from the duration is a cut stream. */
 private const val NATURAL_END_MARGIN_SECONDS = 30.0
@@ -786,19 +787,19 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             if (event.action == KeyEvent.ACTION_DOWN) if (ui.skipVisible) skip() else ui.show()
             return true
         }
-        val action = action(event.keyCode) ?: return false
+        val action = action(event) ?: return false
         if (event.action == KeyEvent.ACTION_DOWN) action(player)
         return true
     }
 
-    private fun action(keyCode: Int): ((PlayerEngine) -> Unit)? = when (keyCode) {
+    private fun action(event: KeyEvent): ((PlayerEngine) -> Unit)? = when (event.keyCode) {
         KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
         KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_SPACE -> { p ->
             p.togglePause()
             ui.show()
         }
-        KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> { p -> seek(p, -SEEK_SECONDS) }
-        KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { p -> seek(p, SEEK_SECONDS) }
+        KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> { p -> heldSeek(p, -1.0, event.repeatCount) }
+        KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { p -> heldSeek(p, 1.0, event.repeatCount) }
         KeyEvent.KEYCODE_DPAD_UP -> { _ ->
             ui.chapterMenu = ui.chapters.isNotEmpty()
             ui.show()
@@ -812,6 +813,11 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         // Remotes that have it; the Shield's has not, and goes through the track menu
         KeyEvent.KEYCODE_INFO -> { _ -> openInfo() }
         else -> null
+    }
+
+    /** ◀ ▶ held (ADR 0090): the step grows with the repeats, and only some repeats seek. */
+    private fun heldSeek(player: PlayerEngine, direction: Double, repeatCount: Int) {
+        if (seeksOnRepeat(repeatCount)) seek(player, direction * seekStep(repeatCount))
     }
 
     private fun seek(player: PlayerEngine, seconds: Double) {
