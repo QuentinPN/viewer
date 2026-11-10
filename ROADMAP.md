@@ -1094,3 +1094,14 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Fixed**: ADR 0092. The home bar showed only « Films » and « Séries », each opening one library (« Séries » opened « Anime »; « Films Anime » and « Séries TV » could not be opened). It now lists every film and series library by name, in the server's order, as the desktop does; the one opened last takes the focus back; the bar scrolls sideways if they do not fit.
 - **Tests**: `HomeBarTest`. `testDebugUnitTest` 460/460, `assembleDebug` and `lintDebug` OK.
 - **Checked on the Shield**: the bar reads Accueil, Anime, Films, Films Anime, Séries TV; « Films Anime » opens « Films Anime · 15 titres »; Back puts the focus on « Films Anime ». Logcat: 0 token line, no crash.
+
+### 2026-11-10 — Android TV: genre and studio open the title's library; home rows setting. Windows: player top bar
+
+- **Changed**: ADR 0093. A genre or studio chip opens the library that holds the title (`/Items/{Id}/Ancestors`), falling back to the first library of its type.
+- **Added**: ADR 0094. Réglages › Accueil lists the home rows (Reprendre, À suivre, Favoris, each « Derniers ajouts », Listes de lecture); OK shows or hides one; a hidden row is no longer requested; kept per user on the device.
+- **Fixed (Windows)**: outside fullscreen, the player's top bar sat in the middle of the window (the caption wrapper added in 87a8cda was a flex item). Reported by the owner with a maximized window; `npm run verify:web` OK (161 tests). **Not verified** in the app: the owner checks it.
+- **Tests**: `testDebugUnitTest` 476/476, `assembleDebug` and `lintDebug` OK.
+- **Checked on the Shield**:
+  - Overgeared (Anime): « Fantasy » opens « Anime · Genre : Fantasy »; Back returns to the chip. The film « Moi quand je me réincarne en Slime - Scarlet Bond » (Films Anime): « Animation » opens « Films Anime · 15 titres · Genre : Animation », where it used to open « Films ».
+  - Réglages › Accueil: hiding « Derniers ajouts · Anime » removes it from the home (Reprendre then Derniers ajouts · Films); « Masquée » survives a restart; showing it brings it back. Left as before.
+  - Logcat: 0 token line, no crash.
