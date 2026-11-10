@@ -1046,7 +1046,10 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   .player.hidden .chrome * {
     pointer-events: none;
   }
+  /* Out of the flex flow: as an item, it pushed the top bar to the middle of the
+     window when not fullscreen (its title bar is fixed, so the wrapper has no height). */
   .caption {
+    position: absolute;
     transition: opacity var(--motion-base) ease;
   }
   .caption.faded {
