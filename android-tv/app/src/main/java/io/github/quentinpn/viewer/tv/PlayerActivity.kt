@@ -28,6 +28,7 @@ import io.github.quentinpn.viewer.tv.emby.nextEpisode
 import io.github.quentinpn.viewer.tv.emby.plan
 import io.github.quentinpn.viewer.tv.emby.segmentQuery
 import io.github.quentinpn.viewer.tv.emby.startTicks
+import io.github.quentinpn.viewer.tv.player.AccountTracks
 import io.github.quentinpn.viewer.tv.player.DelayChange
 import io.github.quentinpn.viewer.tv.player.DelayKind
 import io.github.quentinpn.viewer.tv.player.MediaSource
@@ -40,11 +41,13 @@ import io.github.quentinpn.viewer.tv.player.SkipPrompt
 import io.github.quentinpn.viewer.tv.player.TrackPreference
 import io.github.quentinpn.viewer.tv.player.TrackPreferenceStore
 import io.github.quentinpn.viewer.tv.player.TrackType
+import io.github.quentinpn.viewer.tv.player.accountPick
 import io.github.quentinpn.viewer.tv.player.changeDelay
 import io.github.quentinpn.viewer.tv.player.chapters
 import io.github.quentinpn.viewer.tv.player.decide
 import io.github.quentinpn.viewer.tv.player.describeTrack
 import io.github.quentinpn.viewer.tv.player.playbackInfo
+import io.github.quentinpn.viewer.tv.player.playingAudioLanguage
 import io.github.quentinpn.viewer.tv.player.subtitlePosition
 import io.github.quentinpn.viewer.tv.player.transcodeReasons
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettings
@@ -74,7 +77,8 @@ private const val INFO_REFRESH_MS = 1_000L
  * PlaybackInfo, so the token never travels in an Intent (ADR 0007, 0038).
  * Start, progress and stop go to the server through [PlaybackReporter] (ADR 0040).
  * The last audio and subtitle picked in the menu apply to the next files (ADR 0042);
- * without one, the tracks the server picked from the account's preferences (ADR 0055).
+ * without one, the tracks the server picked from the account's preferences (ADR 0055),
+ * else those preferences applied by the app (ADR 0065).
  * At the natural end of an episode, the next one is offered and plays in the same
  * engine (ADR 0043). Intros and credits get a skip button, and the next episode is
  * offered from the start of its credits (ADR 0048). The Réglages apply from the next
@@ -96,6 +100,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     private var facts: PlaybackFacts? = null
     private var surfaceHolder: SurfaceHolder? = null
     private var preferences: TrackPreferenceStore? = null
+
+    /** The account's track preferences once read (ADR 0065); playback never waits for them. */
+    @Volatile private var account: AccountTracks? = null
     private var settingsStore: PlaybackSettingsStore? = null
 
     /** Read again for each item, so a change in Réglages applies to the next one. */
@@ -155,6 +162,13 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         preferences = TrackPreferenceStore(this, session.userId)
         settingsStore = PlaybackSettingsStore(this, session.userId)
         surface.holder.addCallback(this)
+
+        // Read once per session, before the file loads in practice; languages and mode only in the log
+        lifecycleScope.launch {
+            val read = AppServices.accountTracks(client, userId)
+            account = read
+            Log.i(TAG, "account audio=${read?.audioLanguages} default=${read?.playDefaultAudio} sub=${read?.subtitleLanguages} mode=${read?.subtitleMode}")
+        }
 
         // Subtitles move above the controls while they show, never below the place chosen in Réglages
         lifecycleScope.launch {
@@ -323,15 +337,21 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     /**
      * After the external subtitles: one of them may be the remembered choice. The
-     * remembered choice, else the server's pick, else mpv's (ADR 0042, 0055).
+     * remembered choice, else the server's pick, else the account's preferences, else
+     * mpv's (ADR 0042, 0055, 0065). Audio first: `Smart` subtitles depend on its language.
      */
     private fun applyTracks() {
         val player = engine ?: return
         val store = preferences ?: return
         val tracks = player.tracks()
+        val prefs = account
+        var audioLang: String? = null
         val described = TrackType.entries.map { type ->
             val server = if (type == TrackType.Audio) serverTracks.audio else serverTracks.subtitle
-            val decision = decide(tracks, type, store.load(type), server, transcode)
+            // A transcode carries the server's audio only: nothing for the account to pick
+            val wanted = if (type == TrackType.Audio && transcode) null else accountPick(tracks, type, prefs, audioLang)
+            val decision = decide(tracks, type, store.load(type), server, transcode, wanted)
+            if (type == TrackType.Audio) audioLang = playingAudioLanguage(tracks, decision)
             decision.selection?.let { player.selectTrack(type, it.id) }
             "${type.mpv}=${describeTrack(decision, player.property(type.property))}"
         }

@@ -6,8 +6,11 @@ import coil3.ImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import io.github.quentinpn.viewer.tv.emby.DeviceIdentity
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
+import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.SegmentSources
 import io.github.quentinpn.viewer.tv.emby.ServerUrl
+import io.github.quentinpn.viewer.tv.player.AccountTracks
+import io.github.quentinpn.viewer.tv.player.accountTracks
 import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.session.SessionStore
 import okhttp3.OkHttpClient
@@ -24,6 +27,25 @@ object AppServices {
     }
 
     @Volatile private var segmentSources: SegmentSources? = null
+
+    /**
+     * The account's track preferences (ADR 0065), read once per server and user while the
+     * app runs. Null when they cannot be read: playback then keeps the server's and mpv's
+     * picks, and the next player tries again.
+     */
+    suspend fun accountTracks(client: EmbyClient, userId: String): AccountTracks? {
+        val key = "${client.server.url}|$userId"
+        accountCache?.takeIf { it.first == key }?.let { return it.second }
+        val read = try {
+            client.userConfiguration(userId)?.let(::accountTracks)
+        } catch (_: EmbyException) {
+            return null
+        }
+        accountCache = key to read
+        return read
+    }
+
+    @Volatile private var accountCache: Pair<String, AccountTracks?>? = null
 
     fun store(context: Context) = SessionStore(context)
 
