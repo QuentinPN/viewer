@@ -12,6 +12,9 @@ private const val TICKS_PER_SECOND = 10_000_000.0
 /** Margin before the end under which an end of file is a normal end (credits, rounding). */
 private const val EARLY_EOF_TICKS = 30 * 10_000_000L
 
+/** Progress event of a stream change, from the Emby wiki « Playback Check-ins » (ADR 0081). */
+const val QUALITY_CHANGE = "QualityChange"
+
 enum class ReportKind(val path: String) {
     Start("/Sessions/Playing"),
     Progress("/Sessions/Playing/Progress"),
@@ -40,6 +43,9 @@ data class ActivePlayback(
 class PlaybackTracker {
     private var pending: ActivePlayback? = null
     private var playing: Playing? = null
+
+    /** The stream that replaces the playing one, until its file loads (ADR 0081). */
+    private var switching: ActivePlayback? = null
 
     /** Nothing announced or playing: a lost stop report can still be resent. */
     val idle get() = pending == null && playing == null
@@ -82,11 +88,31 @@ class PlaybackTracker {
     /** Announces a new playback; one still playing is reported stopped first. */
     fun begin(playback: ActivePlayback, now: Long): List<Report> {
         val out = stop(failed = false, now)
+        switching = null
         pending = playback
         return out
     }
 
+    /**
+     * The same item goes on in another stream (quality changed in the player, ADR 0081):
+     * nothing is sent now, and no stop ever. Once the new file loads, a progress with
+     * `EventName` `QualityChange` carries its source, session and method.
+     */
+    fun switched(playback: ActivePlayback) {
+        if (playing?.playback?.itemId == playback.itemId) switching = playback
+    }
+
     fun fileLoaded(now: Long): List<Report> {
+        val swap = switching
+        val current = playing
+        if (swap != null && current != null) {
+            switching = null
+            // A duration found by mpv stays known if the server gave none
+            current.playback = swap.copy(runTimeTicks = swap.runTimeTicks ?: current.playback.runTimeTicks)
+            current.positionTicks = swap.startTicks
+            current.seeked = false
+            return listOf(current.report(ReportKind.Progress, QUALITY_CHANGE, now))
+        }
         val playback = pending ?: return emptyList()
         pending = null
         val p = Playing(playback, positionTicks = playback.startTicks, lastSent = now)
@@ -145,6 +171,7 @@ class PlaybackTracker {
     }
 
     private fun stop(failed: Boolean, now: Long): List<Report> {
+        switching = null
         val p = playing ?: return emptyList()
         playing = null
         val report = p.report(ReportKind.Stopped, null, now)

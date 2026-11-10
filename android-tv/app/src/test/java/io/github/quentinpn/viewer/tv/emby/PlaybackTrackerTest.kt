@@ -180,4 +180,58 @@ class PlaybackTrackerTest {
         t.closed(t0)
         assertNull(t.itemId)
     }
+
+    private fun requalified() = playback().copy(
+        mediaSourceId = "mediasource_30207",
+        playSessionId = "ps2",
+        method = PlayMethod.Transcode,
+        startTicks = 1_200_000_000,
+    )
+
+    @Test
+    fun qualityChangeIsAProgressOnceTheNewFileLoads() {
+        val t = loaded()
+        t.duration(6000.0)
+        t.position(120.0, t0)
+        t.switched(requalified())
+        assertTrue("nothing before the new file plays", t.tick(t0 + 1).isEmpty())
+
+        val change = t.fileLoaded(t0 + 2_000)
+        assertEquals(listOf(ReportKind.Progress to QUALITY_CHANGE), kinds(change))
+        val body = change.single().body
+        assertEquals("ps2", body.playSessionId)
+        assertEquals("Transcode", body.playMethod)
+        assertEquals(1_200_000_000L, body.positionTicks)
+        assertEquals("duration kept", 60_000_000_000L, body.runTimeTicks)
+        assertNull("never a stop", body.failed)
+
+        // Later reports and the final stop use the new stream
+        t.position(5990.0, t0 + 3_000)
+        val stop = t.closed(t0 + 4_000).single()
+        assertEquals(ReportKind.Stopped, stop.kind)
+        assertEquals("ps2", stop.body.playSessionId)
+        assertEquals(false, stop.body.failed)
+    }
+
+    @Test
+    fun switchedIsIgnoredWithoutThatItemPlaying() {
+        val idle = PlaybackTracker()
+        idle.switched(requalified())
+        assertTrue(idle.fileLoaded(t0).isEmpty())
+
+        val other = loaded()
+        other.switched(requalified().copy(itemId = "99"))
+        assertTrue("other item: no report", other.fileLoaded(t0).isEmpty())
+
+        // A new playback or a stop forgets a pending switch
+        val begun = loaded()
+        begun.switched(requalified())
+        begun.begin(playback().copy(itemId = "30208", playSessionId = "ps3"), t0)
+        assertEquals(listOf(ReportKind.Start to null), kinds(begun.fileLoaded(t0)))
+
+        val closed = loaded()
+        closed.switched(requalified())
+        closed.closed(t0)
+        assertTrue(closed.fileLoaded(t0).isEmpty())
+    }
 }

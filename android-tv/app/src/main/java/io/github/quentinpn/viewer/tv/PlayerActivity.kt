@@ -21,7 +21,9 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.ExternalSubtitle
+import io.github.quentinpn.viewer.tv.emby.MAX_STREAMING_BITRATE
 import io.github.quentinpn.viewer.tv.emby.PlayMethod
+import io.github.quentinpn.viewer.tv.emby.PlaybackPlan
 import io.github.quentinpn.viewer.tv.emby.Segment
 import io.github.quentinpn.viewer.tv.emby.ServerTracks
 import io.github.quentinpn.viewer.tv.emby.deviceProfile
@@ -33,16 +35,20 @@ import io.github.quentinpn.viewer.tv.emby.startTicks
 import io.github.quentinpn.viewer.tv.player.AccountTracks
 import io.github.quentinpn.viewer.tv.player.DelayChange
 import io.github.quentinpn.viewer.tv.player.DelayKind
+import io.github.quentinpn.viewer.tv.player.Delays
 import io.github.quentinpn.viewer.tv.player.FitChange
 import io.github.quentinpn.viewer.tv.player.KEEPASPECT_PROPERTY
 import io.github.quentinpn.viewer.tv.player.MediaSource
 import io.github.quentinpn.viewer.tv.player.MpvPlayerEngine
+import io.github.quentinpn.viewer.tv.player.NORMAL_SPEED
 import io.github.quentinpn.viewer.tv.player.Night
 import io.github.quentinpn.viewer.tv.player.NightState
 import io.github.quentinpn.viewer.tv.player.PANSCAN_PROPERTY
 import io.github.quentinpn.viewer.tv.player.PlaybackFacts
 import io.github.quentinpn.viewer.tv.player.PlayerEngine
 import io.github.quentinpn.viewer.tv.player.PlayerListener
+import io.github.quentinpn.viewer.tv.player.Quality
+import io.github.quentinpn.viewer.tv.player.QualityChange
 import io.github.quentinpn.viewer.tv.player.SeekThumbnails
 import io.github.quentinpn.viewer.tv.player.SkipPlan
 import io.github.quentinpn.viewer.tv.player.SLEEP_NOTICE
@@ -55,7 +61,11 @@ import io.github.quentinpn.viewer.tv.player.SpeedChange
 import io.github.quentinpn.viewer.tv.player.TrackPreference
 import io.github.quentinpn.viewer.tv.player.TrackPreferenceStore
 import io.github.quentinpn.viewer.tv.player.TrackType
+import io.github.quentinpn.viewer.tv.player.VideoFit
 import io.github.quentinpn.viewer.tv.player.accountPick
+import io.github.quentinpn.viewer.tv.player.applied
+import io.github.quentinpn.viewer.tv.player.applying
+import io.github.quentinpn.viewer.tv.player.capFact
 import io.github.quentinpn.viewer.tv.player.changeDelay
 import io.github.quentinpn.viewer.tv.player.changeFit
 import io.github.quentinpn.viewer.tv.player.changeSleep
@@ -64,16 +74,18 @@ import io.github.quentinpn.viewer.tv.player.chapters
 import io.github.quentinpn.viewer.tv.player.decide
 import io.github.quentinpn.viewer.tv.player.describeTrack
 import io.github.quentinpn.viewer.tv.player.downloadThumbnails
+import io.github.quentinpn.viewer.tv.player.failed
+import io.github.quentinpn.viewer.tv.player.hasStartParameter
 import io.github.quentinpn.viewer.tv.player.playbackInfo
 import io.github.quentinpn.viewer.tv.player.playingAudioLanguage
 import io.github.quentinpn.viewer.tv.player.sleepDue
 import io.github.quentinpn.viewer.tv.player.sleepTimer
+import io.github.quentinpn.viewer.tv.player.step
 import io.github.quentinpn.viewer.tv.player.subtitlePosition
 import io.github.quentinpn.viewer.tv.player.thumbnailsLog
 import io.github.quentinpn.viewer.tv.player.transcodeReasons
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettings
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
-import io.github.quentinpn.viewer.tv.settings.mbits
 import io.github.quentinpn.viewer.tv.ui.PlayerOverlay
 import io.github.quentinpn.viewer.tv.ui.PlayerUi
 import io.github.quentinpn.viewer.tv.ui.SeekFrame
@@ -86,6 +98,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToLong
 
 private const val TAG = "ViewerTV"
 private const val TICKS_PER_SECOND = 10_000_000.0
@@ -116,6 +129,7 @@ private const val INFO_REFRESH_MS = 1_000L
  * The controls show the time and when playback ends; the track menu's « Minuterie » pauses
  * playback after a while, or at the credits, for this player session only (ADR 0073).
  * Its « Format » crops or stretches the picture to the screen, for the current file only (ADR 0078).
+ * Its « Qualité » asks the server again at another cap and reloads at the same place, for this playback only (ADR 0081).
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
     private var engine: PlayerEngine? = null
@@ -128,6 +142,15 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     /** How the server delivers the file being loaded, for "Informations de lecture" (ADR 0061). */
     private var facts: PlaybackFacts? = null
+
+    /** The stream negotiated for the file being loaded or played: its version and session (ADR 0081). */
+    private var stream: PlaybackPlan? = null
+
+    /** Speed, delays and format to put back once the file of a quality change loads (ADR 0081). */
+    @Volatile private var restore: Adjustments? = null
+
+    /** Play session whose transcode ends once the file of a quality change loads (ADR 0081). */
+    @Volatile private var replacedEncoding: String? = null
     private var surfaceHolder: SurfaceHolder? = null
     private var preferences: TrackPreferenceStore? = null
 
@@ -167,7 +190,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val surface = SurfaceView(this)
         val overlay = ComposeView(this).apply {
-            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip, ::openInfo, ::shiftDelay, ::shiftSpeed, ::shiftFit, ::toggleNight, ::changeTimer) } }
+            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip, ::openInfo, ::shiftDelay, ::shiftSpeed, ::shiftFit, ::toggleNight, ::changeTimer, ::pickQuality, ::applyQuality) } }
         }
         setContentView(
             // With the menu focused, keys reach the root before the overlay: the player sees them first
@@ -236,6 +259,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         skips = null
         segments = emptyList()
         facts = null
+        stream = null
+        restore = null
+        replacedEncoding = null
         dropThumbnails()
         settings = settingsStore?.load() ?: PlaybackSettings()
         ui.reset()
@@ -313,18 +339,10 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             Log.i(TAG, "subtitle style=${settings.subtitles}")
             // Nothing fetched yet: the first seek asks for them, playback never waits (ADR 0069)
             thumbnails = SeekThumbnails(lifecycleScope, { downloadThumbnails(client, itemId) }) { Log.i(TAG, thumbnailsLog(it)) }
-            // The server's subtitle goes last, added selected; the others are added without (ADR 0055)
-            subtitles = chosen.subtitles.sortedBy { it.selected }
-            serverTracks = chosen.serverTracks
-            transcode = chosen.method == PlayMethod.Transcode
-            // Only the reasons are kept from the URL: it is never shown
-            val local = client.server.isLocal
-            facts = PlaybackFacts(
-                method = chosen.method,
-                reasons = if (transcode) transcodeReasons(chosen.url) else emptyList(),
-                cap = (settings.capFor(local)?.let(::mbits) ?: "Maximale") + if (local) " · réseau local" else " · accès distant",
-            )
             val source = MediaSource.parse(chosen.url) ?: throw EmbyException(EmbyError.InvalidResponse("adresse de flux refusée"))
+            val cap = settings.capFor(client.server.isLocal)
+            adopt(chosen, cap, chosenInPlayer = false)
+            ui.quality = Quality.of(cap, chosen.method)
             // Reported once the file is loaded; never if loading fails
             reporter.begin(
                 client,
@@ -353,6 +371,107 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             player.load(source, startTicks / TICKS_PER_SECOND)
         } catch (e: EmbyException) {
             ui.status = e.error.message
+        }
+    }
+
+    /** What the player keeps of a negotiated stream, at its first load or after a quality change (ADR 0081). */
+    private fun adopt(chosen: PlaybackPlan, cap: Long?, chosenInPlayer: Boolean) {
+        // The server's subtitle goes last, added selected; the others are added without (ADR 0055)
+        subtitles = chosen.subtitles.sortedBy { it.selected }
+        serverTracks = chosen.serverTracks
+        transcode = chosen.method == PlayMethod.Transcode
+        stream = chosen
+        // Only the reasons are kept from the URL: it is never shown
+        facts = PlaybackFacts(
+            method = chosen.method,
+            reasons = if (transcode) transcodeReasons(chosen.url) else emptyList(),
+            cap = capFact(cap, client.server.isLocal, chosenInPlayer),
+        )
+    }
+
+    /** ◀ ▶ on « Qualité »: the shown cap moves, nothing reloads (ADR 0081). */
+    private fun pickQuality(change: QualityChange) {
+        ui.quality = ui.quality.step(change)
+    }
+
+    /**
+     * OK on « Qualité » (ADR 0081): the server is asked again at the shown cap, for the
+     * version playing and from the current position, then the file reloads there. Only
+     * one change at a time, and only once the file plays.
+     */
+    private fun applyQuality() {
+        val itemId = current ?: return
+        val playing = stream ?: return
+        if (engine == null || ui.status != null || !ui.quality.pending) return
+        val cap = ui.quality.chosen
+        ui.quality = ui.quality.applying()
+        val from = ui.position
+        lifecycleScope.launch { requalify(itemId, playing, cap, from) }
+    }
+
+    private suspend fun requalify(itemId: String, playing: PlaybackPlan, cap: Long?, from: Double) {
+        val bitrate = cap ?: MAX_STREAMING_BITRATE
+        val startTicks = (from * TICKS_PER_SECOND).roundToLong()
+        val chosen = try {
+            plan(
+                client.server,
+                client.playbackInfo(userId, itemId, deviceProfile(bitrate), playing.mediaSourceId, startTicks),
+                playing.mediaSourceId,
+            )
+        } catch (e: EmbyException) {
+            if (current != itemId) return
+            Log.w(TAG, "quality change refused maxBitrate=$bitrate: ${e.error.message}")
+            ui.quality = ui.quality.failed()
+            return
+        }
+        val player = engine
+        // Another item started, or the player closed, during the request
+        if (current != itemId || stream !== playing || player == null) return
+        val source = MediaSource.parse(chosen.url)
+        if (source == null) {
+            Log.w(TAG, "quality change refused: stream address")
+            ui.quality = ui.quality.failed()
+            return
+        }
+        Log.i(TAG, "quality method=${chosen.method} source=${chosen.mediaSourceId} subtitles=${chosen.subtitles.size} maxBitrate=$bitrate " +
+            "from=${playing.method} newSession=${chosen.playSessionId != playing.playSessionId} startInUrl=${hasStartParameter(chosen.url)}")
+        // The replaced transcode is ended once the new file plays, never before: mpv still reads it
+        replacedEncoding = playing.playSessionId?.takeIf { playing.method == PlayMethod.Transcode && it != chosen.playSessionId }
+        adopt(chosen, cap, chosenInPlayer = cap != settings.capFor(client.server.isLocal))
+        // loadfile puts speed, delays and format back to their defaults: this playback keeps them
+        restore = Adjustments(ui.speed, ui.delays, ui.fit)
+        // Playback went on during the request: it resumes where it is now
+        val at = ui.position
+        val playback = ActivePlayback(itemId, chosen.mediaSourceId, chosen.playSessionId, chosen.method, chosen.runTimeTicks, (at * TICKS_PER_SECOND).roundToLong())
+        reporter.event { switched(playback); emptyList() }
+        ui.closeMenus()
+        ui.quality = ui.quality.applied(chosen.method)
+        ui.status = "Changement de qualité…"
+        replacedEnds++
+        player.load(source, at)
+    }
+
+    /**
+     * After a quality change, once the new file is loaded: speed, delays and format as
+     * they were, then the server's transcode of the replaced stream ended (ADR 0081).
+     */
+    private fun restoreAdjustments(player: PlayerEngine) {
+        val kept = restore ?: return
+        restore = null
+        val speed = if (kept.speed != NORMAL_SPEED) player.setSpeed(kept.speed) else NORMAL_SPEED
+        DelayKind.entries.filter { kept.delays.of(it) != 0.0 }.forEach { player.setDelay(it, kept.delays.of(it)) }
+        val fit = if (kept.fit != VideoFit.Original) player.setVideoFit(kept.fit) else VideoFit.Original
+        Log.i(TAG, "quality restored speed=$speed delays=${kept.delays} fit=$fit")
+        val ended = replacedEncoding ?: return
+        replacedEncoding = null
+        lifecycleScope.launch {
+            try {
+                client.stopEncoding(ended)
+                Log.i(TAG, "replaced transcode ended")
+            } catch (e: EmbyException) {
+                // The server also ends a transcode nobody reads any more
+                Log.w(TAG, "replaced transcode not ended: ${e.error.message}")
+            }
         }
     }
 
@@ -389,7 +508,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             ui.show()
         }
         subtitles.forEach { sub -> MediaSource.parse(sub.url)?.let { engine?.addSubtitle(it, sub.selected) } }
+        // The tracks chosen in the menu are remembered: a quality change keeps them the same way
         applyTracks()
+        engine?.let(::restoreAdjustments)
     }
 
     /**
@@ -746,6 +867,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         engine = null
         super.onDestroy()
     }
+
+    /** Per-file settings of this playback that a reload would lose (ADR 0062, 0072, 0078). */
+    private data class Adjustments(val speed: Double, val delays: Delays, val fit: VideoFit)
 
     companion object {
         const val EXTRA_ITEM_ID = "itemId"

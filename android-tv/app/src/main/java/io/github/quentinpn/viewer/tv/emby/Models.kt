@@ -196,6 +196,8 @@ internal data class PlaybackInfoRequest(
     @SerialName("EnableDirectStream") val enableDirectStream: Boolean = true,
     /** The version to play (ADR 0036, 0058); left out, the server picks its first. */
     @SerialName("MediaSourceId") val mediaSourceId: String? = null,
+    /** Where playback goes on, when the quality changes mid-playback (ADR 0081); left out otherwise. */
+    @SerialName("StartTimeTicks") val startTimeTicks: Long? = null,
 )
 
 @Serializable
