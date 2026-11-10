@@ -193,6 +193,7 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
         let sections = format!("/emby/Users/{USER_ID}/HomeSections");
         let section_items = format!("/emby/Users/{USER_ID}/Sections/resume/Items");
         let favorite_items = format!("/emby/Users/{USER_ID}/FavoriteItems/");
+        let played_items = format!("/emby/Users/{USER_ID}/PlayedItems/");
         match path {
             p if (p == views_path
                 || p == sections
@@ -202,7 +203,8 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
                 || p.starts_with("/emby/Shows/")
                 || p.starts_with("/emby/Sessions/")
                 || p == "/emby/Genres"
-                || p.starts_with(&favorite_items))
+                || p.starts_with(&favorite_items)
+                || p.starts_with(&played_items))
                 && !token_ok =>
             {
                 (401, String::new())
@@ -222,6 +224,34 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
                 r#"{"IsFavorite":false,"Played":false,"PlaybackPositionTicks":0}"#.into(),
             ),
             p if p.starts_with(&favorite_items) => (404, NOT_FOUND_TEXT.into()),
+            // 30299 exists for these calls only: reading it back fails (ADR 0096).
+            p if (p == format!("{played_items}30207") || p == format!("{played_items}30299"))
+                && r.method == "POST"
+                && query.starts_with("DatePlayed=") =>
+            {
+                (
+                    200,
+                    r#"{"Played":true,"PlayCount":1,"PlaybackPositionTicks":0,"IsFavorite":false}"#
+                        .into(),
+                )
+            }
+            p if p == format!("{played_items}30207") && r.method == "DELETE" => (
+                200,
+                r#"{"Played":false,"PlayCount":0,"PlaybackPositionTicks":0,"IsFavorite":false}"#
+                    .into(),
+            ),
+            p if p.starts_with(&played_items) => (404, NOT_FOUND_TEXT.into()),
+            p if (p == format!("{items}/30207/HideFromResume")
+                || p == format!("{items}/30299/HideFromResume"))
+                && r.method == "POST"
+                && query == "Hide=true" =>
+            {
+                (
+                    200,
+                    r#"{"Played":false,"PlaybackPositionTicks":18310167000,"IsFavorite":false}"#
+                        .into(),
+                )
+            }
             p if p == items => (200, r#"{"Items":[],"TotalRecordCount":0}"#.into()),
             "/emby/Items/101/Images/Primary" => (200, "JPEG:fake-jpeg-bytes".into()),
             "/emby/Items/102/Images/Primary" => (200, "<html>pas une image</html>".into()),
@@ -1320,6 +1350,114 @@ fn favorite_with_a_revoked_token_ends_the_session() {
     revoked.store(true, Ordering::SeqCst);
     let err = run(fx.service.set_favorite("30207", true)).unwrap_err();
     assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
+}
+
+#[test]
+fn played_is_set_and_cleared_then_read_back() {
+    let (server, fx, _) = signed_in_browser();
+    // The state returned is the one read back: `movie_detail` is half watched.
+    let state = run(fx.service.set_played("30207", true)).unwrap();
+    assert_eq!(state.item_id, "30207");
+    assert!(state.resume.is_some_and(|r| r.fraction.is_some()));
+    let requests = server.requests();
+    let [mark, read] = &requests[requests.len() - 2..] else {
+        unreachable!()
+    };
+    assert_eq!(mark.method, "POST");
+    let (path, query) = mark.path.split_once('?').unwrap();
+    assert_eq!(path, format!("/emby/Users/{USER_ID}/PlayedItems/30207"));
+    let date = query.strip_prefix("DatePlayed=").unwrap();
+    assert!(
+        date.len() == 14 && date.bytes().all(|b| b.is_ascii_digit()),
+        "{query}"
+    );
+    assert!(mark.auth.as_deref().unwrap().contains(TOKEN));
+    assert_eq!(read.method, "GET");
+    assert!(
+        read.path
+            .starts_with(&format!("/emby/Users/{USER_ID}/Items/30207"))
+    );
+
+    run(fx.service.set_played("30207", false)).unwrap();
+    let mark = &server.requests()[server.requests().len() - 2];
+    assert_eq!(mark.method, "DELETE");
+    assert_eq!(
+        mark.path,
+        format!("/emby/Users/{USER_ID}/PlayedItems/30207")
+    );
+    assert!(mark.auth.as_deref().unwrap().contains(TOKEN));
+
+    let err = run(fx.service.set_played("99999", true)).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
+
+    let before = server.requests().len();
+    for id in ["", "../30207", "30207?x=1"] {
+        let err = run(fx.service.set_played(id, true)).unwrap_err();
+        assert!(
+            matches!(err, EmbyError::InvalidResponse(_)),
+            "{id}: {err:?}"
+        );
+    }
+    assert_eq!(server.requests().len(), before);
+    assert!(server.requests().iter().all(|r| !r.path.contains(TOKEN)));
+}
+
+#[test]
+fn played_change_keeps_the_answer_when_it_cannot_be_read_back() {
+    let (server, fx, _) = signed_in_browser();
+    let state = run(fx.service.set_played("30299", true)).unwrap();
+    assert_eq!(state.item_id, "30299");
+    assert!(state.played && state.resume.is_none());
+    let state = run(fx.service.hide_from_resume("30299")).unwrap();
+    assert!(!state.played);
+    // The answer carries no runtime: a position without a fraction.
+    let resume = state.resume.unwrap();
+    assert_eq!(resume.position_seconds, 1831);
+    assert!(resume.fraction.is_none());
+    assert!(server.requests().iter().all(|r| !r.path.contains(TOKEN)));
+}
+
+#[test]
+fn hide_from_resume_posts_hide_true() {
+    let (server, fx, _) = signed_in_browser();
+    let state = run(fx.service.hide_from_resume("30207")).unwrap();
+    assert_eq!(state.item_id, "30207");
+    let requests = server.requests();
+    let hide = &requests[requests.len() - 2];
+    assert_eq!(hide.method, "POST");
+    assert_eq!(
+        hide.path,
+        format!("/emby/Users/{USER_ID}/Items/30207/HideFromResume?Hide=true")
+    );
+    assert!(hide.auth.as_deref().unwrap().contains(TOKEN));
+
+    let err = run(fx.service.hide_from_resume("99999")).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
+    let before = server.requests().len();
+    let err = run(fx.service.hide_from_resume("../30207")).unwrap_err();
+    assert!(matches!(err, EmbyError::InvalidResponse(_)), "{err:?}");
+    assert_eq!(server.requests().len(), before);
+    assert!(server.requests().iter().all(|r| !r.path.contains(TOKEN)));
+}
+
+#[test]
+fn watched_changes_with_a_revoked_token_end_the_session() {
+    let (_server, fx, revoked) = signed_in_browser();
+    revoked.store(true, Ordering::SeqCst);
+    let err = run(fx.service.set_played("30207", true)).unwrap_err();
+    assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
+    let (_server, fx, revoked) = signed_in_browser();
+    revoked.store(true, Ordering::SeqCst);
+    let err = run(fx.service.hide_from_resume("30207")).unwrap_err();
+    assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
+}
+
+#[test]
+fn date_played_is_utc_yyyymmddhhmmss() {
+    assert_eq!(super::client::emby_date(0), "19700101000000");
+    // 2024-02-29 23:59:58 UTC: a leap day.
+    assert_eq!(super::client::emby_date(1_709_251_198), "20240229235958");
+    assert_eq!(super::client::date_played_now().len(), 14);
 }
 
 #[test]
@@ -3744,27 +3882,7 @@ fn real_server_mark_unplayed() {
 
 /// Now as `yyyyMMddHHmmss` in UTC, the `DatePlayed` format.
 fn utc_stamp() -> String {
-    let secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as i64;
-    let (days, rem) = (secs.div_euclid(86_400), secs.rem_euclid(86_400));
-    // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let day = doy - (153 * mp + 2) / 5 + 1;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 };
-    let year = yoe + era * 400 + i64::from(month <= 2);
-    format!(
-        "{year:04}{month:02}{day:02}{:02}{:02}{:02}",
-        rem / 3_600,
-        rem % 3_600 / 60,
-        rem % 60
-    )
+    super::client::date_played_now()
 }
 
 /// Search on the real server (ADR 0011), read-only: accents and case folded,

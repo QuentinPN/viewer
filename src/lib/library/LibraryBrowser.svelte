@@ -6,6 +6,7 @@
 import { onMount, tick, untrack } from "svelte";
 import { episodeItem } from "../detail/format";
 import ItemDetail from "../detail/ItemDetail.svelte";
+import { patchPlayed } from "../detail/watched";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
 import type {
   EmbyError,
@@ -466,7 +467,16 @@ async function loadMore() {
 
 onMount(() => {
   void loadLibraries();
+  // Posters shown follow a watched change made anywhere (ADR 0096).
+  const unlisten = embyApi.onPlaybackStopped((state) => {
+    patchPlayed(pager.items, state);
+    if (found) {
+      patchPlayed(found.movies, state);
+      patchPlayed(found.series, state);
+    }
+  });
   return () => {
+    void unlisten.then((stop) => stop());
     observer?.disconnect();
     clearTimeout(debounce);
   };

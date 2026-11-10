@@ -36,6 +36,7 @@ import {
   versionChoices,
   versionKey,
 } from "./versions";
+import { changePlayed, playedAction } from "./watched";
 
 interface Props {
   /** Grid card: title and poster are shown at once while the detail loads. */
@@ -98,6 +99,9 @@ let fromStartButton = $state<HTMLButtonElement | null>(null);
 /** A favorite change is waiting for the server: further clicks are ignored. */
 let savingFavorite = $state(false);
 let favoriteError = $state<EmbyError | null>(null);
+/** A watched change is waiting for the server (ADR 0096): further clicks are ignored. */
+let savingPlayed = $state(false);
+let playedError = $state<EmbyError | null>(null);
 let previousButton = $state<HTMLButtonElement | null>(null);
 let nextButton = $state<HTMLButtonElement | null>(null);
 /** Consumed by the first load only: a later reload leaves the focus alone. */
@@ -202,6 +206,34 @@ async function toggleFavorite() {
     favoriteError = onError(toEmbyError(e));
   } finally {
     savingFavorite = false;
+  }
+}
+
+/**
+ * Marks the item played or unplayed (ADR 0096). A series or season is read again
+ * on the event that follows: whether Emby applies it to the episodes is not
+ * documented, so the counts come from the server, not from here.
+ */
+async function togglePlayed() {
+  const d = detail;
+  if (!d || savingPlayed) return;
+  savingPlayed = true;
+  playedError = null;
+  const before = d.resume;
+  try {
+    const state = await changePlayed(
+      !d.played,
+      (p) => {
+        d.played = p;
+        d.resume = p ? null : before;
+      },
+      (p) => embyApi.setPlayed(d.id, p),
+    );
+    if (d.kind !== "series") d.resume = state.resume;
+  } catch (e) {
+    playedError = onError(toEmbyError(e));
+  } finally {
+    savingPlayed = false;
   }
 }
 
@@ -431,6 +463,17 @@ onMount(() => {
                 </button>
               {/if}
             {/if}
+            <button
+              type="button"
+              class="secondary watched"
+              aria-pressed={detail.played}
+              aria-disabled={savingPlayed}
+              title={playedAction(detail.played)}
+              onclick={togglePlayed}
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" /></svg>
+              Vu
+            </button>
             {#if detail.kind !== "episode"}
             <button
               type="button"
@@ -658,6 +701,16 @@ onMount(() => {
         {#if errorHint(favoriteError)}<p class="hint">{errorHint(favoriteError)}</p>{/if}
       </div>
       <button type="button" class="secondary" onclick={() => (favoriteError = null)}>Fermer</button>
+    </div>
+  {/if}
+  {#if playedError}
+    <div class="play-error" role="alert">
+      <div>
+        <p class="state-title">Statut « vu » non modifié</p>
+        <p>{playedError.message}</p>
+        {#if errorHint(playedError)}<p class="hint">{errorHint(playedError)}</p>{/if}
+      </div>
+      <button type="button" class="secondary" onclick={() => (playedError = null)}>Fermer</button>
     </div>
   {/if}
   {#if playError}
@@ -1124,10 +1177,29 @@ onMount(() => {
     height: 16px;
     fill: currentColor;
   }
-  .favorite {
+  .favorite,
+  .watched {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
+  }
+  .watched svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.55;
+  }
+  .watched[aria-pressed="true"] svg {
+    stroke: var(--color-accent);
+    stroke-width: 2.2;
+    opacity: 1;
+  }
+  .watched[aria-disabled="true"] {
+    cursor: progress;
   }
   .favorite svg {
     width: 16px;

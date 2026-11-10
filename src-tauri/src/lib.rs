@@ -344,6 +344,8 @@ pub fn run() {
             commands::emby_favorites,
             commands::emby_hero,
             commands::emby_set_favorite,
+            commands::emby_set_played,
+            commands::emby_hide_from_resume,
             commands::emby_search,
             commands::emby_item_detail,
             commands::emby_seasons,

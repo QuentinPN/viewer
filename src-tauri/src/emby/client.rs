@@ -652,15 +652,14 @@ impl EmbyClient {
     }
 
     /// Marks an item played on `date_played` (`yyyyMMddHHmmss`, UTC), or unplayed
-    /// with `None` (`POST` / `DELETE /Users/{Id}/PlayedItems/{Id}`).
-    /// Real-server tests only: the app does not offer it yet.
-    #[cfg(test)]
+    /// with `None` (`POST` / `DELETE /Users/{Id}/PlayedItems/{Id}`, ADR 0096); the
+    /// server answers with the item's new user data.
     pub async fn set_played(
         &self,
         user_id: &str,
         item_id: &str,
         date_played: Option<&str>,
-    ) -> Result<(), EmbyError> {
+    ) -> Result<UserItemData, EmbyError> {
         self.require_token()?;
         let url = self.server.api(&format!(
             "/Users/{}/PlayedItems/{}",
@@ -672,7 +671,29 @@ impl EmbyClient {
             None => self.request_url(Method::DELETE, &url, &[]),
         };
         let res = req.send().await?;
-        check(res, true).map(drop)
+        json(check(res, true)?).await
+    }
+
+    /// Takes an item out of "Reprendre", or puts it back
+    /// (`POST /Users/{Id}/Items/{Id}/HideFromResume?Hide=`, ADR 0096).
+    pub async fn hide_from_resume(
+        &self,
+        user_id: &str,
+        item_id: &str,
+        hide: bool,
+    ) -> Result<UserItemData, EmbyError> {
+        self.require_token()?;
+        let url = self.server.api(&format!(
+            "/Users/{}/Items/{}/HideFromResume",
+            path_segment(user_id)?,
+            path_segment(item_id)?
+        ));
+        let hide = if hide { "true" } else { "false" };
+        let res = self
+            .request_url(Method::POST, &url, &[("Hide", hide)])
+            .send()
+            .await?;
+        json(check(res, true)?).await
     }
 
     /// Authentication for the player's HTTP requests: a header, never the URL.
@@ -782,4 +803,33 @@ fn path_segment(id: &str) -> Result<&str, EmbyError> {
     } else {
         Err(EmbyError::InvalidResponse("identifiant invalide".into()))
     }
+}
+
+/// `secs` since 1970 as `yyyyMMddHHmmss` in UTC, the format of `DatePlayed`.
+pub fn emby_date(secs: i64) -> String {
+    let (days, rem) = (secs.div_euclid(86_400), secs.rem_euclid(86_400));
+    // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    format!(
+        "{year:04}{month:02}{day:02}{:02}{:02}{:02}",
+        rem / 3_600,
+        rem % 3_600 / 60,
+        rem % 60
+    )
+}
+
+/// Now as `DatePlayed`.
+pub fn date_played_now() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    emby_date(i64::try_from(secs).unwrap_or(0))
 }

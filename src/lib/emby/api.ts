@@ -64,6 +64,16 @@ export const embyApi = {
   /** Returns the favorite state the server reports after the change. */
   setFavorite: (itemId: string, favorite: boolean) =>
     invoke<boolean>("emby_set_favorite", { itemId, favorite }),
+  /**
+   * Marks a film, episode, season or series played or unplayed (ADR 0096). The
+   * new state is returned and also sent on the playback-stopped event, so every
+   * view showing the item follows.
+   */
+  setPlayed: (itemId: string, played: boolean) =>
+    invoke<PlaybackStopped>("emby_set_played", { itemId, played }),
+  /** Takes a film or episode out of "Reprendre" (ADR 0096); announced the same way. */
+  hideFromResume: (itemId: string) =>
+    invoke<PlaybackStopped>("emby_hide_from_resume", { itemId }),
   search: (query: string) => invoke<SearchResults>("emby_search", { query }),
   itemDetail: (itemId: string) =>
     invoke<ItemDetail>("emby_item_detail", { itemId }),
@@ -119,7 +129,10 @@ export const embyApi = {
   /** Keeps both caps; a value not offered is refused. */
   setPlaybackQuality: (local: number | null, remote: number | null) =>
     invoke<PlaybackQuality>("emby_set_playback_quality", { local, remote }),
-  /** The item's new state, once a playback stopped and was reported. */
+  /**
+   * The item's new state, once a playback stopped and was reported, or once it
+   * was marked played or unplayed or taken out of "Reprendre" (ADR 0096).
+   */
   onPlaybackStopped: (
     handler: (state: PlaybackStopped) => void,
   ): Promise<UnlistenFn> =>

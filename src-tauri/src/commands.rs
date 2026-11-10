@@ -4,7 +4,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde::{Deserialize, Serialize};
-use tauri::{State, WebviewWindow};
+use tauri::{Emitter, State, WebviewWindow};
 
 use crate::AppState;
 use crate::emby::EmbyError;
@@ -12,10 +12,11 @@ use crate::emby::artwork_cache::{ArtworkCacheCleared, ArtworkCacheStats};
 use crate::emby::chapters::Chapter;
 use crate::emby::models::{
     EpisodePage, HeroItem, ItemDetail, ItemPage, ItemsOptions, Library, MediaItem, PlaybackStart,
-    SavedServer, SearchResults, Season, ServerSummary, SessionStatus, SignedInUser, WatchItem,
+    PlaybackStopped, SavedServer, SearchResults, Season, ServerSummary, SessionStatus,
+    SignedInUser, WatchItem,
 };
 use crate::emby::quality::{PlaybackQuality, QualityCaps};
-use crate::emby::reporting::ActivePlayback;
+use crate::emby::reporting::{ActivePlayback, PLAYBACK_STOPPED_EVENT};
 use crate::emby::session::EmbyService;
 use crate::emby::tracks::TrackPreferences;
 use crate::player::{
@@ -297,6 +298,32 @@ pub async fn emby_set_favorite(
     favorite: bool,
 ) -> Result<bool, EmbyError> {
     emby.set_favorite(&item_id, favorite).await
+}
+
+/// Marks an item played or unplayed (ADR 0096). The new state goes to every view
+/// on the playback-stopped event, as after a playback, and is returned.
+#[tauri::command]
+pub async fn emby_set_played(
+    app: tauri::AppHandle,
+    emby: State<'_, EmbyService>,
+    item_id: String,
+    played: bool,
+) -> Result<PlaybackStopped, EmbyError> {
+    let state = emby.set_played(&item_id, played).await?;
+    let _ = app.emit(PLAYBACK_STOPPED_EVENT, &state);
+    Ok(state)
+}
+
+/// Takes a film or episode out of "Reprendre" (ADR 0096); announced the same way.
+#[tauri::command]
+pub async fn emby_hide_from_resume(
+    app: tauri::AppHandle,
+    emby: State<'_, EmbyService>,
+    item_id: String,
+) -> Result<PlaybackStopped, EmbyError> {
+    let state = emby.hide_from_resume(&item_id).await?;
+    let _ = app.emit(PLAYBACK_STOPPED_EVENT, &state);
+    Ok(state)
 }
 
 #[tauri::command]
