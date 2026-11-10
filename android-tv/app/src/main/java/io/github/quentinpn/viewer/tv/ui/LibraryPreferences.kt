@@ -4,6 +4,7 @@ import android.content.Context
 import io.github.quentinpn.viewer.tv.emby.ItemsOptions
 import io.github.quentinpn.viewer.tv.emby.SortKey
 import io.github.quentinpn.viewer.tv.emby.WatchFilter
+import io.github.quentinpn.viewer.tv.emby.isUsableDecade
 import io.github.quentinpn.viewer.tv.emby.isUsableGenre
 
 /** Sort and filters kept per Emby user and per library, in plain preferences: none is a secret. */
@@ -22,6 +23,7 @@ class LibraryPreferenceStore(context: Context, private val userId: String) {
             watch = watch,
             favorites = prefs.getBoolean("$key.favorites", false),
             genre = prefs.getString("$key.genre", null)?.takeIf(::isUsableGenre),
+            decade = prefs.getInt("$key.decade", NO_DECADE).takeIf(::isUsableDecade),
         )
     }
 
@@ -33,6 +35,7 @@ class LibraryPreferenceStore(context: Context, private val userId: String) {
             .putString("$key.watch", options.watch.name)
             .putBoolean("$key.favorites", options.favorites)
             .putString("$key.genre", options.genre)
+            .putInt("$key.decade", options.decade ?: NO_DECADE)
             .apply()
     }
 
@@ -40,8 +43,17 @@ class LibraryPreferenceStore(context: Context, private val userId: String) {
 
     private companion object {
         const val PREFS = "library"
+
+        /** Stored for « Toutes » : never a usable decade. */
+        const val NO_DECADE = -1
     }
 }
+
+/** The « Années » pill (ADR 0082): « Toutes » or the decade's first year. */
+internal fun decadePillLabel(decade: Int?): String = "Années : ${decade ?: "Toutes"}"
+
+/** A line of the decade list: « Toutes les années », then « Années 1990 ». */
+internal fun decadeChoiceLabel(decade: Int?): String = if (decade == null) "Toutes les années" else "Années $decade"
 
 /** "En cours" only makes sense for films: a series is never resumed as a whole. */
 internal fun watchFilters(itemTypes: String): List<WatchFilter> =

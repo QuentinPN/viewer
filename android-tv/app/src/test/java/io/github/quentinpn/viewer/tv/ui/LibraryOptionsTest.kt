@@ -5,6 +5,7 @@ import io.github.quentinpn.viewer.tv.emby.SortKey
 import io.github.quentinpn.viewer.tv.emby.WatchFilter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -40,5 +41,32 @@ class LibraryOptionsTest {
         // The same choices again: nothing to reload
         memory.change(ItemsOptions(favorites = true))
         assertEquals(generation + 1, memory.generation)
+    }
+
+    @Test
+    fun decadeLabelsAreFrench() {
+        assertEquals("Années : Toutes", decadePillLabel(null))
+        assertEquals("Années : 1990", decadePillLabel(1990))
+        assertEquals("Toutes les années", decadeChoiceLabel(null))
+        assertEquals("Années 1990", decadeChoiceLabel(1990))
+    }
+
+    @Test
+    fun aGenreGridStartsWithEveryDecade() {
+        // The grid opened from a genre chip keeps the sort, not the saved decade (ADR 0079, 0082)
+        val saved = ItemsOptions(SortKey.Year, descending = true, decade = 1980)
+        assertNull(genreOptions(saved, "Drame")?.decade)
+        // « Réinitialiser » goes back to every decade
+        assertNull(ItemsOptions().decade)
+    }
+
+    @Test
+    fun aDecadeChangeReloadsTheGridButKeepsTheDecadeList() {
+        val memory = LibraryMemory(Library("l", "Films", "Movie"))
+        memory.decades = listOf(2020, 1990)
+        val generation = memory.generation
+        memory.change(ItemsOptions(decade = 1990))
+        assertEquals(generation + 1, memory.generation)
+        assertEquals(listOf(2020, 1990), memory.decades)
     }
 }

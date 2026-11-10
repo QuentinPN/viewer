@@ -98,6 +98,9 @@ class LibraryMemory(val library: Library, options: ItemsOptions = ItemsOptions()
     /** Genres of the library, read once when the genre list first opens. */
     internal var genres by mutableStateOf<List<String>?>(null)
 
+    /** Decades of the library, newest first, read once when the decade list first opens (ADR 0082). */
+    internal var decades by mutableStateOf<List<Int>?>(null)
+
     /** Items to read before paging waits for the scroll again: the end of a jump's page (ADR 0070). */
     internal var wanted by mutableIntStateOf(0)
 
@@ -158,7 +161,9 @@ fun LibraryScreen(
     var attempt by remember { mutableIntStateOf(0) }
     var picking by remember { mutableStateOf(false) }
     var pickingLetter by remember { mutableStateOf(false) }
+    var pickingDecade by remember { mutableStateOf(false) }
     val genreButton = remember { FocusRequester() }
+    val decadeButton = remember { FocusRequester() }
     val letterButton = remember { FocusRequester() }
     val randomButton = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
@@ -264,10 +269,11 @@ fun LibraryScreen(
             Toolbar(
                 memory.options,
                 memory.library.itemTypes,
-                ToolbarFocus(genreButton, letterButton, randomButton),
+                ToolbarFocus(genreButton, decadeButton, letterButton, randomButton),
                 ::change,
                 onPickLetter = { pickingLetter = true },
                 onPickRandom = ::pickRandom,
+                onPickDecade = { pickingDecade = true },
             ) { picking = true }
             val error = memory.error
             when {
@@ -290,11 +296,33 @@ fun LibraryScreen(
             }
         }
         if (picking) {
-            GenrePicker(client, userId, memory, Modifier.align(Alignment.CenterEnd), onSessionExpired) { genre ->
+            SidePicker(
+                loaded = memory.genres,
+                load = { memory.genres = client.genres(userId, memory.library.id, memory.library.itemTypes) },
+                current = memory.options.genre,
+                label = { it ?: "Tous les genres" },
+                modifier = Modifier.align(Alignment.CenterEnd),
+                onSessionExpired = onSessionExpired,
+            ) { genre ->
                 picking = false
                 if (genre != null) change(memory.options.copy(genre = genre.value))
                 // Back to the genre button once the list closes
                 runCatching { genreButton.requestFocus() }
+            }
+        }
+        if (pickingDecade) {
+            SidePicker(
+                loaded = memory.decades,
+                load = { memory.decades = client.decades(userId, memory.library.id, memory.library.itemTypes) },
+                current = memory.options.decade,
+                label = ::decadeChoiceLabel,
+                modifier = Modifier.align(Alignment.CenterEnd),
+                onSessionExpired = onSessionExpired,
+            ) { decade ->
+                pickingDecade = false
+                if (decade != null) change(memory.options.copy(decade = decade.value))
+                // Back to the « Années » pill once the list closes
+                runCatching { decadeButton.requestFocus() }
             }
         }
         if (pickingLetter) {
@@ -328,7 +356,7 @@ private fun watchLabel(watch: WatchFilter) = when (watch) {
 }
 
 /** Pills that take the focus back when a side list or a page they opened closes. */
-private class ToolbarFocus(val genre: FocusRequester, val letter: FocusRequester, val random: FocusRequester)
+private class ToolbarFocus(val genre: FocusRequester, val decade: FocusRequester, val letter: FocusRequester, val random: FocusRequester)
 
 /** Glass pills in the home's style (ADR 0067); each steps through its choices, white when it narrows the grid. */
 @Composable
@@ -339,6 +367,7 @@ private fun Toolbar(
     onChange: (ItemsOptions) -> Unit,
     onPickLetter: () -> Unit,
     onPickRandom: () -> Unit,
+    onPickDecade: () -> Unit,
     onPickGenre: () -> Unit,
 ) {
     Row(
@@ -358,6 +387,8 @@ private fun Toolbar(
         Toggle(options.watch != WatchFilter.All, "Visionnage : ${watchLabel(options.watch)}") { onChange(options.nextWatch(itemTypes)) }
         Toggle(options.favorites, "Favoris") { onChange(options.copy(favorites = !options.favorites)) }
         Toggle(options.genre != null, "Genre : ${options.genre ?: "Tous"}", Modifier.focusRequester(focus.genre), onPickGenre)
+        // Filled while a decade narrows the grid (ADR 0082)
+        Toggle(options.decade != null, decadePillLabel(options.decade), Modifier.focusRequester(focus.decade), onPickDecade)
         GlassButton(onClick = { onChange(ItemsOptions()) }) { PillText("Réinitialiser") }
         // Opens one title drawn among those the filters keep (ADR 0077)
         GlassButton(
@@ -378,57 +409,60 @@ internal fun PillText(text: String) {
     Text(text, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
-/** A picked genre; [value] null means every genre. */
-private class Picked(val value: String?)
+/** A picked genre or decade; [value] null means all of them. */
+private class Picked<T>(val value: T?)
 
-/** Side list of the library's genres; Back closes it without a change. */
+/**
+ * Side list of the library's genres or decades (ADR 0045, 0082): « all » first, then [loaded],
+ * read by [load] while still null. Back closes it without a change.
+ */
 @Composable
-private fun GenrePicker(
-    client: EmbyClient,
-    userId: String,
-    memory: LibraryMemory,
+private fun <T : Any> SidePicker(
+    loaded: List<T>?,
+    load: suspend () -> Unit,
+    current: T?,
+    label: (T?) -> String,
     modifier: Modifier,
     onSessionExpired: () -> Unit,
-    onDone: (Picked?) -> Unit,
+    onDone: (Picked<T>?) -> Unit,
 ) {
     var error by remember { mutableStateOf<String?>(null) }
     var attempt by remember { mutableIntStateOf(0) }
     BackHandler { onDone(null) }
     LaunchedEffect(attempt) {
-        if (memory.genres != null) return@LaunchedEffect
+        if (loaded != null) return@LaunchedEffect
         try {
-            memory.genres = client.genres(userId, memory.library.id, memory.library.itemTypes)
+            load()
         } catch (e: EmbyException) {
             if (e.error == EmbyError.SessionExpired) onSessionExpired()
             error = e.error.message
         }
     }
     val panel = modifier.fillMaxHeight().width(420.dp).background(Palette.surface)
-    val genres = memory.genres
     val failed = error
     when {
-        genres == null && failed != null -> Box(panel) {
+        loaded == null && failed != null -> Box(panel) {
             Retry(failed) {
                 error = null
                 attempt++
             }
         }
-        genres == null -> Box(panel, contentAlignment = Alignment.Center) { Text("Chargement…", color = Palette.textSecondary) }
+        loaded == null -> Box(panel, contentAlignment = Alignment.Center) { Text("Chargement…", color = Palette.textSecondary) }
         else -> {
-            val choices = listOf<String?>(null) + genres
+            val choices = listOf<T?>(null) + loaded
             val first = remember { FocusRequester() }
-            val start = choices.indexOf(memory.options.genre).coerceAtLeast(0)
+            val start = choices.indexOf(current).coerceAtLeast(0)
             LazyColumn(
                 panel,
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                itemsIndexed(choices) { index, genre ->
-                    val selected = genre == memory.options.genre
+                itemsIndexed(choices) { index, choice ->
+                    val selected = choice == current
                     ListItem(
                         selected = selected,
-                        onClick = { onDone(Picked(genre)) },
-                        headlineContent = { Text(genre ?: "Tous les genres", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        onClick = { onDone(Picked(choice)) },
+                        headlineContent = { Text(label(choice), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         trailingContent = if (selected) ({ Text("✓") }) else null,
                         modifier = if (index == start) Modifier.focusRequester(first) else Modifier,
                     )

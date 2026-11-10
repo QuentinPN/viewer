@@ -432,6 +432,54 @@ class EmbyClientTest {
     }
 
     @Test
+    fun decadeFiltersTheGridItsLettersAndItsRandomPick() = runBlocking {
+        val options = ItemsOptions(genre = "Drame", decade = 1990)
+        val years = "1990,1991,1992,1993,1994,1995,1996,1997,1998,1999"
+        respond(200, """{"Items":[],"TotalRecordCount":0}""")
+        client.withToken("t").libraryItems("u1", "lib1", "Movie", 0, 60, options)
+        respond(200, """{"Items":[],"TotalRecordCount":0}""")
+        client.withToken("t").sortNames("u1", "lib1", "Movie", options)
+        respond(200, """{"Items":[],"TotalRecordCount":0}""")
+        client.withToken("t").randomLibraryItem("u1", "lib1", "Movie", options)
+        repeat(3) {
+            val url = server.takeRequest().url
+            assertEquals(years, url.queryParameter("Years"))
+            assertEquals("Drame", url.queryParameter("Genres"))
+        }
+    }
+
+    @Test
+    fun noDecadeOrAnOddOneSendsNoYears() = runBlocking {
+        respond(200, """{"Items":[],"TotalRecordCount":0}""")
+        client.withToken("t").libraryItems("u1", "lib1", "Movie", 0, 60, ItemsOptions())
+        respond(200, """{"Items":[],"TotalRecordCount":0}""")
+        client.withToken("t").libraryItems("u1", "lib1", "Movie", 0, 60, ItemsOptions(decade = 1995))
+        repeat(2) { assertNull(server.takeRequest().url.queryParameter("Years")) }
+    }
+
+    @Test
+    fun decadesAreReadFromProductionYears() = runBlocking {
+        respond(
+            200,
+            """{"Items":[{"Id":"m1","ProductionYear":1994},{"Id":"m2"},{"Id":"m3","ProductionYear":2021},{"Id":"m4","ProductionYear":1999}],"TotalRecordCount":4}""",
+        )
+        assertEquals(listOf(2020, 1990), client.withToken("secret-token").decades("u1", "lib1", "Movie"))
+        val request = server.takeRequest()
+        val url = request.url
+        assertEquals("/emby/Users/u1/Items", url.encodedPath)
+        for ((name, value) in listOf(
+            "ParentId" to "lib1", "Recursive" to "true", "IncludeItemTypes" to "Movie",
+            "Fields" to "ProductionYear", "EnableImages" to "false", "EnableUserData" to "false",
+        )) {
+            assertEquals(name, value, url.queryParameter(name))
+        }
+        // The whole library, every filter aside
+        assertNull(url.queryParameter("Limit"))
+        assertNull(url.queryParameter("Years"))
+        assertFalse("secret-token" in url.toString())
+    }
+
+    @Test
     fun genresAreReadByName() = runBlocking {
         respond(200, """{"Items":[{"Id":"g1","Name":"Action"},{"Id":"g2","Name":"Drame"},{"Id":"g3","Name":"x|y"}],"TotalRecordCount":3}""")
         assertEquals(listOf("Action", "Drame"), client.withToken("t").genres("u1", "lib1", "Movie"))

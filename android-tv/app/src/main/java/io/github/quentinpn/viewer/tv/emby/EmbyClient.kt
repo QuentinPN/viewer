@@ -245,7 +245,24 @@ class EmbyClient(
             .addQueryParameter("SortOrder", if (options.descending) "Descending" else "Ascending")
         options.filters()?.let { builder.addQueryParameter("Filters", it) }
         options.genre?.takeIf(::isUsableGenre)?.let { builder.addQueryParameter("Genres", it) }
+        options.years()?.let { builder.addQueryParameter("Years", it) }
         return builder
+    }
+
+    /**
+     * Decades of a library's films or series, newest first (ADR 0082): the production year of
+     * every title, read once with no image nor user data, since no year list is documented.
+     */
+    suspend fun decades(userId: String, parentId: String, itemTypes: String): List<Int> {
+        val url = server.api("/Users/${segment(userId)}/Items").newBuilder()
+            .addQueryParameter("ParentId", segment(parentId))
+            .addQueryParameter("Recursive", "true")
+            .addQueryParameter("IncludeItemTypes", itemTypes)
+            .addQueryParameter("Fields", "ProductionYear")
+            .addQueryParameter("EnableImages", "false")
+            .addQueryParameter("EnableUserData", "false")
+            .build()
+        return decadesOf(call(get(url), QueryResult.serializer(BaseItemDto.serializer())).items.map { it.productionYear })
     }
 
     /**
