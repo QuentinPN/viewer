@@ -16,6 +16,9 @@ enum class NoThumbnails(val reason: String) {
     /** 404: the server has not extracted any for this item, or does not offer them. */
     Missing("not on the server"),
 
+    /** A BIF with no image: the server answers one for an item it has extracted none for. */
+    Empty("none extracted on the server"),
+
     /** Larger than [MAX_BIF_BYTES]: refused without reading the rest. */
     TooLarge("too large"),
 
@@ -30,7 +33,8 @@ enum class NoThumbnails(val reason: String) {
 sealed interface ThumbnailsOutcome {
     data class Loaded(val count: Int, val intervalMs: Long, val bytes: Int) : ThumbnailsOutcome
 
-    data class None(val why: NoThumbnails) : ThumbnailsOutcome
+    /** [detail]: size and first bytes of an unreadable answer, to tell what the server sent. */
+    data class None(val why: NoThumbnails, val detail: String? = null) : ThumbnailsOutcome
 }
 
 /** The JPEG of one BIF image, [length] bytes of [bytes] from [offset]; [index] tells two targets on the same image apart. */
@@ -76,7 +80,8 @@ class SeekThumbnails(
             when {
                 bif != null -> ThumbnailsOutcome.Loaded(bif.frames.size, bif.intervalMs, bif.bytes.size)
                 outcome is Result.None -> ThumbnailsOutcome.None(outcome.why)
-                else -> ThumbnailsOutcome.None(NoThumbnails.Unreadable)
+                outcome is Result.Bytes && isEmptyBif(outcome.bytes) -> ThumbnailsOutcome.None(NoThumbnails.Empty)
+                else -> ThumbnailsOutcome.None(NoThumbnails.Unreadable, (outcome as? Result.Bytes)?.bytes?.let(::firstBytes))
             },
         )
         bif.takeUnless { closed }
@@ -108,5 +113,9 @@ suspend fun downloadThumbnails(client: EmbyClient, itemId: String): SeekThumbnai
 /** The one log line of a file's thumbnails: counts and reasons only, never the URL. */
 fun thumbnailsLog(outcome: ThumbnailsOutcome): String = when (outcome) {
     is ThumbnailsOutcome.Loaded -> "seek thumbnails: ${outcome.count} images every ${outcome.intervalMs} ms (${outcome.bytes / 1024} KB)"
-    is ThumbnailsOutcome.None -> "seek thumbnails: none (${outcome.why.reason})"
+    is ThumbnailsOutcome.None -> "seek thumbnails: none (${outcome.why.reason})" + (outcome.detail?.let { ", $it" } ?: "")
 }
+
+/** "1234 bytes starting 89 42 49 46 ...": the size and the first 16 bytes in hex, never decoded as text. */
+internal fun firstBytes(bytes: ByteArray): String =
+    "${bytes.size} bytes starting " + bytes.take(16).joinToString(" ") { "%02x".format(it.toInt() and 0xFF) }

@@ -118,7 +118,7 @@ class SeekThumbnailsTest {
         val outcomes = mutableListOf<ThumbnailsOutcome>()
         val thumbs = SeekThumbnails(this, { SeekThumbnails.Result.Bytes("<html></html>".toByteArray()) }) { outcomes += it }
         assertNull(thumbs.frameAt(10.0))
-        assertEquals(listOf(ThumbnailsOutcome.None(NoThumbnails.Unreadable)), outcomes)
+        assertEquals(listOf(ThumbnailsOutcome.None(NoThumbnails.Unreadable, "13 bytes starting 3c 68 74 6d 6c 3e 3c 2f 68 74 6d 6c 3e")), outcomes)
     }
 
     @Test

@@ -73,6 +73,13 @@ fun parseBif(bytes: ByteArray): Bif? {
     return if (frames.isEmpty()) null else Bif(bytes, frames)
 }
 
+/**
+ * A well-formed BIF of version 0 holding no image: what Emby 4.10 answers, 72 bytes, for an
+ * item whose thumbnails were never extracted (seen on the Shield, ADR 0069).
+ */
+fun isEmptyBif(bytes: ByteArray): Boolean =
+    bytes.size >= HEADER_BYTES && MAGIC.indices.all { bytes[it] == MAGIC[it] } && u32(bytes, 8) == 0L && u32(bytes, 12) == 0L
+
 private fun u32(bytes: ByteArray, at: Int): Long =
     (bytes[at].toLong() and 0xFF) or
         ((bytes[at + 1].toLong() and 0xFF) shl 8) or

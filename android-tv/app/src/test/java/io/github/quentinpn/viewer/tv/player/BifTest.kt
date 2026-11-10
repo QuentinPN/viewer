@@ -43,6 +43,22 @@ private fun jpeg(tag: Int) = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), tag.toByt
 
 class BifTest {
     @Test
+    fun theServersAnswerWithoutThumbnailsIsAnEmptyBif() {
+        // 72 bytes: header, then only the end entry, as Emby 4.10 answers on the Shield
+        val empty = ByteArray(72).also { b ->
+            byteArrayOf(0x89.toByte(), 0x42, 0x49, 0x46, 0x0d, 0x0a, 0x1a, 0x0a).copyInto(b)
+            for (i in 64 until 68) b[i] = 0xFF.toByte()
+        }
+        org.junit.Assert.assertNull(parseBif(empty))
+        org.junit.Assert.assertTrue(isEmptyBif(empty))
+        org.junit.Assert.assertFalse(isEmptyBif(ByteArray(72)))
+        org.junit.Assert.assertEquals(
+            "72 bytes starting 89 42 49 46 0d 0a 1a 0a 00 00 00 00 00 00 00 00",
+            firstBytes(empty),
+        )
+    }
+
+    @Test
     fun readsHeaderIndexAndImageRanges() {
         val images = listOf(jpeg(1), jpeg(2), jpeg(3))
         val parsed = parseBif(bif(images))!!
