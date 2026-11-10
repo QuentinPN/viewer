@@ -7,22 +7,30 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import io.github.quentinpn.viewer.tv.emby.EmbyClient
+import io.github.quentinpn.viewer.tv.emby.EmbyException
+import io.github.quentinpn.viewer.tv.settings.DeviceReport
+import io.github.quentinpn.viewer.tv.settings.InfoRow
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettings
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
+import io.github.quentinpn.viewer.tv.settings.ServerAbout
 import io.github.quentinpn.viewer.tv.settings.SubtitleBackground
 import io.github.quentinpn.viewer.tv.settings.SubtitleColor
 import io.github.quentinpn.viewer.tv.settings.SubtitlePosition
@@ -30,16 +38,41 @@ import io.github.quentinpn.viewer.tv.settings.SubtitleSize
 import io.github.quentinpn.viewer.tv.settings.SubtitleStyle
 import io.github.quentinpn.viewer.tv.settings.addressNote
 import io.github.quentinpn.viewer.tv.settings.capLabel
+import io.github.quentinpn.viewer.tv.settings.decoderRows
+import io.github.quentinpn.viewer.tv.settings.displayHdrRow
 import io.github.quentinpn.viewer.tv.settings.nextCap
 import io.github.quentinpn.viewer.tv.settings.nextChoice
+import io.github.quentinpn.viewer.tv.settings.serverAddress
+import io.github.quentinpn.viewer.tv.settings.serverRows
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Réglages (ADR 0051): the Windows playback settings that make sense on a TV, kept
  * on the device for this Emby user. Each row changes on OK and is saved at once.
+ * « À propos » ends it with read-only diagnostics (ADR 0076).
  */
 @Composable
-fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, version: String) {
+fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, client: EmbyClient) {
     var settings by remember { mutableStateOf(store.load()) }
+    val context = LocalContext.current
+    val app = remember { DeviceReport.appRows(context) }
+    val device = remember { DeviceReport.deviceRows() }
+    val address = remember(client) { serverAddress(client.server.url) }
+    // Once per screen open, cancelled when it closes
+    val server by produceState<ServerAbout>(ServerAbout.Loading, client) {
+        value = try {
+            ServerAbout.Loaded(client.publicInfo())
+        } catch (e: EmbyException) {
+            ServerAbout.Failed(e.error)
+        }
+    }
+    val playback by produceState<List<InfoRow>?>(null) {
+        value = withContext(Dispatchers.Default) {
+            runCatching { decoderRows(DeviceReport.decoders()) + displayHdrRow(DeviceReport.displayHdrTypes(context)) }
+                .getOrElse { listOf(InfoRow("Décodeurs", "Liste illisible sur cet appareil")) }
+        }
+    }
     val first = remember { FocusRequester() }
     fun change(next: PlaybackSettings) {
         settings = next
@@ -143,7 +176,25 @@ fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, version:
         item { Note("Ces réglages restent sur cet appareil et s'appliquent à la prochaine lecture.") }
 
         item { Section("À propos") }
-        item { Note("Viewer TV, version $version") }
+        item { Subsection("Application") }
+        items(app, key = { "app-" + it.label }) { Info(it) }
+        item { Subsection("Appareil") }
+        items(device, key = { "device-" + it.label }) { Info(it) }
+        item { Subsection("Serveur") }
+        items(serverRows(server, address), key = { "server-" + it.label }) { Info(it) }
+        item { Subsection("Lecture") }
+        item {
+            Note(
+                "Décodeurs annoncés par l'appareil et formats HDR annoncés par l'écran : une indication, pas une " +
+                    "garantie. La lecture réelle dépend aussi du fichier, du débit et de la chaîne HDMI.",
+            )
+        }
+        val rows = playback
+        if (rows == null) {
+            item { Info(InfoRow("Décodeurs", "Lecture en cours…")) }
+        } else {
+            items(rows, key = { "playback-" + it.label }) { Info(it) }
+        }
     }
 }
 
@@ -156,6 +207,24 @@ private fun Section(title: String) {
         style = MaterialTheme.typography.titleLarge,
         color = Palette.text,
         modifier = Modifier.padding(top = 24.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun Subsection(title: String) {
+    Text(title, style = MaterialTheme.typography.titleMedium, color = Palette.text, modifier = Modifier.padding(top = 12.dp))
+}
+
+/** A read-only row: focusable so ▲ ▼ scroll to it, OK does nothing. */
+@Composable
+private fun Info(row: InfoRow) {
+    ListItem(
+        selected = false,
+        onClick = {},
+        headlineContent = { Text(row.label) },
+        supportingContent = row.detail?.let { { Text(it) } },
+        trailingContent = { Text(row.value) },
+        modifier = Modifier.widthIn(max = 900.dp),
     )
 }
 
