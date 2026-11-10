@@ -55,6 +55,7 @@ import io.github.quentinpn.viewer.tv.player.SeekThumbnails
 import io.github.quentinpn.viewer.tv.player.SkipPlan
 import io.github.quentinpn.viewer.tv.player.SLEEP_NOTICE
 import io.github.quentinpn.viewer.tv.player.SkipPrompt
+import io.github.quentinpn.viewer.tv.player.trackSkipShown
 import io.github.quentinpn.viewer.tv.player.SleepChange
 import io.github.quentinpn.viewer.tv.player.SleepChoice
 import io.github.quentinpn.viewer.tv.player.SleepItem
@@ -732,6 +733,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             }
         }
         ui.skip = prompt as? SkipPrompt.Button
+        ui.skipSince = trackSkipShown(ui.skipSince, ui.skip, System.currentTimeMillis())
     }
 
     /** Seeks past the segment; past the end of the file, mpv ends it as a natural end. */
@@ -777,10 +779,11 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     private fun handleKey(event: KeyEvent): Boolean {
         val player = engine ?: return false
         if (ui.status != null || ui.menuOpen || ui.upNext != null) return false
-        // OK presses the skip button while it shows; play / pause keys still pause
+        // OK presses the skip button while it shows; play / pause keys still pause.
+        // Once it hid (ADR 0089), OK only brings it back with the controls
         val ok = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER
         if (ok && ui.skip != null) {
-            if (event.action == KeyEvent.ACTION_DOWN) skip()
+            if (event.action == KeyEvent.ACTION_DOWN) if (ui.skipVisible) skip() else ui.show()
             return true
         }
         val action = action(event.keyCode) ?: return false

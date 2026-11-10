@@ -112,3 +112,47 @@ export function offersNextToo(
 /** Stable key of a segment, to skip each one once per playback. */
 export const segmentKey = (segment: Segment) =>
   `${segment.kind}@${segment.start}`;
+
+/** How long the button shows on its own once its segment starts (ADR 0089). */
+export const SKIP_SHOWN_MS = 10_000;
+
+/**
+ * When the button of the segment being played appeared. `key` is null outside
+ * any segment, so leaving one (its end, or a seek before its start) and
+ * entering another start a new countdown.
+ */
+export interface SkipShown {
+  key: string | null;
+  since: number;
+}
+
+export const NO_SKIP_SHOWN: SkipShown = { key: null, since: 0 };
+
+/** The countdown for segment `key` at `now`; unchanged within the same segment. */
+export function trackSkipShown(
+  prev: SkipShown,
+  key: string | null,
+  now: number,
+): SkipShown {
+  return key === prev.key ? prev : { key, since: now };
+}
+
+/**
+ * Whether the button shows: for `SKIP_SHOWN_MS` after it appeared, then only
+ * with the controls, until the segment ends.
+ */
+export function skipShown(
+  shown: SkipShown,
+  now: number,
+  controls: boolean,
+): boolean {
+  if (shown.key === null) return false;
+  return controls || now - shown.since < SKIP_SHOWN_MS;
+}
+
+/** Milliseconds until the button hides on its own; null once it did, or outside a segment. */
+export function skipHidesIn(shown: SkipShown, now: number): number | null {
+  if (shown.key === null) return null;
+  const left = shown.since + SKIP_SHOWN_MS - now;
+  return left > 0 ? left : null;
+}
