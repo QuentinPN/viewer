@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -66,17 +67,27 @@ import io.github.quentinpn.viewer.tv.player.Delays
 import io.github.quentinpn.viewer.tv.player.InfoRow
 import io.github.quentinpn.viewer.tv.player.NORMAL_SPEED
 import io.github.quentinpn.viewer.tv.player.Night
+import io.github.quentinpn.viewer.tv.player.SleepChange
+import io.github.quentinpn.viewer.tv.player.SleepChoice
+import io.github.quentinpn.viewer.tv.player.SleepItem
+import io.github.quentinpn.viewer.tv.player.SleepTimer
 import io.github.quentinpn.viewer.tv.player.SpeedChange
 import io.github.quentinpn.viewer.tv.player.SkipPrompt
 import io.github.quentinpn.viewer.tv.player.Track
 import io.github.quentinpn.viewer.tv.player.TrackType
 import io.github.quentinpn.viewer.tv.player.chapterIndex
+import io.github.quentinpn.viewer.tv.player.endLabel
+import io.github.quentinpn.viewer.tv.player.formatClock
 import io.github.quentinpn.viewer.tv.player.formatDelay
 import io.github.quentinpn.viewer.tv.player.formatSpeed
 import io.github.quentinpn.viewer.tv.player.nightNote
 import io.github.quentinpn.viewer.tv.player.nightValue
+import io.github.quentinpn.viewer.tv.player.sleepBadge
+import io.github.quentinpn.viewer.tv.player.sleepValue
 import io.github.quentinpn.viewer.tv.player.speedBadge
+import io.github.quentinpn.viewer.tv.player.untilNextMinute
 import kotlinx.coroutines.delay
+import java.time.ZoneId
 
 private const val HIDE_AFTER_MS = 5_000L
 
@@ -138,6 +149,18 @@ class PlayerUi {
     /** Night mode, from Réglages or the menu (ADR 0072). */
     var night by mutableStateOf(Night())
 
+    /** Wall clock of the clock and « Fin à » (ADR 0073): set on each position, and at each minute while the controls show. */
+    var now by mutableLongStateOf(System.currentTimeMillis())
+
+    /** Episode or film, for « Fin de l'épisode » / « Fin du film »; null for anything else or until known (ADR 0073). */
+    var item by mutableStateOf<SleepItem?>(null)
+
+    /** The sleep timer: the whole player session, kept from one episode to the next (ADR 0073). */
+    var sleep by mutableStateOf(SleepTimer())
+
+    /** Over the paused picture once the timer has run out; gone when playback resumes. */
+    var notice by mutableStateOf<String?>(null)
+
     /** Target of the last ◀ ▶ seek while its thumbnail may show (ADR 0069); null once the seek settles. */
     var seekTarget by mutableStateOf<Double?>(null)
         private set
@@ -188,6 +211,8 @@ class PlayerUi {
         info = null
         delays = Delays()
         speed = NORMAL_SPEED
+        item = null
+        notice = null
         seekTarget = null
         seekFrame = null
         controls = false
@@ -226,7 +251,7 @@ internal fun episodeLabel(season: Int?, episode: Int?, name: String): String {
     return if (code.isEmpty()) name else if (name.isEmpty()) code else "$code — $name"
 }
 
-/** Time, progress and title over the video, the audio / subtitle / delay, chapter and information menus, the skip button and the next episode card. */
+/** Time, progress, title, clock and end time over the video, the audio / subtitle / delay, chapter and information menus, the skip button and the next episode card. */
 @Composable
 fun PlayerOverlay(
     ui: PlayerUi,
@@ -239,11 +264,21 @@ fun PlayerOverlay(
     onDelay: (DelayKind, DelayChange) -> Unit,
     onSpeed: (SpeedChange) -> Unit,
     onNight: () -> Unit,
+    onSleep: (SleepChange) -> Unit,
 ) {
     ui.AutoHide()
     BoxWithConstraints(Modifier.fillMaxSize()) {
         ui.status?.let {
             Text(it, color = Palette.text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.align(Alignment.Center))
+        }
+        val notice = ui.notice
+        if (notice != null && ui.status == null) {
+            Text(
+                notice,
+                color = Palette.text,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.align(Alignment.Center).background(Palette.surface.copy(alpha = 0.92f), RoundedCornerShape(10.dp)).padding(horizontal = 24.dp, vertical = 14.dp),
+            )
         }
         val upNext = ui.upNext
         if (upNext != null) {
@@ -258,7 +293,7 @@ fun PlayerOverlay(
             SkipButton(skip, !ui.menuOpen, onSkip, Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
         }
         ui.tracks?.let {
-            TrackMenu(it, MenuState(ui.delays, ui.speed, ui.night), MenuActions(onSelect, onDelay, onSpeed, onNight, onInfo), Modifier.align(Alignment.CenterEnd))
+            TrackMenu(it, MenuState(ui.delays, ui.speed, ui.night, ui.sleep.choice, ui.item), MenuActions(onSelect, onDelay, onSpeed, onNight, onSleep, onInfo), Modifier.align(Alignment.CenterEnd))
         }
         ui.info?.let { InfoMenu(it, Modifier.align(Alignment.CenterEnd)) }
         if (ui.chapterMenu) ChapterMenu(ui.chapters, chapterIndex(ui.chapters, ui.position), onChapter, Modifier.align(Alignment.CenterEnd))
@@ -325,7 +360,18 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
             .padding(start = 48.dp, end = 48.dp, top = FADE, bottom = 36.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(ui.title, color = Palette.text, style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // The clock moves on with each position; paused, the minute's start moves it on (ADR 0073)
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(untilNextMinute(System.currentTimeMillis()))
+                ui.now = System.currentTimeMillis()
+            }
+        }
+        val zone = remember { ZoneId.systemDefault() }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(ui.title, color = Palette.text, style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(formatClock(ui.now, zone), color = Palette.text, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 24.dp))
+        }
         ui.detail?.let { Text(it, color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         val fraction = if (ui.duration > 0) (ui.position / ui.duration).coerceIn(0.0, 1.0).toFloat() else 0f
         BoxWithConstraints(Modifier.padding(top = 6.dp).fillMaxWidth().height(6.dp).background(Color.White.copy(alpha = 0.25f), RoundedCornerShape(3.dp))) {
@@ -356,7 +402,8 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
                 )
             }
             // Only away from 1x: a reminder that the speed was changed in the menu (ADR 0072)
-            speedBadge(ui.speed)?.let {
+            // As the speed's: the timer set in the menu, and what is left of it (ADR 0073)
+            listOfNotNull(speedBadge(ui.speed), sleepBadge(ui.sleep, ui.now, ui.item)).forEach {
                 Text(
                     it,
                     color = Palette.text,
@@ -368,9 +415,12 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
             if (ui.duration > 0) {
                 Text("−${seconds(ui.duration - ui.position)}", color = Palette.textSecondary, style = MaterialTheme.typography.bodyLarge)
             }
+            endLabel(ui.now, ui.position, ui.duration, ui.speed, zone)?.let {
+                Text(it, color = Palette.text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 16.dp))
+            }
         }
         Text(
-            "OK lecture / pause  ·  ◀ ▶ 10 s  ·  ▼ audio, sous-titres, vitesse et infos" + if (ui.chapters.isNotEmpty()) "  ·  ▲ chapitres" else "",
+            "OK lecture / pause  ·  ◀ ▶ 10 s  ·  ▼ audio, sous-titres, vitesse, minuterie et infos" + if (ui.chapters.isNotEmpty()) "  ·  ▲ chapitres" else "",
             color = Palette.textSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -418,18 +468,22 @@ private sealed interface MenuRow {
     /** OK turns night mode on or off (ADR 0072). */
     data class NightMode(val night: Night) : MenuRow
 
+    /** ◀ ▶ step through the timer's values, OK goes to the next one and wraps (ADR 0073). */
+    data class Sleep(val choice: SleepChoice, val item: SleepItem?) : MenuRow
+
     /** Last row: opens "Informations de lecture" in place of the menu (ADR 0061). */
     data object Info : MenuRow
 }
 
 /** What the rows of the track menu show beyond the tracks. */
-private class MenuState(val delays: Delays, val speed: Double, val night: Night)
+private class MenuState(val delays: Delays, val speed: Double, val night: Night, val sleep: SleepChoice, val item: SleepItem?)
 
 private class MenuActions(
     val select: (TrackType, Int?) -> Unit,
     val delay: (DelayKind, DelayChange) -> Unit,
     val speed: (SpeedChange) -> Unit,
     val night: () -> Unit,
+    val sleep: (SleepChange) -> Unit,
     val info: () -> Unit,
 )
 
@@ -463,6 +517,7 @@ private fun menuRows(tracks: List<Track>, state: MenuState): List<MenuRow> = bui
     add(MenuRow.Header("Lecture"))
     add(MenuRow.Speed(state.speed))
     add(MenuRow.NightMode(state.night))
+    add(MenuRow.Sleep(state.sleep, state.item))
     add(MenuRow.Info)
 }
 
@@ -515,6 +570,14 @@ private fun TrackMenu(tracks: List<Track>, state: MenuState, actions: MenuAction
                     headlineContent = { Text("Mode nuit", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     supportingContent = { Text(nightNote(row.night), maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     trailingContent = { Text(nightValue(row.night)) },
+                )
+                is MenuRow.Sleep -> ListItem(
+                    selected = false,
+                    onClick = { actions.sleep(SleepChange.Cycle) },
+                    headlineContent = { Text("Minuterie", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = { Text("◀ ▶ ou OK change  ·  met ensuite la lecture en pause", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    trailingContent = { Text(sleepValue(row.choice, row.item)) },
+                    modifier = Modifier.leftRight(SleepChange.Previous, SleepChange.Next, actions.sleep),
                 )
                 MenuRow.Info -> ListItem(
                     selected = false,

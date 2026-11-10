@@ -42,13 +42,19 @@ import io.github.quentinpn.viewer.tv.player.PlayerEngine
 import io.github.quentinpn.viewer.tv.player.PlayerListener
 import io.github.quentinpn.viewer.tv.player.SeekThumbnails
 import io.github.quentinpn.viewer.tv.player.SkipPlan
+import io.github.quentinpn.viewer.tv.player.SLEEP_NOTICE
 import io.github.quentinpn.viewer.tv.player.SkipPrompt
+import io.github.quentinpn.viewer.tv.player.SleepChange
+import io.github.quentinpn.viewer.tv.player.SleepChoice
+import io.github.quentinpn.viewer.tv.player.SleepItem
+import io.github.quentinpn.viewer.tv.player.SleepTimer
 import io.github.quentinpn.viewer.tv.player.SpeedChange
 import io.github.quentinpn.viewer.tv.player.TrackPreference
 import io.github.quentinpn.viewer.tv.player.TrackPreferenceStore
 import io.github.quentinpn.viewer.tv.player.TrackType
 import io.github.quentinpn.viewer.tv.player.accountPick
 import io.github.quentinpn.viewer.tv.player.changeDelay
+import io.github.quentinpn.viewer.tv.player.changeSleep
 import io.github.quentinpn.viewer.tv.player.changeSpeed
 import io.github.quentinpn.viewer.tv.player.chapters
 import io.github.quentinpn.viewer.tv.player.decide
@@ -56,6 +62,8 @@ import io.github.quentinpn.viewer.tv.player.describeTrack
 import io.github.quentinpn.viewer.tv.player.downloadThumbnails
 import io.github.quentinpn.viewer.tv.player.playbackInfo
 import io.github.quentinpn.viewer.tv.player.playingAudioLanguage
+import io.github.quentinpn.viewer.tv.player.sleepDue
+import io.github.quentinpn.viewer.tv.player.sleepTimer
 import io.github.quentinpn.viewer.tv.player.subtitlePosition
 import io.github.quentinpn.viewer.tv.player.thumbnailsLog
 import io.github.quentinpn.viewer.tv.player.transcodeReasons
@@ -101,6 +109,8 @@ private const val INFO_REFRESH_MS = 1_000L
  * Subtitles and audio can be shifted from the track menu, for the current file only (ADR 0062).
  * ◀ ▶ show the server's thumbnail of the target above the bar, when it has extracted some (ADR 0069).
  * The track menu also sets the speed, for the current file only, and night mode, kept in Réglages (ADR 0072).
+ * The controls show the time and when playback ends; the track menu's « Minuterie » pauses
+ * playback after a while, or at the credits, for this player session only (ADR 0073).
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
     private var engine: PlayerEngine? = null
@@ -134,6 +144,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     /** Intro and credits of the current item, once known (ADR 0048). */
     private var skips: SkipPlan? = null
 
+    /** The same segments, for « Fin de l'épisode » of the sleep timer (ADR 0073). */
+    private var segments: List<Segment> = emptyList()
+
     /** Seek thumbnails of the file being played, fetched at its first seek (ADR 0069). */
     private var thumbnails: SeekThumbnails? = null
 
@@ -149,7 +162,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val surface = SurfaceView(this)
         val overlay = ComposeView(this).apply {
-            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip, ::openInfo, ::shiftDelay, ::shiftSpeed, ::toggleNight) } }
+            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip, ::openInfo, ::shiftDelay, ::shiftSpeed, ::toggleNight, ::changeTimer) } }
         }
         setContentView(
             // With the menu focused, keys reach the root before the overlay: the player sees them first
@@ -216,10 +229,13 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         current = itemId
         next = null
         skips = null
+        segments = emptyList()
         facts = null
         dropThumbnails()
         settings = settingsStore?.load() ?: PlaybackSettings()
         ui.reset()
+        // Minutes go on into the next episode; « Fin de l'épisode » was for the one before
+        if (ui.sleep.holdsNext) ui.sleep = SleepTimer()
         ui.night = Night(settings.nightMode)
         lifecycleScope.launch { describe(itemId) }
         lifecycleScope.launch { negotiate(itemId, startTicks, mediaSourceId) }
@@ -232,6 +248,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             val item = client.fullItem(userId, itemId)
             if (current != itemId) return
             ui.chapters = chapters(item.chapters, item.runTimeTicks)
+            ui.item = SleepItem.of(item.type)
             lifecycleScope.launch { findSegments(item) }
             if (item.type == "Episode") {
                 ui.title = item.seriesName ?: item.name
@@ -260,6 +277,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         if (current != item.id) return
         Log.i(TAG, "segments=${found.joinToString { "${it.kind}@${it.start}-${it.end ?: "end"} (${it.source})" }} auto=$auto")
         skips = SkipPlan(found, auto)
+        segments = found
     }
 
     /** Emby's markers completed by IntroDB and TheIntroDB; null when another item started meanwhile. */
@@ -396,7 +414,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         reporter.event { position(seconds, it) }
         runOnUiThread {
             ui.position = seconds
-            updateSkip()
+            ui.now = System.currentTimeMillis()
+            // Paused by the timer: no skip button nor up-next card over the notice
+            if (!checkTimer()) updateSkip()
         }
     }
 
@@ -407,7 +427,23 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     override fun onPauseChanged(paused: Boolean) {
         reporter.event { paused(paused, it) }
-        runOnUiThread { ui.paused = paused }
+        runOnUiThread {
+            ui.paused = paused
+            if (!paused) resumed()
+        }
+    }
+
+    /**
+     * Playback goes on: the notice goes. Minutes that ran out while paused end there, so
+     * playing again is not paused at once; « Fin de l'épisode » still waits for its stop.
+     */
+    private fun resumed() {
+        ui.notice = null
+        val now = System.currentTimeMillis()
+        if (ui.sleep.choice is SleepChoice.Minutes && sleepDue(ui.sleep, now, ui.position, ui.duration, segments)) {
+            Log.i(TAG, "sleep timer ran out while paused")
+            ui.sleep = SleepTimer()
+        }
     }
 
     override fun onSeek() = reporter.event { seeked(); emptyList() }
@@ -415,6 +451,11 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     override fun onEndReached() {
         reporter.event { ended(it) }
         runOnUiThread {
+            // « Fin de l'épisode » not caught by a position: the player stays, without the next one
+            if (ui.sleep.holdsNext && ui.upNext == null) {
+                ranOut(pause = false)
+                return@runOnUiThread
+            }
             val following = next
             // A cut stream also reaches its end: no next episode then
             val natural = ui.duration <= 0 || ui.duration - ui.position <= NATURAL_END_MARGIN_SECONDS
@@ -437,10 +478,47 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         runOnUiThread { finish() }
     }
 
+    /** Pauses playback if the sleep timer has run out (ADR 0073); true when it did. */
+    private fun checkTimer(): Boolean {
+        // Until the new file loads, positions are still those of the replaced one
+        if (ui.status != null || !ui.sleep.on) return false
+        if (!sleepDue(ui.sleep, ui.now, ui.position, ui.duration, segments)) return false
+        ranOut(pause = true)
+        return true
+    }
+
+    /**
+     * The timer ends: no up-next card, so no next episode, and a notice over the picture.
+     * The pause goes through mpv as any other, so the tracker reports it the usual way;
+     * at the end of the file ([pause] false), playback is already over.
+     */
+    private fun ranOut(pause: Boolean) {
+        Log.i(TAG, "sleep timer ran out choice=${ui.sleep.choice} at=${ui.position}")
+        ui.sleep = SleepTimer()
+        ui.upNext = null
+        ui.skip = null
+        ui.closeMenus()
+        if (pause && !ui.paused) engine?.togglePause()
+        ui.notice = SLEEP_NOTICE
+        ui.show()
+    }
+
+    /** The « Minuterie » row: a new value starts from now; the same one, held at an end, keeps its time. */
+    private fun changeTimer(change: SleepChange) {
+        val choice = changeSleep(ui.sleep.choice, change, ui.item)
+        if (choice == ui.sleep.choice) return
+        val now = System.currentTimeMillis()
+        ui.sleep = sleepTimer(choice, now, ui.position)
+        ui.now = now
+        Log.i(TAG, "sleep timer=$choice")
+    }
+
     /** The skip button, or the up-next card from the start of the credits. */
     private fun updateSkip() {
+        // « Fin de l'épisode » set: the credits get their button, never the next episode (ADR 0073)
+        val hasNext = next != null && !ui.sleep.holdsNext
         // Until the new file loads, positions are still those of the replaced one
-        val prompt = if (ui.status == null) skips?.at(ui.position, ui.duration, next != null) else null
+        val prompt = if (ui.status == null) skips?.at(ui.position, ui.duration, hasNext) else null
         if (prompt == SkipPrompt.UpNext && ui.upNext == null) {
             val following = next ?: return
             ui.closeMenus()
@@ -480,6 +558,11 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     private fun playNext() {
         val following = next ?: return finish()
+        // Run out during the card's countdown, when no position comes: the next episode does not start
+        if (sleepDue(ui.sleep, System.currentTimeMillis(), ui.position, ui.duration, segments)) {
+            ranOut(pause = ui.upNext?.atCredits == true)
+            return
+        }
         Log.i(TAG, "play next=${following.id}")
         play(following.id, following.startTicks())
     }
