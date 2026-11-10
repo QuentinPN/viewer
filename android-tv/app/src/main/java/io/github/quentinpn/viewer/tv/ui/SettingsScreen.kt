@@ -101,6 +101,14 @@ fun SettingsScreen(store: PlaybackSettingsStore, localAddress: Boolean, version:
             }
         }
         item { Note(addressNote(localAddress)) }
+        item {
+            Choice(
+                "Mode nuit",
+                "Réduit l'écart entre dialogues et explosions, pour regarder à faible volume. Aussi dans le menu ▼ " +
+                    "du lecteur. Sans effet quand le son part tel quel vers l'ampli.",
+                onOff(settings.nightMode),
+            ) { change(settings.copy(nightMode = !settings.nightMode)) }
+        }
 
         item { Section("Sous-titres") }
         item {

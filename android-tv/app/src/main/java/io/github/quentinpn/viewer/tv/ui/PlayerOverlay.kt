@@ -64,11 +64,18 @@ import io.github.quentinpn.viewer.tv.player.DelayChange
 import io.github.quentinpn.viewer.tv.player.DelayKind
 import io.github.quentinpn.viewer.tv.player.Delays
 import io.github.quentinpn.viewer.tv.player.InfoRow
+import io.github.quentinpn.viewer.tv.player.NORMAL_SPEED
+import io.github.quentinpn.viewer.tv.player.Night
+import io.github.quentinpn.viewer.tv.player.SpeedChange
 import io.github.quentinpn.viewer.tv.player.SkipPrompt
 import io.github.quentinpn.viewer.tv.player.Track
 import io.github.quentinpn.viewer.tv.player.TrackType
 import io.github.quentinpn.viewer.tv.player.chapterIndex
 import io.github.quentinpn.viewer.tv.player.formatDelay
+import io.github.quentinpn.viewer.tv.player.formatSpeed
+import io.github.quentinpn.viewer.tv.player.nightNote
+import io.github.quentinpn.viewer.tv.player.nightValue
+import io.github.quentinpn.viewer.tv.player.speedBadge
 import kotlinx.coroutines.delay
 
 private const val HIDE_AFTER_MS = 5_000L
@@ -125,6 +132,12 @@ class PlayerUi {
     /** Subtitle and audio delays, as mpv holds them; this playback only (ADR 0062). */
     var delays by mutableStateOf(Delays())
 
+    /** Playback speed as mpv holds it; this playback only (ADR 0072). */
+    var speed by mutableDoubleStateOf(NORMAL_SPEED)
+
+    /** Night mode, from Réglages or the menu (ADR 0072). */
+    var night by mutableStateOf(Night())
+
     /** Target of the last ◀ ▶ seek while its thumbnail may show (ADR 0069); null once the seek settles. */
     var seekTarget by mutableStateOf<Double?>(null)
         private set
@@ -174,6 +187,7 @@ class PlayerUi {
         chapterMenu = false
         info = null
         delays = Delays()
+        speed = NORMAL_SPEED
         seekTarget = null
         seekFrame = null
         controls = false
@@ -223,6 +237,8 @@ fun PlayerOverlay(
     onSkip: () -> Unit,
     onInfo: () -> Unit,
     onDelay: (DelayKind, DelayChange) -> Unit,
+    onSpeed: (SpeedChange) -> Unit,
+    onNight: () -> Unit,
 ) {
     ui.AutoHide()
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -241,7 +257,9 @@ fun PlayerOverlay(
             // Above the text of the controls while they show; stays when they fade
             SkipButton(skip, !ui.menuOpen, onSkip, Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
         }
-        ui.tracks?.let { TrackMenu(it, ui.delays, onSelect, onDelay, onInfo, Modifier.align(Alignment.CenterEnd)) }
+        ui.tracks?.let {
+            TrackMenu(it, MenuState(ui.delays, ui.speed, ui.night), MenuActions(onSelect, onDelay, onSpeed, onNight, onInfo), Modifier.align(Alignment.CenterEnd))
+        }
         ui.info?.let { InfoMenu(it, Modifier.align(Alignment.CenterEnd)) }
         if (ui.chapterMenu) ChapterMenu(ui.chapters, chapterIndex(ui.chapters, ui.position), onChapter, Modifier.align(Alignment.CenterEnd))
     }
@@ -337,13 +355,22 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
                     modifier = Modifier.padding(start = 16.dp).background(Palette.text, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
                 )
             }
+            // Only away from 1x: a reminder that the speed was changed in the menu (ADR 0072)
+            speedBadge(ui.speed)?.let {
+                Text(
+                    it,
+                    color = Palette.text,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = 16.dp).background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
             Spacer(Modifier.weight(1f))
             if (ui.duration > 0) {
                 Text("−${seconds(ui.duration - ui.position)}", color = Palette.textSecondary, style = MaterialTheme.typography.bodyLarge)
             }
         }
         Text(
-            "OK lecture / pause  ·  ◀ ▶ 10 s  ·  ▼ audio, sous-titres et infos" + if (ui.chapters.isNotEmpty()) "  ·  ▲ chapitres" else "",
+            "OK lecture / pause  ·  ◀ ▶ 10 s  ·  ▼ audio, sous-titres, vitesse et infos" + if (ui.chapters.isNotEmpty()) "  ·  ▲ chapitres" else "",
             color = Palette.textSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -385,11 +412,41 @@ private sealed interface MenuRow {
     /** ◀ ▶ shift by a tenth of a second, OK goes back to none (ADR 0062). */
     data class Delay(val kind: DelayKind, val seconds: Double) : MenuRow
 
+    /** ◀ ▶ step through the offered speeds, OK goes back to « Normale » (ADR 0072). */
+    data class Speed(val speed: Double) : MenuRow
+
+    /** OK turns night mode on or off (ADR 0072). */
+    data class NightMode(val night: Night) : MenuRow
+
     /** Last row: opens "Informations de lecture" in place of the menu (ADR 0061). */
     data object Info : MenuRow
 }
 
-private fun menuRows(tracks: List<Track>, delays: Delays): List<MenuRow> = buildList {
+/** What the rows of the track menu show beyond the tracks. */
+private class MenuState(val delays: Delays, val speed: Double, val night: Night)
+
+private class MenuActions(
+    val select: (TrackType, Int?) -> Unit,
+    val delay: (DelayKind, DelayChange) -> Unit,
+    val speed: (SpeedChange) -> Unit,
+    val night: () -> Unit,
+    val info: () -> Unit,
+)
+
+/** ◀ and ▶ on a row: [left] or [right], held down they repeat; other keys go on as usual. */
+private fun <T> Modifier.leftRight(left: T, right: T, onChange: (T) -> Unit) = onPreviewKeyEvent {
+    if (it.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+    val change = when (it.key) {
+        Key.DirectionLeft -> left
+        Key.DirectionRight -> right
+        else -> return@onPreviewKeyEvent false
+    }
+    onChange(change)
+    true
+}
+
+private fun menuRows(tracks: List<Track>, state: MenuState): List<MenuRow> = buildList {
+    val delays = state.delays
     val subs = tracks.filter { it.type == TrackType.Subtitle }
     add(MenuRow.Header("Sous-titres"))
     add(MenuRow.Choice(TrackType.Subtitle, null, "Désactivés", subs.none { it.selected }))
@@ -403,19 +460,15 @@ private fun menuRows(tracks: List<Track>, delays: Delays): List<MenuRow> = build
     // Shifting subtitles that do not show would change nothing visible
     if (subs.any { it.selected }) add(MenuRow.Delay(DelayKind.Subtitle, delays.subtitle))
     add(MenuRow.Delay(DelayKind.Audio, delays.audio))
+    add(MenuRow.Header("Lecture"))
+    add(MenuRow.Speed(state.speed))
+    add(MenuRow.NightMode(state.night))
     add(MenuRow.Info)
 }
 
 @Composable
-private fun TrackMenu(
-    tracks: List<Track>,
-    delays: Delays,
-    onSelect: (TrackType, Int?) -> Unit,
-    onDelay: (DelayKind, DelayChange) -> Unit,
-    onInfo: () -> Unit,
-    modifier: Modifier,
-) {
-    val rows = menuRows(tracks, delays)
+private fun TrackMenu(tracks: List<Track>, state: MenuState, actions: MenuActions, modifier: Modifier) {
+    val rows = menuRows(tracks, state)
     val first = remember { FocusRequester() }
     // Focus starts on the subtitle in use
     val start = rows.indexOfFirst { it is MenuRow.Choice && it.type == TrackType.Subtitle && it.selected }
@@ -434,32 +487,38 @@ private fun TrackMenu(
                 )
                 is MenuRow.Choice -> ListItem(
                     selected = row.selected,
-                    onClick = { onSelect(row.type, row.id) },
+                    onClick = { actions.select(row.type, row.id) },
                     headlineContent = { Text(row.label, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     trailingContent = if (row.selected) ({ Text("✓") }) else null,
                     modifier = if (rows.indexOf(row) == start) Modifier.focusRequester(first) else Modifier,
                 )
                 is MenuRow.Delay -> ListItem(
                     selected = false,
-                    onClick = { onDelay(row.kind, DelayChange.Reset) },
+                    onClick = { actions.delay(row.kind, DelayChange.Reset) },
                     headlineContent = { Text(row.kind.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     supportingContent = { Text("◀ ▶ 0,1 s  ·  OK remet à zéro", maxLines = 1) },
                     trailingContent = { Text(formatDelay(row.seconds)) },
                     // Held down, the key repeats: one tenth per repeat; ▲ ▼ still move between rows
-                    modifier = Modifier.onPreviewKeyEvent {
-                        if (it.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                        val change = when (it.key) {
-                            Key.DirectionLeft -> DelayChange.Earlier
-                            Key.DirectionRight -> DelayChange.Later
-                            else -> return@onPreviewKeyEvent false
-                        }
-                        onDelay(row.kind, change)
-                        true
-                    },
+                    modifier = Modifier.leftRight(DelayChange.Earlier, DelayChange.Later) { actions.delay(row.kind, it) },
+                )
+                is MenuRow.Speed -> ListItem(
+                    selected = false,
+                    onClick = { actions.speed(SpeedChange.Reset) },
+                    headlineContent = { Text("Vitesse", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = { Text("◀ ▶ change  ·  OK revient à Normale", maxLines = 1) },
+                    trailingContent = { Text(formatSpeed(row.speed)) },
+                    modifier = Modifier.leftRight(SpeedChange.Slower, SpeedChange.Faster, actions.speed),
+                )
+                is MenuRow.NightMode -> ListItem(
+                    selected = false,
+                    onClick = actions.night,
+                    headlineContent = { Text("Mode nuit", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = { Text(nightNote(row.night), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                    trailingContent = { Text(nightValue(row.night)) },
                 )
                 MenuRow.Info -> ListItem(
                     selected = false,
-                    onClick = onInfo,
+                    onClick = actions.info,
                     headlineContent = { Text("Informations de lecture", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     modifier = Modifier.padding(top = 16.dp),
                 )

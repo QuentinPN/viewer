@@ -35,17 +35,21 @@ import io.github.quentinpn.viewer.tv.player.DelayChange
 import io.github.quentinpn.viewer.tv.player.DelayKind
 import io.github.quentinpn.viewer.tv.player.MediaSource
 import io.github.quentinpn.viewer.tv.player.MpvPlayerEngine
+import io.github.quentinpn.viewer.tv.player.Night
+import io.github.quentinpn.viewer.tv.player.NightState
 import io.github.quentinpn.viewer.tv.player.PlaybackFacts
 import io.github.quentinpn.viewer.tv.player.PlayerEngine
 import io.github.quentinpn.viewer.tv.player.PlayerListener
 import io.github.quentinpn.viewer.tv.player.SeekThumbnails
 import io.github.quentinpn.viewer.tv.player.SkipPlan
 import io.github.quentinpn.viewer.tv.player.SkipPrompt
+import io.github.quentinpn.viewer.tv.player.SpeedChange
 import io.github.quentinpn.viewer.tv.player.TrackPreference
 import io.github.quentinpn.viewer.tv.player.TrackPreferenceStore
 import io.github.quentinpn.viewer.tv.player.TrackType
 import io.github.quentinpn.viewer.tv.player.accountPick
 import io.github.quentinpn.viewer.tv.player.changeDelay
+import io.github.quentinpn.viewer.tv.player.changeSpeed
 import io.github.quentinpn.viewer.tv.player.chapters
 import io.github.quentinpn.viewer.tv.player.decide
 import io.github.quentinpn.viewer.tv.player.describeTrack
@@ -96,6 +100,7 @@ private const val INFO_REFRESH_MS = 1_000L
  * "Informations de lecture" opens from the last row of the track menu, or the INFO key (ADR 0061).
  * Subtitles and audio can be shifted from the track menu, for the current file only (ADR 0062).
  * ◀ ▶ show the server's thumbnail of the target above the bar, when it has extracted some (ADR 0069).
+ * The track menu also sets the speed, for the current file only, and night mode, kept in Réglages (ADR 0072).
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
     private var engine: PlayerEngine? = null
@@ -144,7 +149,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val surface = SurfaceView(this)
         val overlay = ComposeView(this).apply {
-            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip, ::openInfo, ::shiftDelay) } }
+            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip, ::openInfo, ::shiftDelay, ::shiftSpeed, ::toggleNight) } }
         }
         setContentView(
             // With the menu focused, keys reach the root before the overlay: the player sees them first
@@ -215,6 +220,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         dropThumbnails()
         settings = settingsStore?.load() ?: PlaybackSettings()
         ui.reset()
+        ui.night = Night(settings.nightMode)
         lifecycleScope.launch { describe(itemId) }
         lifecycleScope.launch { negotiate(itemId, startTicks, mediaSourceId) }
     }
@@ -307,6 +313,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
                 // Headers are fixed at mpv init (token out of logcat): the first file's apply
                 replacedEnds++
                 styleSubtitles(running)
+                applyNightMode(running)
                 running.load(source, startTicks / TICKS_PER_SECOND)
                 return
             }
@@ -319,6 +326,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
                 holder.surfaceFrame.let { player.resizeSurface(it.width(), it.height()) }
             }
             styleSubtitles(player)
+            applyNightMode(player)
             player.load(source, startTicks / TICKS_PER_SECOND)
         } catch (e: EmbyException) {
             ui.status = e.error.message
@@ -329,6 +337,12 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     private fun styleSubtitles(player: PlayerEngine) {
         player.setSubtitleStyle(settings.subtitles)
         player.setSubtitlePosition(subtitlePosition(settings.subtitles.position, ui.covered))
+    }
+
+    /** Night mode of Réglages, set before the file loads so its audio chain starts with it (ADR 0072). */
+    private fun applyNightMode(player: PlayerEngine) {
+        val held = player.setNightMode(settings.nightMode)
+        Log.i(TAG, "night=${settings.nightMode} held=$held")
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
@@ -507,6 +521,8 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         }
         KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_MENU -> { p ->
             ui.tracks = p.tracks()
+            // Audio passed through to the amplifier: night mode says it cannot apply (ADR 0072)
+            if (p.audioPassthrough()) ui.night = ui.night.copy(state = NightState.Passthrough)
             ui.show()
         }
         // Remotes that have it; the Shield's has not, and goes through the track menu
@@ -591,6 +607,32 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         Log.i(TAG, "${kind.property}=$applied")
         // Unreadable: the row keeps the last value mpv gave
         if (applied != null) ui.delays = ui.delays.with(kind, applied)
+    }
+
+    /** The speed row of the track menu: what mpv holds afterwards is shown (ADR 0072). */
+    private fun shiftSpeed(change: SpeedChange) {
+        val player = engine ?: return
+        val applied = player.setSpeed(changeSpeed(ui.speed, change))
+        Log.i(TAG, "speed=$applied pitch-correction=${player.property("audio-pitch-correction")}")
+        if (applied != null) ui.speed = applied
+    }
+
+    /**
+     * The night mode row: saved in Réglages at once, then applied live when mpv takes it.
+     * In passthrough, saved only: no filter can touch audio that is not decoded.
+     */
+    private fun toggleNight() {
+        val player = engine ?: return
+        val on = !ui.night.on
+        settingsStore?.let { store -> store.save(store.load().copy(nightMode = on)) }
+        settings = settings.copy(nightMode = on)
+        val state = when {
+            player.audioPassthrough() -> NightState.Passthrough
+            player.setNightMode(on) -> NightState.Applied
+            else -> NightState.NextPlayback
+        }
+        Log.i(TAG, "night=$on state=$state af=${player.property("af")}")
+        ui.night = Night(on, state)
     }
 
     override fun onStop() {

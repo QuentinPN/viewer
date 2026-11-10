@@ -7,7 +7,8 @@ import io.github.quentinpn.viewer.tv.emby.MAX_STREAMING_BITRATE
 // Réglages (ADR 0051), ported from the Windows client: the intro and credits options
 // of src/lib/player/segments.ts (ADR 0030) and the streaming caps of
 // src-tauri/src/emby/quality.rs (ADR 0037), then the subtitle look of
-// src/lib/player/subtitles.ts (ADR 0035, 0053). Kept on the device, never on the server.
+// src/lib/player/subtitles.ts (ADR 0035, 0053), then night mode (ADR 0072, TV only).
+// Kept on the device, never on the server.
 
 /** Caps offered, in bits per second, as `BITRATE_CHOICES` on Windows; null is "Maximale". */
 val BITRATE_CHOICES: List<Long> = listOf(40_000_000, 20_000_000, 10_000_000, 8_000_000, 4_000_000, 3_000_000, 1_500_000)
@@ -24,6 +25,8 @@ data class PlaybackSettings(
     val remoteCap: Long? = null,
     /** Look of text subtitles. */
     val subtitles: SubtitleStyle = SubtitleStyle(),
+    /** Compress the audio's dynamic range, for dialogue at low volume (ADR 0072). */
+    val nightMode: Boolean = false,
 ) {
     /** Drops caps outside the list, e.g. from an older version. */
     fun sanitized() = copy(localCap = offeredCap(localCap), remoteCap = offeredCap(remoteCap))
@@ -132,6 +135,7 @@ class PlaybackSettingsStore(context: Context, private val userId: String) {
                 position = choice(SUB_POSITION, SubtitlePosition.entries, style.position),
                 overrideAss = prefs.getBoolean(key(SUB_OVERRIDE_ASS), style.overrideAss),
             ),
+            nightMode = prefs.getBoolean(key(NIGHT_MODE), defaults.nightMode),
         ).sanitized()
     }
 
@@ -149,6 +153,7 @@ class PlaybackSettingsStore(context: Context, private val userId: String) {
             putString(key(SUB_BACKGROUND), style.background.stored)
             putString(key(SUB_POSITION), style.position.stored)
             putBoolean(key(SUB_OVERRIDE_ASS), style.overrideAss)
+            putBoolean(key(NIGHT_MODE), clean.nightMode)
         }
     }
 
@@ -165,5 +170,6 @@ class PlaybackSettingsStore(context: Context, private val userId: String) {
         const val SUB_BACKGROUND = "subtitle.background"
         const val SUB_POSITION = "subtitle.position"
         const val SUB_OVERRIDE_ASS = "subtitle.overrideAss"
+        const val NIGHT_MODE = "audio.nightMode"
     }
 }

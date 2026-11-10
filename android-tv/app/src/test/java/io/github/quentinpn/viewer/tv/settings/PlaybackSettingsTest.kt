@@ -22,6 +22,16 @@ class PlaybackSettingsTest {
     }
 
     @Test
+    fun nightModeIsOffByDefaultAndSurvivesSanitizing() {
+        assertFalse(PlaybackSettings().nightMode)
+        // Sanitizing drops a stale cap, never the night mode choice
+        val stored = PlaybackSettings(localCap = 123, nightMode = true).sanitized()
+        assertTrue(stored.nightMode)
+        assertNull(stored.localCap)
+        assertFalse(PlaybackSettings(nightMode = false).sanitized().nightMode)
+    }
+
+    @Test
     fun choicesAreThoseOfWindows() {
         assertEquals(listOf(40_000_000L, 20_000_000L, 10_000_000L, 8_000_000L, 4_000_000L, 3_000_000L, 1_500_000L), BITRATE_CHOICES)
     }

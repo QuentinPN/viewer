@@ -107,6 +107,8 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         MPVLib.setPropertyString("sid", "auto")
         // So are the delays: each file starts in sync, the next episode too (ADR 0062)
         for (kind in DelayKind.entries) MPVLib.setPropertyDouble(kind.property, 0.0)
+        // And the speed: each file starts at 1x (ADR 0072)
+        MPVLib.setPropertyDouble(SPEED_PROPERTY, NORMAL_SPEED)
         MPVLib.command(arrayOf("loadfile", file.source.uri, "replace", "-1", file.options))
     }
 
@@ -147,6 +149,22 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         MPVLib.setPropertyDouble(kind.property, seconds)
         return MPVLib.getPropertyDouble(kind.property)
     }
+
+    override fun setSpeed(speed: Double): Double? {
+        if (released.get()) return null
+        MPVLib.setPropertyDouble(SPEED_PROPERTY, speed)
+        return MPVLib.getPropertyDouble(SPEED_PROPERTY)
+    }
+
+    override fun setNightMode(on: Boolean): Boolean {
+        if (released.get()) return false
+        // The JNI bridge drops mpv's error code: what `af` holds afterwards tells
+        MPVLib.setPropertyString(AUDIO_FILTER_PROPERTY, nightFilter(on))
+        return nightModeHeld(MPVLib.getPropertyString(AUDIO_FILTER_PROPERTY), on)
+    }
+
+    override fun audioPassthrough(): Boolean = !released.get() &&
+        (isPassthrough(MPVLib.getPropertyString("audio-params/format")) || isPassthrough(MPVLib.getPropertyString("audio-out-params/format")))
 
     override fun property(name: String): String? = if (released.get()) null else MPVLib.getPropertyString(name)
 
@@ -222,6 +240,8 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
             "hwdec-codecs" to "h264,hevc,mpeg4,mpeg2video,vp8,vp9,av1",
             "ao" to "audiotrack,opensles",
             "audio-set-media-role" to "yes",
+            // mpv's default, stated: at another speed, scaletempo2 keeps voices at their pitch (ADR 0072)
+            "audio-pitch-correction" to "yes",
             // French subtitles when neither the track menu (ADR 0042) nor the server (ADR 0055) picks one
             "slang" to "fr,fre,fra",
             // The Shield has 3 GB of RAM: a bounded demuxer cache
