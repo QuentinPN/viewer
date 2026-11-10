@@ -64,6 +64,7 @@ import io.github.quentinpn.viewer.tv.player.Chapter
 import io.github.quentinpn.viewer.tv.player.DelayChange
 import io.github.quentinpn.viewer.tv.player.DelayKind
 import io.github.quentinpn.viewer.tv.player.Delays
+import io.github.quentinpn.viewer.tv.player.FitChange
 import io.github.quentinpn.viewer.tv.player.InfoRow
 import io.github.quentinpn.viewer.tv.player.NORMAL_SPEED
 import io.github.quentinpn.viewer.tv.player.Night
@@ -75,6 +76,7 @@ import io.github.quentinpn.viewer.tv.player.SpeedChange
 import io.github.quentinpn.viewer.tv.player.SkipPrompt
 import io.github.quentinpn.viewer.tv.player.Track
 import io.github.quentinpn.viewer.tv.player.TrackType
+import io.github.quentinpn.viewer.tv.player.VideoFit
 import io.github.quentinpn.viewer.tv.player.chapterIndex
 import io.github.quentinpn.viewer.tv.player.endLabel
 import io.github.quentinpn.viewer.tv.player.formatClock
@@ -146,6 +148,9 @@ class PlayerUi {
     /** Playback speed as mpv holds it; this playback only (ADR 0072). */
     var speed by mutableDoubleStateOf(NORMAL_SPEED)
 
+    /** How the picture fills the screen, as mpv holds it; this playback only (ADR 0078). */
+    var fit by mutableStateOf(VideoFit.Original)
+
     /** Night mode, from Réglages or the menu (ADR 0072). */
     var night by mutableStateOf(Night())
 
@@ -211,6 +216,7 @@ class PlayerUi {
         info = null
         delays = Delays()
         speed = NORMAL_SPEED
+        fit = VideoFit.Original
         item = null
         notice = null
         seekTarget = null
@@ -263,6 +269,7 @@ fun PlayerOverlay(
     onInfo: () -> Unit,
     onDelay: (DelayKind, DelayChange) -> Unit,
     onSpeed: (SpeedChange) -> Unit,
+    onFit: (FitChange) -> Unit,
     onNight: () -> Unit,
     onSleep: (SleepChange) -> Unit,
 ) {
@@ -293,7 +300,7 @@ fun PlayerOverlay(
             SkipButton(skip, !ui.menuOpen, onSkip, Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
         }
         ui.tracks?.let {
-            TrackMenu(it, MenuState(ui.delays, ui.speed, ui.night, ui.sleep.choice, ui.item), MenuActions(onSelect, onDelay, onSpeed, onNight, onSleep, onInfo), Modifier.align(Alignment.CenterEnd))
+            TrackMenu(it, MenuState(ui.delays, ui.speed, ui.fit, ui.night, ui.sleep.choice, ui.item), MenuActions(onSelect, onDelay, onSpeed, onFit, onNight, onSleep, onInfo), Modifier.align(Alignment.CenterEnd))
         }
         ui.info?.let { InfoMenu(it, Modifier.align(Alignment.CenterEnd)) }
         if (ui.chapterMenu) ChapterMenu(ui.chapters, chapterIndex(ui.chapters, ui.position), onChapter, Modifier.align(Alignment.CenterEnd))
@@ -402,8 +409,9 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
                 )
             }
             // Only away from 1x: a reminder that the speed was changed in the menu (ADR 0072)
+            // Likewise away from « Original »: the picture format chosen in the menu (ADR 0078)
             // As the speed's: the timer set in the menu, and what is left of it (ADR 0073)
-            listOfNotNull(speedBadge(ui.speed), sleepBadge(ui.sleep, ui.now, ui.item)).forEach {
+            listOfNotNull(speedBadge(ui.speed), ui.fit.badge, sleepBadge(ui.sleep, ui.now, ui.item)).forEach {
                 Text(
                     it,
                     color = Palette.text,
@@ -420,7 +428,7 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
             }
         }
         Text(
-            "OK lecture / pause  ·  ◀ ▶ 10 s  ·  ▼ audio, sous-titres, vitesse, minuterie et infos" + if (ui.chapters.isNotEmpty()) "  ·  ▲ chapitres" else "",
+            "OK lecture / pause  ·  ◀ ▶ 10 s  ·  ▼ audio, sous-titres, vitesse, format, minuterie et infos" + if (ui.chapters.isNotEmpty()) "  ·  ▲ chapitres" else "",
             color = Palette.textSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -465,6 +473,9 @@ private sealed interface MenuRow {
     /** ◀ ▶ step through the offered speeds, OK goes back to « Normale » (ADR 0072). */
     data class Speed(val speed: Double) : MenuRow
 
+    /** ◀ ▶ step through the picture formats, OK goes back to « Original » (ADR 0078). */
+    data class Fit(val fit: VideoFit) : MenuRow
+
     /** OK turns night mode on or off (ADR 0072). */
     data class NightMode(val night: Night) : MenuRow
 
@@ -476,12 +487,13 @@ private sealed interface MenuRow {
 }
 
 /** What the rows of the track menu show beyond the tracks. */
-private class MenuState(val delays: Delays, val speed: Double, val night: Night, val sleep: SleepChoice, val item: SleepItem?)
+private class MenuState(val delays: Delays, val speed: Double, val fit: VideoFit, val night: Night, val sleep: SleepChoice, val item: SleepItem?)
 
 private class MenuActions(
     val select: (TrackType, Int?) -> Unit,
     val delay: (DelayKind, DelayChange) -> Unit,
     val speed: (SpeedChange) -> Unit,
+    val fit: (FitChange) -> Unit,
     val night: () -> Unit,
     val sleep: (SleepChange) -> Unit,
     val info: () -> Unit,
@@ -516,6 +528,7 @@ private fun menuRows(tracks: List<Track>, state: MenuState): List<MenuRow> = bui
     add(MenuRow.Delay(DelayKind.Audio, delays.audio))
     add(MenuRow.Header("Lecture"))
     add(MenuRow.Speed(state.speed))
+    add(MenuRow.Fit(state.fit))
     add(MenuRow.NightMode(state.night))
     add(MenuRow.Sleep(state.sleep, state.item))
     add(MenuRow.Info)
@@ -563,6 +576,14 @@ private fun TrackMenu(tracks: List<Track>, state: MenuState, actions: MenuAction
                     supportingContent = { Text("◀ ▶ change  ·  OK revient à Normale", maxLines = 1) },
                     trailingContent = { Text(formatSpeed(row.speed)) },
                     modifier = Modifier.leftRight(SpeedChange.Slower, SpeedChange.Faster, actions.speed),
+                )
+                is MenuRow.Fit -> ListItem(
+                    selected = false,
+                    onClick = { actions.fit(FitChange.Reset) },
+                    headlineContent = { Text("Format", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = { Text("◀ ▶ change  ·  OK revient à Original", maxLines = 1) },
+                    trailingContent = { Text(row.fit.label) },
+                    modifier = Modifier.leftRight(FitChange.Previous, FitChange.Next, actions.fit),
                 )
                 is MenuRow.NightMode -> ListItem(
                     selected = false,

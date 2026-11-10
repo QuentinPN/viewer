@@ -76,6 +76,9 @@ interface PlayerEngine {
     /** Playback speed for the loaded file only (ADR 0072); returns the value mpv then holds, null if unreadable. */
     fun setSpeed(speed: Double): Double?
 
+    /** How the picture fills the screen, for the loaded file only (ADR 0078); returns the fit mpv then holds, null if unreadable. */
+    fun setVideoFit(fit: VideoFit): VideoFit?
+
     /** Night mode's compressor on or off (ADR 0072); true when mpv holds it as asked. Kept for the next files. */
     fun setNightMode(on: Boolean): Boolean
 

@@ -109,6 +109,8 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         for (kind in DelayKind.entries) MPVLib.setPropertyDouble(kind.property, 0.0)
         // And the speed: each file starts at 1x (ADR 0072)
         MPVLib.setPropertyDouble(SPEED_PROPERTY, NORMAL_SPEED)
+        // And the picture format: each file starts at « Original » (ADR 0078)
+        for ((name, value) in fitProperties(VideoFit.Original)) MPVLib.setPropertyString(name, value)
         MPVLib.command(arrayOf("loadfile", file.source.uri, "replace", "-1", file.options))
     }
 
@@ -154,6 +156,13 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         if (released.get()) return null
         MPVLib.setPropertyDouble(SPEED_PROPERTY, speed)
         return MPVLib.getPropertyDouble(SPEED_PROPERTY)
+    }
+
+    override fun setVideoFit(fit: VideoFit): VideoFit? {
+        if (released.get()) return null
+        // VO options: mpv recomputes the picture's place on the next frame, no reload
+        for ((name, value) in fitProperties(fit)) MPVLib.setPropertyString(name, value)
+        return readFit(MPVLib.getPropertyString(PANSCAN_PROPERTY), MPVLib.getPropertyString(KEEPASPECT_PROPERTY))
     }
 
     override fun setNightMode(on: Boolean): Boolean {

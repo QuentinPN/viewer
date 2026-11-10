@@ -33,10 +33,13 @@ import io.github.quentinpn.viewer.tv.emby.startTicks
 import io.github.quentinpn.viewer.tv.player.AccountTracks
 import io.github.quentinpn.viewer.tv.player.DelayChange
 import io.github.quentinpn.viewer.tv.player.DelayKind
+import io.github.quentinpn.viewer.tv.player.FitChange
+import io.github.quentinpn.viewer.tv.player.KEEPASPECT_PROPERTY
 import io.github.quentinpn.viewer.tv.player.MediaSource
 import io.github.quentinpn.viewer.tv.player.MpvPlayerEngine
 import io.github.quentinpn.viewer.tv.player.Night
 import io.github.quentinpn.viewer.tv.player.NightState
+import io.github.quentinpn.viewer.tv.player.PANSCAN_PROPERTY
 import io.github.quentinpn.viewer.tv.player.PlaybackFacts
 import io.github.quentinpn.viewer.tv.player.PlayerEngine
 import io.github.quentinpn.viewer.tv.player.PlayerListener
@@ -54,6 +57,7 @@ import io.github.quentinpn.viewer.tv.player.TrackPreferenceStore
 import io.github.quentinpn.viewer.tv.player.TrackType
 import io.github.quentinpn.viewer.tv.player.accountPick
 import io.github.quentinpn.viewer.tv.player.changeDelay
+import io.github.quentinpn.viewer.tv.player.changeFit
 import io.github.quentinpn.viewer.tv.player.changeSleep
 import io.github.quentinpn.viewer.tv.player.changeSpeed
 import io.github.quentinpn.viewer.tv.player.chapters
@@ -111,6 +115,7 @@ private const val INFO_REFRESH_MS = 1_000L
  * The track menu also sets the speed, for the current file only, and night mode, kept in Réglages (ADR 0072).
  * The controls show the time and when playback ends; the track menu's « Minuterie » pauses
  * playback after a while, or at the credits, for this player session only (ADR 0073).
+ * Its « Format » crops or stretches the picture to the screen, for the current file only (ADR 0078).
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
     private var engine: PlayerEngine? = null
@@ -162,7 +167,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val surface = SurfaceView(this)
         val overlay = ComposeView(this).apply {
-            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip, ::openInfo, ::shiftDelay, ::shiftSpeed, ::toggleNight, ::changeTimer) } }
+            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip, ::openInfo, ::shiftDelay, ::shiftSpeed, ::shiftFit, ::toggleNight, ::changeTimer) } }
         }
         setContentView(
             // With the menu focused, keys reach the root before the overlay: the player sees them first
@@ -698,6 +703,15 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         val applied = player.setSpeed(changeSpeed(ui.speed, change))
         Log.i(TAG, "speed=$applied pitch-correction=${player.property("audio-pitch-correction")}")
         if (applied != null) ui.speed = applied
+    }
+
+    /** The format row of the track menu: what mpv holds afterwards is shown (ADR 0078). */
+    private fun shiftFit(change: FitChange) {
+        val player = engine ?: return
+        val applied = player.setVideoFit(changeFit(ui.fit, change))
+        Log.i(TAG, "fit=$applied panscan=${player.property(PANSCAN_PROPERTY)} keepaspect=${player.property(KEEPASPECT_PROPERTY)}")
+        // Unreadable or partial: the row keeps the last fit mpv gave
+        if (applied != null) ui.fit = applied
     }
 
     /**
