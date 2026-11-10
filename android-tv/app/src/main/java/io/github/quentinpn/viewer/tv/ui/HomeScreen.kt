@@ -53,6 +53,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.HeroTitle
+import io.github.quentinpn.viewer.tv.emby.favoriteTitles
 import io.github.quentinpn.viewer.tv.emby.homeHero
 import io.github.quentinpn.viewer.tv.emby.nextUpRow
 import io.github.quentinpn.viewer.tv.emby.withoutDuplicates
@@ -122,8 +123,8 @@ class HomeMemory {
 }
 
 /**
- * The hero (ADR 0059), "Reprendre", "À suivre" (ADR 0056), then the latest additions of each
- * film and series library and, last, the user's playlists (ADR 0088).
+ * The hero (ADR 0059), "Reprendre", "À suivre" (ADR 0056), "Favoris" (ADR 0091), then the latest
+ * additions of each film and series library and, last, the user's playlists (ADR 0088).
  */
 @Composable
 fun HomeScreen(
@@ -155,12 +156,13 @@ fun HomeScreen(
         if (shown && memory.loadedFor == refresh) return@LaunchedEffect
         if (!shown) memory.state = HomeState.Loading
         val next = try {
-            val (resume, nextUp, hero) = coroutineScope {
+            val (resume, nextUp, hero, favorites) = coroutineScope {
                 val upcoming = async { nextUpOrNothing(client, userId) }
                 val resumed = async { client.resumeItems(userId, RESUME_LIMIT).items }
                 // The same "Reprendre" items feed the hero: one request for both
                 val titles = async { heroOrNothing(client, userId, resumed.await()) }
-                Triple(resumed.await(), upcoming.await(), titles.await())
+                val favored = async { favoritesOrNothing(client, userId) }
+                FirstRows(resumed.await(), upcoming.await(), titles.await(), favored.await())
             }
             val libraries = client.views(userId).items
                 .filter { it.collectionType == "movies" || it.collectionType == "tvshows" }
@@ -169,6 +171,7 @@ fun HomeScreen(
                 if (resume.isNotEmpty()) add(Shelf("Reprendre", resume, landscape = true, resume = true))
                 val upNext = withoutDuplicates(nextUp, resume)
                 if (upNext.isNotEmpty()) add(Shelf("À suivre", upNext, landscape = true, resume = false))
+                favoriteShelf(favorites)?.let(::add)
                 for (library in libraries) {
                     val latest = client.latest(userId, library.id, LATEST_LIMIT)
                     if (latest.isNotEmpty()) {
@@ -290,6 +293,32 @@ private suspend fun nextUpOrNothing(client: EmbyClient, userId: String): List<Ba
  */
 private suspend fun heroOrNothing(client: EmbyClient, userId: String, resumed: List<BaseItemDto>): List<HeroTitle> = try {
     client.homeHero(userId, resumed)
+} catch (e: EmbyException) {
+    if (e.error == EmbyError.SessionExpired) throw e
+    emptyList()
+}
+
+/** What the home reads in parallel before the libraries. */
+private data class FirstRows(
+    val resume: List<BaseItemDto>,
+    val nextUp: List<BaseItemDto>,
+    val hero: List<HeroTitle>,
+    val favorites: List<BaseItemDto>,
+)
+
+/** Title of the favourites row, also its key in [HomeMemory]. */
+internal const val FAVORITES_SHELF = "Favoris"
+
+/** The home row of the user's favourite films and series (ADR 0091); null when there is none, so the row hides. */
+internal fun favoriteShelf(items: List<BaseItemDto>): Shelf? =
+    favoriteTitles(items).takeIf { it.isNotEmpty() }?.let { Shelf(FAVORITES_SHELF, it, landscape = false, resume = false) }
+
+/**
+ * The user's favourites (ADR 0091); none when they cannot be read, so the row hides and the
+ * rest of the home still shows. An expired session is not hidden: the whole home handles it.
+ */
+private suspend fun favoritesOrNothing(client: EmbyClient, userId: String): List<BaseItemDto> = try {
+    client.favorites(userId).items
 } catch (e: EmbyException) {
     if (e.error == EmbyError.SessionExpired) throw e
     emptyList()

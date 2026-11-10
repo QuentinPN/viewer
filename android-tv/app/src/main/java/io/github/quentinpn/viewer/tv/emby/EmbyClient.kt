@@ -600,6 +600,13 @@ class EmbyClient(
         return call(get(builder.build()), QueryResult.serializer(BaseItemDto.serializer()))
     }
 
+    /** The user's favourite films and series (ADR 0091): the items query built by [favoritesQuery]. */
+    suspend fun favorites(userId: String, limit: Int = FAVORITES_LIMIT): QueryResult<BaseItemDto> {
+        val builder = server.api("/Users/${segment(userId)}/Items").newBuilder()
+        favoritesQuery(limit).forEach { (name, value) -> builder.addQueryParameter(name, value) }
+        return call(get(builder.build()), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
     /** The entries of one playlist, in its order (ADR 0088): `GET /Playlists/{Id}/Items`, built by [playlistItemsQuery]. */
     suspend fun playlistItems(userId: String, playlistId: String, limit: Int = PLAYLIST_ITEMS_LIMIT): QueryResult<BaseItemDto> {
         val builder = server.api("/Playlists/${segment(playlistId)}/Items").newBuilder()
