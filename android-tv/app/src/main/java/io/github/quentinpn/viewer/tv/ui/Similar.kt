@@ -28,11 +28,21 @@ internal const val SIMILAR_LIMIT = 12
 /** Pages deep enough for any chain of similar titles; the oldest is forgotten past it. */
 internal const val MAX_PAGES = 10
 
-/** A film or series page in the navigation of `MainActivity`; similar titles stack them (ADR 0063). */
+/**
+ * A page in the navigation of `MainActivity`; similar titles stack them (ADR 0063), as do an
+ * episode and a person (ADR 0068). [person] names the « Distribution » card a page left for a
+ * person page, so Back from it focuses that card again on the page read anew.
+ */
 internal sealed interface DetailPage {
-    data class Movie(val id: String) : DetailPage
+    data class Movie(val id: String, val person: String? = null) : DetailPage
 
-    data class Series(val target: SeriesTarget) : DetailPage
+    data class Series(val target: SeriesTarget, val person: String? = null) : DetailPage
+
+    /** Over its series page; Back names that page's season and card (ADR 0060). */
+    data class Episode(val target: SeriesTarget, val person: String? = null) : DetailPage
+
+    /** [opened]: the title last opened from it, focused again on Back. */
+    data class Person(val member: CastMember, val opened: String? = null) : DetailPage
 }
 
 /** [page] over [pages], Back going down to the one below. */

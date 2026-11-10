@@ -39,7 +39,8 @@ import io.github.quentinpn.viewer.tv.emby.EmbyException
 
 /**
  * A film: backdrop, year, length, overview, "Reprendre" / "Lire depuis le début", its version
- * if it has several, and below the screen the « Titres similaires » row (ADR 0063).
+ * if it has several, and below the screen the « Distribution » (ADR 0068) and « Titres
+ * similaires » (ADR 0063) rows.
  */
 @Composable
 fun MovieScreen(
@@ -52,7 +53,11 @@ fun MovieScreen(
     onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit,
     /** OK on a similar title opens its film or series page. */
     onOpenSimilar: (BaseItemDto) -> Unit,
+    /** OK on a « Distribution » card opens that person's page (ADR 0068). */
+    onOpenPerson: (CastMember) -> Unit,
     onSessionExpired: () -> Unit,
+    /** The card a person page was opened from: focused instead of the play button. */
+    focusPerson: String? = null,
     /** Changes after each playback: the resume point and watched mark are read again. */
     refresh: Int = 0,
 ) {
@@ -86,7 +91,9 @@ fun MovieScreen(
                     val scroll = rememberScrollState()
                     ScrollingPage(scroll, Modifier.fillMaxSize()) {
                         // Back on the buttons, the film's title shows again
-                        Details(m.value, versions, onPlay, Modifier.height(screen).topOnFocus(scroll))
+                        Details(m.value, versions, onPlay, focusPerson == null, Modifier.height(screen).topOnFocus(scroll))
+                        val cast = remember(m.value.people) { castMembers(m.value) }
+                        CastRow(cast, client, images, focusPerson, onOpenPerson)
                         SimilarRow(similar, client, images, onOpenSimilar)
                     }
                 }
@@ -100,6 +107,8 @@ private fun Details(
     movie: BaseItemDto,
     versions: VersionStore,
     onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit,
+    /** False when the « Distribution » row takes the first focus. */
+    takeFocus: Boolean,
     modifier: Modifier,
 ) {
     val played = movie.userData?.played == true
@@ -153,7 +162,13 @@ private fun Details(
         }
     }
     // Also after a reload removed the focused "Lire depuis le début"; one frame later, once laid out
+    var skip by remember { mutableStateOf(!takeFocus) }
     LaunchedEffect(resume) {
+        // Only the first time: a reload that removes "Lire depuis le début" still moves the focus
+        if (skip) {
+            skip = false
+            return@LaunchedEffect
+        }
         withFrameNanos {}
         runCatching { first.requestFocus() }
     }

@@ -4,14 +4,17 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
+
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -138,7 +141,7 @@ private data class FocusAsk(val to: Focus, val token: Int)
 
 /**
  * One episode: series, season and number, title, image, air date, length, overview,
- * credits, "Lire" / "Reprendre" / "Lire depuis le début", its version if it has several,
+ * credits and guest stars (ADR 0068), "Lire" / "Reprendre" / "Lire depuis le début", its version if it has several,
  * and the episodes before and after it across seasons.
  */
 @Composable
@@ -155,9 +158,13 @@ fun EpisodeScreen(
     onNavigate: (SeriesTarget) -> Unit,
     /** Back: the series page to show, on this episode's season and card. */
     onBack: (SeriesTarget) -> Unit,
+    /** OK on a « Distribution » card opens that person's page (ADR 0068). */
+    onOpenPerson: (CastMember) -> Unit,
     onSessionExpired: () -> Unit,
     /** Changes after each playback: the resume point and watched mark are read again. */
     refresh: Int = 0,
+    /** The card a person page was opened from: focused instead of the play button. */
+    focusPerson: String? = null,
 ) {
     val episodeId = target.episodeId ?: return
     var data by remember { mutableStateOf<Load<EpisodeData>>(Load.Loading) }
@@ -194,7 +201,8 @@ fun EpisodeScreen(
         val token = (ask?.token ?: 0) + 1
         val wasResume = before?.let { resumes(it.episode) }
         ask = when {
-            before == null -> FocusAsk(Focus.Play, token)
+            // Back from a person page: the « Distribution » row focuses its card itself
+            before == null -> if (focusPerson != null) ask else FocusAsk(Focus.Play, token)
             before.episode.id != shown.episode.id -> FocusAsk(movedFocus(moved, shown.neighbours), token)
             // A reload removed the focused "Lire depuis le début": back on the first button
             wasResume != resumes(shown.episode) -> FocusAsk(Focus.Play, token)
@@ -210,16 +218,27 @@ fun EpisodeScreen(
             is Load.Ready -> {
                 val episode = d.value.episode
                 EpisodeArtwork(episode, client, images)
-                Details(
-                    d.value,
-                    versions,
-                    ask,
-                    onPlay,
-                    onNavigate = { to, direction ->
-                        moved = direction
-                        onNavigate(neighbourTarget(episode.seriesId ?: target.seriesId, to))
-                    },
-                )
+                // The details fill the screen as before; Down from the buttons scrolls to the guest stars
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val screen = maxHeight
+                    val scroll = rememberScrollState()
+                    ScrollingPage(scroll, Modifier.fillMaxSize()) {
+                        Details(
+                            d.value,
+                            versions,
+                            ask,
+                            onPlay,
+                            onNavigate = { to, direction ->
+                                moved = direction
+                                onNavigate(neighbourTarget(episode.seriesId ?: target.seriesId, to))
+                            },
+                            // Back on the buttons, the episode's title shows again
+                            Modifier.height(screen).topOnFocus(scroll),
+                        )
+                        val cast = remember(episode.people) { castMembers(episode) }
+                        CastRow(cast, client, images, focusPerson, onOpenPerson)
+                    }
+                }
             }
         }
     }
@@ -271,6 +290,7 @@ private fun Details(
     ask: FocusAsk?,
     onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit,
     onNavigate: (BaseItemDto, Focus) -> Unit,
+    modifier: Modifier,
 ) {
     val episode = data.episode
     val played = episode.userData?.played == true
@@ -283,7 +303,7 @@ private fun Details(
     val choices = remember(episode.mediaSources) { versionChoices(episode.mediaSources) }
     var version by remember(episode.id, choices) { mutableStateOf(versions.load(episode.id, choices)) }
     Column(
-        Modifier.fillMaxHeight().fillMaxWidth(0.65f).padding(horizontal = 48.dp, vertical = 36.dp),
+        modifier.fillMaxWidth(0.65f).padding(horizontal = 48.dp, vertical = 36.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.Bottom),
     ) {
         val heading = listOfNotNull(

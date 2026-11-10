@@ -3,6 +3,8 @@ package io.github.quentinpn.viewer.tv.emby
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 
 // Emby API models, limited to the fields this client uses. Shapes verified on
 // Emby Server 4.10 by the Windows client (src-tauri/src/emby/models.rs).
@@ -140,12 +142,25 @@ data class SourceStreamDto(
 @Serializable
 data class NameDto(@SerialName("Name") val name: String = "")
 
+/** `BaseItemPerson` of an item's `People` (ADR 0016, 0068). */
 @Serializable
 data class PersonDto(
     @SerialName("Name") val name: String = "",
     /** `Actor`, `Director`, `Writer`, `Producer`, `GuestStar`… */
     @SerialName("Type") val type: String = "",
-)
+    /** The character played; often absent for crew. */
+    @SerialName("Role") val role: String? = null,
+    /**
+     * Documented as a string and sent as one by Emby 4.10, but `Studios[].Id` there is a
+     * number: read as any primitive, so a number would not make the whole item unreadable.
+     */
+    @SerialName("Id") val rawId: JsonPrimitive? = null,
+    /** Tag of the person's photo, the `Primary` image of the person item [id]. */
+    @SerialName("PrimaryImageTag") val primaryImageTag: String? = null,
+) {
+    /** The person item's id, what `PersonIds` and the image path take; null when absent. */
+    val id: String? get() = rawId?.takeUnless { it is JsonNull }?.content?.trim()?.takeIf { it.isNotEmpty() }
+}
 
 /** `MarkerType` is `Chapter`, `IntroStart`, `IntroEnd` or `CreditsStart` (ADR 0030). */
 @Serializable

@@ -13,23 +13,19 @@ import androidx.tv.material3.Text
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import java.util.Locale
 
-private const val MAX_CAST = 6
-
 /** A labelled line of the detail page, as in the Windows facts list. */
 internal data class Fact(val label: String, val value: String)
 
 /**
- * Director, writer, cast and studio of a film or series; empty ones left out. An episode's
- * cast is its guest stars, not the series' main cast (Windows `ItemDetail`, ADR 0016).
+ * Director, writer and studio of a film, series or episode; empty ones left out. The cast,
+ * once an « Avec » / « Invités » line, is the « Distribution » row now (ADR 0068).
  */
 internal fun facts(item: BaseItemDto): List<Fact> {
     val series = item.type == "Series"
-    val (castType, castLabel) = if (item.type == "Episode") "GuestStar" to "Invités" else "Actor" to "Avec"
     fun people(type: String) = item.people.filter { it.type == type }.map { it.name.trim() }.filter { it.isNotEmpty() }
     return listOfNotNull(
         people("Director").takeIf { it.isNotEmpty() }?.let { Fact("Réalisation", it.joinToString(", ")) },
         people("Writer").takeIf { it.isNotEmpty() && !series }?.let { Fact("Scénario", it.joinToString(", ")) },
-        people(castType).takeIf { it.isNotEmpty() }?.let { Fact(castLabel, it.take(MAX_CAST).joinToString(", ")) },
         item.studios.map { it.name.trim() }.filter { it.isNotEmpty() }.takeIf { it.isNotEmpty() }
             ?.let { Fact(if (series) "Diffusion" else "Studio", it.joinToString(", ")) },
     )
