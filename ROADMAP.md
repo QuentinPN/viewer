@@ -1105,3 +1105,11 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - Overgeared (Anime): « Fantasy » opens « Anime · Genre : Fantasy »; Back returns to the chip. The film « Moi quand je me réincarne en Slime - Scarlet Bond » (Films Anime): « Animation » opens « Films Anime · 15 titres · Genre : Animation », where it used to open « Films ».
   - Réglages › Accueil: hiding « Derniers ajouts · Anime » removes it from the home (Reprendre then Derniers ajouts · Films); « Masquée » survives a restart; showing it brings it back. Left as before.
   - Logcat: 0 token line, no crash.
+
+### 2026-11-10 — Android TV: release build; owner checklist
+
+- **Scope**: the Shield is the only TV target from now on; webOS is not a client (ADR 0038 had already rejected it).
+- **Added**: ADR 0095. The Gate TV-1 test activity moves to the `debug` source set; the release APK (R8, signed with the debug key for personal use) carries only `MainActivity` and `PlayerActivity`, is not debuggable, 33.6 MB instead of 59.8 MB, and installs over the debug build keeping the session.
+- **Added**: `docs/android-tv-owner-checklist.md`, every Android TV point still unverified that needs the owner's remote, eyes, ears or account data (79 items).
+- **Tests**: `testDebugUnitTest` 476/476; `assembleDebug`, `lintDebug`, `assembleRelease`, `lintRelease` OK.
+- **Checked on the Shield** (release build): the home shows, « Reprendre à 3:16 » plays Overgeared S1E7, ▼ lists the audio tracks, Back sends `report Stopped`. Logcat: 0 token line, 0 `FATAL EXCEPTION`. The release build is left installed.
