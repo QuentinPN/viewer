@@ -24,6 +24,13 @@ class HomeBarTest {
     }
 
     @Test
+    fun theBarListsEveryFilmAndSeriesLibraryInOrder() {
+        val music = Library("4", "Musique", "Audio")
+        assertEquals(listOf(films, anime, series), barLibraries(listOf(films, anime, music, series, films)))
+        assertEquals(emptyList<Library>(), barLibraries(emptyList()))
+    }
+
+    @Test
     fun theAvatarShowsTheFirstLetterOrDigit() {
         assertEquals("C", initial("claude"))
         assertEquals("É", initial(" élodie"))

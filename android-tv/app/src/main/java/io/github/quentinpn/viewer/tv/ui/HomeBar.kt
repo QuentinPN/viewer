@@ -3,6 +3,7 @@ package io.github.quentinpn.viewer.tv.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -50,8 +52,11 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 
-/** Entries of the home bar (ADR 0064); the one opened last takes the focus back on return. */
-internal enum class BarItem { Home, Movies, Series, Search, Settings, Account }
+/**
+ * Entries of the home bar (ADR 0064); the one opened last takes the focus back on return.
+ * [Library] is one of the libraries, named by [HomeBar]'s `focusLibrary` (ADR 0092).
+ */
+internal enum class BarItem { Home, Library, Search, Settings, Account }
 
 /**
  * The library « Films » or « Séries » opens: the one named so when there are several of
@@ -62,6 +67,10 @@ internal fun sectionLibrary(libraries: List<Library>, itemTypes: String, label: 
     return candidates.firstOrNull { it.name.trim().equals(label, ignoreCase = true) } ?: candidates.firstOrNull()
 }
 
+/** The bar's libraries (ADR 0092): every film and series library, in the server's order, as the desktop lists them. */
+internal fun barLibraries(libraries: List<Library>): List<Library> =
+    libraries.filter { it.itemTypes == "Movie" || it.itemTypes == "Series" }.distinctBy { it.id }
+
 /** The avatar's letter: the user name's first letter or digit, upper case. */
 internal fun initial(userName: String): String = userName.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?"
 
@@ -71,41 +80,52 @@ private val activeInFocusedBar = Color(0x2EFFFFFF)
 private val idleText = Color(0xD1EBEBF5)
 
 /**
- * The home's floating bar (ADR 0064): Accueil, Films, Séries, the search and settings icons,
- * then the avatar, whose menu holds « Se déconnecter ». [home] is the focus target of Up
- * from the hero; Down from the bar goes to [below].
+ * The home's floating bar (ADR 0064): Accueil, each film and series library by its name
+ * (ADR 0092), the search and settings icons, then the avatar, whose menu holds « Se
+ * déconnecter ». [home] is the focus target of Up from the hero; Down from the bar goes to
+ * [below]. Too many libraries for the screen scroll the bar sideways.
  */
 @Composable
 internal fun HomeBar(
     userName: String,
-    movies: Library?,
-    series: Library?,
+    libraries: List<Library>,
     home: FocusRequester,
     below: FocusRequester?,
     /** The entry whose screen was opened last: the focus goes back to it. */
     focusOn: BarItem?,
+    /** The library opened last, when [focusOn] is [BarItem.Library]. */
+    focusLibrary: String?,
     onOpen: (BarItem) -> Unit,
+    onOpenLibrary: (Library) -> Unit,
     onSignOut: () -> Unit,
 ) {
     var barFocused by remember { mutableStateOf(false) }
     var account by remember { mutableStateOf(false) }
     val requesters = remember { BarItem.entries.associateWith { FocusRequester() } }
+    val libraryRequesters = remember(libraries) { libraries.associate { it.id to FocusRequester() } }
 
-    LaunchedEffect(focusOn) {
-        val target = focusOn?.let(requesters::get) ?: return@LaunchedEffect
+    LaunchedEffect(focusOn, focusLibrary, libraryRequesters) {
+        val target = when (focusOn) {
+            null -> null
+            BarItem.Library -> focusLibrary?.let(libraryRequesters::get)
+            else -> requesters[focusOn]
+        } ?: return@LaunchedEffect
         withFrameNanos {}
         runCatching { target.requestFocus() }
     }
 
+    fun Modifier.below(): Modifier = focusProperties { if (below != null) down = below }
+
     fun Modifier.entry(item: BarItem): Modifier {
         val own = requesters.getValue(item)
         val base = if (item == BarItem.Home) focusRequester(home) else this
-        return base.focusRequester(own).focusProperties { if (below != null) down = below }
+        return base.focusRequester(own).below()
     }
 
-    Box(Modifier.fillMaxWidth().padding(top = 20.dp), contentAlignment = Alignment.TopCenter) {
+    Box(Modifier.fillMaxWidth().padding(top = 20.dp, start = 48.dp, end = 48.dp), contentAlignment = Alignment.TopCenter) {
         Row(
             Modifier
+                .horizontalScroll(rememberScrollState())
                 .onFocusChanged { barFocused = it.hasFocus }
                 .background(pill, CircleShape)
                 .border(1.dp, Color(0x14FFFFFF), CircleShape)
@@ -116,11 +136,9 @@ internal fun HomeBar(
             BarEntry(Modifier.entry(BarItem.Home), active = true, barFocused = barFocused, onClick = {}) { color ->
                 Label("Accueil", color, bold = true)
             }
-            movies?.let {
-                BarEntry(Modifier.entry(BarItem.Movies), onClick = { onOpen(BarItem.Movies) }) { color -> Label("Films", color) }
-            }
-            series?.let {
-                BarEntry(Modifier.entry(BarItem.Series), onClick = { onOpen(BarItem.Series) }) { color -> Label("Séries", color) }
+            for (library in libraries) {
+                val own = libraryRequesters.getValue(library.id)
+                BarEntry(Modifier.focusRequester(own).below(), onClick = { onOpenLibrary(library) }) { color -> Label(library.name.trim(), color) }
             }
             BarEntry(Modifier.entry(BarItem.Search).semantics { contentDescription = "Rechercher" }, round = true, onClick = { onOpen(BarItem.Search) }) { color ->
                 Icon(SearchIcon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))

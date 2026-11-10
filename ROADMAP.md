@@ -1088,3 +1088,9 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - Home: no « Favoris » row, the account « claude » showing none; « Reprendre » then « Derniers ajouts » as before.
   - Logcat: 0 token line, no crash.
 - **Not verified**: a real hold reaching 30 s and 60 s steps (adb cannot hold a key; the owner checks it with the remote); the row with favourites, its posters and Back to the opened card (no favourite added for testing).
+
+### 2026-11-10 — Android TV: every library in the home bar
+
+- **Fixed**: ADR 0092. The home bar showed only « Films » and « Séries », each opening one library (« Séries » opened « Anime »; « Films Anime » and « Séries TV » could not be opened). It now lists every film and series library by name, in the server's order, as the desktop does; the one opened last takes the focus back; the bar scrolls sideways if they do not fit.
+- **Tests**: `HomeBarTest`. `testDebugUnitTest` 460/460, `assembleDebug` and `lintDebug` OK.
+- **Checked on the Shield**: the bar reads Accueil, Anime, Films, Films Anime, Séries TV; « Films Anime » opens « Films Anime · 15 titres »; Back puts the focus on « Films Anime ». Logcat: 0 token line, no crash.

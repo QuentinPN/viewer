@@ -120,6 +120,7 @@ class HomeMemory {
 
     /** Set after an entry of the bar opened a screen: coming back puts the focus on it, not on a card. */
     internal var focusHeader: BarItem? = null
+    internal var focusLibrary: String? = null
 }
 
 /**
@@ -193,26 +194,28 @@ fun HomeScreen(
     val header: @Composable () -> Unit = {
         val ready = memory.state as? HomeState.Ready
         val libraries = ready?.libraries.orEmpty()
-        val movies = sectionLibrary(libraries, "Movie", "Films")
-        val series = sectionLibrary(libraries, "Series", "Séries")
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             HomeBar(
                 userName = userName,
-                movies = movies,
-                series = series,
+                libraries = barLibraries(libraries),
                 home = home,
                 below = heroMain.takeIf { ready?.hero?.isNotEmpty() == true },
                 focusOn = memory.focusHeader,
+                focusLibrary = memory.focusLibrary,
                 onOpen = { item ->
                     notice = null
                     memory.focusHeader = item
                     when (item) {
-                        BarItem.Movies -> movies?.let(onOpenLibrary)
-                        BarItem.Series -> series?.let(onOpenLibrary)
                         BarItem.Search -> onOpenSearch()
                         BarItem.Settings -> onOpenSettings()
-                        BarItem.Home, BarItem.Account -> Unit
+                        BarItem.Home, BarItem.Library, BarItem.Account -> Unit
                     }
+                },
+                onOpenLibrary = { library ->
+                    notice = null
+                    memory.focusHeader = BarItem.Library
+                    memory.focusLibrary = library.id
+                    onOpenLibrary(library)
                 },
                 onSignOut = onSignOut,
             )
