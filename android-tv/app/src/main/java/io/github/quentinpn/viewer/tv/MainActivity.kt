@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -43,6 +44,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val store = AppServices.store(this)
         val device = AppServices.device(this)
+        val reporter = AppServices.reporter(this)
         setContent {
             ViewerTheme {
                 var session by remember { mutableStateOf(store.load()) }
@@ -70,7 +72,9 @@ class MainActivity : ComponentActivity() {
                     val libraryPrefs = remember(current) { LibraryPreferenceStore(this, current.userId) }
                     val settingsStore = remember(current) { PlaybackSettingsStore(this, current.userId) }
                     val home = remember(current) { HomeMemory() }
-                    val refresh by AppServices.reporter.stopped.collectAsState()
+                    // Sign-in or restored session: stop reports lost to the network go out now (ADR 0066)
+                    LaunchedEffect(client) { reporter.signedIn(client, current.userId) }
+                    val refresh by reporter.stopped.collectAsState()
                     val versions = remember(current) { VersionStore(this, current.userId) }
                     // A version is only chosen on the film and episode pages (ADR 0058, 0060); elsewhere the server picks
                     val playSource = { itemId: String, startTicks: Long, mediaSourceId: String? ->
@@ -83,6 +87,7 @@ class MainActivity : ComponentActivity() {
                     }
                     val play = { itemId: String, startTicks: Long -> playSource(itemId, startTicks, null) }
                     val expired = {
+                        reporter.signedOut()
                         store.clear()
                         notice = "Session expirée. Reconnectez-vous."
                         session = null
@@ -202,6 +207,7 @@ class MainActivity : ComponentActivity() {
                                 } catch (_: EmbyException) {
                                 }
                             }
+                            reporter.signedOut()
                             store.clear()
                             session = null
                         },

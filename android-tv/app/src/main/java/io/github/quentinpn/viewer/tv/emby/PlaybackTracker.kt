@@ -26,30 +26,6 @@ data class Report(val kind: ReportKind, val body: PlaybackReport) {
     )
 }
 
-/** A lost stop report (ADR 0024): waits between tries, doubled up to the cap. */
-const val STOP_RESEND_FIRST_MS = 5_000L
-const val STOP_RESEND_CAP_MS = 15_000L
-
-/** An older report could overwrite a playback made elsewhere in the meantime. */
-const val STOP_RESEND_GIVE_UP_MS = 3_600_000L
-
-/** When a lost stop report is sent again, and when it is given up; times in ms. */
-class ResendSchedule(now: Long) {
-    private val giveUpAt = now + STOP_RESEND_GIVE_UP_MS
-    private var delay = STOP_RESEND_FIRST_MS
-    private var nextAt = now + delay
-
-    fun due(now: Long) = now >= nextAt
-
-    fun expired(now: Long) = now >= giveUpAt
-
-    /** The try at [now] failed. */
-    fun postpone(now: Long) {
-        delay = (delay * 2).coerceAtMost(STOP_RESEND_CAP_MS)
-        nextAt = now + delay
-    }
-}
-
 /** A playback announced before its file is loaded. */
 data class ActivePlayback(
     val itemId: String,
@@ -67,6 +43,9 @@ class PlaybackTracker {
 
     /** Nothing announced or playing: a lost stop report can still be resent. */
     val idle get() = pending == null && playing == null
+
+    /** Item announced or playing: a lost stop of it is older than this playback. */
+    val itemId get() = pending?.itemId ?: playing?.playback?.itemId
 
     private class Playing(
         var playback: ActivePlayback,

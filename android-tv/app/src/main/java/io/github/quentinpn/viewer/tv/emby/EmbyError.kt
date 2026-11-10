@@ -23,7 +23,7 @@ sealed class EmbyError(val message: String) {
 
     class PlaybackRefused(reason: String) : EmbyError("Lecture refusée : $reason.")
 
-    class Server(status: Int) : EmbyError("Erreur du serveur (HTTP $status).")
+    class Server(val status: Int) : EmbyError("Erreur du serveur (HTTP $status).")
 
     class InvalidResponse(reason: String) : EmbyError("Réponse inattendue du serveur : $reason.")
 }

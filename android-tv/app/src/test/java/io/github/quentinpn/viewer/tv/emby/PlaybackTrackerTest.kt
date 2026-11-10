@@ -137,28 +137,6 @@ class PlaybackTrackerTest {
     }
 
     @Test
-    fun aLostStopReportIsResentWithAGrowingDelayThenGivenUp() {
-        val t0 = 1_000L
-        val s = ResendSchedule(t0)
-        assertFalse(s.due(t0 + 4_000))
-        assertTrue(s.due(t0 + STOP_RESEND_FIRST_MS))
-
-        val t1 = t0 + STOP_RESEND_FIRST_MS
-        s.postpone(t1)
-        assertFalse(s.due(t1 + 9_000))
-        assertTrue(s.due(t1 + 10_000))
-
-        val t2 = t1 + 10_000
-        s.postpone(t2)
-        assertTrue(s.due(t2 + STOP_RESEND_CAP_MS))
-        s.postpone(t2)
-        assertTrue("capped", s.due(t2 + STOP_RESEND_CAP_MS))
-
-        assertFalse(s.expired(t0 + STOP_RESEND_GIVE_UP_MS - 1_000))
-        assertTrue(s.expired(t0 + STOP_RESEND_GIVE_UP_MS))
-    }
-
-    @Test
     fun aLateProgressCarriesThePositionOfTheLostStop() {
         val stop = Report(
             ReportKind.Stopped,
@@ -189,5 +167,17 @@ class PlaybackTrackerTest {
         assertTrue(t.idle)
         t.begin(ActivePlayback("i", "ms", null, PlayMethod.DirectPlay, null, 0), 0)
         assertFalse(t.idle)
+    }
+
+    @Test
+    fun itemIdIsTheAnnouncedOrPlayingItem() {
+        val t = PlaybackTracker()
+        assertNull(t.itemId)
+        t.begin(playback(), t0)
+        assertEquals("announced", "30207", t.itemId)
+        t.fileLoaded(t0)
+        assertEquals("playing", "30207", t.itemId)
+        t.closed(t0)
+        assertNull(t.itemId)
     }
 }
