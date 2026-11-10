@@ -49,7 +49,10 @@ enum class TrackOrigin(val log: String) {
     /** `DefaultAudioStreamIndex` / `DefaultSubtitleStreamIndex` of PlaybackInfo (ADR 0055). */
     Server("server"),
 
-    /** Neither: mpv's own choice (`slang`, the file's default flags). */
+    /** The account's preferences applied by the client (ADR 0065). */
+    Account("account"),
+
+    /** None of them: mpv's own choice (`slang`, the file's default flags). */
     Mpv("mpv"),
 }
 
@@ -65,17 +68,30 @@ data class TrackDecision(val origin: TrackOrigin, val embyIndex: Int? = null, va
  * mpv's. As on Windows (ADR 0035), when playing the file the Emby `Index` of one of
  * its own streams is the mpv track of the same type with that `ff-index`, external
  * files left out. A transcode carries the server's audio, and its subtitle pick was
- * added selected ([transcode]): nothing is left to select.
+ * added selected ([transcode]): nothing is left to select. When the server names no
+ * track, or one not in the file, the account's pick [account] (ADR 0065), then mpv's.
  */
-fun decide(tracks: List<Track>, type: TrackType, preference: TrackPreference?, serverIndex: Int?, transcode: Boolean): TrackDecision {
+fun decide(
+    tracks: List<Track>,
+    type: TrackType,
+    preference: TrackPreference?,
+    serverIndex: Int?,
+    transcode: Boolean,
+    account: Selection? = null,
+): TrackDecision {
     remembered(tracks, type, preference)?.let { wanted ->
         return TrackDecision(TrackOrigin.Remembered, selection = wanted.takeUnless { isSelected(tracks, type, it) })
     }
-    serverIndex ?: return TrackDecision(TrackOrigin.Mpv)
-    if (transcode) return TrackDecision(TrackOrigin.Server, serverIndex)
-    val track = tracks.firstOrNull { it.type == type && !it.external && it.ffIndex == serverIndex }
-        ?: return TrackDecision(TrackOrigin.Mpv)
-    return TrackDecision(TrackOrigin.Server, serverIndex, Selection(track.id).takeUnless { track.selected })
+    if (serverIndex != null) {
+        if (transcode) return TrackDecision(TrackOrigin.Server, serverIndex)
+        tracks.firstOrNull { it.type == type && !it.external && it.ffIndex == serverIndex }?.let { track ->
+            return TrackDecision(TrackOrigin.Server, serverIndex, Selection(track.id).takeUnless { track.selected })
+        }
+    }
+    account?.let { wanted ->
+        return TrackDecision(TrackOrigin.Account, selection = wanted.takeUnless { isSelected(tracks, type, it) })
+    }
+    return TrackDecision(TrackOrigin.Mpv)
 }
 
 /** "2→1 (server)", "-→no (remembered)": Emby index, mpv's track once applied, origin. No URL, no token. */

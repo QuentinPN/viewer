@@ -2,6 +2,7 @@ package io.github.quentinpn.viewer.tv.emby
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 // Emby API models, limited to the fields this client uses. Shapes verified on
 // Emby Server 4.10 by the Windows client (src-tauri/src/emby/models.rs).
@@ -32,6 +33,25 @@ class AuthenticationResult(
 data class UserDto(
     @SerialName("Id") val id: String,
     @SerialName("Name") val name: String,
+)
+
+/**
+ * The track fields of `UserDto.Configuration` (`UserConfiguration`, ADR 0065). The
+ * other fields, `ProfilePin` among them, are never decoded. `SubtitleMode` stays text:
+ * an unknown value then means no preference rather than an unreadable user.
+ */
+@Serializable
+data class UserConfigurationDto(
+    @SerialName("AudioLanguagePreference") val audioLanguagePreference: String? = null,
+    @SerialName("PlayDefaultAudioTrack") val playDefaultAudioTrack: Boolean = false,
+    @SerialName("SubtitleLanguagePreference") val subtitleLanguagePreference: String? = null,
+    @SerialName("SubtitleMode") val subtitleMode: String? = null,
+)
+
+/** `GET /Users/{Id}` read for its `Configuration` only; its shape is checked by [EmbyClient.userConfiguration]. */
+@Serializable
+internal data class UserWithConfiguration(
+    @SerialName("Configuration") val configuration: JsonElement? = null,
 )
 
 @Serializable

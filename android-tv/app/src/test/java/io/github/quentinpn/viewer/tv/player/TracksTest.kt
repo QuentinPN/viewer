@@ -15,15 +15,17 @@ class TracksTest {
             "track-list/1/ff-index" to "1",
             "track-list/2/type" to "sub", "track-list/2/id" to "1", "track-list/2/lang" to "fre",
             "track-list/2/codec" to "ass", "track-list/2/title" to "", "track-list/2/selected" to "no",
-            "track-list/2/ff-index" to "3",
+            "track-list/2/ff-index" to "3", "track-list/2/default" to "yes", "track-list/2/forced" to "yes",
+            "track-list/2/hearing-impaired" to "no",
             "track-list/3/type" to "sub", "track-list/3/id" to "2", "track-list/3/lang" to "eng",
             "track-list/3/codec" to "subrip", "track-list/3/external" to "yes", "track-list/3/selected" to "yes",
+            "track-list/3/hearing-impaired" to "yes",
         )
         assertEquals(
             listOf(
                 Track(1, TrackType.Audio, "Japonais · AAC stéréo", selected = true, lang = "jpn", ffIndex = 1),
-                Track(1, TrackType.Subtitle, "Français · ASS", selected = false, lang = "fre", ffIndex = 3),
-                Track(2, TrackType.Subtitle, "Anglais · SRT (externe)", selected = true, lang = "eng", external = true),
+                Track(1, TrackType.Subtitle, "Français · ASS", selected = false, lang = "fre", ffIndex = 3, isDefault = true, forced = true),
+                Track(2, TrackType.Subtitle, "Anglais · SRT (externe)", selected = true, lang = "eng", external = true, hearingImpaired = true),
             ),
             readTracks { props[it] },
         )

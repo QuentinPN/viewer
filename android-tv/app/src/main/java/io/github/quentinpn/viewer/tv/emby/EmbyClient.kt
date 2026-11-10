@@ -5,6 +5,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -63,6 +65,27 @@ class EmbyClient(
     /** Current user; also checks that the stored token is still accepted. */
     suspend fun user(userId: String): UserDto =
         call(get(server.api("/Users/${segment(userId)}")), UserDto.serializer())
+
+    /**
+     * The account's track preferences, from `Configuration` of `GET /Users/{Id}` (ADR 0065).
+     * The documentation types it `UserConfiguration[]`: an object or the first object of
+     * an array is read. Null when the user has none.
+     */
+    suspend fun userConfiguration(userId: String): UserConfigurationDto? {
+        val user = call(get(server.api("/Users/${segment(userId)}")), UserWithConfiguration.serializer())
+        val config = when (val element = user.configuration) {
+            is JsonObject -> element
+            is JsonArray -> element.firstOrNull() as? JsonObject
+            else -> null
+        } ?: return null
+        return try {
+            json.decodeFromJsonElement(UserConfigurationDto.serializer(), config)
+        } catch (e: SerializationException) {
+            throw EmbyException(EmbyError.InvalidResponse(e.message ?: "JSON invalide"), e)
+        } catch (e: IllegalArgumentException) {
+            throw EmbyException(EmbyError.InvalidResponse(e.message ?: "JSON invalide"), e)
+        }
+    }
 
     suspend fun logout() {
         requireToken()

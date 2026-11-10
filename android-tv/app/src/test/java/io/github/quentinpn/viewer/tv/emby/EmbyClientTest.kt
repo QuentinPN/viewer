@@ -236,6 +236,43 @@ class EmbyClientTest {
     }
 
     @Test
+    fun userConfigurationReadsTheTrackPreferences() = runBlocking {
+        respond(
+            200,
+            """{"Id":"u1","Name":"claude","Configuration":{"AudioLanguagePreference":"jpn","PlayDefaultAudioTrack":false,""" +
+                """"SubtitleLanguagePreference":"fre","SubtitleMode":"Smart","ProfilePin":"1234","OrderedViews":[]}}""",
+        )
+        val config = client.withToken("secret-token").userConfiguration("u1")
+        assertEquals(UserConfigurationDto("jpn", false, "fre", "Smart"), config)
+        assertFalse("the pin is never decoded", "1234" in config.toString())
+        val request = server.takeRequest()
+        assertEquals("GET", request.method)
+        assertEquals("/emby/Users/u1", request.url.encodedPath)
+        assertNull(request.url.query)
+        assertTrue("Token=\"secret-token\"" in request.headers["X-Emby-Authorization"]!!)
+    }
+
+    @Test
+    fun userConfigurationAcceptsTheDocumentedArrayAndItsAbsence() = runBlocking {
+        respond(200, """{"Id":"u1","Configuration":[{"SubtitleMode":"None"}]}""")
+        respond(200, """{"Id":"u1","Name":"claude"}""")
+        respond(200, """{"Id":"u1","Configuration":[]}""")
+        val withToken = client.withToken("t")
+        assertEquals(UserConfigurationDto(subtitleMode = "None"), withToken.userConfiguration("u1"))
+        assertNull(withToken.userConfiguration("u1"))
+        assertNull(withToken.userConfiguration("u1"))
+    }
+
+    @Test
+    fun userConfigurationErrorsAreTyped() {
+        respond(200, """{"Configuration":{"PlayDefaultAudioTrack":"maybe"}}""")
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").userConfiguration("u1") }
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").userConfiguration("../admin") }
+        respond(401)
+        expectError(EmbyError.SessionExpired::class.java) { client.withToken("t").userConfiguration("u1") }
+    }
+
+    @Test
     fun libraryPageIsSortedByTitle() = runBlocking {
         respond(200, """{"Items":[{"Id":"m1","Name":"Akira","Type":"Movie"}],"TotalRecordCount":120}""")
         val page = client.withToken("t").libraryItems("u1", "lib1", "Movie", 60, 60)

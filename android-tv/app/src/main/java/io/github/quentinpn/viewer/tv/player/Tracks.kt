@@ -10,6 +10,7 @@ enum class TrackType(val mpv: String, val property: String) {
 /**
  * One audio or subtitle track of the playing file, as mpv numbers it; [lang] and [title] as the file gives them.
  * [ffIndex] is the stream's number in its file: for the media's own streams, Emby's `Index` (ADR 0035, 0055).
+ * [isDefault], [forced] and [hearingImpaired] are the file's flags, read for the account's preferences (ADR 0065).
  */
 data class Track(
     val id: Int,
@@ -20,6 +21,9 @@ data class Track(
     val title: String? = null,
     val ffIndex: Int? = null,
     val external: Boolean = false,
+    val isDefault: Boolean = false,
+    val forced: Boolean = false,
+    val hearingImpaired: Boolean = false,
 )
 
 /**
@@ -46,6 +50,8 @@ fun readTracks(get: (String) -> String?): List<Track> {
         Track(
             id, type, label, selected = prop("selected") == "yes", lang = lang, title = title,
             ffIndex = prop("ff-index")?.toIntOrNull(), external = external,
+            isDefault = prop("default") == "yes", forced = prop("forced") == "yes",
+            hearingImpaired = prop("hearing-impaired") == "yes",
         )
     }
 }
