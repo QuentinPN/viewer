@@ -70,6 +70,10 @@ class QualityTest {
         assertEquals("OK applique ce débit à cette lecture", qualityNote(picked))
         assertEquals("Changement en cours…", qualityNote(picked.applying()))
         assertEquals("Échec : la qualité n'a pas changé", qualityNote(picked.applying().failed()))
+        // The reasons of « Informations de lecture », not « raison non précisée » (ADR 0086)
+        val transcoded = picked.applying().applied(PlayMethod.Transcode, listOf("débit trop élevé"))
+        assertEquals("Transcodage · débit trop élevé  ·  ◀ ▶ puis OK pour changer", qualityNote(transcoded))
+        assertEquals("Transcodage · débit trop élevé  ·  ◀ ▶ puis OK pour changer", qualityNote(Quality.of(null, PlayMethod.Transcode, listOf("débit trop élevé"))))
     }
 
     @Test

@@ -38,20 +38,23 @@ enum class QualityPhase {
 
 /**
  * The row's state. [applied] is the cap of the stream playing, [chosen] the one shown,
- * picked with ◀ ▶ and not applied until OK; [method] how the server delivers the stream.
+ * picked with ◀ ▶ and not applied until OK; [method] how the server delivers the stream,
+ * and [reasons] why it transcodes, as « Informations de lecture » shows them (ADR 0086).
  */
 data class Quality(
     val applied: Long? = null,
     val chosen: Long? = null,
     val phase: QualityPhase = QualityPhase.Idle,
     val method: PlayMethod? = null,
+    val reasons: List<String> = emptyList(),
 ) {
     /** A pick that OK would apply. */
     val pending get() = chosen != applied && phase != QualityPhase.Applying
 
     companion object {
         /** The playback starts at the cap of Réglages for the server's kind of address. */
-        fun of(cap: Long?, method: PlayMethod?) = offeredCap(cap).let { Quality(applied = it, chosen = it, method = method) }
+        fun of(cap: Long?, method: PlayMethod?, reasons: List<String> = emptyList()) =
+            offeredCap(cap).let { Quality(applied = it, chosen = it, method = method, reasons = reasons) }
     }
 }
 
@@ -63,7 +66,8 @@ fun Quality.step(change: QualityChange): Quality =
 fun Quality.applying(): Quality = copy(phase = QualityPhase.Applying)
 
 /** The new stream plays at the shown cap. */
-fun Quality.applied(method: PlayMethod): Quality = copy(applied = chosen, phase = QualityPhase.Idle, method = method)
+fun Quality.applied(method: PlayMethod, reasons: List<String> = emptyList()): Quality =
+    copy(applied = chosen, phase = QualityPhase.Idle, method = method, reasons = reasons)
 
 /** The server or the player refused: the playing stream and its cap stay. */
 fun Quality.failed(): Quality = copy(chosen = applied, phase = QualityPhase.Failed)
@@ -76,7 +80,7 @@ fun qualityNote(quality: Quality): String = when {
     quality.phase == QualityPhase.Applying -> "Changement en cours…"
     quality.pending -> "OK applique ce débit à cette lecture"
     quality.phase == QualityPhase.Failed -> "Échec : la qualité n'a pas changé"
-    else -> listOfNotNull(quality.method?.let { methodLabel(it, emptyList()) }, "◀ ▶ puis OK pour changer").joinToString("  ·  ")
+    else -> listOfNotNull(quality.method?.let { methodLabel(it, quality.reasons) }, "◀ ▶ puis OK pour changer").joinToString("  ·  ")
 }
 
 /**

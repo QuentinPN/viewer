@@ -363,7 +363,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             val source = MediaSource.parse(chosen.url) ?: throw EmbyException(EmbyError.InvalidResponse("adresse de flux refusée"))
             val cap = settings.capFor(client.server.isLocal)
             adopt(chosen, cap, chosenInPlayer = false)
-            ui.quality = Quality.of(cap, chosen.method)
+            ui.quality = Quality.of(cap, chosen.method, facts?.reasons.orEmpty())
             // Reported once the file is loaded; never if loading fails, never for a trailer
             if (!trailer) reporter.begin(
                 client,
@@ -488,7 +488,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         val playback = ActivePlayback(itemId, chosen.mediaSourceId, chosen.playSessionId, chosen.method, chosen.runTimeTicks, (at * TICKS_PER_SECOND).roundToLong())
         report { switched(playback); emptyList() }
         ui.closeMenus()
-        ui.quality = ui.quality.applied(chosen.method)
+        ui.quality = ui.quality.applied(chosen.method, facts?.reasons.orEmpty())
         ui.status = "Changement de qualité…"
         replacedEnds++
         play(player, source, at)
