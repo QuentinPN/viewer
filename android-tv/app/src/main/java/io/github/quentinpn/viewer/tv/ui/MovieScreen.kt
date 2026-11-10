@@ -36,6 +36,7 @@ import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
+import io.github.quentinpn.viewer.tv.emby.UserItemData
 
 /**
  * A film: backdrop, year, length, overview, "Reprendre" / "Lire depuis le début", « Bande-annonce » (ADR 0083), its version
@@ -74,6 +75,8 @@ fun MovieScreen(
     onOpenStudio: ((String) -> Unit)? = null,
     /** The studio chip a grid was opened from: focused instead of the play button. */
     focusStudio: String? = null,
+    /** After a watched mark or favourite sent from here (ADR 0097): the home reads its shelves again. */
+    onUserDataChanged: () -> Unit = {},
 ) {
     var movie by remember { mutableStateOf<Load<BaseItemDto>>(Load.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
@@ -123,6 +126,14 @@ fun MovieScreen(
                             takeFocus,
                             ChipLines(chips, genreFocus, { onOpenGenre?.invoke(it) }, studios, studioFocus) { onOpenStudio?.invoke(it) },
                             Modifier.height(screen).topOnFocus(scroll),
+                            actions = { onMessage ->
+                                // The answer is the film's new user data: the page shows it at once (ADR 0097)
+                                val update = { data: UserItemData ->
+                                    movie = Load.Ready(m.value.copy(userData = data))
+                                    onUserDataChanged()
+                                }
+                                UserDataButtons(m.value, client, userId, onSessionExpired, onMessage, onPlayed = update, onFavorite = update)
+                            },
                         ) { onMessage ->
                             trailers?.let { TrailerButton(m.value, client, userId, it, onSessionExpired, onMessage) }
                         }
@@ -150,6 +161,8 @@ private fun Details(
     /** Genres and studios to open (ADR 0079, 0087); empty leaves them on the year line and in the facts. */
     chips: ChipLines,
     modifier: Modifier,
+    /** The watched mark and favourite buttons (ADR 0097), on their own row under the play row. */
+    actions: @Composable (onMessage: (String?) -> Unit) -> Unit,
     /** The trailer button, last of the play row (ADR 0083); its message shows under the row. */
     trailer: @Composable (onMessage: (String?) -> Unit) -> Unit,
 ) {
@@ -161,6 +174,7 @@ private fun Details(
     val choices = remember(movie.mediaSources) { versionChoices(movie.mediaSources) }
     var version by remember(movie.id, choices) { mutableStateOf(versions.load(movie.id, choices)) }
     var trailerMessage by remember { mutableStateOf<String?>(null) }
+    var actionMessage by remember { mutableStateOf<String?>(null) }
     Column(
         modifier.fillMaxWidth(0.6f).padding(horizontal = 48.dp, vertical = 56.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Bottom),
@@ -199,6 +213,8 @@ private fun Details(
             trailer { trailerMessage = it }
         }
         trailerMessage?.let { Text(it, color = Palette.error) }
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) { actions { actionMessage = it } }
+        actionMessage?.let { Text(it, color = Palette.error) }
         choices.firstOrNull { it.id == version }?.let { chosen ->
             // OK goes to the next version, as the choices of Réglages
             OutlinedButton(

@@ -50,8 +50,8 @@ import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
+import io.github.quentinpn.viewer.tv.emby.UserItemData
 import io.github.quentinpn.viewer.tv.emby.startTicks
-import io.github.quentinpn.viewer.tv.emby.trailerChoices
 
 internal sealed interface Load<out T> {
     data object Loading : Load<Nothing>
@@ -62,6 +62,21 @@ internal sealed interface Load<out T> {
 }
 
 private class SeriesData(val series: BaseItemDto, val seasons: List<BaseItemDto>)
+
+/** The series with its new user data, after an action on it (ADR 0097). */
+private fun SeriesData.withSeries(data: UserItemData) = SeriesData(series.copy(userData = data), seasons)
+
+/** The season [id] with its new user data, after an action on it (ADR 0097). */
+private fun SeriesData.withSeason(id: String, data: UserItemData) =
+    SeriesData(series, seasons.map { if (it.id == id) it.copy(userData = data) else it })
+
+/** « Marquer la série comme vue » or « … non vue » (ADR 0097). */
+internal fun seriesPlayedLabel(series: BaseItemDto): String =
+    if (series.userData?.played == true) "Marquer la série comme non vue" else "Marquer la série comme vue"
+
+/** « Marquer la saison comme vue » or « … non vue » (ADR 0097). */
+internal fun seasonPlayedLabel(season: BaseItemDto): String =
+    if (season.userData?.played == true) "Marquer la saison comme non vue" else "Marquer la saison comme vue"
 
 /**
  * A series page to open; an episode found by search also names its season (`SeasonId`,
@@ -130,9 +145,14 @@ fun SeriesScreen(
     onOpenStudio: ((String) -> Unit)? = null,
     /** The studio chip a grid was opened from: focused instead of an episode card. */
     focusStudio: String? = null,
+    /** After a watched mark or favourite sent from here (ADR 0097): the home reads its shelves again. */
+    onUserDataChanged: () -> Unit = {},
 ) {
     var data by remember { mutableStateOf<Load<SeriesData>>(Load.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
+    // After a watched mark on the series or a season: seasons and episodes are read again in place,
+    // since the server's cascade to the episodes is not documented (ADR 0097)
+    var reloads by remember { mutableIntStateOf(0) }
     var seasonId by remember { mutableStateOf<String?>(null) }
     // The searched episode is focused until another season is chosen
     var focusEpisode by remember { mutableStateOf(target.episodeId) }
@@ -151,7 +171,7 @@ fun SeriesScreen(
         Load.Failed(e.error.message)
     }
 
-    LaunchedEffect(attempt, refresh) {
+    LaunchedEffect(attempt, refresh, reloads) {
         // After a playback the seasons' counts are read again in place, the season kept
         val shown = data is Load.Ready
         if (!shown) data = Load.Loading
@@ -177,9 +197,25 @@ fun SeriesScreen(
                     val studios = remember(d.value.series.studios, onOpenStudio != null) { if (onOpenStudio != null) studioChips(d.value.series) else emptyList() }
                     val studioFocus = studioChipFocus?.takeIf { it in studios }
                     val lines = ChipLines(chips, genreFocus, { onOpenGenre?.invoke(it) }, studios, studioFocus) { onOpenStudio?.invoke(it) }
-                    Header(d.value.series, lines) { onMessage ->
-                        trailers?.let { TrailerButton(d.value.series, client, userId, it, onSessionExpired, onMessage) }
-                    }
+                    Header(d.value.series, lines)
+                    Actions(
+                        d.value.series,
+                        d.value.seasons.firstOrNull { it.id == seasonId },
+                        client,
+                        userId,
+                        onSessionExpired,
+                        trailer = { onMessage -> trailers?.let { TrailerButton(d.value.series, client, userId, it, onSessionExpired, onMessage) } },
+                        onSeries = { action, userData ->
+                            (data as? Load.Ready)?.let { data = Load.Ready(it.value.withSeries(userData)) }
+                            if (action != ItemAction.AddFavorite && action != ItemAction.RemoveFavorite) reloads++
+                            onUserDataChanged()
+                        },
+                        onSeason = { id, userData ->
+                            (data as? Load.Ready)?.let { data = Load.Ready(it.value.withSeason(id, userData)) }
+                            reloads++
+                            onUserDataChanged()
+                        },
+                    )
                     if (d.value.seasons.isEmpty()) {
                         Text("Aucune saison sur le serveur.", color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp))
                     } else {
@@ -194,7 +230,7 @@ fun SeriesScreen(
                             }
                         }
                         seasonId?.let { id ->
-                            Episodes(client, userId, seriesId, id, focusEpisode, castFocus == null && genreFocus == null && studioFocus == null, d.value.series, images, onPlay, onOpenEpisode, onSessionExpired, refresh)
+                            Episodes(client, userId, seriesId, id, focusEpisode, castFocus == null && genreFocus == null && studioFocus == null, d.value.series, images, onPlay, onOpenEpisode, onSessionExpired, refresh, reloads)
                         }
                     }
                     val cast = remember(d.value.series.people) { castMembers(d.value.series) }
@@ -244,10 +280,7 @@ private fun Header(
     series: BaseItemDto,
     /** Genres and networks to open (ADR 0079, 0087). */
     chips: ChipLines,
-    /** The trailer button (ADR 0083): no play row on a series, so its own line, never focused first. */
-    trailer: @Composable (onMessage: (String?) -> Unit) -> Unit,
 ) {
-    var trailerMessage by remember { mutableStateOf<String?>(null) }
     Column(Modifier.padding(horizontal = 48.dp).fillMaxWidth(0.6f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(series.name, style = MaterialTheme.typography.displaySmall, color = Palette.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
         // Year, the age rating badge, then genres and scores; the text ends in an ellipsis, not the badge
@@ -266,13 +299,37 @@ private fun Header(
         Facts(series, limit = 2, studios = chips.studios.isEmpty())
         GenreChips(chips.genres, chips.focusGenre, chips.onOpenGenre)
         StudioChips(series, chips.studios, chips.focusStudio, chips.onOpenStudio)
-        // No line at all without a trailer: the episode row stays where it was
-        if (trailerChoices(series).isNotEmpty()) {
-            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                trailer { trailerMessage = it }
-                trailerMessage?.let { Text(it, color = Palette.error) }
-            }
+    }
+}
+
+/**
+ * The series' buttons, never focused first, as wide as the page: « Bande-annonce » (ADR 0083),
+ * then the watched mark and favourite of the series and the watched mark of the season shown
+ * (ADR 0097). A message shows at the end of the line.
+ */
+@Composable
+private fun Actions(
+    series: BaseItemDto,
+    season: BaseItemDto?,
+    client: EmbyClient,
+    userId: String,
+    onSessionExpired: () -> Unit,
+    trailer: @Composable (onMessage: (String?) -> Unit) -> Unit,
+    onSeries: (ItemAction, UserItemData) -> Unit,
+    onSeason: (seasonId: String, UserItemData) -> Unit,
+) {
+    var message by remember { mutableStateOf<String?>(null) }
+    val onMessage = { text: String? -> message = text }
+    Row(Modifier.padding(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        trailer(onMessage)
+        val played = playedAction(series)
+        ActionButton(series, played, client, userId, onSessionExpired, onMessage, label = seriesPlayedLabel(series)) { onSeries(played, it) }
+        val favorite = favoriteAction(series)
+        ActionButton(series, favorite, client, userId, onSessionExpired, onMessage) { onSeries(favorite, it) }
+        season?.let { s ->
+            ActionButton(s, playedAction(s), client, userId, onSessionExpired, onMessage, label = seasonPlayedLabel(s)) { onSeason(s.id, it) }
         }
+        message?.let { Text(it, color = Palette.error, maxLines = 2, overflow = TextOverflow.Ellipsis) }
     }
 }
 
@@ -340,12 +397,14 @@ private fun Episodes(
     onOpenEpisode: (SeriesTarget) -> Unit,
     onSessionExpired: () -> Unit,
     refresh: Int,
+    /** Changes after a watched mark on the series or the season (ADR 0097): read again in place. */
+    reloads: Int,
 ) {
     var episodes by remember(seasonId) { mutableStateOf<Load<List<BaseItemDto>>>(Load.Loading) }
     var attempt by remember(seasonId) { mutableIntStateOf(0) }
     var focused by remember(seasonId) { mutableStateOf<BaseItemDto?>(null) }
 
-    LaunchedEffect(seasonId, attempt, refresh) {
+    LaunchedEffect(seasonId, attempt, refresh, reloads) {
         // After a playback the episodes are read again in place, focus kept
         val shown = episodes is Load.Ready
         if (!shown) episodes = Load.Loading

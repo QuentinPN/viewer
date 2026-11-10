@@ -676,4 +676,80 @@ class EmbyClientTest {
         assertEquals("/emby/Items/i1/Images/Primary", url.encodedPath)
         assertEquals("tag=abc&maxWidth=300", url.query)
     }
+
+    /** The request of a write action (ADR 0097): its method and path, no body, the token in the header only. */
+    private fun assertWrite(method: String, path: String, query: String?) {
+        val request = server.takeRequest()
+        assertEquals(method, request.method)
+        assertEquals(path, request.url.encodedPath)
+        assertEquals(query, request.url.query)
+        assertFalse("no token in the URL", "secret-token" in request.url.toString())
+        assertTrue(request.headers["X-Emby-Authorization"]!!.endsWith(", Token=\"secret-token\""))
+        assertEquals(0, request.body?.size ?: 0)
+    }
+
+    @Test
+    fun markingPlayedPostsAndReadsTheNewUserData() = runBlocking {
+        respond(200, """{"Played":true,"PlaybackPositionTicks":0,"IsFavorite":false,"PlayCount":1}""")
+        val data = client.withToken("secret-token").setPlayed("u1", "m1", played = true)
+        assertTrue(data.played)
+        assertEquals(0L, data.playbackPositionTicks)
+        assertWrite("POST", "/emby/Users/u1/PlayedItems/m1", null)
+    }
+
+    @Test
+    fun markingUnplayedDeletes() = runBlocking {
+        respond(200, """{"Played":false,"UnplayedItemCount":12}""")
+        val data = client.withToken("secret-token").setPlayed("u1", "s1", played = false)
+        assertFalse(data.played)
+        assertEquals(12, data.unplayedItemCount)
+        assertWrite("DELETE", "/emby/Users/u1/PlayedItems/s1", null)
+    }
+
+    @Test
+    fun favouritesArePostedAndDeleted() = runBlocking {
+        respond(200, """{"IsFavorite":true}""")
+        respond(200, """{"IsFavorite":false}""")
+        val c = client.withToken("secret-token")
+        assertTrue(c.setFavorite("u1", "m1", favorite = true).isFavorite)
+        assertWrite("POST", "/emby/Users/u1/FavoriteItems/m1", null)
+        assertFalse(c.setFavorite("u1", "m1", favorite = false).isFavorite)
+        assertWrite("DELETE", "/emby/Users/u1/FavoriteItems/m1", null)
+    }
+
+    @Test
+    fun hidingFromResumePostsTheHideFlag() = runBlocking {
+        respond(200, """{"Played":false,"PlaybackPositionTicks":420000000}""")
+        respond(200, """{"Played":false}""")
+        val c = client.withToken("secret-token")
+        assertEquals(420000000L, c.hideFromResume("u1", "e1", hide = true).playbackPositionTicks)
+        assertWrite("POST", "/emby/Users/u1/Items/e1/HideFromResume", "Hide=true")
+        c.hideFromResume("u1", "e1", hide = false)
+        assertWrite("POST", "/emby/Users/u1/Items/e1/HideFromResume", "Hide=false")
+    }
+
+    @Test
+    fun writeActionsNeedASession() = expectError(EmbyError.NotSignedIn::class.java) {
+        client.setPlayed("u1", "m1", played = true)
+    }
+
+    @Test
+    fun writeActionsRejectAnIdThatWouldChangeThePath() {
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").setPlayed("u1", "../Users", played = true) }
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").setFavorite("../u1", "m1", favorite = true) }
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").hideFromResume("u1", "e1/x", hide = true) }
+        assertEquals("nothing sent", 0, server.requestCount)
+    }
+
+    @Test
+    fun writeActionErrorsMapToCategories() {
+        respond(401)
+        expectError(EmbyError.SessionExpired::class.java) { client.withToken("t").setPlayed("u1", "m1", played = true) }
+        respond(404)
+        expectError(EmbyError.NotFound::class.java) { client.withToken("t").setFavorite("u1", "m1", favorite = false) }
+        respond(500)
+        expectError(EmbyError.Server::class.java) { client.withToken("t").hideFromResume("u1", "e1", hide = true) }
+        respond(200, "pas du json")
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").setPlayed("u1", "m1", played = false) }
+    }
 }

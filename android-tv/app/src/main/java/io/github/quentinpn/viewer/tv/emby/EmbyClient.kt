@@ -521,6 +521,8 @@ class EmbyClient(
 
     private fun post(url: HttpUrl, body: RequestBody) = request(url).post(body).build()
 
+    private fun delete(url: HttpUrl) = request(url).delete().build()
+
     private fun request(url: HttpUrl) = Request.Builder().url(url)
         .header("X-Emby-Authorization", authorizationHeader())
         .header("Accept", "application/json")
@@ -616,6 +618,33 @@ class EmbyClient(
         val builder = server.api("/Users/${segment(userId)}/Items").newBuilder()
         favoritesQuery(limit).forEach { (name, value) -> builder.addQueryParameter(name, value) }
         return call(get(builder.build()), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
+    /**
+     * Marks [itemId] watched or not (ADR 0097): `POST` / `DELETE /Users/{Id}/PlayedItems/{Id}`,
+     * answered with the item's new user data. No `DatePlayed`: the server dates it itself. On a
+     * series or season the server's cascade to the episodes is not documented: read them again.
+     */
+    suspend fun setPlayed(userId: String, itemId: String, played: Boolean): UserItemData {
+        val url = server.api("/Users/${segment(userId)}/PlayedItems/${segment(itemId)}")
+        return call(if (played) post(url, ByteArray(0).toRequestBody()) else delete(url), UserItemData.serializer())
+    }
+
+    /** Adds [itemId] to the favourites or removes it (ADR 0097): `POST` / `DELETE /Users/{Id}/FavoriteItems/{Id}`. */
+    suspend fun setFavorite(userId: String, itemId: String, favorite: Boolean): UserItemData {
+        val url = server.api("/Users/${segment(userId)}/FavoriteItems/${segment(itemId)}")
+        return call(if (favorite) post(url, ByteArray(0).toRequestBody()) else delete(url), UserItemData.serializer())
+    }
+
+    /**
+     * Takes [itemId] out of « Reprendre » or puts it back (ADR 0097):
+     * `POST /Users/{Id}/Items/{Id}/HideFromResume?Hide=`, answered with the new user data.
+     */
+    suspend fun hideFromResume(userId: String, itemId: String, hide: Boolean): UserItemData {
+        val url = server.api("/Users/${segment(userId)}/Items/${segment(itemId)}/HideFromResume").newBuilder()
+            .addQueryParameter("Hide", hide.toString())
+            .build()
+        return call(post(url, ByteArray(0).toRequestBody()), UserItemData.serializer())
     }
 
     /** The entries of one playlist, in its order (ADR 0088): `GET /Playlists/{Id}/Items`, built by [playlistItemsQuery]. */

@@ -43,6 +43,7 @@ import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
+import io.github.quentinpn.viewer.tv.emby.UserItemData
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -165,6 +166,8 @@ fun EpisodeScreen(
     refresh: Int = 0,
     /** The card a person page was opened from: focused instead of the play button. */
     focusPerson: String? = null,
+    /** After a watched mark or favourite sent from here (ADR 0097): the home reads its shelves again. */
+    onUserDataChanged: () -> Unit = {},
 ) {
     val episodeId = target.episodeId ?: return
     var data by remember { mutableStateOf<Load<EpisodeData>>(Load.Loading) }
@@ -234,7 +237,14 @@ fun EpisodeScreen(
                             },
                             // Back on the buttons, the episode's title shows again
                             Modifier.height(screen).topOnFocus(scroll),
-                        )
+                        ) { onMessage ->
+                            // The answer is the episode's new user data: the page shows it at once (ADR 0097)
+                            val update = { userData: UserItemData ->
+                                data = Load.Ready(EpisodeData(episode.copy(userData = userData), d.value.neighbours))
+                                onUserDataChanged()
+                            }
+                            UserDataButtons(episode, client, userId, onSessionExpired, onMessage, onPlayed = update, onFavorite = update)
+                        }
                         val cast = remember(episode.people) { castMembers(episode) }
                         CastRow(cast, client, images, focusPerson, onOpenPerson)
                     }
@@ -291,7 +301,10 @@ private fun Details(
     onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit,
     onNavigate: (BaseItemDto, Focus) -> Unit,
     modifier: Modifier,
+    /** The watched mark and favourite buttons (ADR 0097), on their own row under the play row. */
+    actions: @Composable (onMessage: (String?) -> Unit) -> Unit,
 ) {
+    var actionMessage by remember { mutableStateOf<String?>(null) }
     val episode = data.episode
     val played = episode.userData?.played == true
     val position = episode.userData?.playbackPositionTicks ?: 0
@@ -340,6 +353,8 @@ private fun Details(
             }
             if (resume) OutlinedButton(onClick = { onPlay(episode.id, 0, version) }) { Text("Lire depuis le début") }
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) { actions { actionMessage = it } }
+        actionMessage?.let { Text(it, color = Palette.error) }
         choices.firstOrNull { it.id == version }?.let { chosen ->
             // OK goes to the next version, as on the film page
             OutlinedButton(

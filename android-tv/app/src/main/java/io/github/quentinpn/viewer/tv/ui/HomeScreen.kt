@@ -121,6 +121,17 @@ class HomeMemory {
     /** The rows shown when the shelves were loaded (ADR 0094): a change in Réglages loads them again. */
     internal var loadedRows: HomeRowVisibility? = null
 
+    /** Counts the watched marks, favourites and « Reprendre » changes sent (ADR 0097); each reads the shelves again. */
+    internal var changes by mutableIntStateOf(0)
+
+    /** The [changes] value the shelves were loaded for. */
+    internal var loadedChanges = 0
+
+    /** A page wrote the user's data: the shelves are read again, in place, when the home shows. */
+    fun userDataChanged() {
+        changes++
+    }
+
     /** Set after an entry of the bar opened a screen: coming back puts the focus on it, not on a card. */
     internal var focusHeader: BarItem? = null
     internal var focusLibrary: String? = null
@@ -158,10 +169,11 @@ fun HomeScreen(
     val home = remember { FocusRequester() }
     val heroMain = remember { FocusRequester() }
 
-    LaunchedEffect(memory.attempt, refresh, rows) {
+    LaunchedEffect(memory.attempt, refresh, rows, memory.changes) {
         // Already loaded: the screen is shown again after a series page
         val shown = memory.state is HomeState.Ready
-        if (shown && memory.loadedFor == refresh && memory.loadedRows == rows) return@LaunchedEffect
+        val changes = memory.changes
+        if (shown && memory.loadedFor == refresh && memory.loadedRows == rows && memory.loadedChanges == changes) return@LaunchedEffect
         if (!shown) memory.state = HomeState.Loading
         val next = try {
             // A hidden row is not requested; "Reprendre" still is, for the hero
@@ -185,6 +197,24 @@ fun HomeScreen(
         if (!shown || next is HomeState.Ready) memory.state = next
         memory.loadedFor = refresh
         memory.loadedRows = rows
+        memory.loadedChanges = changes
+    }
+
+    // A card's menu (ADR 0097): the answer updates the shelves at once, then they are read again
+    val onAction: suspend (Shelf, BaseItemDto, ItemAction) -> Unit = { shelf, item, action ->
+        val data = try {
+            client.perform(userId, item.id, action)
+        } catch (e: EmbyException) {
+            if (e.error == EmbyError.SessionExpired) onSessionExpired()
+            throw e
+        }
+        (memory.state as? HomeState.Ready)?.let { ready ->
+            val after = shelvesAfter(ready.shelves, item.id, action, data)
+            memory.opened = focusAfter(ready.shelves, after, shelf.title, item.id)
+            memory.focusHeader = null
+            memory.state = ready.copy(shelves = after)
+        }
+        memory.userDataChanged()
     }
 
     val header: @Composable () -> Unit = {
@@ -257,7 +287,7 @@ fun HomeScreen(
                         if (title.type == "Movie") onOpenMovie(title.id) else onOpenSeries(title.id)
                     },
                 )
-                Shelves(s.shelves, s.hero, heroActions, HeroFocus(main = heroMain, up = home), header, memory, client, images, onAll = { shelf, library ->
+                Shelves(s.shelves, s.hero, heroActions, HeroFocus(main = heroMain, up = home), header, memory, client, images, onAction, onAll = { shelf, library ->
                     notice = null
                     memory.focusHeader = null
                     memory.opened = shelf.title to ALL
@@ -390,11 +420,15 @@ private fun Shelves(
     memory: HomeMemory,
     client: EmbyClient,
     images: ImageLoader,
+    /** Sends a card menu's action (ADR 0097); throws [EmbyException] on failure. */
+    perform: suspend (Shelf, BaseItemDto, ItemAction) -> Unit,
     onAll: (Shelf, Library) -> Unit,
     onOpen: (Shelf, BaseItemDto) -> Unit,
 ) {
     val first = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
+    // The card whose menu is open, by shelf title and item id
+    var menu by remember { mutableStateOf<Pair<String, String>?>(null) }
     // While the hero or the bar has the focus, only a strip of the first shelf's cards shows
     var heroFocused by remember { mutableStateOf(false) }
     // The card or hero button opened last when it is still there, else the hero's
@@ -463,7 +497,21 @@ private fun Shelves(
                 ) {
                     items(shelf.items, key = { it.id }) { item ->
                         val focus = if (target == shelf.title to item.id) Modifier.focusRequester(first) else Modifier
-                        ItemCard(item, shelf.landscape, client, images, focus) { onOpen(shelf, item) }
+                        val actions = cardActions(item, shelf.resume)
+                        Box {
+                            ItemCard(
+                                item,
+                                shelf.landscape,
+                                client,
+                                images,
+                                focus,
+                                // A long press on OK opens the card's menu; none on a playlist
+                                onLongClick = if (actions.isEmpty()) null else ({ menu = shelf.title to item.id }),
+                            ) { onOpen(shelf, item) }
+                            if (menu == shelf.title to item.id) {
+                                CardMenu(item, actions, onDismiss = { menu = null }) { perform(shelf, item, it) }
+                            }
+                        }
                     }
                     shelf.library?.let { library ->
                         item(key = ALL) {
@@ -504,6 +552,8 @@ internal fun ItemCard(
     images: ImageLoader,
     modifier: Modifier,
     fill: Boolean = false,
+    /** A long press on OK (ADR 0097); null leaves it to the click. */
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     val width: Dp = if (landscape) 320.dp else 180.dp
@@ -512,6 +562,7 @@ internal fun ItemCard(
     Column(if (fill) Modifier.fillMaxWidth() else Modifier.width(width), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Card(
             onClick = onClick,
+            onLongClick = onLongClick,
             modifier = modifier.fillMaxWidth().aspectRatio(ratio),
             shape = CardDefaults.shape(shape),
             scale = CardDefaults.scale(focusedScale = 1.06f),

@@ -176,6 +176,7 @@ class MainActivity : ComponentActivity() {
                                     onSessionExpired = expired,
                                     refresh = refresh,
                                     focusPerson = page.person,
+                                    onUserDataChanged = home::userDataChanged,
                                 )
                                 is DetailPage.Grid -> LibraryScreen(
                                     client,
@@ -223,6 +224,7 @@ class MainActivity : ComponentActivity() {
                                     trailers = trailers,
                                     onOpenStudio = studioOpener("Series", ancestors),
                                     focusStudio = page.studio,
+                                    onUserDataChanged = home::userDataChanged,
                                 )
                                 is DetailPage.Movie -> MovieScreen(
                                     client,
@@ -244,6 +246,7 @@ class MainActivity : ComponentActivity() {
                                     trailers = trailers,
                                     onOpenStudio = studioOpener("Movie", ancestors),
                                     focusStudio = page.studio,
+                                    onUserDataChanged = home::userDataChanged,
                                 )
                             }
                         }

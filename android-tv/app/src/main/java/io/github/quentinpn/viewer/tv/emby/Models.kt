@@ -198,6 +198,7 @@ data class UserItemData(
     @SerialName("PlaybackPositionTicks") val playbackPositionTicks: Long = 0,
     /** Series and seasons only: episodes not yet watched. */
     @SerialName("UnplayedItemCount") val unplayedItemCount: Int? = null,
+    @SerialName("IsFavorite") val isFavorite: Boolean = false,
 )
 
 @Serializable
