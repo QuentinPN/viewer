@@ -73,6 +73,15 @@ interface PlayerEngine {
     /** Sets a delay, in seconds, for the loaded file only (ADR 0062); returns the value mpv then holds, null if unreadable. */
     fun setDelay(kind: DelayKind, seconds: Double): Double?
 
+    /** Playback speed for the loaded file only (ADR 0072); returns the value mpv then holds, null if unreadable. */
+    fun setSpeed(speed: Double): Double?
+
+    /** Night mode's compressor on or off (ADR 0072); true when mpv holds it as asked. Kept for the next files. */
+    fun setNightMode(on: Boolean): Boolean
+
+    /** Audio leaves undecoded (spdif passthrough): no audio filter can apply to it. */
+    fun audioPassthrough(): Boolean
+
     /** Diagnostics only: reads one libmpv property as text. */
     fun property(name: String): String?
 
