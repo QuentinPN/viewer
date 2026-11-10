@@ -1025,3 +1025,18 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - « Format » on a film that is not 16:9: Overgeared fills the screen, so cropping and stretching change nothing visible. Subtitles in a cropped or stretched picture.
   - Genres on a film page; with several film or series libraries; a genre name with accents.
   - A change of sort inside a genre grid leaving the saved grid choices untouched (code only).
+
+### 2026-11-10 — Android TV: quality from the player, decades and trailers
+
+- **Added**: ADR 0081. The ▼ menu's « Lecture » section starts with « Qualité ». ◀ ▶ only change the value shown; OK asks PlaybackInfo again with the new cap, the version playing and the position (`StartTimeTicks`), then reloads at the same place. The choice is for this playback only; Réglages is untouched. No stop and no new start are sent: one Progress report with `EventName=QualityChange` carries the new session. A replaced transcode is ended with `DELETE /Videos/ActiveEncodings` once the new file plays. « Informations de lecture » shows « choisi pour cette lecture ».
+- **Added**: ADR 0082. The Films and Séries grids have an « Années » pill, between « Genre » and « Réinitialiser ». Its side list shows the decades the library really has (read from `ProductionYear`), newest first; the grid then asks the server with `Years`. The choice is saved with the other grid choices.
+- **Added**: ADR 0083. Film and series pages have a « Bande-annonce » button after « Lire ». A local trailer plays in the player with no report, no segment lookup and no next episode; otherwise a remote one opens in the YouTube app (https and YouTube hosts only).
+- **Changed**: the controls' hint now reads « ▼ options » instead of listing every row of the menu.
+- **Tests**: `QualityTest`, `PlaybackTrackerTest`, `EmbyClientTest`, `DecadesTest`, `TrailersTest`. `testDebugUnitTest` 410/410, `assembleDebug` and `lintDebug` OK.
+- **Checked on the Shield**:
+  - Overgeared S1E6 in Direct Play: « Qualité » set to 1,5 Mbit/s and OK. Log `quality method=Transcode ... from=DirectPlay newSession=true startInUrl=true`, then `report Progress QualityChange position=10700000000` and `quality restored`. Playback went on from 17:50 with no double seek. « Informations de lecture »: « Transcodage · débit trop élevé », « 1,5 Mbit/s · réseau local · choisi pour cette lecture », HLS, H.264 720 × 404. The stop report went out at 20:38 and the home offers « Reprendre à 20:38 »: not marked watched.
+  - Films: « Années » lists 2020 down to 1950 (no 1960s in this library). « Années 1990 » shows 41 titles instead of 606.
+  - Breakdown: « Bande-annonce » opened the YouTube trailer in the YouTube app.
+  - Logcat: 0 token line, no crash.
+- **Known issue**, fixed next (ADR 0084): after the switch to a transcode, the audio menu lists only the French track (the Japanese one being played is lost) and the external subtitles are named « Stream.ass ».
+- **Not verified**: a quality change from one transcode to another (the `DELETE` of the old transcode), a local trailer, the « Années » pill in Séries, « Réinitialiser » clearing the decade.
