@@ -529,4 +529,13 @@ class EmbyClient(
             return id
         }
     }
+
+    /**
+     * One title of a library drawn by the server among those the grid's filters keep
+     * (ADR 0077), or null when none does. Reads only: no user data is written.
+     */
+    suspend fun randomLibraryItem(userId: String, parentId: String, itemTypes: String, options: ItemsOptions): BaseItemDto? {
+        val url = randomPick(libraryQuery(userId, parentId, itemTypes, options)).build()
+        return call(get(url), QueryResult.serializer(BaseItemDto.serializer())).items.firstOrNull()
+    }
 }

@@ -406,6 +406,32 @@ class EmbyClientTest {
     }
 
     @Test
+    fun randomPickFollowsTheGridFilters() = runBlocking {
+        respond(200, """{"Items":[{"Id":"s1","Name":"Dark","Type":"Series"}],"TotalRecordCount":42}""")
+        val options = ItemsOptions(SortKey.Rating, descending = true, watch = WatchFilter.Unplayed, favorites = true, genre = "Drame")
+        val picked = client.withToken("t").randomLibraryItem("u1", "lib1", "Series", options)
+        assertEquals("s1", picked?.id)
+        assertEquals("Series", picked?.type)
+        val request = server.takeRequest()
+        assertEquals("GET", request.method)
+        val url = request.url
+        assertEquals("/emby/Users/u1/Items", url.encodedPath)
+        for ((name, value) in listOf(
+            "ParentId" to "lib1", "Recursive" to "true", "IncludeItemTypes" to "Series",
+            "Filters" to "IsUnplayed,IsFavorite", "Genres" to "Drame", "SortBy" to "Random", "Limit" to "1",
+        )) {
+            assertEquals(name, value, url.queryParameter(name))
+        }
+        assertNull(url.queryParameter("SortOrder"))
+    }
+
+    @Test
+    fun randomPickWithNoMatchIsNull() = runBlocking {
+        respond(200, """{"Items":[],"TotalRecordCount":0}""")
+        assertNull(client.withToken("t").randomLibraryItem("u1", "lib1", "Movie", ItemsOptions(favorites = true)))
+    }
+
+    @Test
     fun genresAreReadByName() = runBlocking {
         respond(200, """{"Items":[{"Id":"g1","Name":"Action"},{"Id":"g2","Name":"Drame"},{"Id":"g3","Name":"x|y"}],"TotalRecordCount":3}""")
         assertEquals(listOf("Action", "Drame"), client.withToken("t").genres("u1", "lib1", "Movie"))

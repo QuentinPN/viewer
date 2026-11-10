@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -55,6 +56,7 @@ import io.github.quentinpn.viewer.tv.emby.SortKey
 import io.github.quentinpn.viewer.tv.emby.WatchFilter
 import io.github.quentinpn.viewer.tv.emby.pageEnd
 import io.github.quentinpn.viewer.tv.emby.pageLimit
+import kotlinx.coroutines.launch
 
 private const val PAGE_SIZE = 60
 
@@ -108,6 +110,9 @@ class LibraryMemory(val library: Library, options: ItemsOptions = ItemsOptions()
     /** Letter picked last: the picker opens on it. */
     internal var letter: Char? = null
 
+    /** True after « Au hasard » opened a title: Back gives the focus to that pill (ADR 0077). */
+    internal var focusRandom = false
+
     /** New sort or filters: back to the first page. */
     internal fun change(next: ItemsOptions) {
         if (next == options) return
@@ -124,6 +129,7 @@ class LibraryMemory(val library: Library, options: ItemsOptions = ItemsOptions()
         jump = null
         letters = null
         letter = null
+        focusRandom = false
     }
 }
 
@@ -154,6 +160,11 @@ fun LibraryScreen(
     var pickingLetter by remember { mutableStateOf(false) }
     val genreButton = remember { FocusRequester() }
     val letterButton = remember { FocusRequester() }
+    val randomButton = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
+    // A random pick on its way: more presses are ignored (ADR 0077)
+    var drawing by remember { mutableStateOf(false) }
+    var notice by remember { mutableStateOf<String?>(null) }
 
     suspend fun loadPage() {
         val generation = memory.generation
@@ -179,8 +190,45 @@ fun LibraryScreen(
 
     fun change(next: ItemsOptions) {
         if (next == memory.options) return
+        notice = null
         memory.change(next)
         onOptionsChanged(next)
+    }
+
+    // One title drawn by the server with the grid's filters, opened as its poster would be (ADR 0077)
+    fun pickRandom() {
+        if (drawing) return
+        drawing = true
+        notice = null
+        val generation = memory.generation
+        val library = memory.library
+        scope.launch {
+            try {
+                val item = client.randomLibraryItem(userId, library.id, library.itemTypes, memory.options)
+                // The filters changed while the pick travelled: it belongs to the old ones
+                if (generation != memory.generation) return@launch
+                if (item == null) {
+                    notice = if (memory.options.narrowed) "Aucun titre avec ces filtres." else "Cette bibliothèque est vide."
+                    return@launch
+                }
+                memory.focusGrid = false
+                memory.focusRandom = true
+                if (item.type == "Series") onOpenSeries(item.id) else onOpenMovie(item.id)
+            } catch (e: EmbyException) {
+                if (e.error == EmbyError.SessionExpired) onSessionExpired()
+                notice = e.error.message
+            } finally {
+                drawing = false
+            }
+        }
+    }
+
+    // Back from a title drawn at random: the focus returns to « Au hasard », once the toolbar is placed
+    LaunchedEffect(Unit) {
+        if (!memory.focusRandom) return@LaunchedEffect
+        memory.focusRandom = false
+        withFrameNanos {}
+        runCatching { randomButton.requestFocus() }
     }
 
     // Pages follow the scroll; read again when a page lands, in case it did not fill the screen.
@@ -211,8 +259,16 @@ fun LibraryScreen(
                     val count = memory.total
                     Text(if (count > 1) "$count titres" else "$count titre", color = Palette.textSecondary, modifier = Modifier.padding(bottom = 4.dp))
                 }
+                notice?.let { Text(it, color = Palette.textSecondary, modifier = Modifier.padding(bottom = 4.dp)) }
             }
-            Toolbar(memory.options, memory.library.itemTypes, genreButton, letterButton, ::change, { pickingLetter = true }) { picking = true }
+            Toolbar(
+                memory.options,
+                memory.library.itemTypes,
+                ToolbarFocus(genreButton, letterButton, randomButton),
+                ::change,
+                onPickLetter = { pickingLetter = true },
+                onPickRandom = ::pickRandom,
+            ) { picking = true }
             val error = memory.error
             when {
                 memory.items.isEmpty() && error != null -> Retry(error) {
@@ -271,15 +327,18 @@ private fun watchLabel(watch: WatchFilter) = when (watch) {
     WatchFilter.InProgress -> "En cours"
 }
 
+/** Pills that take the focus back when a side list or a page they opened closes. */
+private class ToolbarFocus(val genre: FocusRequester, val letter: FocusRequester, val random: FocusRequester)
+
 /** Glass pills in the home's style (ADR 0067); each steps through its choices, white when it narrows the grid. */
 @Composable
 private fun Toolbar(
     options: ItemsOptions,
     itemTypes: String,
-    genreButton: FocusRequester,
-    letterButton: FocusRequester,
+    focus: ToolbarFocus,
     onChange: (ItemsOptions) -> Unit,
     onPickLetter: () -> Unit,
+    onPickRandom: () -> Unit,
     onPickGenre: () -> Unit,
 ) {
     Row(
@@ -293,13 +352,18 @@ private fun Toolbar(
         if (options.sort == SortKey.Name) {
             GlassButton(
                 onClick = onPickLetter,
-                modifier = Modifier.focusRequester(letterButton).semantics { contentDescription = "Aller à une lettre" },
+                modifier = Modifier.focusRequester(focus.letter).semantics { contentDescription = "Aller à une lettre" },
             ) { PillText("Lettre") }
         }
         Toggle(options.watch != WatchFilter.All, "Visionnage : ${watchLabel(options.watch)}") { onChange(options.nextWatch(itemTypes)) }
         Toggle(options.favorites, "Favoris") { onChange(options.copy(favorites = !options.favorites)) }
-        Toggle(options.genre != null, "Genre : ${options.genre ?: "Tous"}", Modifier.focusRequester(genreButton), onPickGenre)
+        Toggle(options.genre != null, "Genre : ${options.genre ?: "Tous"}", Modifier.focusRequester(focus.genre), onPickGenre)
         GlassButton(onClick = { onChange(ItemsOptions()) }) { PillText("Réinitialiser") }
+        // Opens one title drawn among those the filters keep (ADR 0077)
+        GlassButton(
+            onClick = onPickRandom,
+            modifier = Modifier.focusRequester(focus.random).semantics { contentDescription = "Ouvrir un titre au hasard" },
+        ) { PillText("Au hasard") }
     }
 }
 
