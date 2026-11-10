@@ -979,3 +979,18 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Added**: ADR 0072. The player's ▼ menu has a « Lecture » section: « Vitesse » 0,75× to 2× with pitch correction, shown as a badge when not 1×, back to 1× for each new item; « Mode nuit », an mpv `acompressor` filter, also in Réglages, kept between sessions, without effect when the sound goes to the amplifier untouched.
 - **Tests**: `CollectionsTest`, `CollectionRowTest`, `AudioModesTest`, `PlaybackSettingsTest`, `EmbyClientTest`. `testDebugUnitTest` 315/315, `assembleDebug` and `lintDebug` OK. Checked on the Shield: on Overgeared, Down enters the cast row on its first card; Back from Asami Seto's page shows her card in view and focused. In the player, « Vitesse » shows the « 1,5× » badge; « Mode nuit » applies at once (mpv's `af` read back holds `acompressor`), then turned off again. The Réglages row shows its title and note. Logcat: 0 token line, no crash.
 - **Not verified**: the collection row. The test account sees no collection (0 `BoxSet`) and the item detail carries no `Collections` field, so the row may never show if the server does not send that field. For night mode: how it sounds, its CPU cost, the passthrough detection and the fallback on the next item.
+
+### 2026-11-10 — Android TV: player clock, sleep timer and ratings
+
+- **Added**: ADR 0073. The player controls show the time and « Fin à HH:mm » (time left divided by the speed). The ▼ menu's « Lecture » section has « Minuterie »: Désactivée, 15 to 90 min, « Fin de l'épisode » or « Fin du film ». A badge shows « Arrêt dans N min » or « Arrêt : fin de l'épisode ». When it runs out, playback pauses through the usual path with « Minuterie écoulée : lecture en pause », and the next episode does not start. « Fin de… » stops at the start of the known credits, else at the end of the file. The timer is for this player session only, and paused time counts.
+- **Added**: ADR 0074. Film, series and episode pages show the age rating in an outlined badge, then genres, « ★ 7,4 » and the critics' score « 87 % critiques », each only when the server has it. These are base fields of the item, with no extra request.
+- **Tests**: `SleepTimerTest`, `EndTimeTest`, `RatingsTest`, `FactsTest`. `testDebugUnitTest` 331/331, `assembleDebug` and `lintDebug` OK.
+- **Checked on the Shield**:
+  - Overgeared shows « 2026 [BR-14] Fantasy, Animation, Action · ★ 7,7 »; Luther : Soleil déchu shows « 2023 2 h 10 [FR-12] Thriller, Crime, Action ★ 7,2 ». An episode with no rating shows none.
+  - In the player at 12:59, the clock read 17:29 with « Fin à 17:40 » for 10:40 left.
+  - « Minuterie » steps from 15 min to « Fin de l'épisode », with the matching badge.
+  - The stop report went out at 12:59. Logcat: 0 token line, no crash.
+- **Not verified**:
+  - the critics' score, since no film checked has one;
+  - the timer running out, both after minutes and at the credits. Reaching the credits would bring the episode near 90 % and could mark it watched on the test account.
+  - the up-next card held back.
