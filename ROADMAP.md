@@ -1058,3 +1058,15 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Tests**: `testDebugUnitTest` 422/422, `assembleDebug` and `lintDebug` OK.
 - **Checked on the Shield**: Overgeared S1E7, switch to a 1,5 Mbit/s transcode: `quality restored` 1.6 s after the request, then `subtitles added=3 in 811 ms` on another thread and the tracks chosen again (Japanese audio, 3 French subtitles in the menu). Progress reports go on, the stop report goes out on exit. Logcat: 0 token line, no crash.
 - **Not verified**: a real block of several minutes (this episode's subtitles were already extracted), `stop` aborting a `sub-add`, mpv destroyed on its own thread.
+
+### 2026-11-10 — Android TV: quality reasons, studios and playlists
+
+- **Fixed**: ADR 0086. The line under « Qualité » gives the server's transcode reasons (« Transcodage · débit trop élevé »), as « Informations de lecture » does, instead of « raison non précisée ».
+- **Added**: ADR 0087. On film and series pages, up to 3 studios become pills (« Studio » on a film, « Diffusion » on a series), under « Genres ». OK opens a grid of that library filtered with `Studios=<name>`, titled with the studio; Back returns to the pill. Names with `|` get no pill.
+- **Added**: ADR 0088. A « Listes de lecture » home row, last, shown only when the account has a video playlist; a playlist page lists its films and episodes in playlist order and opens their pages. Read-only, no « Lire » (no queue yet).
+- **Tests**: `QualityTest`, `StudiosTest`, `EmbyClientTest`, `PlaylistsTest`, `PlaylistScreenTest`. `testDebugUnitTest` 444/444, `assembleDebug` and `lintDebug` OK.
+- **Checked on the Shield**:
+  - Overgeared S1E7, switch to 1,5 Mbit/s: « Transcodage · débit trop élevé · ◀ ▶ puis OK pour changer ».
+  - Overgeared page: « Diffusion » shows J.C.STAFF, Tokyo MX, Pony Canyon. « J.C.STAFF » opens a « J.C.STAFF · 6 titres » grid of that studio's series on the real server; Back puts the focus on the pill again.
+  - Logcat: 0 token line, no crash.
+- **Not verified**: a film's « Studio » pills; studio names with accents, `&` or `+`; the playlist row and page (the account « claude » has no playlist; the real response shapes are not seen).
