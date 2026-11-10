@@ -374,7 +374,7 @@ private fun Toggle(on: Boolean, label: String, modifier: Modifier = Modifier, on
 }
 
 @Composable
-private fun PillText(text: String) {
+internal fun PillText(text: String) {
     Text(text, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
