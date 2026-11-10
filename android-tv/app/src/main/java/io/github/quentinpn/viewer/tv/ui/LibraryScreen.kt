@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -49,8 +50,11 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.ItemsOptions
+import io.github.quentinpn.viewer.tv.emby.LetterStart
 import io.github.quentinpn.viewer.tv.emby.SortKey
 import io.github.quentinpn.viewer.tv.emby.WatchFilter
+import io.github.quentinpn.viewer.tv.emby.pageEnd
+import io.github.quentinpn.viewer.tv.emby.pageLimit
 
 private const val PAGE_SIZE = 60
 
@@ -83,14 +87,26 @@ class LibraryMemory(val library: Library, options: ItemsOptions = ItemsOptions()
     internal var grid by mutableStateOf(LazyGridState())
         private set
 
-    /** Id of the card last opened. */
-    internal var opened: String? = null
+    /** Id of the card last opened, or reached by a letter jump: it takes the focus. */
+    internal var opened by mutableStateOf<String?>(null)
 
     /** False after a toolbar change, so focus stays on the toolbar while the grid reloads. */
     internal var focusGrid = true
 
     /** Genres of the library, read once when the genre list first opens. */
     internal var genres by mutableStateOf<List<String>?>(null)
+
+    /** Items to read before paging waits for the scroll again: the end of a jump's page (ADR 0070). */
+    internal var wanted by mutableIntStateOf(0)
+
+    /** A letter picked whose first title is not focused yet. */
+    internal var jump by mutableStateOf<Jump?>(null)
+
+    /** First title of each letter for the current query, read when the letter picker first opens. */
+    internal var letters by mutableStateOf<Map<Char, LetterStart>?>(null)
+
+    /** Letter picked last: the picker opens on it. */
+    internal var letter: Char? = null
 
     /** New sort or filters: back to the first page. */
     internal fun change(next: ItemsOptions) {
@@ -104,12 +120,22 @@ class LibraryMemory(val library: Library, options: ItemsOptions = ItemsOptions()
         opened = null
         grid = LazyGridState()
         focusGrid = false
+        wanted = 0
+        jump = null
+        letters = null
+        letter = null
     }
 }
 
-/** True when the grid is near the end of the loaded items and the server has more. */
-internal fun shouldLoadMore(lastVisible: Int, loaded: Int, total: Int, margin: Int = PAGE_MARGIN): Boolean =
-    total < 0 || (loaded < total && lastVisible >= loaded - margin)
+/** A letter jump; compared by identity, so picking the same letter twice jumps twice. */
+internal class Jump(val start: LetterStart)
+
+/**
+ * True when the grid is near the end of the loaded items and the server has more, or when
+ * a letter jump still [wanted] the page holding its first title.
+ */
+internal fun shouldLoadMore(lastVisible: Int, loaded: Int, total: Int, margin: Int = PAGE_MARGIN, wanted: Int = 0): Boolean =
+    total < 0 || (loaded < total && (lastVisible >= loaded - margin || loaded < wanted))
 
 /** Every film or series of a library in a poster grid paged as it scrolls, with sort and filters. */
 @Composable
@@ -125,13 +151,17 @@ fun LibraryScreen(
 ) {
     var attempt by remember { mutableIntStateOf(0) }
     var picking by remember { mutableStateOf(false) }
+    var pickingLetter by remember { mutableStateOf(false) }
     val genreButton = remember { FocusRequester() }
+    val letterButton = remember { FocusRequester() }
 
     suspend fun loadPage() {
         val generation = memory.generation
         try {
             val library = memory.library
-            val page = client.libraryItems(userId, library.id, library.itemTypes, memory.fetched, PAGE_SIZE, memory.options)
+            // After a jump, every page up to the letter's in one request: the grid stays one list
+            val limit = pageLimit(memory.fetched, memory.wanted, PAGE_SIZE)
+            val page = client.libraryItems(userId, library.id, library.itemTypes, memory.fetched, limit, memory.options)
             // A sort or filter change while this page travelled: it belongs to the old query
             if (generation != memory.generation) return
             memory.fetched += page.items.size
@@ -156,10 +186,17 @@ fun LibraryScreen(
     // Pages follow the scroll; read again when a page lands, in case it did not fill the screen.
     // A new query restarts the collector, which cancels a page still on its way.
     LaunchedEffect(attempt, memory.generation) {
-        snapshotFlow { (memory.grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) to memory.items.size }
-            .collect { (last, _) ->
-                if (memory.error == null && shouldLoadMore(last, memory.fetched, memory.total)) loadPage()
+        snapshotFlow { Triple(memory.grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1, memory.items.size, memory.wanted) }
+            .collect { (last, _, wanted) ->
+                if (memory.error == null && shouldLoadMore(last, memory.fetched, memory.total, wanted = wanted)) loadPage()
             }
+    }
+
+    // The page of the letter is read by the collector above, the only one that loads
+    fun jumpTo(start: LetterStart) {
+        memory.wanted = maxOf(memory.wanted, pageEnd(start.position, PAGE_SIZE))
+        memory.focusGrid = true
+        memory.jump = Jump(start)
     }
 
     Box(Modifier.fillMaxSize().background(Palette.background)) {
@@ -175,7 +212,7 @@ fun LibraryScreen(
                     Text(if (count > 1) "$count titres" else "$count titre", color = Palette.textSecondary, modifier = Modifier.padding(bottom = 4.dp))
                 }
             }
-            Toolbar(memory.options, memory.library.itemTypes, genreButton, ::change) { picking = true }
+            Toolbar(memory.options, memory.library.itemTypes, genreButton, letterButton, ::change, { pickingLetter = true }) { picking = true }
             val error = memory.error
             when {
                 memory.items.isEmpty() && error != null -> Retry(error) {
@@ -202,6 +239,13 @@ fun LibraryScreen(
                 if (genre != null) change(memory.options.copy(genre = genre.value))
                 // Back to the genre button once the list closes
                 runCatching { genreButton.requestFocus() }
+            }
+        }
+        if (pickingLetter) {
+            LetterPicker(client, userId, memory, Modifier.align(Alignment.CenterEnd), onSessionExpired) { start ->
+                pickingLetter = false
+                // A letter: the grid takes the focus on its first title; Back: the letter button
+                if (start != null) jumpTo(start) else runCatching { letterButton.requestFocus() }
             }
         }
     }
@@ -233,7 +277,9 @@ private fun Toolbar(
     options: ItemsOptions,
     itemTypes: String,
     genreButton: FocusRequester,
+    letterButton: FocusRequester,
     onChange: (ItemsOptions) -> Unit,
+    onPickLetter: () -> Unit,
     onPickGenre: () -> Unit,
 ) {
     Row(
@@ -243,6 +289,13 @@ private fun Toolbar(
     ) {
         GlassButton(onClick = { onChange(options.nextSort()) }) { PillText("Tri : ${sortLabel(options.sort)}") }
         GlassButton(onClick = { onChange(options.copy(descending = !options.descending)) }) { PillText(directionLabel(options)) }
+        // Jumping by letter only follows a sort by title (ADR 0070)
+        if (options.sort == SortKey.Name) {
+            GlassButton(
+                onClick = onPickLetter,
+                modifier = Modifier.focusRequester(letterButton).semantics { contentDescription = "Aller à une lettre" },
+            ) { PillText("Lettre") }
+        }
         Toggle(options.watch != WatchFilter.All, "Visionnage : ${watchLabel(options.watch)}") { onChange(options.nextWatch(itemTypes)) }
         Toggle(options.favorites, "Favoris") { onChange(options.copy(favorites = !options.favorites)) }
         Toggle(options.genre != null, "Genre : ${options.genre ?: "Tous"}", Modifier.focusRequester(genreButton), onPickGenre)
@@ -342,6 +395,26 @@ private fun Grid(
         if (!memory.focusGrid) return@LaunchedEffect
         withFrameNanos {}
         runCatching { focus.requestFocus() }
+    }
+    // A letter jump (ADR 0070): once its page is in, show its first title and focus it, with
+    // no animation. Found by id; if the list moved since the index was read, by position.
+    LaunchedEffect(memory.jump, memory.items.size, memory.total) {
+        val jump = memory.jump ?: return@LaunchedEffect
+        var index = memory.items.indexOfFirst { it.id == jump.start.id }
+        if (index < 0) {
+            val waiting = memory.fetched < memory.wanted && memory.fetched < memory.total && memory.error == null
+            if (waiting) return@LaunchedEffect
+            index = jump.start.position.coerceAtMost(memory.items.lastIndex)
+        }
+        memory.opened = memory.items[index].id
+        memory.grid.scrollToItem(index)
+        // The card takes the focus requester on the next composition
+        repeat(2) {
+            withFrameNanos {}
+            runCatching { focus.requestFocus() }
+        }
+        // Last: clearing the key restarts this effect, which would cancel the steps above
+        memory.jump = null
     }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(150.dp),

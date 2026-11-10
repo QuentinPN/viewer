@@ -212,21 +212,40 @@ class EmbyClient(
         limit: Int,
         options: ItemsOptions = ItemsOptions(),
     ): QueryResult<BaseItemDto> {
-        val builder = server.api("/Users/${segment(userId)}/Items").newBuilder()
-            .addQueryParameter("ParentId", segment(parentId))
-            .addQueryParameter("Recursive", "true")
-            .addQueryParameter("IncludeItemTypes", itemTypes)
-            .addQueryParameter("SortBy", options.sort.sortBy)
-            .addQueryParameter("SortOrder", if (options.descending) "Descending" else "Ascending")
+        val builder = libraryQuery(userId, parentId, itemTypes, options)
             .addQueryParameter("StartIndex", startIndex.toString())
             .addQueryParameter("Limit", limit.toString())
             .addQueryParameter("Fields", "ProductionYear")
             .addQueryParameter("EnableUserData", "true")
             .addQueryParameter("ImageTypeLimit", "1")
             .addQueryParameter("EnableImageTypes", "Primary")
+        return call(get(builder.build()), QueryResult.serializer(BaseItemDto.serializer()))
+    }
+
+    /**
+     * Every title of the grid's query, in its order and filters, with `SortName` only: the
+     * letter index of the jump (ADR 0070). No images, no user data, no paging.
+     */
+    suspend fun sortNames(userId: String, parentId: String, itemTypes: String, options: ItemsOptions): List<SortNameDto> {
+        val url = libraryQuery(userId, parentId, itemTypes, options)
+            .addQueryParameter("Fields", "SortName")
+            .addQueryParameter("EnableImages", "false")
+            .addQueryParameter("EnableUserData", "false")
+            .build()
+        return call(get(url), QueryResult.serializer(SortNameDto.serializer())).items
+    }
+
+    /** The library grid's items query: parent, types, sort and filters, shared by its pages and its letter index. */
+    private fun libraryQuery(userId: String, parentId: String, itemTypes: String, options: ItemsOptions): HttpUrl.Builder {
+        val builder = server.api("/Users/${segment(userId)}/Items").newBuilder()
+            .addQueryParameter("ParentId", segment(parentId))
+            .addQueryParameter("Recursive", "true")
+            .addQueryParameter("IncludeItemTypes", itemTypes)
+            .addQueryParameter("SortBy", options.sort.sortBy)
+            .addQueryParameter("SortOrder", if (options.descending) "Descending" else "Ascending")
         options.filters()?.let { builder.addQueryParameter("Filters", it) }
         options.genre?.takeIf(::isUsableGenre)?.let { builder.addQueryParameter("Genres", it) }
-        return call(get(builder.build()), QueryResult.serializer(BaseItemDto.serializer()))
+        return builder
     }
 
     /**

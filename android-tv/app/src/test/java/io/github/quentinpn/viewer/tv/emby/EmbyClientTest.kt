@@ -313,6 +313,30 @@ class EmbyClientTest {
     }
 
     @Test
+    fun letterIndexFollowsTheGridQuery() = runBlocking {
+        respond(200, """{"Items":[{"Id":"m1","Name":"Le Mépris","SortName":"mépris","ImageTags":{}},{"Id":"m2","Name":"Akira"}],"TotalRecordCount":2}""")
+        val options = ItemsOptions(SortKey.Name, descending = true, watch = WatchFilter.Unplayed, favorites = true, genre = "Drame")
+        val names = client.withToken("secret-token").sortNames("u1", "lib1", "Movie", options)
+        assertEquals(listOf("mépris", "Akira"), names.map { it.key })
+        val request = server.takeRequest()
+        val url = request.url
+        assertEquals("/emby/Users/u1/Items", url.encodedPath)
+        for ((name, value) in listOf(
+            "ParentId" to "lib1", "Recursive" to "true", "IncludeItemTypes" to "Movie",
+            "SortBy" to "SortName", "SortOrder" to "Descending", "Filters" to "IsUnplayed,IsFavorite", "Genres" to "Drame",
+            "Fields" to "SortName", "EnableImages" to "false", "EnableUserData" to "false",
+        )) {
+            assertEquals(name, value, url.queryParameter(name))
+        }
+        // The whole list in one answer: no paging
+        assertNull(url.queryParameter("StartIndex"))
+        assertNull(url.queryParameter("Limit"))
+        // The token travels in the header only
+        assertFalse("secret-token" in url.toString())
+        assertTrue("Token=\"secret-token\"" in request.headers["X-Emby-Authorization"]!!)
+    }
+
+    @Test
     fun genresAreReadByName() = runBlocking {
         respond(200, """{"Items":[{"Id":"g1","Name":"Action"},{"Id":"g2","Name":"Drame"},{"Id":"g3","Name":"x|y"}],"TotalRecordCount":3}""")
         assertEquals(listOf("Action", "Drame"), client.withToken("t").genres("u1", "lib1", "Movie"))
