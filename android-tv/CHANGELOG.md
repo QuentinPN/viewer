@@ -2,6 +2,10 @@
 
 Chaque version livrée sur la Shield augmente `versionName` et `versionCode` dans `app/build.gradle.kts` et ajoute sa section ici.
 
+## 1.0.1 — 2026-11-11
+
+- Correctif : avec une télécommande qui passe par la TV (HDMI-CEC, comme la LG Magic Remote), l'appui long qui ouvre le menu d'une carte ne lance plus la lecture quand on descend ensuite dans le menu.
+
 ## 1.0.0 — 2026-11-11
 
 - Écran de pré-connexion « L'étagère » : une vignette par serveur et compte enregistrés, reconnexion sans mot de passe tant que la session est valide, « Gérer » pour oublier un serveur, connexion manuelle (ADR 0104).

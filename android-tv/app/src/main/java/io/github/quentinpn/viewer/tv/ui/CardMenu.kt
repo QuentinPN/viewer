@@ -41,6 +41,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -141,6 +144,32 @@ internal fun menuActions(item: BaseItemDto, context: MenuContext = MenuContext()
 internal fun nextEpisodePlay(episodes: List<BaseItemDto>): MenuAction.Play? =
     episodes.firstOrNull { it.type == "Episode" && it.id.isNotEmpty() }?.let { MenuAction.Play(it.id, resumeTicks(it)) }
 
+/**
+ * Swallows what is left of the long press that opened the menu. An HDMI-CEC remote (LG Magic
+ * Remote through the TV) sends the held OK again as fresh presses and its release late, with
+ * the next key: they landed on the first row, « Reprendre », and the press of ▼ started playback.
+ * OK is ignored until that release, or until another key shows the user moved on.
+ */
+internal class OpeningPressGuard {
+    private var armed = false
+
+    /** Whether an [ok] key event, [down] or up, belongs to the opening press and must be consumed. */
+    fun consume(ok: Boolean, down: Boolean): Boolean {
+        if (armed) return false
+        if (!ok) {
+            armed = true
+            return false
+        }
+        if (!down) armed = true
+        return true
+    }
+}
+
+/** OK on a TV remote, a keyboard or a game pad. */
+internal fun isOkKey(keyCode: Int): Boolean = keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
+    keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER ||
+    keyCode == android.view.KeyEvent.KEYCODE_BUTTON_A
+
 /** The panel's pages; Back goes to [previous], and closes the menu from [Actions]. */
 internal enum class MenuPage {
     Actions,
@@ -240,6 +269,7 @@ internal fun CardMenu(
     var message by remember { mutableStateOf<String?>(null) }
     var playlists by remember { mutableStateOf<Load<List<BaseItemDto>>>(Load.Loading) }
     var name by remember { mutableStateOf(defaultPlaylistName(item)) }
+    val opening = remember { OpeningPressGuard() }
 
     fun go(to: MenuPage, back: Boolean = false) {
         // The focused row leaves with its page: the panel holds the focus until the new page's
@@ -281,7 +311,9 @@ internal fun CardMenu(
         properties = PopupProperties(focusable = true),
     ) {
         Column(
-            Modifier.width(296.dp).background(PanelColor, RoundedCornerShape(16.dp))
+            Modifier.onPreviewKeyEvent {
+                opening.consume(isOkKey(it.nativeKeyEvent.keyCode), it.type == KeyEventType.KeyDown)
+            }.width(296.dp).background(PanelColor, RoundedCornerShape(16.dp))
                 .focusRequester(panel).focusable().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
