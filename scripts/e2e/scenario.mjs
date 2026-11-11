@@ -116,17 +116,43 @@ export async function waitForDiagnostics(page, accept, timeoutMs = 20000) {
 export const waitForPosition = (page, seconds, timeoutMs) =>
   waitForDiagnostics(page, (d) => (d.timePos ?? 0) > seconds, timeoutMs);
 
-/** Fills the sign-in form; `url` overrides the prefilled server address. */
+/**
+ * From the pre-connection shelf (ADR 0103), opens « Connexion manuelle »; does
+ * nothing when a sign-in card (manual or password) is already open.
+ */
+export async function openManualForm(page) {
+  if (
+    (await page.locator("#server-url").count()) ||
+    (await page.locator("#password").count())
+  )
+    return;
+  await page
+    .getByRole("button", { name: "Se connecter manuellement", exact: true })
+    .click();
+  await page.locator("#server-url").waitFor({ timeout: 10000 });
+}
+
+/**
+ * Signs in with the manual form (address, user, password on one card), or
+ * with the password card when the server asks the password again (`url` is
+ * then ignored). `url` overrides the prefilled server address.
+ */
 export async function signIn(page, { url, user }, password) {
-  if (await page.locator("#server-url").count()) {
-    if (url) await page.locator("#server-url").fill(url);
-    await page.getByRole("button", { name: "Continuer" }).click();
-    await page.locator("#username").waitFor({ timeout: 15000 });
-  }
+  await openManualForm(page);
+  if (url && (await page.locator("#server-url").count()))
+    await page.locator("#server-url").fill(url);
   await page.locator("#username").fill(user);
   await page.locator("#password").fill(password);
-  await page.getByRole("button", { name: "Se connecter" }).click();
+  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
 }
+
+/** Tile of a saved server on the shelf, by its server name (ADR 0103). */
+export const shelfTile = (page, name) =>
+  page.getByRole("button", {
+    name: new RegExp(
+      `^Se connecter à ${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\(`,
+    ),
+  });
 
 /** Moves and resizes the real window without activating it (SetWindowPos). */
 export function resizeWindow(pid, width, height) {

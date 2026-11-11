@@ -18,12 +18,12 @@ import type {
   PlaybackStopped,
   Playlist,
   PlaylistCreated,
-  SavedServer,
   SearchResults,
   Season,
   Segment,
   ServerSummary,
   SessionStatus,
+  ShelfServer,
   SignedInUser,
   SortNameEntry,
   WatchItem,
@@ -41,7 +41,11 @@ export const embyApi = {
   restore: () => invoke<SessionStatus>("emby_restore"),
   /** Sets the session aside without revoking it, to come back to it later. */
   changeServer: () => invoke<void>("emby_change_server"),
-  savedSessions: () => invoke<SavedServer[]>("emby_saved_sessions"),
+  /** Tiles of the pre-connection shelf (ADR 0103). */
+  shelf: () => invoke<ShelfServer[]>("emby_shelf"),
+  /** Forgets a server on this device; nothing is deleted on the server. */
+  forgetServer: (serverId: string, userId: string) =>
+    invoke<void>("emby_forget_server", { serverId, userId }),
   resumeSaved: (serverId: string, userId: string) =>
     invoke<SessionStatus>("emby_resume_saved", { serverId, userId }),
   signOut: () => invoke<void>("emby_sign_out"),

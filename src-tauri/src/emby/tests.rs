@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use super::EmbyError;
 use super::client::AccessToken;
 use super::credentials::{CredentialStore, MemoryCredentialStore, account};
-use super::models::{SessionStatus, SignedInUser};
+use super::models::{SessionStatus, ShelfAccess, SignedInUser};
 use super::session::{EmbyService, SessionFile};
 
 const SERVER_ID: &str = "d969e3d9465b49ec8f73a5f1eab2e86f";
@@ -4899,6 +4899,204 @@ fn sign_out_keeps_set_aside_sessions_and_clears_the_hint() {
     assert_eq!(saved[0].id, SERVER_ID);
     assert_eq!(stored_token(&fx).unwrap().expose(), TOKEN);
     assert!(session_file(&fx).reauth.is_none());
+}
+
+/// `(server id, access)` of each shelf tile, in order.
+fn shelf_of(fx: &Fixture) -> Vec<(String, ShelfAccess)> {
+    fx.service
+        .shelf()
+        .into_iter()
+        .map(|t| (t.server.id, t.access))
+        .collect()
+}
+
+/// A second server with its own id and user, accepting the same password.
+fn second_server() -> (FakeEmby, &'static str) {
+    let other_user = "0b1a2c3d4e5f60718293a4b5c6d7e8f9";
+    let server = FakeEmby::start(Box::new(move |r| {
+        let body = match r.path.as_str() {
+            "/emby/System/Info/Public" => public_info().replace(SERVER_ID, "secondsrv"),
+            "/emby/Users/AuthenticateByName" => auth_result()
+                .replace(SERVER_ID, "secondsrv")
+                .replace(USER_ID, other_user),
+            _ => String::new(),
+        };
+        (if body.is_empty() { 204 } else { 200 }, body)
+    }));
+    (server, other_user)
+}
+
+#[test]
+fn shelf_lists_set_aside_signed_out_and_rejected_sessions_newest_first() {
+    let first = FakeEmby::start(emby_like(204));
+    let fx = fixture();
+    run(fx.service.sign_in(&first.url, "testeur", PASSWORD)).unwrap();
+    assert!(fx.service.shelf().is_empty(), "the open session is no tile");
+    fx.service.change_server().unwrap();
+    let (second, other_user) = second_server();
+    run(fx.service.sign_in(&second.url, "testeur", PASSWORD)).unwrap();
+    run(fx.service.sign_out()).unwrap();
+
+    // Signed out on purpose: the tile stays, without token and without pill.
+    assert_eq!(
+        shelf_of(&fx),
+        vec![
+            ("secondsrv".to_owned(), ShelfAccess::SignedOut),
+            (SERVER_ID.to_owned(), ShelfAccess::Session),
+        ]
+    );
+    assert!(
+        fx.store
+            .load(&account("secondsrv", other_user))
+            .unwrap()
+            .is_none()
+    );
+    let fx = reopen(fx.store, fx.path);
+    assert!(matches!(
+        run(fx.service.restore()).unwrap(),
+        SessionStatus::SignedOut
+    ));
+    let json = serde_json::to_string(&fx.service.shelf()).unwrap();
+    assert!(!json.contains(TOKEN), "{json}");
+    assert!(json.contains("\"access\":\"signedOut\""), "{json}");
+
+    // The first server rejects its token: after "Changer de serveur" its tile
+    // says "Mot de passe requis", even after a restart.
+    fx.store
+        .save(
+            &account(SERVER_ID, USER_ID),
+            &AccessToken::new("revoked".into()),
+        )
+        .unwrap();
+    let status = run(fx.service.resume_saved(SERVER_ID, USER_ID)).unwrap();
+    assert_eq!(reauth_kind(status), "sessionExpired");
+    assert_eq!(
+        shelf_of(&fx)[0],
+        (SERVER_ID.to_owned(), ShelfAccess::Rejected)
+    );
+    fx.service.change_server().unwrap();
+    let fx = reopen(fx.store, fx.path);
+    assert_eq!(
+        shelf_of(&fx),
+        vec![
+            (SERVER_ID.to_owned(), ShelfAccess::Rejected),
+            ("secondsrv".to_owned(), ShelfAccess::SignedOut),
+        ]
+    );
+    // Signing in again clears the mark.
+    run(fx.service.sign_in(&first.url, "testeur", PASSWORD)).unwrap();
+    fx.service.change_server().unwrap();
+    assert_eq!(
+        shelf_of(&fx)[0],
+        (SERVER_ID.to_owned(), ShelfAccess::Session)
+    );
+    assert_eq!(shelf_of(&fx).len(), 2, "one tile per server and user");
+}
+
+#[test]
+fn forget_server_removes_the_record_and_token_then_revokes_best_effort() {
+    let server = FakeEmby::start(emby_like(204));
+    let fx = fixture();
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    fx.service.change_server().unwrap();
+    let before = server.requests().len();
+
+    let err = fx.service.forget_server("unknown", USER_ID).err();
+    assert!(matches!(err, Some(EmbyError::NotFound)), "{err:?}");
+    let revocation = fx.service.forget_server(SERVER_ID, USER_ID).unwrap();
+    // Removed before any request: an unreachable server cannot hold it back.
+    assert_eq!(server.requests().len(), before);
+    assert!(stored_token(&fx).is_none());
+    assert!(fx.service.shelf().is_empty());
+    let file = std::fs::read_to_string(&fx.path).unwrap();
+    assert!(
+        !file.contains(&server.url) && !file.contains("testeur"),
+        "{file}"
+    );
+    assert!(fx.service.last_server_url().is_none());
+
+    run(revocation.expect("a token to revoke").send());
+    let reqs = server.requests();
+    let sent: Vec<_> = reqs[before..].iter().map(|r| r.path.as_str()).collect();
+    assert_eq!(sent, ["/emby/System/Info/Public", "/emby/Sessions/Logout"]);
+    assert!(
+        reqs[before]
+            .auth
+            .as_deref()
+            .is_none_or(|a| !a.contains(TOKEN))
+    );
+    assert!(
+        reqs[before + 1]
+            .auth
+            .as_deref()
+            .unwrap()
+            .contains(&format!("Token=\"{TOKEN}\""))
+    );
+    // Nothing left to forget.
+    assert!(matches!(
+        fx.service.forget_server(SERVER_ID, USER_ID),
+        Err(EmbyError::NotFound)
+    ));
+}
+
+#[test]
+fn forget_server_never_sends_the_token_to_another_server() {
+    let first = FakeEmby::start(emby_like(204));
+    let fx = fixture();
+    run(fx.service.sign_in(&first.url, "testeur", PASSWORD)).unwrap();
+    // Another Emby now answers at the saved address.
+    let (other, _) = second_server();
+    let fx = retarget(fx, &other.url);
+    fx.service.change_server().unwrap();
+    let revocation = fx.service.forget_server(SERVER_ID, USER_ID).unwrap();
+    run(revocation.unwrap().send());
+    let reqs = other.requests();
+    assert_eq!(reqs.len(), 1, "{reqs:?}");
+    assert!(
+        reqs.iter()
+            .all(|r| r.auth.as_deref().is_none_or(|a| !a.contains(TOKEN)))
+    );
+    assert!(stored_token(&fx).is_none());
+
+    // Unreachable server: forgotten all the same, the revocation just fails.
+    let fx = fixture();
+    run(fx.service.sign_in(&first.url, "testeur", PASSWORD)).unwrap();
+    let fx = short_timeouts(retarget(fx, "http://127.0.0.1:9"));
+    fx.service.change_server().unwrap();
+    let revocation = fx.service.forget_server(SERVER_ID, USER_ID).unwrap();
+    assert!(fx.service.shelf().is_empty());
+    run(revocation.unwrap().send());
+    assert!(stored_token(&fx).is_none());
+}
+
+#[test]
+fn forget_server_without_token_only_removes_the_record() {
+    let server = FakeEmby::start(emby_like(204));
+    let fx = fixture();
+    run(fx.service.sign_in(&server.url, "testeur", PASSWORD)).unwrap();
+    run(fx.service.sign_out()).unwrap();
+    let (second, _) = second_server();
+    run(fx.service.sign_in(&second.url, "testeur", PASSWORD)).unwrap();
+    fx.service.change_server().unwrap();
+    assert_eq!(fx.service.shelf().len(), 2);
+
+    let before = server.requests().len();
+    assert!(
+        fx.service
+            .forget_server(SERVER_ID, USER_ID)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(server.requests().len(), before);
+    assert_eq!(
+        shelf_of(&fx),
+        vec![("secondsrv".to_owned(), ShelfAccess::Session)]
+    );
+    // The address of the server still on the shelf stays prefilled.
+    assert_eq!(
+        fx.service.last_server_url().as_deref(),
+        Some(second.url.as_str())
+    );
 }
 
 /// Home hero (ADR 0015) on the real server, read only: at most five titles, one per

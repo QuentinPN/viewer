@@ -54,6 +54,21 @@ export interface SavedServer {
   userName: string;
 }
 
+/** What a tile of the pre-connection shelf does (ADR 0103). */
+export type ShelfAccess =
+  /** A token is saved: the tile validates it, no password. */
+  | "session"
+  /** The server already rejected this session: « Mot de passe requis ». */
+  | "rejected"
+  /** Signed out on purpose: the password is asked. */
+  | "signedOut";
+
+/** One tile of the pre-connection shelf. Never carries the token. */
+export interface ShelfServer {
+  server: SavedServer;
+  access: ShelfAccess;
+}
+
 /** Outcome of `emby_restore`: only a rejection asks for the password again. */
 export type SessionStatus =
   | { state: "signedOut" }

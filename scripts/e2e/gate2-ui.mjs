@@ -47,7 +47,7 @@ try {
   await shot(page, "wrong-password");
 
   await page.locator("#password").fill(password);
-  await page.getByRole("button", { name: "Se connecter" }).click();
+  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await libraryNav(page).waitFor({ timeout: 20000 });
   let libraries = libraryNav(page).locator("ul.libraries button");
   await libraries.first().waitFor({ timeout: 20000 });
