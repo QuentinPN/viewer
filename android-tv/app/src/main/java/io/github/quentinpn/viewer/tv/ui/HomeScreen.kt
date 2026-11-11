@@ -156,6 +156,8 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onSessionExpired: () -> Unit,
     onSignOut: () -> Unit,
+    /** « Changer de serveur » of the account menu (ADR 0104). */
+    onSwitchServer: () -> Unit,
     /** Rows hidden in Réglages › Accueil (ADR 0094), read again each time the home is shown. */
     rowStore: HomeRowStore,
     memory: HomeMemory = remember { HomeMemory() },
@@ -265,6 +267,7 @@ fun HomeScreen(
                     onOpenLibrary(library)
                 },
                 onSignOut = onSignOut,
+                onSwitchServer = onSwitchServer,
             )
             notice?.let { Text(it, color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp)) }
         }
