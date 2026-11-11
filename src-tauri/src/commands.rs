@@ -13,7 +13,7 @@ use crate::emby::chapters::Chapter;
 use crate::emby::models::{
     EpisodePage, HeroItem, ItemDetail, ItemPage, ItemsOptions, Library, MediaItem, PlaybackStart,
     PlaybackStopped, Playlist, PlaylistCreated, SavedServer, SearchResults, Season, ServerSummary,
-    SessionStatus, SignedInUser, WatchItem,
+    SessionStatus, SignedInUser, SortNameEntry, WatchItem,
 };
 use crate::emby::quality::{PlaybackQuality, QualityCaps};
 use crate::emby::reporting::{ActivePlayback, PLAYBACK_STOPPED_EVENT};
@@ -208,6 +208,37 @@ pub async fn emby_items(
         &options.unwrap_or_default(),
     )
     .await
+}
+
+/// Titles of a library grid in order with their sort name (letter rail, ADR 0101).
+#[tauri::command]
+pub async fn emby_sort_names(
+    emby: State<'_, EmbyService>,
+    library_id: String,
+    options: Option<ItemsOptions>,
+) -> Result<Vec<SortNameEntry>, EmbyError> {
+    emby.sort_names(&library_id, &options.unwrap_or_default())
+        .await
+}
+
+/// One random title among those the grid shows (ADR 0101).
+#[tauri::command]
+pub async fn emby_random_item(
+    emby: State<'_, EmbyService>,
+    library_id: String,
+    options: Option<ItemsOptions>,
+) -> Result<Option<MediaItem>, EmbyError> {
+    emby.random_item(&library_id, &options.unwrap_or_default())
+        .await
+}
+
+/// Production years of a library, newest first (decade filter, ADR 0101).
+#[tauri::command]
+pub async fn emby_production_years(
+    emby: State<'_, EmbyService>,
+    library_id: String,
+) -> Result<Vec<i32>, EmbyError> {
+    emby.production_years(&library_id).await
 }
 
 /// Artwork cache figures (ADR 0019), `None` when the app has no cache directory.

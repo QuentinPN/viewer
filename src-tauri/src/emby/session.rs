@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 use super::EmbyError;
 use super::artwork_cache::{ArtworkCache, ArtworkCacheCleared, ArtworkCacheStats};
 use super::chapters::{self, Chapter};
-use super::client::{AccessToken, DeviceIdentity, EmbyClient, EpisodesQuery, ItemsQuery};
+use super::client::{
+    AccessToken, DeviceIdentity, EmbyClient, EpisodesQuery, ItemsQuery, ItemsShape,
+};
 use super::credentials::{self, CredentialStore};
 use super::images::{self, ImageRequest, ImageType};
 use super::models::{
@@ -19,8 +21,8 @@ use super::models::{
     HeroEpisode, HeroItem, HeroReason, ImageRef, ItemDetail, ItemPage, ItemsOptions, Library,
     LibraryKind, MediaInfo, MediaItem, MediaSourceDto, MediaStreamDto, PlayMethod, PlaybackStopped,
     PlaybackTitle, Playlist, PlaylistCreated, ResumePoint, SavedServer, SearchResults, Season,
-    ServerSummary, SessionStatus, SignedInUser, StreamInfo, UserItemData, VideoInfo, WatchItem,
-    WatchKind, is_usable_genre,
+    ServerSummary, SessionStatus, SignedInUser, SortNameEntry, StreamInfo, UserItemData, VideoInfo,
+    WatchItem, WatchKind, is_usable_decade, is_usable_genre,
 };
 use super::playback::{self, PlaybackPlan};
 use super::quality::{BITRATE_CHOICES, PlaybackQuality, QualityCaps, QualityStore, StreamingLimit};
@@ -472,13 +474,7 @@ impl EmbyService {
         limit: u32,
         options: &ItemsOptions,
     ) -> Result<ItemPage, EmbyError> {
-        if options
-            .genre
-            .as_deref()
-            .is_some_and(|g| !is_usable_genre(g))
-        {
-            return Err(EmbyError::InvalidResponse("genre invalide".into()));
-        }
+        check_options(options)?;
         let kind = self.known_library(library_id).await?;
         let (client, user_id) = self.session()?;
         let scope = self.scope();
@@ -488,6 +484,7 @@ impl EmbyService {
             start_index,
             limit: limit.clamp(1, MAX_PAGE),
             options,
+            shape: ItemsShape::Page,
         };
         let page = self.expire_on_401(&client, client.items(&user_id, &query).await)?;
         let returned = u32::try_from(page.items.len()).unwrap_or(u32::MAX);
@@ -501,6 +498,84 @@ impl EmbyService {
             start_index,
             total: page.total_record_count,
         })
+    }
+
+    /// Every title of a library grid in its order, with its sort name: the
+    /// letter rail jumps from it (ADR 0101). Unlike pages, nothing is dropped, so
+    /// positions match the server's.
+    pub async fn sort_names(
+        &self,
+        library_id: &str,
+        options: &ItemsOptions,
+    ) -> Result<Vec<SortNameEntry>, EmbyError> {
+        check_options(options)?;
+        let kind = self.known_library(library_id).await?;
+        let (client, user_id) = self.session()?;
+        let query = ItemsQuery {
+            parent_id: library_id,
+            item_types: kind.item_types(),
+            start_index: 0,
+            limit: 0,
+            options,
+            shape: ItemsShape::SortNames,
+        };
+        let page = self.expire_on_401(&client, client.items(&user_id, &query).await)?;
+        Ok(page
+            .items
+            .into_iter()
+            .map(|d| SortNameEntry {
+                name: d
+                    .sort_name
+                    .filter(|n| !n.trim().is_empty())
+                    .unwrap_or(d.name),
+                id: d.id,
+            })
+            .collect())
+    }
+
+    /// One title drawn by the server among those the grid shows (ADR 0101),
+    /// `None` when none matches.
+    pub async fn random_item(
+        &self,
+        library_id: &str,
+        options: &ItemsOptions,
+    ) -> Result<Option<MediaItem>, EmbyError> {
+        check_options(options)?;
+        let kind = self.known_library(library_id).await?;
+        let (client, user_id) = self.session()?;
+        let scope = self.scope();
+        let query = ItemsQuery {
+            parent_id: library_id,
+            item_types: kind.item_types(),
+            start_index: 0,
+            limit: 1,
+            options,
+            shape: ItemsShape::Random,
+        };
+        let page = self.expire_on_401(&client, client.items(&user_id, &query).await)?;
+        Ok(page.items.into_iter().find_map(|d| media_item(d, &scope)))
+    }
+
+    /// Production years of a library, newest first, without repeats (decade
+    /// filter, ADR 0101).
+    pub async fn production_years(&self, library_id: &str) -> Result<Vec<i32>, EmbyError> {
+        let kind = self.known_library(library_id).await?;
+        let (client, user_id) = self.session()?;
+        let page = self.expire_on_401(
+            &client,
+            client
+                .production_years(&user_id, library_id, kind.item_types())
+                .await,
+        )?;
+        let mut years: Vec<i32> = page
+            .items
+            .into_iter()
+            .filter_map(|d| d.production_year)
+            .filter(|y| (1880..=2199).contains(y))
+            .collect();
+        years.sort_unstable_by(|a, b| b.cmp(a));
+        years.dedup();
+        Ok(years)
     }
 
     /// Genres offered as a filter of a library grid, by name. Names the server
@@ -1495,6 +1570,22 @@ async fn summary(client: &EmbyClient) -> Result<ServerSummary, EmbyError> {
 }
 
 /// Grid card for a film or series; items with an unusable id are dropped.
+/// Options from the UI the server could not filter on are refused before any
+/// request.
+fn check_options(options: &ItemsOptions) -> Result<(), EmbyError> {
+    if options
+        .genre
+        .as_deref()
+        .is_some_and(|g| !is_usable_genre(g))
+    {
+        return Err(EmbyError::InvalidResponse("genre invalide".into()));
+    }
+    if options.decade.is_some_and(|d| !is_usable_decade(d)) {
+        return Err(EmbyError::InvalidResponse("décennie invalide".into()));
+    }
+    Ok(())
+}
+
 fn media_item(dto: BaseItemDto, server: &str) -> Option<MediaItem> {
     let poster = images::image_ref(
         server,

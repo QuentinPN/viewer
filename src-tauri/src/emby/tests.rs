@@ -179,6 +179,35 @@ fn movies_page() -> String {
         .into()
 }
 
+fn sort_names_answer() -> String {
+    r#"{"Items":[
+        {"Name":"Le Grand Bleu","SortName":"Grand Bleu","Id":"201","Type":"Movie"},
+        {"Name":"Sans nom de tri","Id":"../202","Type":"Movie"},
+        {"Name":"Vide","SortName":"  ","Id":"203","Type":"Movie"}
+    ],"TotalRecordCount":3}"#
+        .into()
+}
+
+/// One title when the genre is "Drame", none otherwise.
+fn random_answer(query: &str) -> String {
+    if query.contains("Genres=Drame") {
+        r#"{"Items":[{"Name":"2 Coeurs","Id":"101","Type":"Movie","ProductionYear":2020}],"TotalRecordCount":1}"#.into()
+    } else {
+        r#"{"Items":[],"TotalRecordCount":0}"#.into()
+    }
+}
+
+fn years_answer() -> String {
+    r#"{"Items":[
+        {"Name":"A","Id":"1","Type":"Movie","ProductionYear":1994},
+        {"Name":"B","Id":"2","Type":"Movie","ProductionYear":2020},
+        {"Name":"C","Id":"3","Type":"Movie"},
+        {"Name":"D","Id":"4","Type":"Movie","ProductionYear":1994},
+        {"Name":"E","Id":"5","Type":"Movie","ProductionYear":1}
+    ],"TotalRecordCount":5}"#
+        .into()
+}
+
 /// `emby_like` plus library browsing. `revoked` makes every token call answer 401.
 fn browse_like(revoked: Arc<AtomicBool>) -> Route {
     let base = emby_like(204);
@@ -226,6 +255,21 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
             p if p.starts_with("/emby/Playlists") => (404, NOT_FOUND_TEXT.into()),
             "/emby/Genres" if query.contains("ParentId=5") => (200, genres()),
             p if p == items && query.contains("SearchTerm=") => (200, search_answer(query)),
+            p if p == items
+                && query.contains("ParentId=5")
+                && query.split('&').any(|q| q == "Fields=SortName") =>
+            {
+                (200, sort_names_answer())
+            }
+            p if p == items && query.contains("ParentId=5") && query.contains("SortBy=Random") => {
+                (200, random_answer(query))
+            }
+            p if p == items
+                && query.contains("ParentId=5")
+                && query.split('&').any(|q| q == "Fields=ProductionYear") =>
+            {
+                (200, years_answer())
+            }
             p if p == items && query.contains("ParentId=5") => (200, movies_page()),
             p if p == items && query.contains("Filters=IsFavorite") => (200, favorites()),
             p if p == items && query.contains("ImageTypes=Backdrop") => (200, hero_latest()),
@@ -1108,8 +1152,10 @@ fn items_send_the_chosen_sort_and_filters() {
         watch: WatchFilter::Unplayed,
         favorites: true,
         genre: Some("Science-Fiction & Fantastique".into()),
+        decade: Some(1990),
     });
     for expected in [
+        "Years=1990%2C1991%2C1992%2C1993%2C1994%2C1995%2C1996%2C1997%2C1998%2C1999",
         "SortBy=DateCreated%2CSortName",
         "SortOrder=Descending",
         "Filters=IsUnplayed%2CIsFavorite",
@@ -1164,6 +1210,152 @@ fn items_refuse_a_genre_the_server_cannot_filter_on() {
 }
 
 #[test]
+fn items_refuse_a_decade_the_server_cannot_filter_on() {
+    use super::models::ItemsOptions;
+    let (server, fx, _) = signed_in_browser();
+    let before = server.requests().len();
+    for decade in [1995, 1870, 2200, -10] {
+        let options = ItemsOptions {
+            decade: Some(decade),
+            ..Default::default()
+        };
+        let err = run(fx.service.items("5", 0, 60, &options)).unwrap_err();
+        assert!(matches!(err, EmbyError::InvalidResponse(_)), "{decade}");
+        let err = run(fx.service.sort_names("5", &options)).unwrap_err();
+        assert!(matches!(err, EmbyError::InvalidResponse(_)), "{decade}");
+        let err = run(fx.service.random_item("5", &options)).unwrap_err();
+        assert!(matches!(err, EmbyError::InvalidResponse(_)), "{decade}");
+    }
+    assert_eq!(server.requests().len(), before, "nothing sent");
+}
+
+#[test]
+fn sort_names_follow_the_grid_query_without_paging_or_images() {
+    use super::models::{ItemsOptions, SortKey, WatchFilter};
+    let (server, fx, _) = signed_in_browser();
+    let options = ItemsOptions {
+        sort: SortKey::Name,
+        descending: true,
+        watch: WatchFilter::Unplayed,
+        genre: Some("Drame".into()),
+        decade: Some(2010),
+        ..Default::default()
+    };
+    let names = run(fx.service.sort_names("5", &options)).unwrap();
+    let pairs: Vec<_> = names
+        .iter()
+        .map(|n| (n.id.as_str(), n.name.as_str()))
+        .collect();
+    // Nothing dropped, so positions stay the server's; a blank sort name falls back.
+    assert_eq!(
+        pairs,
+        [
+            ("201", "Grand Bleu"),
+            ("../202", "Sans nom de tri"),
+            ("203", "Vide")
+        ]
+    );
+
+    let req = server.requests().into_iter().last().unwrap();
+    let (path, query) = req.path.split_once('?').unwrap();
+    assert_eq!(path, format!("/emby/Users/{USER_ID}/Items"));
+    let q: Vec<_> = query.split('&').collect();
+    for expected in [
+        "ParentId=5",
+        "Recursive=true",
+        "IncludeItemTypes=Movie",
+        "SortBy=SortName",
+        "SortOrder=Descending",
+        "Fields=SortName",
+        "EnableImages=false",
+        "EnableUserData=false",
+        "Filters=IsUnplayed",
+        "Genres=Drame",
+    ] {
+        assert!(q.contains(&expected), "{expected} in {query}");
+    }
+    assert!(q.iter().any(|p| p.starts_with("Years=2010%2C")), "{query}");
+    assert!(
+        q.iter()
+            .all(|p| !p.starts_with("StartIndex=") && !p.starts_with("Limit="))
+    );
+    assert!(!req.path.contains(TOKEN));
+
+    let err = run(fx.service.sort_names("999", &ItemsOptions::default())).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
+}
+
+#[test]
+fn random_item_is_drawn_by_the_server_with_the_grid_filters() {
+    use super::models::{ItemsOptions, WatchFilter};
+    let (server, fx, _) = signed_in_browser();
+    let options = ItemsOptions {
+        watch: WatchFilter::Played,
+        favorites: true,
+        genre: Some("Drame".into()),
+        ..Default::default()
+    };
+    let item = run(fx.service.random_item("5", &options)).unwrap().unwrap();
+    assert_eq!((item.id.as_str(), item.year), ("101", Some(2020)));
+
+    let req = server.requests().into_iter().last().unwrap();
+    let query = req.path.split_once('?').unwrap().1;
+    let q: Vec<_> = query.split('&').collect();
+    for expected in [
+        "ParentId=5",
+        "SortBy=Random",
+        "Limit=1",
+        "Filters=IsPlayed%2CIsFavorite",
+        "Genres=Drame",
+    ] {
+        assert!(q.contains(&expected), "{expected} in {query}");
+    }
+    assert!(
+        q.iter()
+            .all(|p| !p.starts_with("SortOrder=") && !p.starts_with("StartIndex="))
+    );
+    assert!(!req.path.contains(TOKEN));
+
+    // Nothing matches: no title, no error.
+    assert!(
+        run(fx.service.random_item("5", &ItemsOptions::default()))
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn production_years_are_read_once_without_filters() {
+    let (server, fx, _) = signed_in_browser();
+    let years = run(fx.service.production_years("5")).unwrap();
+    assert_eq!(
+        years,
+        [2020, 1994],
+        "newest first, no repeat, none impossible"
+    );
+
+    let req = server.requests().into_iter().last().unwrap();
+    let query = req.path.split_once('?').unwrap().1;
+    let q: Vec<_> = query.split('&').collect();
+    for expected in [
+        "ParentId=5",
+        "Recursive=true",
+        "IncludeItemTypes=Movie",
+        "Fields=ProductionYear",
+        "EnableImages=false",
+    ] {
+        assert!(q.contains(&expected), "{expected} in {query}");
+    }
+    assert!(
+        q.iter()
+            .all(|p| !p.starts_with("Filters=") && !p.starts_with("Limit="))
+    );
+
+    let err = run(fx.service.production_years("999")).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
+}
+
+#[test]
 fn options_from_the_ui_default_and_parse() {
     use super::models::{ItemsOptions, SortKey, WatchFilter};
     let parsed: ItemsOptions =
@@ -1171,6 +1363,9 @@ fn options_from_the_ui_default_and_parse() {
             .unwrap();
     assert_eq!(parsed.sort, SortKey::Rating);
     assert!(parsed.descending && !parsed.favorites && parsed.genre.is_none());
+    assert!(parsed.decade.is_none());
+    let with_decade: ItemsOptions = serde_json::from_str(r#"{"decade":1980}"#).unwrap();
+    assert_eq!(with_decade.decade, Some(1980));
     assert_eq!(parsed.watch, WatchFilter::InProgress);
     assert_eq!(
         serde_json::from_str::<ItemsOptions>("{}").unwrap(),

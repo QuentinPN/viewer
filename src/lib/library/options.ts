@@ -14,6 +14,7 @@ export const DEFAULT_OPTIONS: Readonly<ItemsOptions> = {
   watch: "all",
   favorites: false,
   genre: null,
+  decade: null,
 };
 
 export const SORTS: readonly { key: SortKey; label: string }[] = [
@@ -63,7 +64,7 @@ export function withSort(options: ItemsOptions, sort: SortKey): ItemsOptions {
 
 /** Something narrows the list (the sort alone does not). */
 export const isFiltered = (o: ItemsOptions): boolean =>
-  o.watch !== "all" || o.favorites || o.genre !== null;
+  o.watch !== "all" || o.favorites || o.genre !== null || o.decade !== null;
 
 export const isDefault = (o: ItemsOptions): boolean =>
   o.sort === DEFAULT_OPTIONS.sort &&
@@ -75,7 +76,16 @@ export const sameOptions = (a: ItemsOptions, b: ItemsOptions): boolean =>
   a.descending === b.descending &&
   a.watch === b.watch &&
   a.favorites === b.favorites &&
-  a.genre === b.genre;
+  a.genre === b.genre &&
+  a.decade === b.decade;
+
+/** Same bounds as Rust (`is_usable_decade`). */
+export const isUsableDecade = (d: unknown): d is number =>
+  typeof d === "number" &&
+  Number.isInteger(d) &&
+  d % 10 === 0 &&
+  d >= 1880 &&
+  d <= 2190;
 
 /** Same bound as Rust (`MAX_GENRE_CHARS`). */
 const MAX_GENRE_CHARS = 100;
@@ -102,6 +112,7 @@ export function sanitize(raw: unknown, kind: LibraryKind): ItemsOptions {
   ) {
     o.genre = r.genre;
   }
+  if (isUsableDecade(r.decade)) o.decade = r.decade;
   return o;
 }
 

@@ -25,6 +25,7 @@ import type {
   ServerSummary,
   SessionStatus,
   SignedInUser,
+  SortNameEntry,
   WatchItem,
 } from "./types";
 
@@ -53,6 +54,15 @@ export const embyApi = {
     options?: ItemsOptions,
   ) =>
     invoke<ItemPage>("emby_items", { libraryId, startIndex, limit, options }),
+  /** Every title of the grid in its order, with its sort name (ADR 0101). */
+  sortNames: (libraryId: string, options: ItemsOptions) =>
+    invoke<SortNameEntry[]>("emby_sort_names", { libraryId, options }),
+  /** One title drawn by the server among those the grid shows (ADR 0101). */
+  randomItem: (libraryId: string, options: ItemsOptions) =>
+    invoke<MediaItem | null>("emby_random_item", { libraryId, options }),
+  /** Production years of a library, newest first (ADR 0101). */
+  productionYears: (libraryId: string) =>
+    invoke<number[]>("emby_production_years", { libraryId }),
   /** Genre names of a library, usable as a filter (ADR 0013). */
   genres: (libraryId: string) => invoke<string[]>("emby_genres", { libraryId }),
   continueWatching: () => invoke<WatchItem[]>("emby_continue_watching"),
