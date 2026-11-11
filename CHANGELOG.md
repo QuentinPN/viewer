@@ -1,5 +1,11 @@
 # Journal des versions
 
+## 1.0.1 — 2026-11-08
+
+- Open the main window maximized by default
+- Fix: library grid keeps stale played marks and counts after a playback
+- Fix: home latest rows keep stale episode counts after a playback
+
 ## 1.0.0 — 2026-11-07
 
 - Fix: caption buttons ignored once the player controls faded

@@ -298,10 +298,18 @@ try {
   // Favourite, then undo.
   const isFavorite = async () =>
     (await invoke(page, "emby_favorites")).some((i) => i.id === targetId);
+  // The menu closes before the server answers (optimistic): poll for 5 s.
+  const favoriteBecomes = async (want) => {
+    for (let i = 0; i < 25; i++) {
+      if ((await isFavorite()) === want) return true;
+      await page.waitForTimeout(200);
+    }
+    return false;
+  };
   await card.click({ button: "right" });
   await menuRow(page, "Ajouter aux favoris").click();
   await menu(page).waitFor({ state: "detached", timeout: 10000 });
-  check("favorite_added", await isFavorite());
+  check("favorite_added", await favoriteBecomes(true));
   await card.click({ button: "right" });
   check(
     "menu_follows_favorite",
@@ -309,7 +317,7 @@ try {
   );
   await menuRow(page, "Retirer des favoris").click();
   await menu(page).waitFor({ state: "detached", timeout: 10000 });
-  check("favorite_removed", !(await isFavorite()));
+  check("favorite_removed", await favoriteBecomes(false));
 
   // Played, then undo.
   await card.click({ button: "right" });
