@@ -380,7 +380,8 @@ private fun ServerTile(entry: SavedServer, manage: Boolean, busy: Boolean, modif
                     .border(1.dp, Line, shape),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(tileInitial(entry), color = Color.hsl(hue, 0.6f, 0.9f), fontSize = 44.sp, fontWeight = FontWeight.Bold)
+                // In « Gérer » the red layer replaces the initial, which would show through it
+                if (!manage) Text(tileInitial(entry), color = Color.hsl(hue, 0.6f, 0.9f), fontSize = 44.sp, fontWeight = FontWeight.Bold)
                 val pill = when {
                     busy -> "Connexion…"
                     !entry.hasToken -> "Mot de passe requis"
