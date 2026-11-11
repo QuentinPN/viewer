@@ -1,12 +1,12 @@
-// Gate 3 sort and filters of a library grid (ADR 0013), on the real Emby test
-// account, driven over CDP. Read only: nothing is written to the server.
+// Gate 3 sort and filters of a library grid (ADR 0013, rails of ADR 0101), on the
+// real Emby test account, driven over CDP. Read only: nothing is written to the server.
 // - defaults: title A→Z, nothing filtered, no "Réinitialiser";
 // - each sort orders the grid as the server does (years checked on the cards);
 // - a filter with no match shows its own empty state, whose button keeps the sort;
 // - a genre narrows the count; favorites toggle (aria-pressed);
 // - "En cours" for films only; choices kept per library and across a restart;
 // - quick successive changes: the grid matches the last choice only;
-// - the keyboard changes a select; cleanup leaves the defaults.
+// - the keyboard changes the sort in its panel; cleanup leaves the defaults.
 import { launch } from "./app.mjs";
 import {
   cards,
@@ -21,15 +21,24 @@ import {
 const account = testAccount();
 const { check, shot, finish } = createReport("gate3-sort-filter");
 
-const toolbar = (page) => page.locator('.toolbar[aria-label="Tri et filtres"]');
-const select = (page, label) =>
-  toolbar(page)
-    .locator("label.field", { has: page.locator(`span:text-is("${label}")`) })
-    .locator("select");
+const rail = (page) => page.locator('.icon-rail[aria-label="Tri et filtres"]');
+const sortIcon = (page) => rail(page).getByRole("button", { name: /^Tri : / });
+const filtersIcon = (page) =>
+  rail(page).getByRole("button", { name: /^Filtres : / });
+const watchIcon = (page) =>
+  rail(page).getByRole("button", { name: /^Visionnage : / });
 const favorites = (page) =>
-  toolbar(page).getByRole("button", { name: "Favoris" });
+  rail(page).getByRole("button", { name: "Favoris seulement" });
 const resetButton = (page) =>
-  toolbar(page).getByRole("button", { name: "Réinitialiser" });
+  rail(page).getByRole("button", {
+    name: "Réinitialiser le tri et les filtres",
+  });
+const sortPanel = (page) => page.locator("#sort-panel");
+const filtersPanel = (page) => page.locator("#filters-panel");
+const genreSelect = (page) =>
+  filtersPanel(page)
+    .locator("label.field", { has: page.locator('span:text-is("Genre")') })
+    .locator("select");
 const countText = (page) => page.locator(".heading .count").textContent();
 const countOf = async (page) =>
   Number((await countText(page)).replace(/\D/g, "")) || 0;
@@ -44,6 +53,72 @@ async function settled(page) {
     null,
     { timeout: 20000 },
   );
+}
+
+/** Open state of a rail panel; false outside a library, where it does not exist. */
+const isOpen = async (panel) =>
+  (await panel.count()) > 0 &&
+  (await panel.evaluate((p) => p.matches(":popover-open")));
+async function openPanel(page, icon, panel) {
+  if (!(await isOpen(panel))) await icon.click();
+  await page.waitForFunction(
+    (id) => document.getElementById(id)?.matches(":popover-open"),
+    await panel.getAttribute("id"),
+    { timeout: 5000 },
+  );
+}
+async function closePanels(page) {
+  for (const panel of [sortPanel(page), filtersPanel(page)])
+    if (await isOpen(panel)) await page.keyboard.press("Escape");
+}
+
+/** Sort key and direction, read from the radios of the Tri panel. */
+const sortKey = (page) =>
+  sortPanel(page)
+    .locator('input[name="grid-sort"]:checked')
+    .evaluate((i) => i.value);
+const descending = (page) =>
+  sortPanel(page)
+    .locator('input[name="grid-order"]')
+    .nth(1)
+    .evaluate((i) => i.checked);
+const watchState = async (page) =>
+  (await watchIcon(page).getAttribute("aria-label")).replace(
+    "Visionnage : ",
+    "",
+  );
+const genreValue = (page) => genreSelect(page).evaluate((s) => s.value);
+
+async function setSort(page, key) {
+  await openPanel(page, sortIcon(page), sortPanel(page));
+  await sortPanel(page)
+    .locator(`input[name="grid-sort"][value="${key}"]`)
+    .check();
+  await settled(page);
+}
+async function setDescending(page, desc) {
+  await openPanel(page, sortIcon(page), sortPanel(page));
+  await sortPanel(page)
+    .locator('input[name="grid-order"]')
+    .nth(desc ? 1 : 0)
+    .check();
+  await settled(page);
+}
+/** Clicks Visionnage until it shows `label`; returns the labels seen. */
+async function setWatch(page, label) {
+  const seen = [await watchState(page)];
+  for (let i = 0; i < 5 && seen.at(-1) !== label; i++) {
+    await watchIcon(page).click();
+    await settled(page);
+    seen.push(await watchState(page));
+  }
+  if (seen.at(-1) !== label) throw new Error(`Visionnage : ${seen.join("/")}`);
+  return seen;
+}
+async function setGenre(page, value) {
+  await openPanel(page, filtersIcon(page), filtersPanel(page));
+  await genreSelect(page).selectOption(value);
+  await settled(page);
 }
 
 const years = (page) =>
@@ -62,6 +137,7 @@ const titles = (page) =>
 const sorted = (xs, cmp) => xs.every((x, i) => i === 0 || cmp(xs[i - 1], x));
 
 async function openLibrary(page, name) {
+  await closePanels(page);
   await libraryNav(page)
     .locator("ul.libraries button", { hasText: name })
     .first()
@@ -69,7 +145,7 @@ async function openLibrary(page, name) {
   await page
     .locator(".heading h1", { hasText: new RegExp(`^${name}$`) })
     .waitFor({ timeout: 20000 });
-  await toolbar(page).waitFor({ timeout: 20000 });
+  await rail(page).waitFor({ timeout: 20000 });
   await settled(page);
 }
 
@@ -101,10 +177,10 @@ try {
   const total = await countOf(page);
   check(
     "defaults",
-    (await select(page, "Trier par").inputValue()) === "name" &&
-      (await select(page, "Ordre").inputValue()) === "asc" &&
-      (await select(page, "Visionnage").inputValue()) === "all" &&
-      (await select(page, "Genre").inputValue()) === "" &&
+    (await sortKey(page)) === "name" &&
+      !(await descending(page)) &&
+      (await watchState(page)) === "Tous" &&
+      (await genreValue(page)) === "" &&
       (await favorites(page).getAttribute("aria-pressed")) === "false" &&
       !(await resetButton(page).isVisible()),
     `${total} films`,
@@ -120,30 +196,33 @@ try {
   await shot(page, "defaults");
 
   // Year: newest first by default, then reversed.
-  await select(page, "Trier par").selectOption("year");
-  await settled(page);
+  await setSort(page, "year");
   let ys = await years(page);
   check(
     "year_descending",
-    (await select(page, "Ordre").inputValue()) === "desc" &&
-      ys.length > 10 &&
-      sorted(ys, (a, b) => a >= b),
+    (await descending(page)) && ys.length > 10 && sorted(ys, (a, b) => a >= b),
     ys.slice(0, 6).join(", "),
   );
   check(
     "sort_keeps_total",
     (await countOf(page)) === total && (await resetButton(page).isVisible()),
   );
-  const orderLabels = await select(page, "Ordre")
-    .locator("option")
+  const orderLabels = await sortPanel(page)
+    .locator("label.choice", { has: page.locator('input[name="grid-order"]') })
     .allInnerTexts();
   check(
     "direction_labels",
-    orderLabels.join("/") === "Plus anciennes/Plus récentes",
+    orderLabels.map((l) => l.trim()).join("/") ===
+      "Plus anciennes/Plus récentes",
     orderLabels.join("/"),
   );
-  await select(page, "Ordre").selectOption("asc");
-  await settled(page);
+  check(
+    "sort_icon_label",
+    (await sortIcon(page).getAttribute("aria-label")) ===
+      "Tri : Année, Plus récentes",
+    await sortIcon(page).getAttribute("aria-label"),
+  );
+  await setDescending(page, false);
   ys = await years(page);
   check(
     "year_ascending",
@@ -151,18 +230,17 @@ try {
     ys.slice(0, 6).join(", "),
   );
   await shot(page, "year-ascending");
+  await closePanels(page);
 
-  // Watched filter with no match on the test account (nothing watched).
-  const watchOptions = await select(page, "Visionnage")
-    .locator("option")
-    .allInnerTexts();
+  // Visionnage cycle, then the played filter.
+  const cycle = await setWatch(page, "En cours");
+  cycle.push(...(await setWatch(page, "Tous")).slice(1));
   check(
     "film_watch_choices",
-    watchOptions.join("/") === "Tous/Non vus/Vus/En cours",
-    watchOptions.join("/"),
+    cycle.join("/") === "Tous/Non vus/Vus/En cours/Tous",
+    cycle.join("/"),
   );
-  await select(page, "Visionnage").selectOption("played");
-  await settled(page);
+  await setWatch(page, "Vus");
   const playedCount = await countOf(page);
   const noMatch = page.getByText("Aucun film ne correspond à ces filtres");
   if (playedCount === 0) {
@@ -174,9 +252,9 @@ try {
     await settled(page);
     check(
       "reset_filters_keeps_sort",
-      (await select(page, "Visionnage").inputValue()) === "all" &&
-        (await select(page, "Trier par").inputValue()) === "year" &&
-        (await select(page, "Ordre").inputValue()) === "asc" &&
+      (await watchState(page)) === "Tous" &&
+        (await sortKey(page)) === "year" &&
+        !(await descending(page)) &&
         (await countOf(page)) === total,
     );
     check(
@@ -184,9 +262,8 @@ try {
       await page.evaluate(
         () =>
           document.activeElement
-            ?.closest("label")
-            ?.textContent?.trim()
-            .startsWith("Trier par") ?? false,
+            ?.getAttribute("aria-label")
+            ?.startsWith("Tri : ") ?? false,
       ),
     );
   } else {
@@ -198,36 +275,32 @@ try {
           (await cards(page).count()),
       `${playedCount}`,
     );
-    await select(page, "Visionnage").selectOption("all");
-    await settled(page);
+    await setWatch(page, "Tous");
   }
-  await select(page, "Visionnage").selectOption("unplayed");
-  await settled(page);
+  await setWatch(page, "Non vus");
   const unplayed = await countOf(page);
   check(
     "unplayed_plus_played_is_total",
     unplayed + playedCount === total,
     `${unplayed} + ${playedCount} / ${total}`,
   );
-  await select(page, "Visionnage").selectOption("all");
-  await settled(page);
+  await setWatch(page, "Tous");
 
-  // Genre.
+  // Genre, in the Filtres panel.
+  await openPanel(page, filtersIcon(page), filtersPanel(page));
   await page.waitForFunction(
     () =>
       document
-        .querySelector('.toolbar select[aria-busy="false"]')
-        ?.closest("label")
-        ?.textContent?.includes("Genre"),
+        .querySelector("#filters-panel select")
+        ?.getAttribute("aria-busy") === "false",
     null,
     { timeout: 20000 },
   );
-  const genreOptions = await select(page, "Genre")
+  const genreOptions = await genreSelect(page)
     .locator("option")
     .allInnerTexts();
   const genre = genreOptions.includes("Action") ? "Action" : genreOptions[1];
-  await select(page, "Genre").selectOption(genre);
-  await settled(page);
+  await setGenre(page, genre);
   const genreCount = await countOf(page);
   check(
     "genre_narrows",
@@ -236,6 +309,13 @@ try {
       genreCount > 0 &&
       genreCount < total,
     `${genre} : ${genreCount} / ${total} (${genreOptions.length - 1} genres)`,
+  );
+  await closePanels(page);
+  check(
+    "filters_icon_label",
+    (await filtersIcon(page).getAttribute("aria-label")) ===
+      `Filtres : ${genre}`,
+    await filtersIcon(page).getAttribute("aria-label"),
   );
 
   // Favorites, combined with the genre.
@@ -259,29 +339,28 @@ try {
 
   // Another library has its own choices, and no "En cours" for series.
   await openLibrary(page, series);
-  const seriesWatch = await select(page, "Visionnage")
-    .locator("option")
-    .allInnerTexts();
+  const seriesDefaults =
+    (await sortKey(page)) === "name" && (await genreValue(page)) === "";
+  const seriesWatch = await setWatch(page, "Vus");
+  seriesWatch.push(...(await setWatch(page, "Tous")).slice(1));
   check(
     "series_defaults_and_choices",
-    (await select(page, "Trier par").inputValue()) === "name" &&
-      (await select(page, "Genre").inputValue()) === "" &&
-      seriesWatch.join("/") === "Tous/Non vus/Vus",
+    seriesDefaults && seriesWatch.join("/") === "Tous/Non vus/Vus/Tous",
     seriesWatch.join("/"),
   );
   await openLibrary(page, films);
   const kept = [
-    await select(page, "Trier par").inputValue(),
-    await select(page, "Ordre").inputValue(),
-    await select(page, "Genre").inputValue(),
+    await sortKey(page),
+    await descending(page),
+    await genreValue(page),
     await countOf(page),
   ];
   check(
     "film_choices_kept",
-    (await select(page, "Trier par").inputValue()) === "year" &&
-      (await select(page, "Ordre").inputValue()) === "asc" &&
-      (await select(page, "Genre").inputValue()) === genre &&
-      (await countOf(page)) === genreCount,
+    kept[0] === "year" &&
+      kept[1] === false &&
+      kept[2] === genre &&
+      kept[3] === genreCount,
     kept.join(" / "),
   );
 
@@ -293,37 +372,52 @@ try {
   await openLibrary(page, films);
   check(
     "choices_kept_after_restart",
-    (await select(page, "Trier par").inputValue()) === "year" &&
-      (await select(page, "Genre").inputValue()) === genre &&
+    (await sortKey(page)) === "year" &&
+      (await genreValue(page)) === genre &&
       (await countOf(page)) === genreCount,
   );
 
   // Quick successive changes: only the last one shows.
-  await select(page, "Genre").selectOption("");
-  await select(page, "Trier par").selectOption("rating");
-  await select(page, "Trier par").selectOption("dateAdded");
-  await select(page, "Trier par").selectOption("name");
+  await setGenre(page, "");
+  await closePanels(page);
+  await openPanel(page, sortIcon(page), sortPanel(page));
+  for (const key of ["rating", "dateAdded", "name"])
+    await sortPanel(page)
+      .locator(`input[name="grid-sort"][value="${key}"]`)
+      .check();
+  await settled(page);
+  await page.waitForTimeout(500);
   await settled(page);
   const quick = await titles(page);
   check(
     "last_change_wins",
     (await countOf(page)) === total &&
-      (await select(page, "Ordre").inputValue()) === "asc" &&
+      !(await descending(page)) &&
       quick.join("\n") === t.join("\n"),
     quick.slice(0, 3).join(" | "),
   );
 
-  // Keyboard: a focused select changes with the arrows.
-  await select(page, "Trier par").focus();
+  // Keyboard: in the open Tri panel, ↓ moves to the next sort.
+  await sortPanel(page).locator('input[name="grid-sort"]:checked').focus();
   await page.keyboard.press("ArrowDown");
   await settled(page);
   check(
     "keyboard_changes_sort",
-    (await select(page, "Trier par").inputValue()) === "dateAdded" &&
-      (await select(page, "Ordre").inputValue()) === "desc",
-    await select(page, "Trier par").inputValue(),
+    (await sortKey(page)) === "dateAdded" && (await descending(page)),
+    await sortKey(page),
   );
   await shot(page, "keyboard");
+  await page.keyboard.press("Escape");
+  check(
+    "escape_closes_panel",
+    !(await isOpen(sortPanel(page))) &&
+      (await page.evaluate(
+        () =>
+          document.activeElement
+            ?.getAttribute("aria-label")
+            ?.startsWith("Tri : ") ?? false,
+      )),
+  );
 
   // Scroll a few pages in: the infinite list keeps the options.
   await page.locator("main.content").evaluate((el) => {
