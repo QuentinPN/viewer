@@ -21,8 +21,8 @@ use super::models::{
     HeroEpisode, HeroItem, HeroReason, ImageRef, ItemDetail, ItemPage, ItemsOptions, Library,
     LibraryKind, MediaInfo, MediaItem, MediaSourceDto, MediaStreamDto, PlayMethod, PlaybackStopped,
     PlaybackTitle, Playlist, PlaylistCreated, ResumePoint, SavedServer, SearchResults, Season,
-    ServerSummary, SessionStatus, SignedInUser, SortNameEntry, StreamInfo, UserItemData, VideoInfo,
-    WatchItem, WatchKind, is_usable_decade, is_usable_genre,
+    ServerSummary, SessionStatus, ShelfAccess, ShelfServer, SignedInUser, SortNameEntry,
+    StreamInfo, UserItemData, VideoInfo, WatchItem, WatchKind, is_usable_decade, is_usable_genre,
 };
 use super::playback::{self, PlaybackPlan};
 use super::quality::{BITRATE_CHOICES, PlaybackQuality, QualityCaps, QualityStore, StreamingLimit};
@@ -58,6 +58,10 @@ pub struct SessionRecord {
     pub server_version: String,
     pub user_id: String,
     pub user_name: String,
+    /// The server rejected this session before it was put on the shelf: its tile
+    /// says "Mot de passe requis" (ADR 0103).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub rejected: bool,
 }
 
 impl SessionRecord {
@@ -69,7 +73,12 @@ impl SessionRecord {
             server_version: user.server.version.clone(),
             user_id: user.user_id.clone(),
             user_name: user.user_name.clone(),
+            rejected: false,
         }
+    }
+
+    fn is(&self, server_id: &str, user_id: &str) -> bool {
+        self.server_id == server_id && self.user_id == user_id
     }
 
     fn same_account(&self, other: &SessionRecord) -> bool {
@@ -104,6 +113,24 @@ impl SessionFile {
             file.device_id = uuid::Uuid::new_v4().simple().to_string();
         }
         file
+    }
+
+    /// Puts a record at the front of the shelf (`saved`), replacing the same
+    /// account, and returns the records pushed out beyond `MAX_SAVED`.
+    fn shelve(&mut self, record: SessionRecord) -> Vec<SessionRecord> {
+        self.saved.retain(|s| !s.same_account(&record));
+        self.saved.insert(0, record);
+        let keep = self.saved.len().min(MAX_SAVED);
+        self.saved.split_off(keep)
+    }
+
+    /// Every record still naming this address.
+    fn uses_url(&self, url: &str) -> bool {
+        self.session
+            .iter()
+            .chain(self.reauth.iter())
+            .chain(self.saved.iter())
+            .any(|r| r.server_url == url)
     }
 
     /// Atomic write (temp file + rename) so a crash never leaves a half file.
@@ -1477,23 +1504,129 @@ impl EmbyService {
 
     /// "Changer de serveur": closes the session without revoking it and sets it
     /// aside so the user can come back to it (ADR 0012).
+    /// A rejected session (the reauthentication hint) stays on the shelf with
+    /// "Mot de passe requis" (ADR 0103).
     pub fn change_server(&self) -> Result<(), EmbyError> {
         self.set_current(None);
         let evicted = self.update_file(|f| {
-            f.reauth = None;
-            if let Some(r) = f.session.take() {
-                f.saved.retain(|s| !s.same_account(&r));
-                f.saved.insert(0, r);
+            let mut evicted = Vec::new();
+            if let Some(mut hint) = f.reauth.take() {
+                hint.rejected = true;
+                evicted.extend(f.shelve(hint));
             }
-            let keep = f.saved.len().min(MAX_SAVED);
-            f.saved.split_off(keep)
+            if let Some(r) = f.session.take() {
+                evicted.extend(f.shelve(r));
+            }
+            evicted
         })?;
+        self.delete_evicted(evicted);
+        Ok(())
+    }
+
+    fn delete_evicted(&self, evicted: Vec<SessionRecord>) {
         for r in evicted {
             if let Err(e) = self.store.delete(&r.account()) {
                 log::warn!("evicted token not deleted: {}", e.kind());
             }
         }
-        Ok(())
+    }
+
+    fn has_token(&self, record: &SessionRecord) -> bool {
+        matches!(self.store.load(&record.account()), Ok(Some(_)))
+    }
+
+    /// Tiles of the pre-connection shelf (ADR 0103), newest first, one per
+    /// server and user: the session left by a failed check (never the open
+    /// one), the rejected session, then the shelf.
+    pub fn shelf(&self) -> Vec<ShelfServer> {
+        let file = self.file();
+        let open = self.current_user().map(|u| SessionRecord::of(&u));
+        let rejected = file.reauth.map(|mut r| {
+            r.rejected = true;
+            r
+        });
+        let mut tiles: Vec<ShelfServer> = Vec::new();
+        let mut seen: Vec<SessionRecord> = Vec::new();
+        let records = file
+            .session
+            .into_iter()
+            .filter(|r| !open.as_ref().is_some_and(|o| o.same_account(r)))
+            .chain(rejected)
+            .chain(file.saved);
+        for record in records {
+            if seen.iter().any(|s| s.same_account(&record)) {
+                continue;
+            }
+            let access = if self.has_token(&record) {
+                ShelfAccess::Session
+            } else if record.rejected {
+                ShelfAccess::Rejected
+            } else {
+                ShelfAccess::SignedOut
+            };
+            tiles.push(ShelfServer {
+                server: record.summary(),
+                access,
+            });
+            seen.push(record);
+        }
+        tiles
+    }
+
+    /// "Oublier ce serveur" (ADR 0103): the record (address, user name) leaves
+    /// `session.json` and the token leaves the credential store. Nothing changes
+    /// on the server; the returned revocation is a best effort the caller may
+    /// run later, it never holds the removal back.
+    pub fn forget_server(
+        &self,
+        server_id: &str,
+        user_id: &str,
+    ) -> Result<Option<Revocation>, EmbyError> {
+        let file = self.file();
+        let Some(record) = file
+            .session
+            .iter()
+            .chain(file.reauth.iter())
+            .chain(file.saved.iter())
+            .find(|r| r.is(server_id, user_id))
+            .cloned()
+        else {
+            return Err(EmbyError::NotFound);
+        };
+        if self
+            .current_user()
+            .is_some_and(|u| SessionRecord::of(&u).same_account(&record))
+        {
+            self.set_current(None);
+        }
+        // The token first: a vault failure leaves everything as it was.
+        let token = self.store.load(&record.account()).ok().flatten();
+        self.store.delete(&record.account())?;
+        self.update_file(|f| {
+            if f.session.as_ref().is_some_and(|r| r.is(server_id, user_id)) {
+                f.session = None;
+            }
+            if f.reauth.as_ref().is_some_and(|r| r.is(server_id, user_id)) {
+                f.reauth = None;
+            }
+            f.saved.retain(|r| !r.is(server_id, user_id));
+            if f.last_server_url.as_deref() == Some(record.server_url.as_str())
+                && !f.uses_url(&record.server_url)
+            {
+                f.last_server_url = None;
+            }
+        })?;
+        let Some(token) = token else {
+            return Ok(None);
+        };
+        Ok(self
+            .new_client(&record.server_url)
+            .ok()
+            .map(|client| Revocation {
+                client,
+                server_id: record.server_id,
+                token,
+            }))
     }
 
     /// Sessions set aside whose token is still in the store.
@@ -1501,40 +1634,50 @@ impl EmbyService {
         self.file()
             .saved
             .iter()
-            .filter(|r| matches!(self.store.load(&r.account()), Ok(Some(_))))
+            .filter(|r| self.has_token(r))
             .map(SessionRecord::summary)
             .collect()
     }
 
-    /// Brings a set-aside session back, then validates it like at startup.
+    /// Brings a set-aside session back, then validates it like at startup. The
+    /// session left by a failed check (vault error at startup) is accepted too.
     pub async fn resume_saved(
         &self,
         server_id: &str,
         user_id: &str,
     ) -> Result<SessionStatus, EmbyError> {
         self.set_current(None);
-        let found = self.update_file(|f| {
-            let pos = f
-                .saved
-                .iter()
-                .position(|s| s.server_id == server_id && s.user_id == user_id)?;
-            let record = f.saved.remove(pos);
-            if let Some(previous) = f.session.take() {
-                f.saved.insert(0, previous);
+        let (found, evicted) = self.update_file(|f| {
+            let mut evicted = Vec::new();
+            if f.session.as_ref().is_some_and(|s| s.is(server_id, user_id)) {
+                return (true, evicted);
             }
-            f.reauth = None;
+            let Some(pos) = f.saved.iter().position(|s| s.is(server_id, user_id)) else {
+                return (false, evicted);
+            };
+            let mut record = f.saved.remove(pos);
+            record.rejected = false;
+            if let Some(mut hint) = f.reauth.take() {
+                hint.rejected = true;
+                evicted.extend(f.shelve(hint));
+            }
+            if let Some(previous) = f.session.take() {
+                evicted.extend(f.shelve(previous));
+            }
             f.last_server_url = Some(record.server_url.clone());
             f.session = Some(record);
-            Some(())
+            (true, evicted)
         })?;
-        if found.is_none() {
+        self.delete_evicted(evicted);
+        if !found {
             return Err(EmbyError::NotFound);
         }
         self.restore().await
     }
 
     /// Revokes the token on the server when reachable, then always forgets it
-    /// locally: an offline sign-out must not leave a usable token on disk.
+    /// locally: an offline sign-out must not leave a usable token on disk. The
+    /// address and user name stay on the shelf, without token (ADR 0103).
     pub async fn sign_out(&self) -> Result<(), EmbyError> {
         let current = {
             let mut guard = self.lock_current();
@@ -1547,14 +1690,47 @@ impl EmbyService {
         {
             log::warn!("Emby logout not confirmed by the server: {}", e.kind());
         }
-        if let Some(r) = record {
+        if let Some(r) = &record {
             self.store
                 .delete(&credentials::account(&r.server_id, &r.user_id))?;
         }
-        self.update_file(|f| {
+        let evicted = self.update_file(|f| {
             f.session = None;
             f.reauth = None;
-        })
+            match record {
+                Some(r) => f.shelve(SessionRecord {
+                    rejected: false,
+                    ..r
+                }),
+                None => Vec::new(),
+            }
+        })?;
+        self.delete_evicted(evicted);
+        Ok(())
+    }
+}
+
+/// Best-effort revocation of a forgotten session (ADR 0103): the public probe
+/// goes **without** the token, which is only sent to the server with the saved
+/// id, like a restore (ADR 0012).
+pub struct Revocation {
+    client: EmbyClient,
+    server_id: String,
+    token: AccessToken,
+}
+
+impl Revocation {
+    pub async fn send(self) {
+        let outcome = match summary(&self.client).await {
+            Ok(server) if server.id == self.server_id => {
+                self.client.with_token(self.token).logout().await
+            }
+            Ok(_) => Err(EmbyError::ServerMismatch),
+            Err(e) => Err(e),
+        };
+        if let Err(e) = outcome {
+            log::info!("forgotten session not revoked on the server: {}", e.kind());
+        }
     }
 }
 

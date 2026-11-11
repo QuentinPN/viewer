@@ -12,8 +12,8 @@ use crate::emby::artwork_cache::{ArtworkCacheCleared, ArtworkCacheStats};
 use crate::emby::chapters::Chapter;
 use crate::emby::models::{
     EpisodePage, HeroItem, ItemDetail, ItemPage, ItemsOptions, Library, MediaItem, PlaybackStart,
-    PlaybackStopped, Playlist, PlaylistCreated, SavedServer, SearchResults, Season, ServerSummary,
-    SessionStatus, SignedInUser, SortNameEntry, WatchItem,
+    PlaybackStopped, Playlist, PlaylistCreated, SearchResults, Season, ServerSummary,
+    SessionStatus, ShelfServer, SignedInUser, SortNameEntry, WatchItem,
 };
 use crate::emby::quality::{PlaybackQuality, QualityCaps};
 use crate::emby::reporting::{ActivePlayback, PLAYBACK_STOPPED_EVENT};
@@ -162,11 +162,24 @@ pub async fn emby_change_server(emby: State<'_, EmbyService>) -> Result<(), Emby
     emby.change_server()
 }
 
+/// Tiles of the pre-connection shelf (ADR 0103); no token in the answer.
 #[tauri::command]
-pub async fn emby_saved_sessions(
+pub async fn emby_shelf(emby: State<'_, EmbyService>) -> Result<Vec<ShelfServer>, EmbyError> {
+    Ok(emby.shelf())
+}
+
+/// "Oublier ce serveur" (ADR 0103): removed locally at once; the revocation on
+/// the server runs afterwards, best effort, and never delays the answer.
+#[tauri::command]
+pub async fn emby_forget_server(
     emby: State<'_, EmbyService>,
-) -> Result<Vec<SavedServer>, EmbyError> {
-    Ok(emby.saved_sessions())
+    server_id: String,
+    user_id: String,
+) -> Result<(), EmbyError> {
+    if let Some(revocation) = emby.forget_server(&server_id, &user_id)? {
+        tauri::async_runtime::spawn(revocation.send());
+    }
+    Ok(())
 }
 
 #[tauri::command]

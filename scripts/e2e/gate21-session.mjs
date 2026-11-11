@@ -8,7 +8,7 @@
 //   reloaded and grid scroll kept;
 // - token revoked (401 on every authenticated request): one reauthentication
 //   screen, server and user prefilled, the navigation kept after the password;
-// - "Changer de serveur", then "Revenir à …" without a password;
+// - "Changer de serveur", then the session tile of the shelf without a password;
 // - stream cut during playback: "Lecture interrompue", no false "watched", resume
 //   from the server position, then the position is cleared again.
 // Starts in any state, ends signed out with the direct server address as last server.
@@ -125,8 +125,11 @@ try {
   } else if (first.screen === "lost" || first.screen === "reauth") {
     // Left by an interrupted run (proxy gone): the same account signs in again
     // below, which replaces that session and its token.
-    await page.getByRole("button", { name: "Changer de serveur" }).click();
-    await page.locator("#server-url").waitFor({ timeout: 10000 });
+    // "Retour" when no app is behind the password card (ADR 0103).
+    await page
+      .getByRole("button", { name: /^(Changer de serveur|Retour)$/ })
+      .click();
+    await signInHeading(page).waitFor({ timeout: 10000 });
   } else if (first.screen !== "signIn") {
     throw new Error(`unexpected first screen ${first.screen}`);
   }
@@ -297,24 +300,32 @@ try {
   await shot(page, "reauth");
   await proxy.set("up");
   await page.locator("#password").fill(account.password);
-  await page.getByRole("button", { name: "Se connecter" }).click();
+  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   check("reauth_return", (await waitAppUsable(page, 20000)) !== null);
   check("reauth_token_saved", vaultEntries() === vaultSignedIn);
   await homeHeading(page).waitFor({ timeout: 20000 });
 
   // 6. Change server, then come back without a password.
   await accountAction(page, "Changer de serveur");
-  await page.locator("#server-url").waitFor({ timeout: 10000 });
-  const comeBack = page.getByRole("button", { name: /Revenir à/ });
+  // The session set aside is the newest tile of the shelf (ADR 0103).
+  const comeBack = page
+    .getByRole("button", { name: /^Se connecter à / })
+    .first();
   await comeBack.waitFor({ timeout: 10000 });
-  check("change_server_offers_return", true, await text(comeBack));
+  check(
+    "change_server_offers_return",
+    (await comeBack.getAttribute("data-access")) === "session",
+    await comeBack.getAttribute("aria-label"),
+  );
   check("change_server_token_kept", vaultEntries() === vaultSignedIn);
   await shot(page, "change-server");
   await comeBack.click();
   check("return_without_password", (await waitAppUsable(page, 20000)) !== null);
   check(
-    "return_list_emptied",
-    ((await invoke(page, "emby_saved_sessions")).value ?? []).length === 0,
+    "return_shelf_without_open_session",
+    ((await invoke(page, "emby_shelf")).value ?? []).every(
+      (tile) => tile.server.userName !== account.user,
+    ),
   );
 
   // 7. Stream cut during playback.

@@ -90,6 +90,7 @@ En cours de session, seul un 401 met fin à la session. Un 403 ou un 404 sur un 
 ## Conséquences
 - `emby_restore` change de type de retour, et `emby_last_server` reste pour préremplir l'adresse.
 - Nouvelles commandes : `emby_change_server`, `emby_saved_sessions`, `emby_resume_saved`.
+- Révisé par l'ADR 0103 : `emby_saved_sessions` est remplacée par `emby_shelf` et `emby_forget_server`. L'écran hors session devient l'étagère des serveurs enregistrés. Une déconnexion volontaire garde l'adresse et le nom d'utilisateur, sans jeton.
 - Nouvelles catégories d'erreur : `accountUnavailable`, `serverMismatch`, `cancelled`.
 - Une session rangée garde un jeton valide côté serveur tant que l'utilisateur n'y revient pas pour se déconnecter. C'est voulu (« revenir au serveur précédent »), et borné à 8.
 - Le comportement de mpv face à une coupure réseau dépend de son cache et de `network-timeout` : il est mesuré, pas supposé (voir Validation).

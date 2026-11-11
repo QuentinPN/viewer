@@ -4,6 +4,7 @@ import ConnectionLost from "./lib/connection/ConnectionLost.svelte";
 import { ConnectionCoordinator } from "./lib/connection/coordinator";
 import { appOf, type ConnectionState } from "./lib/connection/machine";
 import { embyApi, errorHint, toEmbyError } from "./lib/emby/api";
+import ServerShelf from "./lib/emby/ServerShelf.svelte";
 import SignIn from "./lib/emby/SignIn.svelte";
 import type { EmbyError, PlaybackStart } from "./lib/emby/types";
 import LibraryBrowser from "./lib/library/LibraryBrowser.svelte";
@@ -278,13 +279,14 @@ async function signOut() {
           reauth={conn.server}
           notice={conn.error}
           onSignedIn={(user) => coordinator.signedIn(user)}
-          onChangeServer={() => void coordinator.changeServer()}
+          onBack={() => void coordinator.changeServer()}
+          backLabel={app !== null ? "Changer de serveur" : "Retour"}
         />
       </div>
     {/key}
   {:else if conn.kind === "server_configuration" || conn.kind === "signed_out"}
     {#key conn.kind}
-      <SignIn
+      <ServerShelf
         notice={conn.kind === "signed_out" ? conn.notice : null}
         onSignedIn={(user) => coordinator.signedIn(user)}
         onResumeSaved={(serverId, userId) =>

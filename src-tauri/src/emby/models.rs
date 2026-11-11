@@ -93,6 +93,26 @@ pub struct SavedServer {
     pub user_name: String,
 }
 
+/// What a tile of the pre-connection shelf can do (ADR 0103).
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ShelfAccess {
+    /// A token is in the credential store: the tile validates it, no password.
+    Session,
+    /// The server already rejected this session: "Mot de passe requis".
+    Rejected,
+    /// Signed out on purpose: the password is asked, no rejection was seen.
+    SignedOut,
+}
+
+/// One tile of the pre-connection shelf. Contains no secret.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ShelfServer {
+    pub server: SavedServer,
+    pub access: ShelfAccess,
+}
+
 /// Outcome of validating the saved session (ADR 0012). Network failures keep the
 /// session; only a rejection by the server asks for the password again.
 #[derive(Debug, Serialize)]

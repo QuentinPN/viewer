@@ -56,7 +56,7 @@ try {
   if (await lost.count()) {
     // Left by an interrupted run (proxy gone).
     await page.getByRole("button", { name: "Changer de serveur" }).click();
-    await page.locator("#server-url").waitFor({ timeout: 10000 });
+    await page.locator("#signin-title").waitFor({ timeout: 10000 });
   } else if ((await startScreen(page)) === "signedIn") {
     await signOut(page);
   }
