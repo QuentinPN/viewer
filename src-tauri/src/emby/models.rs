@@ -152,6 +152,9 @@ pub struct BaseItemDto {
     pub item_type: String,
     #[serde(default)]
     pub collection_type: Option<String>,
+    /// Only when asked in `Fields` (letter index, ADR 0101).
+    #[serde(default)]
+    pub sort_name: Option<String>,
     #[serde(default)]
     pub production_year: Option<i32>,
     #[serde(default)]
@@ -408,6 +411,22 @@ pub struct ItemsOptions {
     pub watch: WatchFilter,
     pub favorites: bool,
     pub genre: Option<String>,
+    /// First year of a decade (`1990`), or every year (ADR 0101).
+    pub decade: Option<i32>,
+}
+
+/// A decade the server can filter on: a multiple of ten in a sane range.
+pub fn is_usable_decade(decade: i32) -> bool {
+    decade % 10 == 0 && (1880..=2190).contains(&decade)
+}
+
+/// One title of a library in grid order, for the letter index (ADR 0101).
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SortNameEntry {
+    pub id: String,
+    /// `SortName`, or `Name` when the server sends none.
+    pub name: String,
 }
 
 /// Longest genre name sent to the server.
@@ -442,6 +461,17 @@ impl ItemsOptions {
             .chain(self.favorites.then_some("IsFavorite"))
             .collect::<Vec<_>>()
             .join(",")
+    }
+
+    /// `Years` of the decade, `None` without one or with an unusable one.
+    pub fn years(&self) -> Option<String> {
+        let decade = self.decade.filter(|d| is_usable_decade(*d))?;
+        Some(
+            (decade..decade + 10)
+                .map(|y| y.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+        )
     }
 }
 

@@ -193,8 +193,10 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
-    /// One page of a library, sorted by name. The server ignores an unknown
-    /// `ParentId` and returns the whole server: callers pass known library ids only.
+    /// One page of a library, sorted and filtered as asked; or, by `shape`, the
+    /// sort names of the whole list or one random title of it (ADR 0101). The
+    /// server ignores an unknown `ParentId` and returns the whole server: callers
+    /// pass known library ids only.
     pub async fn items(
         &self,
         user_id: &str,
@@ -207,25 +209,74 @@ impl EmbyClient {
         let (start, limit) = (query.start_index.to_string(), query.limit.to_string());
         let options = query.options;
         let filters = options.filters();
+        let years = options.years();
         let mut params = vec![
             ("ParentId", path_segment(query.parent_id)?),
             ("Recursive", "true"),
             ("IncludeItemTypes", query.item_types),
-            ("SortBy", options.sort.sort_by()),
-            ("SortOrder", options.sort_order()),
-            ("StartIndex", &start),
-            ("Limit", &limit),
-            ("Fields", "PrimaryImageAspectRatio,ProductionYear"),
-            ("EnableImageTypes", "Primary"),
-            ("ImageTypeLimit", "1"),
-            ("EnableUserData", "true"),
         ];
+        match query.shape {
+            ItemsShape::Page => params.extend([
+                ("SortBy", options.sort.sort_by()),
+                ("SortOrder", options.sort_order()),
+                ("StartIndex", start.as_str()),
+                ("Limit", limit.as_str()),
+                ("Fields", "PrimaryImageAspectRatio,ProductionYear"),
+                ("EnableImageTypes", "Primary"),
+                ("ImageTypeLimit", "1"),
+                ("EnableUserData", "true"),
+            ]),
+            // Same order as the grid, no page: positions match what it shows.
+            ItemsShape::SortNames => params.extend([
+                ("SortBy", options.sort.sort_by()),
+                ("SortOrder", options.sort_order()),
+                ("Fields", "SortName"),
+                ("EnableImages", "false"),
+                ("EnableUserData", "false"),
+            ]),
+            // Drawn by the server among the titles the grid shows.
+            ItemsShape::Random => params.extend([
+                ("SortBy", "Random"),
+                ("Limit", "1"),
+                ("Fields", "PrimaryImageAspectRatio,ProductionYear"),
+                ("EnableImageTypes", "Primary"),
+                ("ImageTypeLimit", "1"),
+                ("EnableUserData", "true"),
+            ]),
+        }
         if !filters.is_empty() {
             params.push(("Filters", &filters));
         }
         if let Some(genre) = &options.genre {
             params.push(("Genres", genre));
         }
+        if let Some(years) = &years {
+            params.push(("Years", years));
+        }
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// Production year of every film or series of a library, without filters
+    /// (decade picker, ADR 0101).
+    pub async fn production_years(
+        &self,
+        user_id: &str,
+        parent_id: &str,
+        item_types: &str,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Users/{}/Items", path_segment(user_id)?));
+        let params = [
+            ("ParentId", path_segment(parent_id)?),
+            ("Recursive", "true"),
+            ("IncludeItemTypes", item_types),
+            ("Fields", "ProductionYear"),
+            ("EnableImages", "false"),
+            ("EnableUserData", "false"),
+        ];
         let res = self.request_url(Method::GET, &url, &params).send().await?;
         json(check(res, true)?).await
     }
@@ -828,6 +879,16 @@ pub struct ItemsQuery<'a> {
     pub limit: u32,
     /// Checked by the caller: the genre is a usable one (`is_usable_genre`).
     pub options: &'a ItemsOptions,
+    pub shape: ItemsShape,
+}
+
+/// What a library query returns (ADR 0101). `start_index` and `limit` only
+/// apply to `Page`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ItemsShape {
+    Page,
+    SortNames,
+    Random,
 }
 
 /// Parameters of one page of episodes.

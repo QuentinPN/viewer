@@ -55,6 +55,16 @@ describe("library options", () => {
     expect(isFiltered({ ...DEFAULT_OPTIONS, watch: "played" })).toBe(true);
     expect(sameOptions(sorted, { ...sorted })).toBe(true);
     expect(sameOptions(sorted, DEFAULT_OPTIONS)).toBe(false);
+    const decade = { ...DEFAULT_OPTIONS, decade: 1990 };
+    expect(isFiltered(decade)).toBe(true);
+    expect(sameOptions(decade, DEFAULT_OPTIONS)).toBe(false);
+  });
+
+  it("keeps only a decade the server can filter on", () => {
+    expect(sanitize({ decade: 1990 }, "movies").decade).toBe(1990);
+    for (const decade of [1995, 1870, 2200, "1990", 1990.5, null]) {
+      expect(sanitize({ decade }, "movies").decade).toBeNull();
+    }
   });
 
   it("offers « En cours » for films only", () => {
@@ -99,6 +109,7 @@ describe("library options", () => {
       watch: "unplayed",
       favorites: true,
       genre: "Science-Fiction & Fantastique",
+      decade: null,
     });
   });
 

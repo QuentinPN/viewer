@@ -157,6 +157,15 @@ export interface ItemsOptions {
   favorites: boolean;
   /** One genre among `emby_genres`, or none. */
   genre: string | null;
+  /** First year of a decade (`1990`), or every year (ADR 0101). */
+  decade: number | null;
+}
+
+/** One title of a library grid in its order, for the letter rail (ADR 0101). */
+export interface SortNameEntry {
+  id: string;
+  /** `SortName`, or `Name` when the server sends none. */
+  name: string;
 }
 
 export interface ItemPage {
