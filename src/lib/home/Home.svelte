@@ -4,7 +4,7 @@
 // of each library open their detail page. Rows load in parallel; the hero,
 // "Reprendre" and "À suivre" are read again after every playback, "Favoris" after
 // every favorite change. A "Reprendre" card can be taken out of the row, or
-// marked played (ADR 0096).
+// marked played (ADR 0096), from its menu (ADR 0100).
 import { onMount, tick, untrack } from "svelte";
 import { patchPlayed, restoreItem, withoutItem } from "../detail/watched";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
@@ -317,37 +317,16 @@ onMount(() => {
       <div class="resume-row" bind:this={resumeList}>
         <Row title="Reprendre" id="row-resume" wide>
           {#each inProgress.items as item (item.id)}
-            {@const title = watchTitle(item)}
-            <li class="resume-card">
+            <li>
               <WatchCard
                 {item}
                 busy={starting === item.id}
                 disabled={starting !== null}
                 onPlay={play}
+                menuContext="resume"
+                onMarkPlayed={(i) => takeOut(i, true)}
+                onRemoveFromResume={(i) => takeOut(i, false)}
               />
-              <!-- Shown on hover and keyboard focus; Tab reaches them after the card. -->
-              <div class="card-actions">
-                <button
-                  type="button"
-                  class="card-action"
-                  aria-label={`Marquer « ${title} » comme vu`}
-                  title="Marquer comme vu"
-                  aria-disabled={removing !== null}
-                  onclick={() => takeOut(item, true)}
-                >
-                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" /></svg>
-                </button>
-                <button
-                  type="button"
-                  class="card-action"
-                  aria-label={`Retirer « ${title} » de Reprendre`}
-                  title="Retirer de Reprendre"
-                  aria-disabled={removing !== null}
-                  onclick={() => takeOut(item, false)}
-                >
-                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7m0-7-7 7" /></svg>
-                </button>
-              </div>
             </li>
           {/each}
         </Row>
@@ -482,52 +461,6 @@ onMount(() => {
   }
   button.secondary:hover {
     background: var(--fill-glass-hover);
-  }
-  .resume-card {
-    position: relative;
-  }
-  .card-actions {
-    position: absolute;
-    z-index: 1;
-    top: var(--space-2);
-    right: var(--space-2);
-    display: flex;
-    gap: 6px;
-    opacity: 0;
-    transition: opacity var(--motion-fast);
-  }
-  .resume-card:hover .card-actions,
-  .resume-card:focus-within .card-actions {
-    opacity: 1;
-  }
-  .card-action {
-    width: 30px;
-    height: 30px;
-    display: grid;
-    place-items: center;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: rgb(0 0 0 / 60%);
-    backdrop-filter: blur(12px);
-    color: #fff;
-    cursor: pointer;
-    transition: background var(--motion-fast);
-  }
-  .card-action:hover {
-    background: rgb(0 0 0 / 80%);
-  }
-  .card-action[aria-disabled="true"] {
-    cursor: progress;
-  }
-  .card-action svg {
-    width: 14px;
-    height: 14px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
   .see-all {
     background: transparent;

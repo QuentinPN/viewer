@@ -18,6 +18,7 @@ const item = (id: number, extra: Partial<MediaItem> = {}): MediaItem => ({
   aspectRatio: null,
   played: false,
   unplayedCount: null,
+  favorite: false,
   ...extra,
 });
 

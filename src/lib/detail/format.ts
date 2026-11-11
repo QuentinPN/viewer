@@ -80,6 +80,7 @@ export function episodeItem(e: {
     aspectRatio: null,
     played: e.played ?? false,
     unplayedCount: null,
+    favorite: false,
   };
 }
 

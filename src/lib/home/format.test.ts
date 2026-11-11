@@ -21,6 +21,8 @@ const episode: WatchItem = {
   image: null,
   runtimeMinutes: 50,
   resume: { positionSeconds: 600, fraction: 0.2 },
+  played: false,
+  favorite: false,
 };
 const film: WatchItem = {
   id: "30207",
@@ -32,6 +34,8 @@ const film: WatchItem = {
   image: null,
   runtimeMinutes: 101,
   resume: null,
+  played: false,
+  favorite: false,
 };
 
 describe("home card labels", () => {

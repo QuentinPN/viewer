@@ -12,8 +12,8 @@ use crate::emby::artwork_cache::{ArtworkCacheCleared, ArtworkCacheStats};
 use crate::emby::chapters::Chapter;
 use crate::emby::models::{
     EpisodePage, HeroItem, ItemDetail, ItemPage, ItemsOptions, Library, MediaItem, PlaybackStart,
-    PlaybackStopped, SavedServer, SearchResults, Season, ServerSummary, SessionStatus,
-    SignedInUser, WatchItem,
+    PlaybackStopped, Playlist, PlaylistCreated, SavedServer, SearchResults, Season, ServerSummary,
+    SessionStatus, SignedInUser, WatchItem,
 };
 use crate::emby::quality::{PlaybackQuality, QualityCaps};
 use crate::emby::reporting::{ActivePlayback, PLAYBACK_STOPPED_EVENT};
@@ -324,6 +324,41 @@ pub async fn emby_hide_from_resume(
     let state = emby.hide_from_resume(&item_id).await?;
     let _ = app.emit(PLAYBACK_STOPPED_EVENT, &state);
     Ok(state)
+}
+
+/// First episode of a series not watched yet, for the card menu (ADR 0100).
+#[tauri::command]
+pub async fn emby_series_next_episode(
+    emby: State<'_, EmbyService>,
+    series_id: String,
+) -> Result<Option<WatchItem>, EmbyError> {
+    emby.series_next_episode(&series_id).await
+}
+
+/// Playlists of the user, by name (ADR 0100).
+#[tauri::command]
+pub async fn emby_playlists(emby: State<'_, EmbyService>) -> Result<Vec<Playlist>, EmbyError> {
+    emby.playlists().await
+}
+
+/// Appends an item to a playlist; returns how many items the server added.
+#[tauri::command]
+pub async fn emby_add_to_playlist(
+    emby: State<'_, EmbyService>,
+    playlist_id: String,
+    item_id: String,
+) -> Result<u32, EmbyError> {
+    emby.add_to_playlist(&playlist_id, &item_id).await
+}
+
+/// Creates a video playlist holding the item (ADR 0100).
+#[tauri::command]
+pub async fn emby_create_playlist(
+    emby: State<'_, EmbyService>,
+    name: String,
+    item_id: String,
+) -> Result<PlaylistCreated, EmbyError> {
+    emby.create_playlist(&name, &item_id).await
 }
 
 #[tauri::command]

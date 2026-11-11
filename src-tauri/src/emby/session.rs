@@ -18,8 +18,9 @@ use super::models::{
     BaseItemDto, CastMember, DetailKind, Episode, EpisodeContext, EpisodeLink, EpisodePage,
     HeroEpisode, HeroItem, HeroReason, ImageRef, ItemDetail, ItemPage, ItemsOptions, Library,
     LibraryKind, MediaInfo, MediaItem, MediaSourceDto, MediaStreamDto, PlayMethod, PlaybackStopped,
-    PlaybackTitle, ResumePoint, SavedServer, SearchResults, Season, ServerSummary, SessionStatus,
-    SignedInUser, StreamInfo, UserItemData, VideoInfo, WatchItem, WatchKind, is_usable_genre,
+    PlaybackTitle, Playlist, PlaylistCreated, ResumePoint, SavedServer, SearchResults, Season,
+    ServerSummary, SessionStatus, SignedInUser, StreamInfo, UserItemData, VideoInfo, WatchItem,
+    WatchKind, is_usable_genre,
 };
 use super::playback::{self, PlaybackPlan};
 use super::quality::{BITRATE_CHOICES, PlaybackQuality, QualityCaps, QualityStore, StreamingLimit};
@@ -135,6 +136,10 @@ const TICKS_PER_MINUTE: i64 = 600_000_000;
 const IMAGE_CONCURRENCY: usize = 6;
 /// Sessions kept aside by "Changer de serveur"; the oldest is forgotten beyond.
 pub const MAX_SAVED: usize = 8;
+/// Playlists the card menu offers (ADR 0100).
+const PLAYLISTS_MAX: u32 = 200;
+/// Longest playlist name accepted, in characters.
+pub const PLAYLIST_NAME_MAX: usize = 200;
 
 struct Current {
     client: EmbyClient,
@@ -764,6 +769,87 @@ impl EmbyService {
             client.hide_from_resume(&user_id, item_id, true).await,
         )?;
         Ok(self.state_after_change(item_id, data).await)
+    }
+
+    /// Next episode to play of a series, as the home hero picks it: the first one
+    /// not watched yet, in the series' order (ADR 0100). `None` when all are.
+    pub async fn series_next_episode(
+        &self,
+        series_id: &str,
+    ) -> Result<Option<WatchItem>, EmbyError> {
+        if !is_id(series_id) {
+            return Err(EmbyError::InvalidResponse("identifiant invalide".into()));
+        }
+        let (client, user_id) = self.session()?;
+        let scope = self.scope();
+        let page = self.expire_on_401(
+            &client,
+            client.first_unplayed_episode(&user_id, series_id).await,
+        )?;
+        Ok(page
+            .items
+            .into_iter()
+            .filter(|e| e.item_type == "Episode")
+            .find_map(|d| watch_item(d, &scope)))
+    }
+
+    /// Playlists of the user, by name (ADR 0100).
+    pub async fn playlists(&self) -> Result<Vec<Playlist>, EmbyError> {
+        let (client, user_id) = self.session()?;
+        let page = self.expire_on_401(&client, client.playlists(&user_id, PLAYLISTS_MAX).await)?;
+        Ok(page
+            .items
+            .into_iter()
+            .filter(|p| p.item_type == "Playlist" && is_id(&p.id))
+            .map(|p| Playlist {
+                name: text(Some(p.name)).unwrap_or_else(|| "Sans titre".into()),
+                id: p.id,
+            })
+            .collect())
+    }
+
+    /// Appends a film or episode to one of the user's playlists (ADR 0100);
+    /// returns how many items the server says it added.
+    pub async fn add_to_playlist(
+        &self,
+        playlist_id: &str,
+        item_id: &str,
+    ) -> Result<u32, EmbyError> {
+        if !is_id(playlist_id) || !is_id(item_id) {
+            return Err(EmbyError::InvalidResponse("identifiant invalide".into()));
+        }
+        let (client, user_id) = self.session()?;
+        let res = self.expire_on_401(
+            &client,
+            client.add_to_playlist(&user_id, playlist_id, item_id).await,
+        )?;
+        Ok(res.item_added_count)
+    }
+
+    /// Creates a video playlist named `name` holding the item (ADR 0100).
+    pub async fn create_playlist(
+        &self,
+        name: &str,
+        item_id: &str,
+    ) -> Result<PlaylistCreated, EmbyError> {
+        let name = playlist_name(name)
+            .ok_or_else(|| EmbyError::InvalidResponse("nom de playlist invalide".into()))?;
+        if !is_id(item_id) {
+            return Err(EmbyError::InvalidResponse("identifiant invalide".into()));
+        }
+        let (client, user_id) = self.session()?;
+        let res = self.expire_on_401(
+            &client,
+            client.create_playlist(&user_id, name, item_id).await,
+        )?;
+        if !is_id(&res.id) {
+            return Err(EmbyError::InvalidResponse("identifiant invalide".into()));
+        }
+        Ok(PlaylistCreated {
+            id: res.id,
+            name: text(Some(res.name)).unwrap_or_else(|| name.to_owned()),
+            added: res.item_added_count,
+        })
     }
 
     /// State of an item the server just changed: read again for the resume
@@ -1433,6 +1519,7 @@ fn media_item(dto: BaseItemDto, server: &str) -> Option<MediaItem> {
             .filter(|r| r.is_finite() && *r > 0.0),
         played: user_data.played,
         unplayed_count: user_data.unplayed_item_count,
+        favorite: user_data.is_favorite,
     })
 }
 
@@ -1487,6 +1574,7 @@ fn resumed_hero(dto: BaseItemDto, server: &str) -> Option<HeroItem> {
                     aspect_ratio: None,
                     played: false,
                     unplayed_count: None,
+                    favorite: false,
                 },
                 reason: HeroReason::Resume,
                 backdrop,
@@ -1610,6 +1698,8 @@ fn watch_item(dto: BaseItemDto, server: &str) -> Option<WatchItem> {
         name: dto.name.trim().to_owned(),
         kind,
         image,
+        played: user_data.played,
+        favorite: user_data.is_favorite,
     })
 }
 
@@ -1728,6 +1818,16 @@ fn playback_title(dto: &BaseItemDto) -> Option<PlaybackTitle> {
 }
 
 /// Trimmed, non-empty text.
+/// A playlist name the user typed, trimmed: not empty, not too long, no control
+/// character.
+fn playlist_name(name: &str) -> Option<&str> {
+    let name = name.trim();
+    (!name.is_empty()
+        && name.chars().count() <= PLAYLIST_NAME_MAX
+        && !name.chars().any(char::is_control))
+    .then_some(name)
+}
+
 fn text(value: Option<String>) -> Option<String> {
     value.map(|v| v.trim().to_owned()).filter(|v| !v.is_empty())
 }

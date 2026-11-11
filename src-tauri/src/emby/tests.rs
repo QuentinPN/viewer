@@ -204,12 +204,26 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
                 || p.starts_with("/emby/Sessions/")
                 || p == "/emby/Genres"
                 || p.starts_with(&favorite_items)
-                || p.starts_with(&played_items))
+                || p.starts_with(&played_items)
+                || p.starts_with("/emby/Playlists"))
                 && !token_ok =>
             {
                 (401, String::new())
             }
             p if p == views_path => (200, views()),
+            p if p == items && query.contains("IncludeItemTypes=Playlist") => (200, playlists()),
+            "/emby/Playlists/60001/Items" if r.method == "POST" => (
+                200,
+                format!(
+                    r#"{{"Id":"60001","ItemAddedCount":{}}}"#,
+                    u8::from(query.contains("Ids=30207"))
+                ),
+            ),
+            "/emby/Playlists" if r.method == "POST" && query.contains("MediaType=Video") => (
+                200,
+                r#"{"Id":"60010","Name":"Soirée ciné","ItemAddedCount":1}"#.into(),
+            ),
+            p if p.starts_with("/emby/Playlists") => (404, NOT_FOUND_TEXT.into()),
             "/emby/Genres" if query.contains("ParentId=5") => (200, genres()),
             p if p == items && query.contains("SearchTerm=") => (200, search_answer(query)),
             p if p == items && query.contains("ParentId=5") => (200, movies_page()),
@@ -594,6 +608,17 @@ fn hero_latest() -> String {
 }
 
 /// `/Shows/80473/Episodes?IsPlayed=false&Limit=1` (trimmed), started a little.
+/// `/Users/{Id}/Items?IncludeItemTypes=Playlist` (trimmed), with entries to drop.
+fn playlists() -> String {
+    r#"{"Items":[
+        {"Name":"À revoir","Id":"60001","Type":"Playlist","MediaType":"Video"},
+        {"Name":"  ","Id":"60002","Type":"Playlist","MediaType":"Video"},
+        {"Name":"Id douteux","Id":"../x","Type":"Playlist"},
+        {"Name":"Pas une playlist","Id":"30207","Type":"Movie"}
+    ],"TotalRecordCount":4}"#
+        .into()
+}
+
 fn first_unplayed() -> String {
     r#"{"Items":[
         {"Name":"Secrets","Id":"80475","Type":"Episode","IndexNumber":1,"ParentIndexNumber":1,
@@ -1450,6 +1475,134 @@ fn watched_changes_with_a_revoked_token_end_the_session() {
     revoked.store(true, Ordering::SeqCst);
     let err = run(fx.service.hide_from_resume("30207")).unwrap_err();
     assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
+}
+
+#[test]
+fn playlists_are_listed_by_name_with_unusable_entries_dropped() {
+    let (server, fx, _) = signed_in_browser();
+    let list = run(fx.service.playlists()).unwrap();
+    let names: Vec<_> = list
+        .iter()
+        .map(|p| (p.id.as_str(), p.name.as_str()))
+        .collect();
+    assert_eq!(names, [("60001", "À revoir"), ("60002", "Sans titre")]);
+    let sent = server.requests().into_iter().last().unwrap();
+    assert_eq!(sent.method, "GET");
+    let (path, query) = sent.path.split_once('?').unwrap();
+    assert_eq!(path, format!("/emby/Users/{USER_ID}/Items"));
+    assert!(query.contains("IncludeItemTypes=Playlist"), "{query}");
+    assert!(query.contains("Recursive=true"), "{query}");
+    assert!(sent.auth.as_deref().unwrap().contains(TOKEN));
+    assert!(server.requests().iter().all(|r| !r.path.contains(TOKEN)));
+}
+
+#[test]
+fn an_item_is_added_to_a_playlist() {
+    let (server, fx, _) = signed_in_browser();
+    assert_eq!(
+        run(fx.service.add_to_playlist("60001", "30207")).unwrap(),
+        1
+    );
+    let sent = server.requests().into_iter().last().unwrap();
+    assert_eq!(sent.method, "POST");
+    assert_eq!(
+        sent.path,
+        format!("/emby/Playlists/60001/Items?Ids=30207&UserId={USER_ID}")
+    );
+    assert!(sent.auth.as_deref().unwrap().contains(TOKEN));
+
+    let err = run(fx.service.add_to_playlist("69999", "30207")).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
+    let before = server.requests().len();
+    for (playlist, item) in [
+        ("", "30207"),
+        ("../60001", "30207"),
+        ("60001", "30207&Ids=1"),
+    ] {
+        let err = run(fx.service.add_to_playlist(playlist, item)).unwrap_err();
+        assert!(matches!(err, EmbyError::InvalidResponse(_)), "{err:?}");
+    }
+    assert_eq!(server.requests().len(), before);
+    assert!(server.requests().iter().all(|r| !r.path.contains(TOKEN)));
+}
+
+#[test]
+fn a_video_playlist_is_created_with_the_item() {
+    let (server, fx, _) = signed_in_browser();
+    let created = run(fx.service.create_playlist("  Soirée ciné ", "30207")).unwrap();
+    assert_eq!(created.id, "60010");
+    assert_eq!(created.name, "Soirée ciné");
+    assert_eq!(created.added, 1);
+    let sent = server.requests().into_iter().last().unwrap();
+    assert_eq!(sent.method, "POST");
+    assert_eq!(
+        sent.path,
+        format!(
+            "/emby/Playlists?Name=Soir%C3%A9e+cin%C3%A9&Ids=30207&MediaType=Video&UserId={USER_ID}"
+        )
+    );
+    assert!(sent.auth.as_deref().unwrap().contains(TOKEN));
+
+    // Names and ids are checked before anything is sent.
+    let before = server.requests().len();
+    let long = "a".repeat(201);
+    for (name, item) in [
+        ("   ", "30207"),
+        ("Liste\nde nuit", "30207"),
+        (long.as_str(), "30207"),
+        ("Soirée", "../30207"),
+    ] {
+        let err = run(fx.service.create_playlist(name, item)).unwrap_err();
+        assert!(matches!(err, EmbyError::InvalidResponse(_)), "{err:?}");
+    }
+    assert_eq!(server.requests().len(), before);
+    run(fx.service.create_playlist(&"é".repeat(200), "30207")).unwrap();
+    assert!(server.requests().iter().all(|r| !r.path.contains(TOKEN)));
+}
+
+#[test]
+fn playlist_calls_with_a_revoked_token_end_the_session() {
+    let (_server, fx, revoked) = signed_in_browser();
+    revoked.store(true, Ordering::SeqCst);
+    let err = run(fx.service.add_to_playlist("60001", "30207")).unwrap_err();
+    assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
+    assert!(fx.service.current_user().is_none());
+    for call in 0..2 {
+        let (_server, fx, revoked) = signed_in_browser();
+        revoked.store(true, Ordering::SeqCst);
+        let err = if call == 0 {
+            run(fx.service.playlists()).unwrap_err()
+        } else {
+            run(fx.service.create_playlist("Soirée", "30207")).unwrap_err()
+        };
+        assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
+        assert!(stored_token(&fx).is_none());
+    }
+}
+
+#[test]
+fn next_episode_of_a_series_is_its_first_unwatched_one() {
+    let (server, fx, _) = signed_in_browser();
+    let next = run(fx.service.series_next_episode("80473"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(next.id, "80475");
+    assert!(next.resume.is_some() && !next.played);
+    let sent = server.requests().into_iter().last().unwrap();
+    let (path, query) = sent.path.split_once('?').unwrap();
+    assert_eq!(path, "/emby/Shows/80473/Episodes");
+    assert!(query.contains("IsPlayed=false") && query.contains(&format!("UserId={USER_ID}")));
+
+    assert!(
+        run(fx.service.series_next_episode("80500"))
+            .unwrap()
+            .is_none()
+    );
+    let before = server.requests().len();
+    let err = run(fx.service.series_next_episode("../80473")).unwrap_err();
+    assert!(matches!(err, EmbyError::InvalidResponse(_)), "{err:?}");
+    assert_eq!(server.requests().len(), before);
+    assert!(server.requests().iter().all(|r| !r.path.contains(TOKEN)));
 }
 
 #[test]

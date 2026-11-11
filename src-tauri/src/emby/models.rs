@@ -477,6 +477,8 @@ pub struct MediaItem {
     pub played: bool,
     /// Series only: episodes not yet watched.
     pub unplayed_count: Option<u32>,
+    /// Labels the card menu's favourite action (ADR 0100).
+    pub favorite: bool,
 }
 
 /// Kinds of item the home rows "Reprendre" and "À suivre" play.
@@ -503,6 +505,9 @@ pub struct WatchItem {
     pub image: Option<ImageRef>,
     pub runtime_minutes: Option<u32>,
     pub resume: Option<ResumePoint>,
+    /// Label the card menu's played and favourite actions (ADR 0100).
+    pub played: bool,
+    pub favorite: bool,
 }
 
 /// Answer of a search (ADR 0011, 0020): films, series and episodes whose title
@@ -951,4 +956,40 @@ pub struct PlaybackStopped {
     pub item_id: String,
     pub played: bool,
     pub resume: Option<ResumePoint>,
+}
+
+/// `AddToPlaylistResult` of `POST /Playlists/{Id}/Items`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct AddToPlaylistResultDto {
+    #[serde(default)]
+    pub item_added_count: u32,
+}
+
+/// `PlaylistCreationResult` of `POST /Playlists`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaylistCreationResultDto {
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub item_added_count: u32,
+}
+
+/// A playlist of the user, offered by the card menu (ADR 0100).
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Playlist {
+    pub id: String,
+    pub name: String,
+}
+
+/// A playlist just created, and how many items the server says it holds.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaylistCreated {
+    pub id: String,
+    pub name: String,
+    pub added: u32,
 }
