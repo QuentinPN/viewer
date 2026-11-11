@@ -98,6 +98,8 @@ internal fun HomeBar(
     onOpen: (BarItem) -> Unit,
     onOpenLibrary: (Library) -> Unit,
     onSignOut: () -> Unit,
+    /** Back to the server shelf, the session kept for later (ADR 0104). */
+    onSwitchServer: () -> Unit,
 ) {
     var barFocused by remember { mutableStateOf(false) }
     var account by remember { mutableStateOf(false) }
@@ -154,7 +156,7 @@ internal fun HomeBar(
                     idle = Palette.surfaceRaised,
                     onClick = { account = true },
                 ) { color -> Label(initial(userName), color, bold = true) }
-                if (account) AccountMenu(userName, onDismiss = { account = false }, onSignOut = onSignOut)
+                if (account) AccountMenu(userName, onDismiss = { account = false }, onSignOut = onSignOut, onSwitchServer = onSwitchServer)
             }
         }
     }
@@ -212,9 +214,9 @@ private fun Label(text: String, color: Color, bold: Boolean = false) {
     Text(text, color = color, fontSize = 12.sp, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
 }
 
-/** Under the avatar: who is signed in, and « Se déconnecter »; Back closes it. */
+/** Under the avatar: who is signed in, « Changer de serveur » and « Se déconnecter »; Back closes it. */
 @Composable
-private fun AccountMenu(userName: String, onDismiss: () -> Unit, onSignOut: () -> Unit) {
+private fun AccountMenu(userName: String, onDismiss: () -> Unit, onSignOut: () -> Unit, onSwitchServer: () -> Unit) {
     val first = remember { FocusRequester() }
     Popup(
         alignment = Alignment.TopEnd,
@@ -227,7 +229,9 @@ private fun AccountMenu(userName: String, onDismiss: () -> Unit, onSignOut: () -
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("Connecté : $userName", color = Palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
-            OutlinedButton(onClick = onSignOut, modifier = Modifier.focusRequester(first)) { Text("Se déconnecter") }
+            // The session stays saved: its tile on the shelf opens it again without a password (ADR 0104)
+            OutlinedButton(onClick = onSwitchServer, modifier = Modifier.focusRequester(first)) { Text("Changer de serveur") }
+            OutlinedButton(onClick = onSignOut) { Text("Se déconnecter") }
         }
     }
     LaunchedEffect(Unit) {

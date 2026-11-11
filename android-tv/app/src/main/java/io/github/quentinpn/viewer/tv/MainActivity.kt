@@ -34,12 +34,12 @@ import io.github.quentinpn.viewer.tv.ui.LibraryScreen
 import io.github.quentinpn.viewer.tv.ui.MovieScreen
 import io.github.quentinpn.viewer.tv.ui.PersonScreen
 import io.github.quentinpn.viewer.tv.ui.PlaylistScreen
+import io.github.quentinpn.viewer.tv.ui.PreConnectionScreen
 import io.github.quentinpn.viewer.tv.ui.SearchMemory
 import io.github.quentinpn.viewer.tv.ui.SearchScreen
 import io.github.quentinpn.viewer.tv.ui.SeriesScreen
 import io.github.quentinpn.viewer.tv.ui.SeriesTarget
 import io.github.quentinpn.viewer.tv.ui.SettingsScreen
-import io.github.quentinpn.viewer.tv.ui.SignInScreen
 import io.github.quentinpn.viewer.tv.ui.TrailerHandlers
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import io.github.quentinpn.viewer.tv.ui.VersionStore
@@ -58,7 +58,7 @@ import io.github.quentinpn.viewer.tv.ui.studioOptions
 import io.github.quentinpn.viewer.tv.ui.titleLibrary
 import kotlinx.coroutines.launch
 
-/** Launcher: sign-in when no session is stored, else the home shelves, a library grid or the search, the settings, the series and film pages. */
+/** Launcher: the server shelf when no session is open (ADR 0104), else the home shelves, a library grid or the search, the settings, the series and film pages. */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,15 +68,30 @@ class MainActivity : ComponentActivity() {
         setContent {
             ViewerTheme {
                 var session by remember { mutableStateOf(store.load()) }
-                var notice by remember { mutableStateOf<String?>(null) }
+                // A session refused while in use: the shelf opens on its « Session expirée » card (ADR 0104)
+                var reauth by remember { mutableStateOf<String?>(null) }
                 val scope = rememberCoroutineScope()
                 val current = session
                 if (current == null) {
-                    SignInScreen(store.lastServer, notice, device, AppServices.http) { signedIn: Session ->
-                        store.save(signedIn)
-                        notice = null
-                        session = signedIn
-                    }
+                    PreConnectionScreen(
+                        store = store,
+                        device = device,
+                        http = AppServices.http,
+                        reauthKey = reauth,
+                        onSignedIn = { signedIn: Session ->
+                            reauth = null
+                            session = signedIn
+                        },
+                        onRevoke = { entry, token ->
+                            // Best effort, never waited for: the tile is already gone
+                            scope.launch {
+                                try {
+                                    AppServices.client(this@MainActivity, Session(entry.server, entry.userId, entry.userName, token)).logout()
+                                } catch (_: EmbyException) {
+                                }
+                            }
+                        },
+                    )
                 } else {
                     val client = remember(current) { AppServices.client(this, current) }
                     val images = remember(client) { AppServices.images(this, client) }
@@ -97,6 +112,14 @@ class MainActivity : ComponentActivity() {
                     val home = remember(current) { HomeMemory() }
                     // Sign-in or restored session: stop reports lost to the network go out now (ADR 0066)
                     LaunchedEffect(client) { reporter.signedIn(client, current.userId) }
+                    // The tile of a session opened at start (or migrated) learns the server's name (ADR 0104)
+                    LaunchedEffect(client) {
+                        try {
+                            val info = client.publicInfo()
+                            store.describe(current.key, info.id, info.serverName)
+                        } catch (_: EmbyException) {
+                        }
+                    }
                     val refresh by reporter.stopped.collectAsState()
                     val versions = remember(current) { VersionStore(this, current.userId) }
                     // A version is only chosen on the film and episode pages (ADR 0058, 0060); elsewhere the server picks
@@ -129,8 +152,9 @@ class MainActivity : ComponentActivity() {
                     )
                     val expired = {
                         reporter.signedOut()
-                        store.clear()
-                        notice = "Session expirée. Reconnectez-vous."
+                        // The tile stays without its token; « Session expirée » asks the password
+                        store.signOut()
+                        reauth = current.key
                         session = null
                     }
                     // A genre chip opens the library holding the title on that genre (ADR 0079, 0093)
@@ -325,7 +349,14 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             reporter.signedOut()
-                            store.clear()
+                            // The tile stays on the shelf, without its token (ADR 0104)
+                            store.signOut()
+                            session = null
+                        },
+                        onSwitchServer = {
+                            // The token is kept: OK on the tile opens this session again
+                            reporter.signedOut()
+                            store.deactivate()
                             session = null
                         },
                     )
