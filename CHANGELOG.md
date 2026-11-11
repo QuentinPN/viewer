@@ -1,5 +1,15 @@
 # Journal des versions
 
+## 1.1.0 — 2026-11-11
+
+- Écran de pré-connexion « L'étagère » : une vignette par serveur et compte enregistrés, reconnexion sans mot de passe tant que la session est valide, « Gérer » pour oublier un serveur, connexion manuelle (ADR 0103).
+- Menu des cartes façon Emby (clic droit ou touche menu) : marquer vu ou non vu, favori, retirer de « Reprendre », ajouter à une playlist (ADR 0100).
+- Grille de bibliothèque compacte avec rail des lettres et rail d'icônes pour le tri et les filtres, filtre par décennie (ADR 0101).
+- Les marques « vu » se mettent à jour partout sans recharger la page (ADR 0096).
+- Le bouton « Passer l'intro » ou « Passer le générique » disparaît 10 s après son apparition (ADR 0089).
+- Correctif : la barre du haut du lecteur s'affichait au milieu de la fenêtre hors plein écran.
+- Développement : la version debug a ses propres données et son propre coffre, séparés de l'app installée (ADR 0105).
+
 ## 1.0.1 — 2026-11-08
 
 - Open the main window maximized by default
