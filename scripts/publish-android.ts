@@ -1,7 +1,7 @@
 // npm run android:publish [-- --dry-run] (ADR 0107): checks, builds and publishes the
 // Android TV app at the versionName of android-tv/app/build.gradle.kts. Refuses unless
 // the tree is clean, HEAD is on main, android-tv/CHANGELOG.md has the version's section
-// and no GitHub release exists for android-vX.Y.Z; then runs the unit tests, the release
+// and no GitHub release exists for android-vX.Y.Z; then fetches libmpv, runs the unit tests, the release
 // build and its lint, tags HEAD android-vX.Y.Z, pushes main and the tag, and creates the
 // GitHub release with the APK, never marked Latest (that stays the desktop app's).
 // --dry-run turns the refusals into warnings and stops after the build, printing the
@@ -70,6 +70,13 @@ if (!section) {
   process.exit(1);
 }
 
+step("libmpv Android", "powershell", [
+  "-NoProfile",
+  "-ExecutionPolicy",
+  "Bypass",
+  "-File",
+  "scripts/fetch-libmpv-android.ps1",
+]);
 const studioJdk = "C:\\Program Files\\Android\\Android Studio\\jbr";
 if (!process.env.JAVA_HOME && existsSync(studioJdk))
   process.env.JAVA_HOME = studioJdk;

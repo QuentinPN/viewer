@@ -9,7 +9,7 @@ L'app Android TV (`android-tv/`) a son propre numéro de version (`versionName` 
 - **Un seul dépôt.** Les deux apps partagent les contrats Emby, les ADR, le ROADMAP et les choix d'API ; un second dépôt obligerait à les synchroniser à la main.
 - **Tags `android-vX.Y.Z`**, distincts des `vX.Y.Z` du desktop. `scripts/release.ts` ne cherche que les tags `v*`, donc le journal desktop ignore les tags Android.
 - **`npm run android:publish`** (`scripts/publish-android.ts`), lancé sur la machine du propriétaire après avoir monté la version et écrit la section du journal (règle de chaque version livrée). Il refuse si l'arbre est modifié, si HEAD n'est pas sur `main`, si `android-tv/CHANGELOG.md` n'a pas de section pour la version, si la release GitHub existe déjà, ou si le tag existe sur un autre commit.
-- Puis : `gradlew testDebugUnitTest assembleRelease lintRelease`, tag annoté `android-vX.Y.Z` sur HEAD, `git push origin main android-vX.Y.Z`, `gh release create --latest=false` avec l'APK renommé `Viewer-TV_X.Y.Z.apk`.
+- Puis : `fetch-libmpv-android.ps1` (mpv-android épinglé et vérifié), `gradlew testDebugUnitTest assembleRelease lintRelease`, tag annoté `android-vX.Y.Z` sur HEAD, `git push origin main android-vX.Y.Z`, `gh release create --latest=false` avec l'APK renommé `Viewer-TV_X.Y.Z.apk`.
 - **« Latest » reste au desktop** : GitHub n'en montre qu'une par dépôt, et la release Android est toujours créée avec `--latest=false`.
 - **Notes** : la section de la version dans le journal Android, puis l'APK avec son code de version, sa taille et son SHA-256 (`androidReleaseNotes`, testé par Vitest, comme `gradleVersion`).
 - **Contrôle final** : le SHA-256 calculé par GitHub pour l'APK envoyé doit être celui du build local.
