@@ -3,8 +3,9 @@
 # Credential Manager, created once by the user (cmdkey prompts for the password,
 # hidden):
 #   cmdkey /generic:viewer-e2e-emby /user:<test user> /pass
-# VIEWER_EMBY_URL keeps its value when set, otherwise it is the last server the app
-# signed in to (session.json, no secret in it).
+# VIEWER_EMBY_URL keeps its value when set, otherwise it is the last server the debug
+# app signed in to, else the installed app's (session.json, no secret in it; the
+# debug build has its own data and vault entries, ADR 0105).
 #
 #   ./scripts/with-test-account.ps1 node scripts/e2e/gate2-ui.mjs
 #   ./scripts/with-test-account.ps1 ./scripts/with-msvc.ps1 cargo test … '--' --ignored
@@ -38,9 +39,12 @@ $cred = [E2eCred]::Read($Target)
 if (-not $cred) { throw "No '$Target' credential: run  cmdkey /generic:$Target /user:<test user> /pass" }
 $hadUrl = [bool]$env:VIEWER_EMBY_URL
 if (-not $hadUrl) {
-  $session = Join-Path $env:APPDATA 'io.github.quentinpn.viewer\session.json'
-  if (Test-Path $session) {
-    $env:VIEWER_EMBY_URL = (Get-Content $session -Raw | ConvertFrom-Json).lastServerUrl
+  foreach ($app in 'io.github.quentinpn.viewer.debug', 'io.github.quentinpn.viewer') {
+    $session = Join-Path $env:APPDATA "$app\session.json"
+    if (Test-Path $session) {
+      $env:VIEWER_EMBY_URL = (Get-Content $session -Raw | ConvertFrom-Json).lastServerUrl
+      if ($env:VIEWER_EMBY_URL) { break }
+    }
   }
 }
 $env:VIEWER_EMBY_USER = $cred[0]

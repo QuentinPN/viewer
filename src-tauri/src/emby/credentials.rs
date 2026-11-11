@@ -7,7 +7,13 @@ use std::sync::Mutex;
 use super::EmbyError;
 use super::client::AccessToken;
 
-pub const SERVICE: &str = "Viewer";
+/// Debug builds keep their tokens apart from the installed app (ADR 0105): scripted
+/// UI tests never read, replace or delete the owner's session.
+pub const SERVICE: &str = if cfg!(debug_assertions) {
+    "Viewer-debug"
+} else {
+    "Viewer"
+};
 
 pub trait CredentialStore: Send + Sync {
     fn save(&self, account: &str, token: &AccessToken) -> Result<(), EmbyError>;

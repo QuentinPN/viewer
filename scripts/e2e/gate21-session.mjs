@@ -51,12 +51,13 @@ const invoke = (page, cmd, args = {}) =>
   );
 const text = async (locator) => (await locator.textContent())?.trim() ?? "";
 
-/** Viewer tokens in the Windows Credential Manager (names only, no secret). */
+/** Debug-build tokens in the Windows Credential Manager (names only, no secret, ADR 0105). */
 function vaultEntries() {
   const r = spawnSync("cmdkey", ["/list"], { encoding: "utf8" });
   return r.stdout
     .split(/\r?\n/)
-    .filter((l) => /Viewer/i.test(l) && /cible|target/i.test(l)).length;
+    .filter((l) => /\.Viewer-debug\s*$/i.test(l) && /cible|target/i.test(l))
+    .length;
 }
 
 /**

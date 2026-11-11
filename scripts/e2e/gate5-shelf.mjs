@@ -32,11 +32,11 @@ const focusedName = (page) =>
       document.activeElement?.textContent?.trim() ??
       document.activeElement?.id,
   );
-/** Vault entries of the app for this user (target "<serverId>/<userId>.Viewer"). */
+/** Debug-build vault entry of this user (target "<serverId>/<userId>.Viewer-debug"). */
 const vaultHas = (userId) =>
   spawnSync("cmdkey", ["/list"], { encoding: "utf8" })
     .stdout.split(/\r?\n/)
-    .some((l) => l.includes(`/${userId}.Viewer`));
+    .some((l) => l.trim().endsWith(`/${userId}.Viewer-debug`));
 
 async function toShelf(page) {
   await accountAction(page, "Changer de serveur");

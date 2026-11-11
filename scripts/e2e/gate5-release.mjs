@@ -5,8 +5,10 @@
 // - the Gate 1 prototype is refused;
 // - the bitrate cap of the scenarios is ignored: no "débit trop élevé" transcode;
 // - a film plays, a seek lands, back to 0 then Escape leaves no resume point.
-// VIEWER_RELEASE_EXE sets the executable, by default the per-user install. Starts in any
-// state, ends signed out.
+// VIEWER_RELEASE_EXE sets the executable, by default the per-user install. The installed
+// app holds the owner's data (ADR 0105): a session of another user is left untouched
+// and the scenario stops; at the end the test account is signed out and its tile
+// forgotten, so the owner's shelf keeps only their own servers.
 import { join } from "node:path";
 import { launch } from "./app.mjs";
 import {
@@ -64,6 +66,14 @@ try {
   if ((await startScreen(page)) === "signedOut") {
     await signIn(page, account, account.password);
     await libraryNav(page).waitFor({ timeout: 20000 });
+  } else {
+    const label = await page
+      .getByRole("button", { name: /^Compte : / })
+      .getAttribute("aria-label");
+    if (label !== `Compte : ${account.user}`)
+      throw new Error(
+        `the installed app is signed in as another user (${label}): left untouched`,
+      );
   }
   check("signed_in", true);
   const libraries = libraryNav(page).locator("ul.libraries button");
@@ -131,6 +141,20 @@ try {
 
   await page.keyboard.press("Escape");
   await signOut(page);
+  const shelf = await invoke(page, "emby_shelf", {});
+  for (const { server } of shelf.filter(
+    (s) => s.server.userName === account.user,
+  ))
+    await invoke(page, "emby_forget_server", {
+      serverId: server.id,
+      userId: server.userId,
+    });
+  check(
+    "test_tile_forgotten",
+    !(await invoke(page, "emby_shelf", {})).some(
+      (s) => s.server.userName === account.user,
+    ),
+  );
   check("exit_code", (await app.close()) === 0);
   app = null;
 } catch (e) {

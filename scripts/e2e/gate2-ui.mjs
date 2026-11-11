@@ -277,7 +277,7 @@ try {
   }).stdout.split(/\r?\n/);
   check(
     "no_app_credential_left",
-    !entries.some((l) => /target=.*Viewer/i.test(l)),
+    !entries.some((l) => /target=.*\.Viewer-debug\s*$/i.test(l)),
   );
 } catch (e) {
   check(

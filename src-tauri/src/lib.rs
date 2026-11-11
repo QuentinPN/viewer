@@ -196,6 +196,10 @@ fn log_dir(app: &tauri::App) -> Option<PathBuf> {
         .or_else(|| app.path().app_log_dir().ok())
 }
 
+/// Identifier of debug builds, next to `io.github.quentinpn.viewer` of the release (ADR 0105).
+#[cfg(debug_assertions)]
+const DEBUG_IDENTIFIER: &str = "io.github.quentinpn.viewer.debug";
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// Debug builds only: `VIEWER_E2E_OFFSCREEN` opens the main window off-screen and
 /// without activating it, so scripted UI tests (`scripts/e2e`) do not take the
@@ -203,6 +207,16 @@ fn log_dir(app: &tauri::App) -> Option<PathBuf> {
 fn context() -> tauri::Context<tauri::Wry> {
     #[allow(unused_mut)]
     let mut context = tauri::generate_context!();
+    // Debug builds are another app (ADR 0105): their own config, cache, logs and
+    // WebView storage, so scripted UI tests never touch the installed app's data.
+    #[cfg(debug_assertions)]
+    {
+        let config = context.config_mut();
+        config.identifier = DEBUG_IDENTIFIER.into();
+        for window in &mut config.app.windows {
+            window.title = format!("{} (debug)", window.title);
+        }
+    }
     #[cfg(debug_assertions)]
     if std::env::var_os("VIEWER_E2E_OFFSCREEN").is_some() {
         for window in &mut context.config_mut().app.windows {
