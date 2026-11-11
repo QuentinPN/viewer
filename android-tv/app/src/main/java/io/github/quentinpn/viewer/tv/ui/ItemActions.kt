@@ -1,29 +1,13 @@
 package io.github.quentinpn.viewer.tv.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
@@ -34,6 +18,7 @@ import io.github.quentinpn.viewer.tv.emby.UserItemData
 import kotlinx.coroutines.launch
 
 // Write actions on the user's data (ADR 0097): watched mark, favourite, « Reprendre ».
+// The card menu offering them on the home is in CardMenu.kt (ADR 0098).
 
 /** One write a card's menu or a detail page offers. */
 internal enum class ItemAction(val label: String) {
@@ -44,9 +29,6 @@ internal enum class ItemAction(val label: String) {
     RemoveFavorite("Retirer des favoris"),
 }
 
-/** Types whose watched mark and favourite the server keeps. */
-private val ACTION_TYPES = setOf("Movie", "Episode", "Series", "Season")
-
 /** The watched-mark action [item] offers: the opposite of its current mark. */
 internal fun playedAction(item: BaseItemDto): ItemAction =
     if (item.userData?.played == true) ItemAction.MarkUnplayed else ItemAction.MarkPlayed
@@ -54,15 +36,6 @@ internal fun playedAction(item: BaseItemDto): ItemAction =
 /** The favourite action [item] offers: the opposite of its current state. */
 internal fun favoriteAction(item: BaseItemDto): ItemAction =
     if (item.userData?.isFavorite == true) ItemAction.RemoveFavorite else ItemAction.AddFavorite
-
-/**
- * The menu of a home card, in its order: « Retirer de Reprendre » on that shelf only, then the
- * watched mark and the favourite. None for a playlist or anything else without user data.
- */
-internal fun cardActions(item: BaseItemDto, resumeShelf: Boolean): List<ItemAction> {
-    if (item.type !in ACTION_TYPES) return emptyList()
-    return listOfNotNull(ItemAction.RemoveFromResume.takeIf { resumeShelf }, playedAction(item), favoriteAction(item))
-}
 
 /** Sends [action] for [itemId]; the server answers with the item's new user data. */
 internal suspend fun EmbyClient.perform(userId: String, itemId: String, action: ItemAction): UserItemData = when (action) {
@@ -111,67 +84,6 @@ internal fun focusAfter(before: List<Shelf>, after: List<Shelf>, shelfTitle: Str
     val ids = now.items.map { it.id }.toSet()
     val next = old.drop(at + 1).firstOrNull { it.id in ids } ?: old.take(at).lastOrNull { it.id in ids }
     return shelfTitle to (next ?: now.items.first()).id
-}
-
-/**
- * A card's menu (ADR 0097), opened by a long press on OK: one button per action, the first
- * focused. Stays open while the server answers, with its message on failure; Back closes it
- * and the focus goes back to the card.
- */
-@Composable
-internal fun CardMenu(
-    item: BaseItemDto,
-    actions: List<ItemAction>,
-    onDismiss: () -> Unit,
-    /** Sends the action and updates the home; throws [EmbyException] on failure. */
-    perform: suspend (ItemAction) -> Unit,
-) {
-    val first = remember { FocusRequester() }
-    val scope = rememberCoroutineScope()
-    var busy by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf<String?>(null) }
-    Popup(alignment = Alignment.Center, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
-        Column(
-            Modifier.widthIn(min = 260.dp, max = 360.dp).background(Palette.surface, RoundedCornerShape(12.dp)).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                if (item.type == "Episode") item.seriesName ?: item.name else item.name,
-                color = Palette.textSecondary,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            actions.forEachIndexed { index, action ->
-                OutlinedButton(
-                    onClick = {
-                        // Pressed again while the server answers: nothing more is sent
-                        if (busy) return@OutlinedButton
-                        busy = true
-                        message = null
-                        scope.launch {
-                            try {
-                                perform(action)
-                                onDismiss()
-                            } catch (e: EmbyException) {
-                                message = actionFailed(e.error)
-                            } finally {
-                                busy = false
-                            }
-                        }
-                    },
-                    modifier = (if (index == 0) Modifier.focusRequester(first) else Modifier).alpha(if (busy) 0.5f else 1f),
-                ) {
-                    Text(action.label, maxLines = 1)
-                }
-            }
-            message?.let { Text(it, color = Palette.error, style = MaterialTheme.typography.bodySmall) }
-        }
-    }
-    LaunchedEffect(Unit) {
-        withFrameNanos {}
-        runCatching { first.requestFocus() }
-    }
 }
 
 /**

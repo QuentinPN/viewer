@@ -653,4 +653,31 @@ class EmbyClient(
         playlistItemsQuery(segment(userId), limit).forEach { (name, value) -> builder.addQueryParameter(name, value) }
         return call(get(builder.build()), QueryResult.serializer(BaseItemDto.serializer()))
     }
+
+    /**
+     * Adds [itemId] to the end of [playlistId] (ADR 0098): `POST /Playlists/{Id}/Items?Ids=&UserId=`,
+     * no body. A series is added by its own id: the server adds its episodes.
+     */
+    suspend fun addToPlaylist(userId: String, playlistId: String, itemId: String): AddToPlaylistResult {
+        val url = server.api("/Playlists/${segment(playlistId)}/Items").newBuilder()
+            .addQueryParameter("Ids", segment(itemId))
+            .addQueryParameter("UserId", segment(userId))
+            .build()
+        return call(post(url, ByteArray(0).toRequestBody()), AddToPlaylistResult.serializer())
+    }
+
+    /**
+     * A new video playlist named [name] holding [itemId] (ADR 0098):
+     * `POST /Playlists?Name=&Ids=&MediaType=Video&UserId=`, no body. `UserId` is always sent:
+     * the server is reported to need it to know whose playlist it is.
+     */
+    suspend fun createPlaylist(userId: String, name: String, itemId: String): PlaylistCreationResult {
+        val url = server.api("/Playlists").newBuilder()
+            .addQueryParameter("Name", name)
+            .addQueryParameter("Ids", segment(itemId))
+            .addQueryParameter("MediaType", "Video")
+            .addQueryParameter("UserId", segment(userId))
+            .build()
+        return call(post(url, ByteArray(0).toRequestBody()), PlaylistCreationResult.serializer())
+    }
 }

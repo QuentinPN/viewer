@@ -752,4 +752,60 @@ class EmbyClientTest {
         respond(200, "pas du json")
         expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").setPlayed("u1", "m1", played = false) }
     }
+
+    @Test
+    fun addingToAPlaylistPostsTheItemForTheUser() = runBlocking {
+        respond(200, """{"Id":"p1","ItemAddedCount":1}""")
+        val result = client.withToken("secret-token").addToPlaylist("u1", "p1", "m1")
+        assertEquals(1, result.itemAddedCount)
+        assertWrite("POST", "/emby/Playlists/p1/Items", "Ids=m1&UserId=u1")
+    }
+
+    @Test
+    fun aNewPlaylistIsAVideoOneHoldingTheItem() = runBlocking {
+        respond(200, """{"Id":"p9","Name":"Soirée & ciné","ItemAddedCount":1}""")
+        val created = client.withToken("secret-token").createPlaylist("u1", "Soirée & ciné", "s1")
+        assertEquals("p9", created.id)
+        assertEquals("Soirée & ciné", created.name)
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/emby/Playlists", request.url.encodedPath)
+        // The name is encoded as one parameter: its « & » cannot add another
+        assertEquals("Soirée & ciné", request.url.queryParameter("Name"))
+        assertEquals(listOf("Name", "Ids", "MediaType", "UserId"), request.url.queryParameterNames.toList())
+        assertEquals("s1", request.url.queryParameter("Ids"))
+        assertEquals("Video", request.url.queryParameter("MediaType"))
+        assertEquals("u1", request.url.queryParameter("UserId"))
+        assertFalse("no token in the URL", "secret-token" in request.url.toString())
+        assertTrue(request.headers["X-Emby-Authorization"]!!.endsWith(", Token=\"secret-token\""))
+        assertEquals(0, request.body?.size ?: 0)
+    }
+
+    @Test
+    fun playlistCallsNeedASessionAndCleanIds() {
+        expectError(EmbyError.NotSignedIn::class.java) { client.addToPlaylist("u1", "p1", "m1") }
+        expectError(EmbyError.NotSignedIn::class.java) { client.createPlaylist("u1", "Soirée", "m1") }
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").addToPlaylist("u1", "../p1", "m1") }
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").addToPlaylist("u1", "p1", "m1,m2") }
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").createPlaylist("u1", "Soirée", "m1&UserId=u2") }
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").createPlaylist("../u1", "Soirée", "m1") }
+        assertEquals("nothing sent", 0, server.requestCount)
+    }
+
+    @Test
+    fun playlistErrorsMapToCategories() {
+        respond(401)
+        expectError(EmbyError.SessionExpired::class.java) { client.withToken("t").addToPlaylist("u1", "p1", "m1") }
+        respond(403)
+        expectError(EmbyError.Forbidden::class.java) { client.withToken("t").addToPlaylist("u1", "p1", "m1") }
+        respond(404)
+        expectError(EmbyError.NotFound::class.java) { client.withToken("t").addToPlaylist("u1", "p1", "m1") }
+        respond(500)
+        expectError(EmbyError.Server::class.java) { client.withToken("t").createPlaylist("u1", "Soirée", "m1") }
+        respond(200, "pas du json")
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").createPlaylist("u1", "Soirée", "m1") }
+        // A creation answer without the new playlist's id is no answer
+        respond(200, """{"Name":"Soirée"}""")
+        expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").createPlaylist("u1", "Soirée", "m1") }
+    }
 }
