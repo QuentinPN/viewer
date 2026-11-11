@@ -19,7 +19,15 @@ android {
     }
 
     buildTypes {
+        // Its own app next to the release (ADR 0102): own data, session and Emby device, so
+        // tests run on another account and never replace the owner's install
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            manifestPlaceholders["appLabel"] = "Viewer Debug"
+        }
         release {
+            manifestPlaceholders["appLabel"] = "Viewer"
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Personal use only: the release build is signed with the debug key

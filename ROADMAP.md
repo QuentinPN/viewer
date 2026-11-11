@@ -1132,3 +1132,9 @@ For each completed slice record date, changed behavior, tests executed, outcomes
 - **Checked on the Shield** (debug build, account « claude », each change undone): the long-press menu on « Reprendre »; favourite added then removed; a season of 6 unwatched episodes marked played (all 6 show « Vu », the series turns played: the server cascades) then unplayed; an episode toggled from its page. Logcat: 0 token line, 0 `FATAL EXCEPTION`. Gates: Android `testDebugUnitTest` (494 tests), `lintDebug`, `assembleRelease`, `lintRelease`; desktop `verify:web` and `verify:rust` (168 Rust tests) OK. Release build reinstalled.
 - **Not verified**: « Retirer de Reprendre » against the server (no undo in the UI), the film page, focus returning to the card after the menu, and the whole desktop UI (not run: the owner was using the app).
 - **Side effect while testing**: a mistyped key resumed Overgeared S1E7 for about 45 s; its resume point on « claude » moved from 3:38 to 4:22.
+
+### 2026-11-11 — Version debug séparée (Android TV, ADR 0102)
+
+- **Added**: the debug build installs as its own app, `io.github.quentinpn.viewer.tv.debug` (« Viewer Debug », banner with an orange band), next to the release. Own data, session and Emby device id, so device tests run on the test account and `installDebug` no longer replaces the owner's release.
+- **Checked on the Shield**: `installDebug` left both packages installed (`pm list packages`); the debug app starts on the sign-in screen. Gates: `testDebugUnitTest` (494 tests), `assembleDebug`, `lintDebug`, `assembleRelease`, `lintRelease` OK.
+- **Pending**: the owner signs the debug app in once with the test account (tests never type a password).

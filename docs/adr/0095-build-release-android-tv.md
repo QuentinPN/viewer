@@ -12,7 +12,7 @@ Le propriétaire n'utilisera plus que la Shield pour la TV. Jusqu'ici, seule la 
 
 ## Alternatives
 - **Une clé de release dédiée** : rien à protéger pour un usage personnel. En plus, passer de debug à release obligerait à désinstaller l'app, donc à se reconnecter. Rejeté.
-- **Un `applicationIdSuffix` pour la version debug** : les deux versions cohabiteraient, mais la version debug demanderait une nouvelle connexion, et les tests sur l'appareil ne saisissent pas de mot de passe. Rejeté.
+- **Un `applicationIdSuffix` pour la version debug** : les deux versions cohabiteraient, mais la version debug demanderait une nouvelle connexion, et les tests sur l'appareil ne saisissent pas de mot de passe. Rejeté. *Remplacé par l'ADR 0102 : le propriétaire veut une app de test séparée, sur un autre compte.*
 
 ## Conséquences
 - L'APK release pèse 33,6 Mo contre 59,8 Mo pour la version debug. Il n'est pas débogable et ne contient plus d'activité de test.

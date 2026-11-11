@@ -47,8 +47,8 @@ Start-Sleep -Seconds 1
 
 try {
   Adb logcat -c
-  Adb shell am force-stop io.github.quentinpn.viewer.tv
-  Adb shell am start -W -n io.github.quentinpn.viewer.tv/.PlaybackPocActivity --es url "http://127.0.0.1:$Port/media" --es token $Token --es start $Start |
+  Adb shell am force-stop io.github.quentinpn.viewer.tv.debug
+  Adb shell am start -W -n io.github.quentinpn.viewer.tv.debug/io.github.quentinpn.viewer.tv.PlaybackPocActivity --es url "http://127.0.0.1:$Port/media" --es token $Token --es start $Start |
     Out-File (Join-Path $run 'am-start.txt')
   Start-Sleep -Seconds $StartupSeconds
   Shot '01-lecture'
