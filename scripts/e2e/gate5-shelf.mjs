@@ -130,6 +130,12 @@ try {
   await toShelf(page);
   await button(page, "Se connecter manuellement").click();
   await page.locator("#server-url").waitFor({ timeout: 5000 });
+  // The last address is read after the card opens.
+  await page
+    .waitForFunction(() => document.querySelector("#server-url")?.value, null, {
+      timeout: 5000,
+    })
+    .catch(() => {});
   const prefilled = await page.locator("#server-url").inputValue();
   check(
     "manual_card",
@@ -165,6 +171,18 @@ try {
     );
   }
   await shot(page, "after-forget");
+
+  // Back to the starting state: a tile without token, so the address stays for
+  // the other scenarios.
+  await signIn(page, { ...account, url: prefilled }, account.password);
+  await libraryNav(page).waitFor({ timeout: 20000 });
+  await accountAction(page, "Se déconnecter");
+  await shelf(page).waitFor({ timeout: 15000 });
+  check(
+    "restored_tile",
+    (await ownTile(page, userId).getAttribute("data-access")) === "signedOut" &&
+      !vaultHas(userId),
+  );
 
   check("exit_code", (await app.close()) === 0);
   app = null;
