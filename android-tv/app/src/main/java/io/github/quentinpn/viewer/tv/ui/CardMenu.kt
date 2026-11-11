@@ -2,6 +2,7 @@ package io.github.quentinpn.viewer.tv.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -199,7 +200,7 @@ private class CardMenuPosition(private val margin: Int) : PopupPositionProvider 
 }
 
 /** The panel's dark glass and its rows' shape. */
-private val PanelColor = Color(0xEB1C1C1E)
+private val PanelColor = Color(0xF71C1C1E)
 private val RowShape = RoundedCornerShape(50)
 
 /**
@@ -230,6 +231,7 @@ internal fun CardMenu(
     val context = LocalContext.current
     val margin = with(LocalDensity.current) { 24.dp.roundToPx() }
     val first = remember { FocusRequester() }
+    val panel = remember { FocusRequester() }
     val playlistRow = remember { FocusRequester() }
     var page by remember { mutableStateOf(MenuPage.Actions) }
     // Back from the playlists: the focus goes back on « Ajouter à une playlist »
@@ -240,6 +242,9 @@ internal fun CardMenu(
     var name by remember { mutableStateOf(defaultPlaylistName(item)) }
 
     fun go(to: MenuPage, back: Boolean = false) {
+        // The focused row leaves with its page: the panel holds the focus until the new page's
+        // first row takes it, or the popup would end up with nothing focused
+        runCatching { panel.requestFocus() }
         message = null
         cameBack = back
         page = to
@@ -276,7 +281,8 @@ internal fun CardMenu(
         properties = PopupProperties(focusable = true),
     ) {
         Column(
-            Modifier.width(296.dp).background(PanelColor, RoundedCornerShape(16.dp)).padding(12.dp),
+            Modifier.width(296.dp).background(PanelColor, RoundedCornerShape(16.dp))
+                .focusRequester(panel).focusable().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             MenuHeader(item, client, images)
