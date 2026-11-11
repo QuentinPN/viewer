@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import androidGradle from "../../android-tv/app/build.gradle.kts?raw";
 import pkg from "../../package.json";
 import lock from "../../package-lock.json";
 import cargoLock from "../../src-tauri/Cargo.lock?raw";
@@ -6,10 +7,12 @@ import cargoToml from "../../src-tauri/Cargo.toml?raw";
 import tauriConf from "../../src-tauri/tauri.conf.json";
 import {
   addChangelogSection,
+  androidReleaseNotes,
   cargoLockVersion,
   cargoTomlVersion,
   changelogSection,
   compareVersions,
+  gradleVersion,
   nextVersion,
   releaseNotes,
   setCargoLockVersion,
@@ -116,6 +119,41 @@ describe("release notes", () => {
     expect(notes.startsWith("## Viewer 1.0.1\n\n- Fix A\n")).toBe(true);
     expect(notes).toContain(
       "`Viewer_1.0.1_x64-setup.exe` — 35,72 Mio — SHA-256 `b129dd`",
+    );
+  });
+});
+
+describe("gradleVersion", () => {
+  it("reads the Android TV app's version", () => {
+    expect(gradleVersion(androidGradle)).toBeDefined();
+    expect(
+      gradleVersion('    versionCode = 3\n    versionName = "1.0.1"\n'),
+    ).toEqual({ name: "1.0.1", code: 3 });
+  });
+
+  it("ignores the debug suffix and a missing field", () => {
+    expect(
+      gradleVersion(
+        '        versionCode = 3\n        versionName = "1.0.1"\n            versionNameSuffix = "-debug"\n',
+      )?.name,
+    ).toBe("1.0.1");
+    expect(gradleVersion('versionName = "1.0.1"')).toBeUndefined();
+  });
+});
+
+describe("androidReleaseNotes", () => {
+  it("puts the changelog section, then the APK", () => {
+    const notes = androidReleaseNotes({ name: "1.0.1", code: 3 }, "- Fix A", {
+      name: "Viewer-TV_1.0.1.apk",
+      bytes: 37450769,
+      sha256: "B129DD",
+    });
+    expect(
+      notes.startsWith("## Viewer Android TV 1.0.1\n\n- Fix A\n"),
+    ).toBe(true);
+    expect(notes).toContain("code de version 3");
+    expect(notes).toContain(
+      "`Viewer-TV_1.0.1.apk` — 35,72 Mio — SHA-256 `b129dd`",
     );
   });
 });

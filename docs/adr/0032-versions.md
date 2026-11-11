@@ -24,4 +24,4 @@ L'application restait en 0.1.0 : chaque installateur portait le même numéro, e
 ## Conséquences
 - L'installateur NSIS de Tauri remplace une version plus ancienne déjà installée ; le numéro de l'entrée de désinstallation suit.
 - Construire un installateur se fait après `npm run release`, pour que son numéro corresponde au tag : `npm run release:publish` le construit et le publie en release GitHub (ADR 0106).
-- Android TV (2026-11-11) : version propre à l'app TV, `versionName` et `versionCode` dans `android-tv/app/build.gradle.kts`, journal dans `android-tv/CHANGELOG.md` ; chaque APK livré sur la Shield augmente la version (1.0.0, code 2, le 2026-11-11).
+- Android TV (2026-11-11) : version propre à l'app TV, `versionName` et `versionCode` dans `android-tv/app/build.gradle.kts`, journal dans `android-tv/CHANGELOG.md` ; chaque APK livré sur la Shield augmente la version (1.0.0, code 2, le 2026-11-11). Publication par `npm run android:publish`, tags `android-vX.Y.Z` (ADR 0107).
