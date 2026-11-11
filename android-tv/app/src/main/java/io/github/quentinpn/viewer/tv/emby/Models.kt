@@ -201,6 +201,21 @@ data class UserItemData(
     @SerialName("IsFavorite") val isFavorite: Boolean = false,
 )
 
+/** Answer of `POST /Playlists/{Id}/Items` (ADR 0098). */
+@Serializable
+data class AddToPlaylistResult(
+    @SerialName("Id") val id: String? = null,
+    @SerialName("ItemAddedCount") val itemAddedCount: Int = 0,
+)
+
+/** Answer of `POST /Playlists` (ADR 0098): the new playlist's id. */
+@Serializable
+data class PlaylistCreationResult(
+    @SerialName("Id") val id: String,
+    @SerialName("Name") val name: String? = null,
+    @SerialName("ItemAddedCount") val itemAddedCount: Int = 0,
+)
+
 @Serializable
 internal data class PlaybackInfoRequest(
     @SerialName("UserId") val userId: String,

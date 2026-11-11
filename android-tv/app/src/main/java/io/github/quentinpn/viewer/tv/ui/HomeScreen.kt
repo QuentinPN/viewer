@@ -200,14 +200,10 @@ fun HomeScreen(
         memory.loadedChanges = changes
     }
 
-    // A card's menu (ADR 0097): the answer updates the shelves at once, then they are read again
+    // A card's menu (ADR 0097): the answer updates the shelves at once, then they are read again.
+    // A failure goes back to the menu, which shows it and handles an expired session.
     val onAction: suspend (Shelf, BaseItemDto, ItemAction) -> Unit = { shelf, item, action ->
-        val data = try {
-            client.perform(userId, item.id, action)
-        } catch (e: EmbyException) {
-            if (e.error == EmbyError.SessionExpired) onSessionExpired()
-            throw e
-        }
+        val data = client.perform(userId, item.id, action)
         (memory.state as? HomeState.Ready)?.let { ready ->
             val after = shelvesAfter(ready.shelves, item.id, action, data)
             memory.opened = focusAfter(ready.shelves, after, shelf.title, item.id)
@@ -215,6 +211,31 @@ fun HomeScreen(
             memory.state = ready.copy(shelves = after)
         }
         memory.userDataChanged()
+    }
+
+    // The menu of a card (ADR 0098), laid over it; its play rows start playback as the card does
+    val cardMenu: @Composable (Shelf, BaseItemDto, () -> Unit) -> Unit = { shelf, item, close ->
+        CardMenu(
+            item,
+            menuActions(item, MenuContext(resumeShelf = shelf.resume)),
+            client,
+            userId,
+            images,
+            onDismiss = close,
+            onPlay = { id, startTicks ->
+                notice = null
+                memory.focusHeader = null
+                memory.opened = shelf.title to item.id
+                onPlay(id, startTicks)
+            },
+            onSessionExpired = onSessionExpired,
+            // A new playlist or a new count on the « Listes de lecture » row: read again, focus kept on the card
+            onPlaylistChanged = {
+                memory.focusHeader = null
+                memory.opened = shelf.title to item.id
+                memory.userDataChanged()
+            },
+        ) { onAction(shelf, item, it) }
     }
 
     val header: @Composable () -> Unit = {
@@ -287,7 +308,7 @@ fun HomeScreen(
                         if (title.type == "Movie") onOpenMovie(title.id) else onOpenSeries(title.id)
                     },
                 )
-                Shelves(s.shelves, s.hero, heroActions, HeroFocus(main = heroMain, up = home), header, memory, client, images, onAction, onAll = { shelf, library ->
+                Shelves(s.shelves, s.hero, heroActions, HeroFocus(main = heroMain, up = home), header, memory, client, images, cardMenu, onAll = { shelf, library ->
                     notice = null
                     memory.focusHeader = null
                     memory.opened = shelf.title to ALL
@@ -420,8 +441,8 @@ private fun Shelves(
     memory: HomeMemory,
     client: EmbyClient,
     images: ImageLoader,
-    /** Sends a card menu's action (ADR 0097); throws [EmbyException] on failure. */
-    perform: suspend (Shelf, BaseItemDto, ItemAction) -> Unit,
+    /** A card's menu (ADR 0098), shown over the card; its last argument closes it. */
+    cardMenu: @Composable (Shelf, BaseItemDto, () -> Unit) -> Unit,
     onAll: (Shelf, Library) -> Unit,
     onOpen: (Shelf, BaseItemDto) -> Unit,
 ) {
@@ -497,19 +518,29 @@ private fun Shelves(
                 ) {
                     items(shelf.items, key = { it.id }) { item ->
                         val focus = if (target == shelf.title to item.id) Modifier.focusRequester(first) else Modifier
-                        val actions = cardActions(item, shelf.resume)
+                        val hasMenu = menuActions(item, MenuContext(resumeShelf = shelf.resume)).isNotEmpty()
+                        // The card again once its menu closes
+                        val card = remember { FocusRequester() }
+                        // The menu's popup is anchored on this box, the card's bounds
                         Box {
                             ItemCard(
                                 item,
                                 shelf.landscape,
                                 client,
                                 images,
-                                focus,
+                                focus.focusRequester(card),
                                 // A long press on OK opens the card's menu; none on a playlist
-                                onLongClick = if (actions.isEmpty()) null else ({ menu = shelf.title to item.id }),
+                                onLongClick = if (hasMenu) ({ menu = shelf.title to item.id }) else null,
                             ) { onOpen(shelf, item) }
                             if (menu == shelf.title to item.id) {
-                                CardMenu(item, actions, onDismiss = { menu = null }) { perform(shelf, item, it) }
+                                cardMenu(shelf, item) {
+                                    menu = null
+                                    // Gone after an action that took it off the shelf: the home's target takes over
+                                    scope.launch {
+                                        withFrameNanos {}
+                                        runCatching { card.requestFocus() }
+                                    }
+                                }
                             }
                         }
                     }

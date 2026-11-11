@@ -18,27 +18,13 @@ class ItemActionsTest {
     private val shelves = listOf(resume, favorites, latest)
 
     @Test
-    fun theResumeShelfAlsoOffersToLeaveIt() {
-        assertEquals(
-            listOf(ItemAction.RemoveFromResume, ItemAction.MarkPlayed, ItemAction.AddFavorite),
-            cardActions(item("a"), resumeShelf = true),
-        )
-        assertEquals(listOf(ItemAction.MarkPlayed, ItemAction.AddFavorite), cardActions(item("a", "Series"), resumeShelf = false))
-    }
-
-    @Test
     fun eachActionIsTheOppositeOfTheCurrentState() {
         val watched = item("a", "Episode", UserItemData(played = true, isFavorite = true))
-        assertEquals(listOf(ItemAction.MarkUnplayed, ItemAction.RemoveFavorite), cardActions(watched, resumeShelf = false))
+        assertEquals(ItemAction.MarkUnplayed, playedAction(watched))
+        assertEquals(ItemAction.RemoveFavorite, favoriteAction(watched))
         assertEquals("Marquer comme non vu", playedAction(watched).label)
         assertEquals("Retirer des favoris", favoriteAction(watched).label)
         assertEquals("Ajouter aux favoris", favoriteAction(item("x")).label)
-    }
-
-    @Test
-    fun aPlaylistHasNoMenu() {
-        assertTrue(cardActions(item("p", "Playlist"), resumeShelf = false).isEmpty())
-        assertTrue(cardActions(item("f", "Folder"), resumeShelf = true).isEmpty())
     }
 
     @Test
