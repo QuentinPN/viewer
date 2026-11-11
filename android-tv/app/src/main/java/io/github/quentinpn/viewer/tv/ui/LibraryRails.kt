@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -131,8 +132,9 @@ internal fun IconRail(
     modifier: Modifier,
     onAction: (RailAction) -> Unit,
 ) {
+    val actions = railActions(options)
     Column(modifier, horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        for (action in railActions(options)) {
+        for (action in actions) {
             RailButton(
                 icon = railIcon(action),
                 label = railLabel(action, options),
@@ -140,6 +142,9 @@ internal fun IconRail(
                 modifier = Modifier.focusRequester(requesters.getValue(action)),
             ) { onAction(action) }
         }
+        // The rail is centred: « Réinitialiser » keeps its place while hidden, so the other
+        // icons do not move up when it shows
+        if (RailAction.Reset !in actions) Spacer(Modifier.size(40.dp))
     }
 }
 
