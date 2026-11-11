@@ -22,6 +22,8 @@ import type {
   WatchItem,
 } from "../emby/types";
 import Home from "../home/Home.svelte";
+import CardMenu from "../menu/CardMenu.svelte";
+import { CardMenuState, provideCardMenu } from "../menu/menuState.svelte";
 import {
   cleanQuery,
   isSearchable,
@@ -116,6 +118,15 @@ let scrollBeforeSearch: number | null = null;
 
 /** Bumped after a favorite change on a detail page (ADR 0014). */
 let favoritesVersion = $state(0);
+
+/** The cards' menu (ADR 0100), shared by every card this screen renders. */
+const cardMenu = new CardMenuState();
+provideCardMenu(cardMenu);
+
+function favoriteChanged(itemId: string, favorite: boolean) {
+  favoritesVersion++;
+  cardMenu.noteFavorite(itemId, favorite);
+}
 
 function fail(e: unknown): EmbyError {
   const error = toEmbyError(e);
@@ -808,7 +819,7 @@ $effect(() => {
         onClose={closeDetail}
         onError={fail}
         {onPlay}
-        onFavoriteChange={() => favoritesVersion++}
+        onFavoriteChange={favoriteChanged}
         onNavigate={navigateEpisode}
         focusOnLoad={openedVia}
         backLabel={searching ? "Retour à la recherche" : undefined}
@@ -817,6 +828,7 @@ $effect(() => {
     {/key}
   {/if}
   </div>
+  <CardMenu menu={cardMenu} {onPlay} onError={fail} onFavoriteChange={favoriteChanged} />
 </div>
 
 <style>

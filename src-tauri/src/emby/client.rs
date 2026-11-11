@@ -9,9 +9,10 @@ use serde::de::DeserializeOwned;
 use super::EmbyError;
 use super::images::{self, ImageRequest};
 use super::models::{
-    AuthenticateUserByName, AuthenticationResult, BaseItemDto, DeviceProfile, HomeSectionDto,
-    ItemsOptions, PlaybackInfoRequest, PlaybackInfoResponse, PlaybackReportBody, PublicSystemInfo,
-    QueryResult, UserDto, UserItemData,
+    AddToPlaylistResultDto, AuthenticateUserByName, AuthenticationResult, BaseItemDto,
+    DeviceProfile, HomeSectionDto, ItemsOptions, PlaybackInfoRequest, PlaybackInfoResponse,
+    PlaybackReportBody, PlaylistCreationResultDto, PublicSystemInfo, QueryResult, UserDto,
+    UserItemData,
 };
 use super::server_url::ServerUrl;
 
@@ -693,6 +694,72 @@ impl EmbyClient {
             .request_url(Method::POST, &url, &[("Hide", hide)])
             .send()
             .await?;
+        json(check(res, true)?).await
+    }
+
+    /// Playlists of the user, by name
+    /// (`/Users/{Id}/Items?IncludeItemTypes=Playlist&Recursive=true`, ADR 0100).
+    pub async fn playlists(
+        &self,
+        user_id: &str,
+        limit: u32,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Users/{}/Items", path_segment(user_id)?));
+        let limit = limit.to_string();
+        let params = [
+            ("IncludeItemTypes", "Playlist"),
+            ("Recursive", "true"),
+            ("SortBy", "SortName"),
+            ("SortOrder", "Ascending"),
+            ("Limit", limit.as_str()),
+            ("EnableImageTypes", "Primary"),
+            ("ImageTypeLimit", "1"),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// Appends an item to a playlist
+    /// (`POST /Playlists/{Id}/Items?Ids=&UserId=` → `AddToPlaylistResult`, ADR 0100).
+    pub async fn add_to_playlist(
+        &self,
+        user_id: &str,
+        playlist_id: &str,
+        item_id: &str,
+    ) -> Result<AddToPlaylistResultDto, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Playlists/{}/Items", path_segment(playlist_id)?));
+        let params = [
+            ("Ids", path_segment(item_id)?),
+            ("UserId", path_segment(user_id)?),
+        ];
+        let res = self.request_url(Method::POST, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// Creates a video playlist holding one item
+    /// (`POST /Playlists?Name=&Ids=&MediaType=Video&UserId=` →
+    /// `PlaylistCreationResult`, ADR 0100). The name is checked by the caller.
+    pub async fn create_playlist(
+        &self,
+        user_id: &str,
+        name: &str,
+        item_id: &str,
+    ) -> Result<PlaylistCreationResultDto, EmbyError> {
+        self.require_token()?;
+        let url = self.server.api("/Playlists");
+        let params = [
+            ("Name", name),
+            ("Ids", path_segment(item_id)?),
+            ("MediaType", "Video"),
+            ("UserId", path_segment(user_id)?),
+        ];
+        let res = self.request_url(Method::POST, &url, &params).send().await?;
         json(check(res, true)?).await
     }
 

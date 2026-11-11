@@ -1,17 +1,48 @@
 <script lang="ts">
 // One film or series in a library grid, opening its detail page. Artwork comes
-// ready from Rust (ADR 0005).
+// ready from Rust (ADR 0005). Right-click, the context-menu key or the "…"
+// button open its menu (ADR 0100).
 import type { MediaItem } from "../emby/types";
+import { isMenuKey, type MenuContext, posterTarget } from "../menu/actions";
+import MoreButton from "../menu/MoreButton.svelte";
+import { boxOf, useCardMenu } from "../menu/menuState.svelte";
+import type { Box } from "../menu/position";
 import { itemSubtitle } from "./pager";
 
 interface Props {
   item: MediaItem;
   onOpen: (item: MediaItem) => void;
+  menuContext?: MenuContext;
 }
 
-let { item, onOpen }: Props = $props();
+let { item, onOpen, menuContext = "poster" }: Props = $props();
 
+const menu = useCardMenu();
+let card = $state<HTMLButtonElement | null>(null);
+let more = $state<HTMLButtonElement | null>(null);
 let failed = $state(false);
+const target = $derived(menu ? posterTarget(item) : null);
+const menuOpen = $derived(menu?.isOpenFor(card) ?? false);
+
+function openMenu(anchor: Box) {
+  if (menu && target && card) {
+    menu.open({ target, context: menuContext, anchor, opener: card });
+  }
+}
+
+function onkeydown(e: KeyboardEvent) {
+  if (!target || !more || !isMenuKey(e)) return;
+  e.preventDefault();
+  openMenu(boxOf(more));
+}
+
+function oncontextmenu(e: MouseEvent) {
+  if (!target) return;
+  e.preventDefault();
+  // The context-menu key also sends this event: the menu is already open.
+  if (!menuOpen)
+    openMenu({ left: e.clientX, top: e.clientY, width: 0, height: 0 });
+}
 const subtitle = $derived(itemSubtitle(item));
 const initials = $derived(
   item.name
@@ -23,39 +54,67 @@ const initials = $derived(
 );
 </script>
 
-<button type="button" class="card" data-item-id={item.id} onclick={() => onOpen(item)}>
-  <div class="poster">
-    {#if item.poster && !failed}
-      <img
-        src={item.poster.src}
-        srcset={item.poster.srcset}
-        sizes="(min-width: 1600px) 220px, 180px"
-        alt=""
-        loading="lazy"
-        decoding="async"
-        onerror={() => (failed = true)}
-      />
-    {:else}
-      <span class="placeholder" aria-hidden="true">{initials}</span>
-    {/if}
-    {#if item.played}
-      <span class="badge played" title="Déjà vu">
-        <svg viewBox="0 0 16 16" aria-hidden="true"
-          ><path d="M3 8.5 6.5 12 13 4.5" /></svg
-        >
-        <span class="sr-only">Déjà vu</span>
-      </span>
-    {:else if item.unplayedCount}
-      <span class="badge count" title="Épisodes non vus">
-        {item.unplayedCount}<span class="sr-only"> épisodes non vus</span>
-      </span>
-    {/if}
-  </div>
-  <span class="title">{item.name}</span>
-  {#if subtitle}<span class="meta">{subtitle}</span>{/if}
-</button>
+<div class="menu-holder" class:has-menu={target !== null}>
+  <button
+    bind:this={card}
+    type="button"
+    class="card"
+    data-item-id={item.id}
+    aria-keyshortcuts={target ? "Shift+F10" : undefined}
+    onclick={() => onOpen(item)}
+    {onkeydown}
+    {oncontextmenu}
+  >
+    <div class="poster">
+      {#if item.poster && !failed}
+        <img
+          src={item.poster.src}
+          srcset={item.poster.srcset}
+          sizes="(min-width: 1600px) 220px, 180px"
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onerror={() => (failed = true)}
+        />
+      {:else}
+        <span class="placeholder" aria-hidden="true">{initials}</span>
+      {/if}
+      {#if item.played}
+        <span class="badge played" title="Déjà vu">
+          <svg viewBox="0 0 16 16" aria-hidden="true"
+            ><path d="M3 8.5 6.5 12 13 4.5" /></svg
+          >
+          <span class="sr-only">Déjà vu</span>
+        </span>
+      {:else if item.unplayedCount}
+        <span class="badge count" title="Épisodes non vus">
+          {item.unplayedCount}<span class="sr-only"> épisodes non vus</span>
+        </span>
+      {/if}
+    </div>
+    <span class="title">{item.name}</span>
+    {#if subtitle}<span class="meta">{subtitle}</span>{/if}
+  </button>
+  {#if target}
+    <MoreButton
+      bind:button={more}
+      title={item.name}
+      expanded={menuOpen}
+      onclick={() => more && openMenu(boxOf(more))}
+    />
+  {/if}
+</div>
 
 <style>
+  .menu-holder {
+    position: relative;
+    min-width: 0;
+  }
+  /* The "…" button takes the badge's corner while it shows. */
+  .has-menu:hover .badge,
+  .has-menu:focus-within .badge {
+    opacity: 0;
+  }
   .card {
     min-width: 0;
     width: 100%;

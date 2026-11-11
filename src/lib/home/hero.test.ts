@@ -14,6 +14,7 @@ function hero(id: string, extra: Partial<HeroItem> = {}): HeroItem {
       aspectRatio: null,
       played: false,
       unplayedCount: null,
+      favorite: false,
     },
     reason: "latest",
     backdrop: { src: "b", srcset: "b 960w" },

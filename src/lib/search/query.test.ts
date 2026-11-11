@@ -12,6 +12,7 @@ const item = (id: string): MediaItem => ({
   aspectRatio: null,
   played: false,
   unplayedCount: null,
+  favorite: false,
 });
 
 const episode = (id: string): WatchItem => ({
@@ -24,6 +25,8 @@ const episode = (id: string): WatchItem => ({
   image: null,
   runtimeMinutes: null,
   resume: null,
+  played: false,
+  favorite: false,
 });
 
 const results = (

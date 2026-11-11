@@ -87,6 +87,8 @@ export interface MediaItem {
   played: boolean;
   /** Series only: episodes not yet watched. */
   unplayedCount: number | null;
+  /** Labels the card menu's favourite action (ADR 0100). */
+  favorite: boolean;
 }
 
 /** Films, series and episodes whose title words start with the query (ADR 0011, 0020). */
@@ -117,6 +119,9 @@ export interface WatchItem {
   image: ImageRef | null;
   runtimeMinutes: number | null;
   resume: ResumePoint | null;
+  /** Label the card menu's played and favourite actions (ADR 0100). */
+  played: boolean;
+  favorite: boolean;
 }
 
 /** One title of the home hero (ADR 0015). */
@@ -376,4 +381,17 @@ export interface Segment {
   /** `null`: credits that run to the end of the file. */
   end: number | null;
   source: "emby" | "introDb" | "theIntroDb";
+}
+
+/** A playlist of the user, offered by the card menu (ADR 0100). */
+export interface Playlist {
+  id: string;
+  name: string;
+}
+
+/** A playlist just created, and how many items the server says it holds. */
+export interface PlaylistCreated {
+  id: string;
+  name: string;
+  added: number;
 }

@@ -16,6 +16,8 @@ import type {
   PlaybackQuality,
   PlaybackStart,
   PlaybackStopped,
+  Playlist,
+  PlaylistCreated,
   SavedServer,
   SearchResults,
   Season,
@@ -74,6 +76,17 @@ export const embyApi = {
   /** Takes a film or episode out of "Reprendre" (ADR 0096); announced the same way. */
   hideFromResume: (itemId: string) =>
     invoke<PlaybackStopped>("emby_hide_from_resume", { itemId }),
+  /** First episode of a series not watched yet, as the hero plays it (ADR 0100). */
+  seriesNextEpisode: (seriesId: string) =>
+    invoke<WatchItem | null>("emby_series_next_episode", { seriesId }),
+  /** Playlists of the user, by name (ADR 0100). */
+  playlists: () => invoke<Playlist[]>("emby_playlists"),
+  /** Returns how many items the server says it added. */
+  addToPlaylist: (playlistId: string, itemId: string) =>
+    invoke<number>("emby_add_to_playlist", { playlistId, itemId }),
+  /** Creates a video playlist holding the item (ADR 0100). */
+  createPlaylist: (name: string, itemId: string) =>
+    invoke<PlaylistCreated>("emby_create_playlist", { name, itemId }),
   search: (query: string) => invoke<SearchResults>("emby_search", { query }),
   itemDetail: (itemId: string) =>
     invoke<ItemDetail>("emby_item_detail", { itemId }),
