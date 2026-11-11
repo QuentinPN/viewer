@@ -995,7 +995,7 @@ For each completed slice record date, changed behavior, tests executed, outcomes
   - the timer running out, both after minutes and at the credits. Reaching the credits would bring the episode near 90 % and could mark it watched on the test account.
   - the up-next card held back.
 
-### 2026-11-10 ? Android TV: recent searches, about page and random pick
+### 2026-11-10 — Android TV: recent searches, about page and random pick
 
 - **Added**: ADR 0075. Search shows up to the last searches as chips when the field is empty, per server and user (SharedPreferences, never the server). OK on a chip runs that search again and moves it to the front; ? Effacer l'historique ? clears the list and puts the focus back on the field.
 - **Added**: ADR 0076. R?glages has an ? ? propos ? section: app version and build, device and Android version, server name, Emby version and address (`GET /System/Info/Public`), and what the device decodes (HEVC, AV1, VP9, H.264, HDR, Dolby Vision) from `MediaCodecList` and the display's HDR modes.
