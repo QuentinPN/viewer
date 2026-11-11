@@ -46,12 +46,21 @@ internal fun badgeText(badge: PosterBadge): String = when (badge) {
  * then one line of title and one of facts in smaller type than the home's cards.
  */
 @Composable
-internal fun LibraryCard(item: BaseItemDto, client: EmbyClient, images: ImageLoader, modifier: Modifier, onClick: () -> Unit) {
+internal fun LibraryCard(
+    item: BaseItemDto,
+    client: EmbyClient,
+    images: ImageLoader,
+    modifier: Modifier,
+    /** A long press on OK opens the card's menu (ADR 0098); null leaves it to the click. */
+    onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     val shape = RoundedCornerShape(8.dp)
     val still = reducedMotion()
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Card(
             onClick = onClick,
+            onLongClick = onLongClick,
             modifier = modifier.fillMaxWidth().aspectRatio(2f / 3f),
             shape = CardDefaults.shape(shape),
             scale = CardDefaults.scale(focusedScale = if (still) 1f else 1.06f),

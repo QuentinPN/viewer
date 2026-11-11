@@ -51,6 +51,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.ItemsOptions
 import io.github.quentinpn.viewer.tv.emby.LetterStart
 import io.github.quentinpn.viewer.tv.emby.SortKey
+import io.github.quentinpn.viewer.tv.emby.UserItemData
 import io.github.quentinpn.viewer.tv.emby.pageEnd
 import io.github.quentinpn.viewer.tv.emby.pageLimit
 import kotlinx.coroutines.launch
@@ -113,6 +114,30 @@ class LibraryMemory(val library: Library, options: ItemsOptions = ItemsOptions()
     /** True after « Aléatoire » opened a title: Back gives the focus to that icon (ADR 0077, 0099). */
     internal var focusRandom = false
 
+    /**
+     * A card menu's write answered with [data] for [itemId] (ADR 0098, « Grille bibliothèque »):
+     * the card changes in place, or leaves when the filters no longer hold it, with the count,
+     * the next page's start and the letter index moved up by one. The card, or the one that took
+     * its place, takes the focus.
+     */
+    internal fun userDataChanged(itemId: String, data: UserItemData) {
+        when (val change = gridChange(items, itemId, data, options)) {
+            is GridChange.Updated -> {
+                items[change.index] = change.item
+                opened = itemId
+            }
+            is GridChange.Removed -> {
+                items.removeAt(change.index)
+                // The server's list lost a title before the next page's start
+                fetched = (fetched - 1).coerceAtLeast(0)
+                if (total > 0) total--
+                letters = letters?.let { lettersAfterRemoval(it, change.index, itemId, items.getOrNull(change.index)?.id, total) }
+                opened = change.focus
+            }
+            GridChange.Absent -> Unit
+        }
+    }
+
     /** New sort or filters: back to the first page. */
     internal fun change(next: ItemsOptions) {
         if (next == options) return
@@ -170,6 +195,10 @@ fun LibraryScreen(
     onOpenSeries: (seriesId: String) -> Unit,
     onOpenMovie: (movieId: String) -> Unit,
     onSessionExpired: () -> Unit,
+    /** A card menu's play rows (ADR 0098), as the home's: the player negotiates the stream. */
+    onPlay: (itemId: String, startTicks: Long) -> Unit,
+    /** After a write or a playlist change from a card's menu: the home reads its rows again. */
+    onUserDataChanged: () -> Unit,
 ) {
     var attempt by remember { mutableIntStateOf(0) }
     var panel by remember { mutableStateOf<Panel?>(null) }
@@ -280,6 +309,38 @@ fun LibraryScreen(
             }
     }
 
+    // A card's menu (ADR 0098), as on the home but without « Retirer de Reprendre ». A write
+    // changes its card in place or takes it off the grid; a failure goes back to the menu,
+    // which shows it and handles an expired session.
+    val cardMenu: @Composable (BaseItemDto, () -> Unit) -> Unit = { item, close ->
+        CardMenu(
+            item,
+            menuActions(item),
+            client,
+            userId,
+            images,
+            onDismiss = close,
+            onPlay = { id, startTicks ->
+                notice = null
+                memory.opened = item.id
+                memory.focusGrid = true
+                onPlay(id, startTicks)
+            },
+            onSessionExpired = onSessionExpired,
+            onPlaylistChanged = onUserDataChanged,
+        ) { action ->
+            val generation = memory.generation
+            val data = client.perform(userId, item.id, action)
+            // Never with the menu open, but a page of an older query is not edited
+            if (generation == memory.generation) {
+                memory.userDataChanged(item.id, data)
+                // The last card left: the grid goes, the focus goes to the rail
+                if (memory.items.isEmpty()) focusRail(RailAction.Sort)
+            }
+            onUserDataChanged()
+        }
+    }
+
     // The page of the letter is read by the collector above, the only one that loads
     fun jumpTo(start: LetterStart) {
         memory.wanted = maxOf(memory.wanted, pageEnd(start.position, PAGE_SIZE))
@@ -317,7 +378,7 @@ fun LibraryScreen(
                             Centered("Aucun titre ne correspond à ces filtres.")
                         memory.items.isEmpty() && memory.total == 0 -> Centered("Cette bibliothèque est vide.")
                         memory.items.isEmpty() -> Centered("Chargement…")
-                        else -> Grid(memory, client, images, error, onFocused = { focused = it }, onRetry = {
+                        else -> Grid(memory, client, images, error, cardMenu, onFocused = { focused = it }, onRetry = {
                             memory.error = null
                             attempt++
                         }) { item ->
@@ -469,11 +530,16 @@ private fun Grid(
     client: EmbyClient,
     images: ImageLoader,
     error: String?,
+    /** A card's menu (ADR 0098), shown over the card; its last argument closes it. */
+    cardMenu: @Composable (BaseItemDto, () -> Unit) -> Unit,
     onFocused: (Int) -> Unit,
     onRetry: () -> Unit,
     onOpen: (BaseItemDto) -> Unit,
 ) {
     val focus = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
+    // Id of the card whose menu is open
+    var menu by remember { mutableStateOf<String?>(null) }
     // The card opened last, else the first one; one frame first so the card is placed.
     // After a change from the rail the focus stays on the rail.
     val target = memory.opened?.takeIf { id -> memory.items.any { it.id == id } } ?: memory.items.first().id
@@ -513,7 +579,34 @@ private fun Grid(
         gridItemsIndexed(memory.items, key = { _, item -> item.id }) { index, item ->
             val modifier = (if (item.id == target) Modifier.focusRequester(focus) else Modifier)
                 .onFocusChanged { if (it.isFocused) onFocused(index) }
-            LibraryCard(item, client, images, modifier) { onOpen(item) }
+            val hasMenu = menuActions(item).isNotEmpty()
+            // The menu's popup is anchored on this box, the card's bounds
+            Box {
+                LibraryCard(
+                    item,
+                    client,
+                    images,
+                    modifier,
+                    // A long press on OK opens the card's menu; the card keeps the focus target
+                    onLongClick = if (hasMenu) ({
+                        memory.opened = item.id
+                        menu = item.id
+                    }) else null,
+                ) { onOpen(item) }
+                if (menu == item.id) {
+                    cardMenu(item) {
+                        menu = null
+                        // memory.opened is this card, or the one that took its place once it left
+                        // the grid: its focus requester is placed on the next composition
+                        scope.launch {
+                            repeat(2) {
+                                withFrameNanos {}
+                                runCatching { focus.requestFocus() }
+                            }
+                        }
+                    }
+                }
+            }
         }
         // A later page that failed: the loaded cards stay, with a way to try again
         if (error != null) {

@@ -188,6 +188,8 @@ class MainActivity : ComponentActivity() {
                                     onOpenSeries = { pages = openOver(pages, DetailPage.Series(SeriesTarget(it))) },
                                     onOpenMovie = { pages = openOver(pages, DetailPage.Movie(it)) },
                                     onSessionExpired = expired,
+                                    onPlay = play,
+                                    onUserDataChanged = home::userDataChanged,
                                 )
                                 is DetailPage.Person -> PersonScreen(
                                     client,
@@ -265,6 +267,8 @@ class MainActivity : ComponentActivity() {
                             onOpenSeries = { openSeries(SeriesTarget(it)) },
                             onOpenMovie = openMovie,
                             onSessionExpired = expired,
+                            onPlay = play,
+                            onUserDataChanged = home::userDataChanged,
                         )
                         return@ViewerTheme
                     }
