@@ -134,6 +134,13 @@ pub async fn app_info(state: State<'_, AppState>) -> Result<AppInfo, ()> {
 
 // Emby (ADR 0004). Results carry user and server summaries, never the token.
 
+/// Name, version and address of the signed-in server, read again from its public
+/// system info: an error when it cannot be reached.
+#[tauri::command]
+pub async fn emby_server_info(emby: State<'_, EmbyService>) -> Result<ServerSummary, EmbyError> {
+    emby.server_info().await
+}
+
 #[tauri::command]
 pub async fn emby_probe(
     emby: State<'_, EmbyService>,

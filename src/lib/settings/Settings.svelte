@@ -2,8 +2,8 @@
 import { onMount } from "svelte";
 import { embyApi, toEmbyError } from "../emby/api";
 import type { ArtworkCacheStats, EmbyError } from "../emby/types";
-import { playerApi } from "../player/api";
 import { readSkip, type SkipSetting, saveSkip } from "../player/segments";
+import About from "./About.svelte";
 import Diagnostics from "./Diagnostics.svelte";
 import {
   cacheUsage,
@@ -22,7 +22,6 @@ let clearing = $state(false);
 let clearError = $state<EmbyError | null>(null);
 let announce = $state("");
 let skip = $state<SkipSetting>(readSkip(storage()));
-let version = $state<string | null>(null);
 
 /** `localStorage` may be missing or refused: the setting is then not kept. */
 function storage(): Storage | null {
@@ -67,10 +66,6 @@ async function clear() {
 
 onMount(() => {
   void load();
-  playerApi.appInfo().then(
-    (info) => (version = info.version),
-    () => {},
-  );
 });
 </script>
 
@@ -175,10 +170,7 @@ onMount(() => {
 
 <Diagnostics />
 
-<section class="panel" aria-labelledby="settings-about">
-  <h2 id="settings-about">À propos</h2>
-  <p class="lead">Viewer {version ? `version ${version}` : "— version inconnue"}</p>
-</section>
+<About />
 
 <style>
   .heading {

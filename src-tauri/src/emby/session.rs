@@ -1360,6 +1360,12 @@ impl EmbyService {
     }
 
     /// Validates the address and reads the server's public identity.
+    /// The open session's server as it answers now (Réglages › Serveur).
+    pub async fn server_info(&self) -> Result<ServerSummary, EmbyError> {
+        let client = self.client()?;
+        summary(&client).await
+    }
+
     pub async fn probe(&self, url: &str) -> Result<ServerSummary, EmbyError> {
         summary(&self.new_client(url)?).await
     }
