@@ -64,7 +64,7 @@ export const LANGUAGES: readonly { code: string; label: string }[] = [
 
 export const SUBTITLE_MODES: readonly { value: SubtitleMode; label: string }[] =
   [
-    { value: "server", label: "Comme sur le serveur Emby" },
+    { value: "server", label: "Comme le compte Emby" },
     { value: "off", label: "Désactivés" },
     { value: "forcedOnly", label: "Forcés uniquement" },
     { value: "always", label: "Toujours" },
