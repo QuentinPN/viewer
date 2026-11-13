@@ -1,6 +1,6 @@
 # Journal des versions
 
-## 1.3.1 — en cours
+## 1.3.1 — 2026-11-13
 
 - Réglages : les sections occupent toute la fenêtre, en colonnes selon sa largeur (une sur fenêtre étroite, jusqu'à quatre sur grand écran). Les réglages du quotidien viennent d'abord, en panneaux pleins et sans trou (Lecture et Qualité l'une sous l'autre, puis Audio et sous-titres, puis Accueil) ; mises à jour, cache, journaux et détails techniques sont regroupés plus bas sous « Informations et maintenance », en panneaux plus discrets.
 - L'app te tutoie partout, comme la TV : connexion, choix du serveur, messages d'erreur, recherche et bibliothèques.
