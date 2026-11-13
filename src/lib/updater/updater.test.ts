@@ -14,6 +14,7 @@ function fakeApi(pending: UpdateInfo | null = null) {
       handler = h;
       return unlisten;
     }),
+    check: vi.fn(async () => ({ status: "upToDate" as const })),
   };
   return { api, unlisten, fire: (info: UpdateInfo) => handler?.(info) };
 }

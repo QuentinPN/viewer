@@ -388,6 +388,7 @@ pub fn run() {
             diagnostics::diagnostics_open_log_dir,
             updater::app_update_pending,
             updater::app_update_install,
+            updater::app_update_check,
         ])
         .build(context())
         .expect("error while building Viewer");

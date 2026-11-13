@@ -7,6 +7,8 @@
 // marked played (ADR 0096), from its menu (ADR 0100). Every row is also read again
 // in place after 5 min shown, or 30 s away from the app, so new titles show (ADR 0109),
 // and at once when the server announces a library change (ADR 0110).
+// Rows follow the order and visibility of Réglages › Accueil (ADR 0113), read when
+// the home opens; a hidden row is never requested.
 import { onMount, tick, untrack } from "svelte";
 import { patchPlayed, restoreItem, withoutItem } from "../detail/watched";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
@@ -29,6 +31,14 @@ import {
 import { watchTitle, withoutDuplicates } from "./format";
 import Hero from "./Hero.svelte";
 import Row from "./Row.svelte";
+import {
+  defaultRows,
+  FAVORITES_ROW,
+  type HomeRowPrefs,
+  NEXT_UP_ROW,
+  RESUME_ROW,
+  visibleRows,
+} from "./rows";
 import WatchCard from "./WatchCard.svelte";
 
 interface Props {
@@ -43,6 +53,8 @@ interface Props {
   favoritesVersion: number;
   /** Reports the error upward (a lost server or a 401 changes the screen) and returns it. */
   onError: (e: unknown) => EmbyError;
+  /** Order and hidden rows, read once when the home opens (ADR 0113). */
+  rowPrefs: HomeRowPrefs;
 }
 
 let {
@@ -54,7 +66,15 @@ let {
   refresh,
   favoritesVersion,
   onError,
+  rowPrefs,
 }: Props = $props();
+
+const shown = $derived(visibleRows(defaultRows(libraries), rowPrefs));
+const shows = (key: string) => shown.some((r) => r.key === key);
+/** Libraries whose « Ajoutés récemment » row is shown: only these are requested. */
+const shownLibraries = $derived(
+  shown.flatMap((r) => (r.library ? [r.library] : [])),
+);
 
 interface RowState<T> {
   items: T[] | null;
@@ -63,6 +83,11 @@ interface RowState<T> {
 
 function loadingRow<T>(): RowState<T> {
   return { items: null, error: null };
+}
+
+/** A hidden row: never requested, counts as empty. */
+function hiddenRow<T>(): RowState<T> {
+  return { items: [], error: null };
 }
 
 let hero = $state<RowState<HeroItem>>(loadingRow());
@@ -95,11 +120,12 @@ const watchLoading = $derived(
     (nextUp.items === null && !nextUp.error),
 );
 const everythingEmpty = $derived(
-  hero.items?.length === 0 &&
+  shown.length > 0 &&
+    hero.items?.length === 0 &&
     inProgress.items?.length === 0 &&
     nextUpShown?.length === 0 &&
     favorites.items?.length === 0 &&
-    libraries.every((l) => latest[l.id]?.items?.length === 0),
+    shownLibraries.every((l) => latest[l.id]?.items?.length === 0),
 );
 
 async function loadRow<T>(
@@ -120,12 +146,20 @@ function loadWatchRows() {
   const gen = ++watchGeneration;
   const current = () => gen === watchGeneration;
   void loadRow(embyApi.hero, (r) => (hero = r), current);
-  void loadRow(embyApi.continueWatching, (r) => (inProgress = r), current);
-  void loadRow(embyApi.nextUp, (r) => (nextUp = r), current);
+  if (shows(RESUME_ROW)) {
+    void loadRow(embyApi.continueWatching, (r) => (inProgress = r), current);
+  } else inProgress = hiddenRow();
+  if (shows(NEXT_UP_ROW)) {
+    void loadRow(embyApi.nextUp, (r) => (nextUp = r), current);
+  } else nextUp = hiddenRow();
 }
 
 /** Read again in place: the cards shown stay until the answer comes. */
 function loadFavorites() {
+  if (!shows(FAVORITES_ROW)) {
+    favorites = hiddenRow();
+    return;
+  }
   const gen = ++favoritesGeneration;
   void loadRow(
     embyApi.favorites,
@@ -159,7 +193,7 @@ function afterPlayback() {
   loadedAt = Date.now();
   loadWatchRows();
   loadFavorites();
-  for (const library of libraries) loadLatest(library, true);
+  for (const library of shownLibraries) loadLatest(library, true);
 }
 
 async function start(id: string, resume: boolean, title: string) {
@@ -245,7 +279,7 @@ $effect(() => {
   untrack(() => {
     loadWatchRows();
     loadFavorites();
-    for (const library of libraries) {
+    for (const library of shownLibraries) {
       if (latest[library.id]?.error) loadLatest(library);
     }
   });
@@ -272,7 +306,7 @@ onMount(() => {
   loadedAt = Date.now();
   loadWatchRows();
   loadFavorites();
-  for (const library of libraries) loadLatest(library);
+  for (const library of shownLibraries) loadLatest(library);
   const unlisten = embyApi.onPlaybackStopped(onStopped);
   // Without the socket, the timer and the return to the app still refresh.
   const unwatch = embyApi.watchLibrary(afterPlayback).catch(() => null);
@@ -346,102 +380,113 @@ onMount(() => {
     <Hero items={hero.items} {starting} onPlay={playHero} {onOpen} />
   {/if}
 
-  {#if watchLoading}
-    <Row title="Reprendre" id="row-loading" wide>
-      {@render skeleton(true, 4)}
-    </Row>
-  {:else}
-    {#if inProgress.error}
-      <section class="row-failed" aria-labelledby="row-resume">
-        <h2 id="row-resume">Reprendre</h2>
-        {@render rowError(inProgress.error, loadWatchRows)}
-      </section>
-    {:else if inProgress.items?.length}
-      <div class="resume-row" bind:this={resumeList}>
+  {#each shown as homeRow (homeRow.key)}
+    {#if homeRow.key === RESUME_ROW}
+      {#if inProgress.error}
+        <section class="row-failed" aria-labelledby="row-resume">
+          <h2 id="row-resume">Reprendre</h2>
+          {@render rowError(inProgress.error, loadWatchRows)}
+        </section>
+      {:else if inProgress.items === null}
         <Row title="Reprendre" id="row-resume" wide>
-          {#each inProgress.items as item (item.id)}
+          {@render skeleton(true, 4)}
+        </Row>
+      {:else if inProgress.items.length}
+        <div class="resume-row" bind:this={resumeList}>
+          <Row title="Reprendre" id="row-resume" wide>
+            {#each inProgress.items as item (item.id)}
+              <li>
+                <WatchCard
+                  {item}
+                  busy={starting === item.id}
+                  disabled={starting !== null}
+                  onPlay={play}
+                  menuContext="resume"
+                  onMarkPlayed={(i) => takeOut(i, true)}
+                  onRemoveFromResume={(i) => takeOut(i, false)}
+                />
+              </li>
+            {/each}
+          </Row>
+        </div>
+      {/if}
+    {:else if homeRow.key === NEXT_UP_ROW}
+      {#if nextUp.error}
+        <section class="row-failed" aria-labelledby="row-next">
+          <h2 id="row-next">À suivre</h2>
+          {@render rowError(nextUp.error, loadWatchRows)}
+        </section>
+      {:else if nextUpShown === null}
+        <Row title="À suivre" id="row-next" wide>
+          {@render skeleton(true, 4)}
+        </Row>
+      {:else if nextUpShown.length}
+        <Row title="À suivre" id="row-next" wide>
+          {#each nextUpShown as item (item.id)}
             <li>
               <WatchCard
                 {item}
                 busy={starting === item.id}
                 disabled={starting !== null}
                 onPlay={play}
-                menuContext="resume"
-                onMarkPlayed={(i) => takeOut(i, true)}
-                onRemoveFromResume={(i) => takeOut(i, false)}
               />
             </li>
           {/each}
         </Row>
-      </div>
-    {/if}
-
-    {#if nextUp.error}
-      <section class="row-failed" aria-labelledby="row-next">
-        <h2 id="row-next">À suivre</h2>
-        {@render rowError(nextUp.error, loadWatchRows)}
-      </section>
-    {:else if nextUpShown?.length}
-      <Row title="À suivre" id="row-next" wide>
-        {#each nextUpShown as item (item.id)}
-          <li>
-            <WatchCard
-              {item}
-              busy={starting === item.id}
-              disabled={starting !== null}
-              onPlay={play}
-            />
-          </li>
-        {/each}
-      </Row>
-    {/if}
-  {/if}
-
-  {#if favorites.error}
-    <section class="row-failed" aria-labelledby="row-favorites">
-      <h2 id="row-favorites">Favoris</h2>
-      {@render rowError(favorites.error, retryFavorites)}
-    </section>
-  {:else if !favorites.items || favorites.items.length > 0}
-    <Row title="Favoris" id="row-favorites">
-      {#if favorites.items}
-        {#each favorites.items as item (item.id)}
-          <li><PosterCard {item} onOpen={onOpen} /></li>
-        {/each}
-      {:else}
-        {@render skeleton(false, 8)}
       {/if}
-    </Row>
-  {/if}
-
-  {#each libraries as library (library.id)}
-    {@const row = latest[library.id]}
-    {#if row?.error}
-      <section class="row-failed" aria-labelledby="row-latest-{library.id}">
-        <h2 id="row-latest-{library.id}">Ajoutés récemment · {library.name}</h2>
-        {@render rowError(row.error, () => loadLatest(library))}
-      </section>
-    {:else if !row?.items || row.items.length > 0}
-      <Row title="Ajoutés récemment · {library.name}" id="row-latest-{library.id}">
-        {#snippet action()}
-          <button
-            type="button"
-            class="see-all"
-            aria-label="Tout voir dans {library.name}"
-            onclick={() => onShowLibrary(library)}>Tout voir</button
-          >
-        {/snippet}
-        {#if row?.items}
-          {#each row.items as item (item.id)}
-            <li><PosterCard {item} onOpen={onOpen} /></li>
-          {/each}
-        {:else}
-          {@render skeleton(false, 8)}
-        {/if}
-      </Row>
+    {:else if homeRow.key === FAVORITES_ROW}
+      {#if favorites.error}
+        <section class="row-failed" aria-labelledby="row-favorites">
+          <h2 id="row-favorites">Favoris</h2>
+          {@render rowError(favorites.error, retryFavorites)}
+        </section>
+      {:else if !favorites.items || favorites.items.length > 0}
+        <Row title="Favoris" id="row-favorites">
+          {#if favorites.items}
+            {#each favorites.items as item (item.id)}
+              <li><PosterCard {item} onOpen={onOpen} /></li>
+            {/each}
+          {:else}
+            {@render skeleton(false, 8)}
+          {/if}
+        </Row>
+      {/if}
+    {:else if homeRow.library}
+      {@const library = homeRow.library}
+      {@const row = latest[library.id]}
+      {#if row?.error}
+        <section class="row-failed" aria-labelledby="row-latest-{library.id}">
+          <h2 id="row-latest-{library.id}">{homeRow.label}</h2>
+          {@render rowError(row.error, () => loadLatest(library))}
+        </section>
+      {:else if !row?.items || row.items.length > 0}
+        <Row title={homeRow.label} id="row-latest-{library.id}">
+          {#snippet action()}
+            <button
+              type="button"
+              class="see-all"
+              aria-label="Tout voir dans {library.name}"
+              onclick={() => onShowLibrary(library)}>Tout voir</button
+            >
+          {/snippet}
+          {#if row?.items}
+            {#each row.items as item (item.id)}
+              <li><PosterCard {item} onOpen={onOpen} /></li>
+            {/each}
+          {:else}
+            {@render skeleton(false, 8)}
+          {/if}
+        </Row>
+      {/if}
     {/if}
   {/each}
 
+  {#if shown.length === 0}
+    <div class="state">
+      <p class="state-title">Toutes les rangées sont masquées</p>
+      <p>Choisis celles à afficher dans Réglages › Accueil.</p>
+    </div>
+  {/if}
   {#if everythingEmpty}
     <div class="state">
       <p class="state-title">Rien à afficher pour l'instant</p>

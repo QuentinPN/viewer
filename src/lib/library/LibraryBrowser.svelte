@@ -21,6 +21,7 @@ import type {
   WatchItem,
 } from "../emby/types";
 import Home from "../home/Home.svelte";
+import { prefsKey, readPrefs } from "../home/rows";
 import CardMenu from "../menu/CardMenu.svelte";
 import { CardMenuState, provideCardMenu } from "../menu/menuState.svelte";
 import {
@@ -981,7 +982,10 @@ $effect(() => {
         onOpenEpisode={openEpisode}
       />
     {:else if settingsOpen}
-      <Settings />
+      <Settings
+        libraries={libraries ?? []}
+        rowPrefsKey={prefsKey(user.server.id, user.userId)}
+      />
     {:else if libraries && selected === null}
       <Home
         {libraries}
@@ -992,6 +996,7 @@ $effect(() => {
         {refresh}
         {favoritesVersion}
         onError={fail}
+        rowPrefs={readPrefs(storage(), prefsKey(user.server.id, user.userId))}
       />
     {:else if selected}
       <header class="heading">

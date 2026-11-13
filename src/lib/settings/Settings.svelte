@@ -1,7 +1,7 @@
 <script lang="ts">
 import { onMount } from "svelte";
 import { embyApi, toEmbyError } from "../emby/api";
-import type { ArtworkCacheStats, EmbyError } from "../emby/types";
+import type { ArtworkCacheStats, EmbyError, Library } from "../emby/types";
 import { playerApi } from "../player/api";
 import { readSkip, type SkipSetting, saveSkip } from "../player/segments";
 import Diagnostics from "./Diagnostics.svelte";
@@ -12,8 +12,19 @@ import {
   sessionReads,
   usageRatio,
 } from "./format";
+import HomeRowsSettings from "./HomeRowsSettings.svelte";
 import PlaybackQuality from "./PlaybackQuality.svelte";
 import SubtitleSettings from "./SubtitleSettings.svelte";
+import UpdateSettings from "./UpdateSettings.svelte";
+
+interface Props {
+  /** The user's libraries, for the « Ajoutés récemment » rows of Accueil. */
+  libraries: Library[];
+  /** Where the home rows choice is kept (per server and user, ADR 0113). */
+  rowPrefsKey: string;
+}
+
+let { libraries, rowPrefsKey }: Props = $props();
 
 // `undefined` while loading, `null` when the app has no artwork cache.
 let stats = $state<ArtworkCacheStats | null | undefined>(undefined);
@@ -120,6 +131,8 @@ onMount(() => {
   <p class="muted note">S'applique à la prochaine lecture.</p>
 </section>
 
+<HomeRowsSettings {libraries} storageKey={rowPrefsKey} />
+
 <PlaybackQuality />
 
 <SubtitleSettings />
@@ -175,10 +188,7 @@ onMount(() => {
 
 <Diagnostics />
 
-<section class="panel" aria-labelledby="settings-about">
-  <h2 id="settings-about">À propos</h2>
-  <p class="lead">Viewer {version ? `version ${version}` : "— version inconnue"}</p>
-</section>
+<UpdateSettings {version} />
 
 <style>
   .heading {

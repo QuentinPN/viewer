@@ -42,11 +42,13 @@ impl<T> Default for Slot<T> {
 }
 
 impl<T> Slot<T> {
-    /// A version is fetched only if it is not the one already downloaded.
-    pub fn needs_download(&self, version: &str) -> bool {
+    /// The download of `version`, if it is the one already kept: a version is
+    /// fetched only once.
+    pub fn downloaded(&self, version: &str) -> Option<UpdateInfo> {
         self.ready
             .as_ref()
-            .is_none_or(|(info, _)| info.version != version.trim())
+            .filter(|(info, _)| info.version == version.trim())
+            .map(|(info, _)| info.clone())
     }
 
     /// Keeps the newest download; the payload of an older one is dropped.
@@ -63,14 +65,33 @@ impl<T> Slot<T> {
     }
 }
 
-/// Managed state: the update and its verified installer bytes.
+/// Managed state: the update and its verified installer bytes, and the lock that
+/// serializes checks (background loop and Settings button never download twice).
 #[derive(Default)]
-pub struct UpdateState(Mutex<Slot<(Update, Vec<u8>)>>);
+pub struct UpdateState {
+    slot: Mutex<Slot<(Update, Vec<u8>)>>,
+    checking: tokio::sync::Mutex<()>,
+}
 
 impl UpdateState {
     fn lock(&self) -> std::sync::MutexGuard<'_, Slot<(Update, Vec<u8>)>> {
-        self.0.lock().unwrap_or_else(|p| p.into_inner())
+        self.slot.lock().unwrap_or_else(|p| p.into_inner())
     }
+}
+
+/// Result of one check, as the Settings section shows it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum CheckOutcome {
+    /// No newer version on the manifest.
+    UpToDate,
+    /// A newer version is downloaded and verified (also announced by `app://update-ready`).
+    Ready { info: UpdateInfo },
+    /// Debug builds only: a newer version exists but is not downloaded, so a dev
+    /// build never installs a release over itself.
+    Available { version: String },
+    /// The check or the download failed; `category` as in [`category`].
+    Failed { category: String },
 }
 
 /// Log category of an updater failure: never the URL, body or message, which can
@@ -93,41 +114,56 @@ pub fn category(error: &UpdaterError) -> &'static str {
     }
 }
 
-/// One check (release builds schedule it, see `spawn`): downloads a newer, not yet downloaded update and tells the UI.
-#[cfg_attr(debug_assertions, allow(dead_code))]
-pub async fn check_once(app: &AppHandle) {
+fn failed(error: &UpdaterError, what: &str) -> CheckOutcome {
+    let category = category(error);
+    log::info!("update {what} failed: {category}");
+    CheckOutcome::Failed {
+        category: category.to_owned(),
+    }
+}
+
+/// One check, shared by the background loop and the Settings button. Checks are
+/// serialized: a second caller waits, then finds the version already downloaded.
+/// `download` is false in debug builds (see [`CheckOutcome::Available`]).
+pub async fn check_once(app: &AppHandle, download: bool) -> CheckOutcome {
     use tauri::Manager;
     use tauri_plugin_updater::UpdaterExt;
 
+    let state = app.state::<UpdateState>();
+    let _serial = state.checking.lock().await;
     let update = match app.updater() {
         Ok(updater) => match updater.check().await {
             Ok(Some(update)) => update,
-            Ok(None) => return,
-            Err(e) => {
-                log::info!("update check failed: {}", category(&e));
-                return;
-            }
+            Ok(None) => return CheckOutcome::UpToDate,
+            Err(e) => return failed(&e, "check"),
         },
-        Err(e) => {
-            log::warn!("updater unavailable: {}", category(&e));
-            return;
-        }
+        Err(e) => return failed(&e, "setup"),
     };
-    let state = app.state::<UpdateState>();
-    if !state.lock().needs_download(&update.version) {
-        return;
+    let downloaded = state.lock().downloaded(&update.version);
+    if let Some(info) = downloaded {
+        return CheckOutcome::Ready { info };
+    }
+    if !download {
+        return CheckOutcome::Available {
+            version: update.version.trim().to_owned(),
+        };
     }
     let bytes = match update.download(|_, _| {}, || {}).await {
         Ok(bytes) => bytes,
-        Err(e) => {
-            log::info!("update download failed: {}", category(&e));
-            return;
-        }
+        Err(e) => return failed(&e, "download"),
     };
     let info = UpdateInfo::new(&update.version, update.body.as_deref());
     log::info!("update {} downloaded", info.version);
     state.lock().store(info.clone(), (update, bytes));
     let _ = app.emit(UPDATE_READY_EVENT, &info);
+    CheckOutcome::Ready { info }
+}
+
+/// Manual check from Settings › Mises à jour. Release builds download like the
+/// background loop; debug builds only report a newer version.
+#[tauri::command]
+pub async fn app_update_check(app: AppHandle) -> CheckOutcome {
+    check_once(&app, !cfg!(debug_assertions)).await
 }
 
 /// Release builds only: 15 s after launch, then every 6 h.
@@ -137,7 +173,7 @@ pub fn spawn(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_secs(15)).await;
         loop {
-            check_once(&app).await;
+            check_once(&app, true).await;
             tokio::time::sleep(Duration::from_secs(6 * 60 * 60)).await;
         }
     });
@@ -180,11 +216,14 @@ mod tests {
     #[test]
     fn slot_downloads_each_version_once() {
         let mut slot = Slot::<Vec<u8>>::default();
-        assert!(slot.needs_download("1.2.0"));
+        assert_eq!(slot.downloaded("1.2.0"), None);
         assert_eq!(slot.info(), None);
         slot.store(UpdateInfo::new("1.2.0", Some("notes")), vec![1]);
-        assert!(!slot.needs_download("1.2.0"));
-        assert!(slot.needs_download("1.3.0"));
+        assert_eq!(
+            slot.downloaded(" 1.2.0").map(|i| i.notes),
+            Some("notes".into())
+        );
+        assert_eq!(slot.downloaded("1.3.0"), None);
         assert_eq!(slot.info().map(|i| i.version), Some("1.2.0".into()));
         slot.store(UpdateInfo::new("1.3.0", None), vec![2]);
         assert_eq!(slot.payload(), Some(&vec![2]));
@@ -196,6 +235,31 @@ mod tests {
         assert_eq!(
             json,
             serde_json::json!({ "version": "1.2.0", "notes": "- x" })
+        );
+    }
+
+    #[test]
+    fn outcomes_serialize_tagged_for_the_ui() {
+        let json = |o: CheckOutcome| serde_json::to_value(o).unwrap();
+        assert_eq!(
+            json(CheckOutcome::UpToDate),
+            serde_json::json!({ "status": "upToDate" })
+        );
+        assert_eq!(
+            json(CheckOutcome::Ready {
+                info: UpdateInfo::new("1.3.0", None)
+            }),
+            serde_json::json!({ "status": "ready", "info": { "version": "1.3.0", "notes": "" } })
+        );
+        assert_eq!(
+            json(CheckOutcome::Available {
+                version: "1.3.0".into()
+            }),
+            serde_json::json!({ "status": "available", "version": "1.3.0" })
+        );
+        assert_eq!(
+            json(failed(&UpdaterError::Network("x".into()), "check")),
+            serde_json::json!({ "status": "failed", "category": "network" })
         );
     }
 
