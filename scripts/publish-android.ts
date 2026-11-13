@@ -1,20 +1,14 @@
 // npm run android:publish [-- --dry-run] (ADR 0107): checks, builds and publishes the
 // Android TV app at the versionName of android-tv/app/build.gradle.kts. Refuses unless
 // the tree is clean, HEAD is on main, android-tv/CHANGELOG.md has the version's section
-// and no GitHub release exists for android-vX.Y.Z; then fetches libmpv, runs the unit tests, the release
+// and no Gitea release exists for android-vX.Y.Z (ADR 0111); then fetches libmpv, runs the unit tests, the release
 // build and its lint, tags HEAD android-vX.Y.Z, pushes main and the tag, and creates the
-// GitHub release with the APK, never marked Latest (that stays the desktop app's).
+// Gitea release with the APK.
 // --dry-run turns the refusals into warnings and stops after the build, printing the
 // notes: nothing is tagged, pushed or published.
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import {
-  copyFileSync,
-  existsSync,
-  readFileSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { copyFileSync, existsSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -22,6 +16,7 @@ import {
   changelogSection,
   gradleVersion,
 } from "../src/release/version.ts";
+import { gitea } from "./gitea.ts";
 
 const root = join(import.meta.dirname, "..");
 const app = join(root, "android-tv");
@@ -62,8 +57,8 @@ if (git("rev-parse", "--abbrev-ref", "HEAD") !== "main")
 const tagged = git("tag", "--list", tag);
 if (tagged && git("rev-parse", `${tag}^{commit}`) !== git("rev-parse", "HEAD"))
   refuse(`le tag ${tag} existe déjà sur un autre commit : monter versionName`);
-const existing = spawnSync("gh", ["release", "view", tag], { cwd: root });
-if (existing.status === 0) refuse(`la release GitHub ${tag} existe déjà`);
+const releases = gitea(root);
+if (await releases.exists(tag)) refuse(`la release ${tag} existe déjà`);
 const section = changelogSection(read("android-tv/CHANGELOG.md"), version.name);
 if (!section) {
   console.error(`android-tv/CHANGELOG.md n'a pas de section ${version.name}`);
@@ -106,34 +101,13 @@ if (dryRun) {
 if (!tagged)
   git("tag", "-a", tag, "-m", `Viewer Android TV ${version.name}`);
 step("push", "git", ["push", "origin", "main", tag]);
-const notesFile = join(tmpdir(), `viewer-${tag}-notes.md`);
-writeFileSync(notesFile, notes);
-step("release GitHub", "gh", [
-  "release",
-  "create",
+const release = await releases.publish(
   tag,
-  `"${apk}"`,
-  "--title",
-  `"Viewer Android TV ${version.name}"`,
-  "--notes-file",
-  `"${notesFile}"`,
-  "--verify-tag",
-  "--latest=false",
-]);
-
-const assets = JSON.parse(
-  execFileSync("gh", ["release", "view", tag, "--json", "url,assets"], {
-    cwd: root,
-    encoding: "utf8",
-  }),
-) as { url: string; assets: { name: string; digest: string | null }[] };
-const uploaded = assets.assets.find((a) => a.name === name);
-if (uploaded?.digest !== `sha256:${sha256}`) {
-  console.error(
-    `l'APK en ligne ne correspond pas : ${uploaded?.digest ?? "absent"}`,
-  );
-  process.exit(1);
-}
+  `Viewer Android TV ${version.name}`,
+  notes,
+  apk,
+  sha256,
+);
 console.log(
-  `\n${tag} publiée : ${assets.url}\nSHA-256 ${sha256} vérifié en ligne.`,
+  `\n${tag} publiée : ${release.url}\nSHA-256 ${sha256} vérifié en ligne.`,
 );

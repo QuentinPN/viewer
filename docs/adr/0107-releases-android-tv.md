@@ -1,5 +1,7 @@
 # ADR 0107 — Releases GitHub de l'app Android TV
 
+> Release GitHub remplacée par une release Gitea : voir ADR 0111.
+
 Statut : Accepté (2026-11-11), à la demande du propriétaire.
 
 ## Contexte

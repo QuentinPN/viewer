@@ -1,16 +1,16 @@
 // npm run release:publish [-- --dry-run] (ADR 0106): after `npm run release`, checks,
 // builds and publishes the tagged version. Refuses unless HEAD is the release commit
-// on main with its tag vX.Y.Z and no GitHub release exists for it; then fetches
+// on main with its tag vX.Y.Z and no release exists for it on Gitea (ADR 0111); then fetches
 // libmpv, runs verify:web and verify:rust, builds the NSIS installer, pushes main and
-// the tag, and creates the GitHub release with the installer and its CHANGELOG.md
+// the tag, and creates the Gitea release with the installer and its CHANGELOG.md
 // section. --dry-run turns the refusals into warnings and stops after the build,
 // printing the notes: nothing is pushed or published.
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { changelogSection, releaseNotes } from "../src/release/version.ts";
+import { gitea } from "./gitea.ts";
 
 const root = join(import.meta.dirname, "..");
 const dryRun = process.argv.includes("--dry-run");
@@ -57,8 +57,8 @@ if (git("rev-parse", "--abbrev-ref", "HEAD") !== "main")
 const tagged = git("tag", "--points-at", "HEAD").split("\n");
 if (!tagged.includes(tag))
   refuse(`HEAD ne porte pas le tag ${tag} : lancer d'abord npm run release`);
-const existing = spawnSync("gh", ["release", "view", tag], { cwd: root });
-if (existing.status === 0) refuse(`la release GitHub ${tag} existe déjà`);
+const releases = gitea(root);
+if (await releases.exists(tag)) refuse(`la release ${tag} existe déjà`);
 const section = changelogSection(read("CHANGELOG.md"), version);
 if (!section) {
   console.error(`CHANGELOG.md n'a pas de section ${version}`);
@@ -96,33 +96,13 @@ if (dryRun) {
 }
 
 step("push", "git", ["push", "origin", "main", tag]);
-const notesFile = join(tmpdir(), `viewer-${tag}-notes.md`);
-writeFileSync(notesFile, notes);
-step("release GitHub", "gh", [
-  "release",
-  "create",
+const release = await releases.publish(
   tag,
-  `"${installer}"`,
-  "--title",
-  `"Viewer ${version}"`,
-  "--notes-file",
-  `"${notesFile}"`,
-  "--verify-tag",
-]);
-
-const assets = JSON.parse(
-  execFileSync("gh", ["release", "view", tag, "--json", "url,assets"], {
-    cwd: root,
-    encoding: "utf8",
-  }),
-) as { url: string; assets: { name: string; digest: string | null }[] };
-const uploaded = assets.assets.find((a) => a.name === name);
-if (uploaded?.digest !== `sha256:${sha256}`) {
-  console.error(
-    `l'installateur en ligne ne correspond pas : ${uploaded?.digest ?? "absent"}`,
-  );
-  process.exit(1);
-}
+  `Viewer ${version}`,
+  notes,
+  installer,
+  sha256,
+);
 console.log(
-  `\n${tag} publiée : ${assets.url}\nSHA-256 ${sha256} vérifié en ligne.`,
+  `\n${tag} publiée : ${release.url}\nSHA-256 ${sha256} vérifié en ligne.`,
 );
