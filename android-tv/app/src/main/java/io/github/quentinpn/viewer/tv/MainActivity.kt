@@ -3,6 +3,7 @@ package io.github.quentinpn.viewer.tv
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -21,9 +22,18 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyException
+import io.github.quentinpn.viewer.tv.emby.EmbyError
+import io.github.quentinpn.viewer.tv.session.LostConnection
 import io.github.quentinpn.viewer.tv.session.SearchHistoryStore
 import io.github.quentinpn.viewer.tv.session.Session
+import io.github.quentinpn.viewer.tv.session.SessionCheck
+import io.github.quentinpn.viewer.tv.session.autoRetry
+import io.github.quentinpn.viewer.tv.session.checkSession
+import io.github.quentinpn.viewer.tv.session.failed
 import io.github.quentinpn.viewer.tv.session.hostLabel
+import io.github.quentinpn.viewer.tv.session.isConnectionLoss
+import io.github.quentinpn.viewer.tv.session.retryNow
+import io.github.quentinpn.viewer.tv.ui.ConnectionLost
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
 import io.github.quentinpn.viewer.tv.ui.CastMember
 import io.github.quentinpn.viewer.tv.ui.DetailPage
@@ -181,6 +191,64 @@ class MainActivity : ComponentActivity() {
                         store.signOut()
                         reauth = current.key
                         session = null
+                    }
+                    // The token is kept: OK on the tile opens this session again (ADR 0104)
+                    val switchServer = {
+                        reporter.signedOut()
+                        store.deactivate()
+                        session = null
+                    }
+                    // « Connexion perdue » (ADR 0119): a network error of the home is checked once,
+                    // quietly; if the server is really away the screen shows, with automatic attempts.
+                    // Every state above stays remembered, so the app comes back where it was.
+                    var suspect by remember(current) { mutableStateOf(false) }
+                    var lost by remember(current) { mutableStateOf<LostConnection?>(null) }
+                    val reportError: (EmbyError) -> Unit = { error -> if (lost == null && isConnectionLoss(error)) suspect = true }
+                    val recovered = {
+                        lost = null
+                        if (home.state is HomeState.Failed) {
+                            home.state = HomeState.Loading
+                            home.attempt++
+                        } else {
+                            home.userDataChanged()
+                        }
+                    }
+                    LaunchedEffect(suspect) {
+                        if (!suspect) return@LaunchedEffect
+                        when (val check = checkSession(client, current.userId)) {
+                            SessionCheck.Ok -> Unit
+                            SessionCheck.Refused -> expired()
+                            is SessionCheck.Failed -> lost = null.failed(check.error, SystemClock.elapsedRealtime(), Math.random())
+                        }
+                        suspect = false
+                    }
+                    LaunchedEffect(lost) {
+                        val state = lost ?: return@LaunchedEffect
+                        if (state.checking) {
+                            when (val check = checkSession(client, current.userId)) {
+                                SessionCheck.Ok -> recovered()
+                                SessionCheck.Refused -> {
+                                    lost = null
+                                    expired()
+                                }
+                                is SessionCheck.Failed -> lost = state.failed(check.error, SystemClock.elapsedRealtime(), Math.random())
+                            }
+                        } else {
+                            val at = state.retryAt ?: return@LaunchedEffect
+                            kotlinx.coroutines.delay((at - SystemClock.elapsedRealtime()).coerceAtLeast(0))
+                            lost = state.autoRetry()
+                        }
+                    }
+                    val lostNow = lost
+                    if (lostNow != null) {
+                        ConnectionLost(
+                            lostNow,
+                            serverName = store.server(current.key)?.displayName ?: hostLabel(current.server),
+                            serverLabel = "${hostLabel(current.server)} · ${current.userName}",
+                            onRetry = { lost = lostNow.retryNow() },
+                            onChangeServer = switchServer,
+                        )
+                        return@ViewerTheme
                     }
                     // A genre chip opens the library holding the title on that genre (ADR 0079, 0093)
                     val libraries = (home.state as? HomeState.Ready)?.libraries.orEmpty()
@@ -384,12 +452,8 @@ class MainActivity : ComponentActivity() {
                             store.signOut()
                             session = null
                         },
-                        onSwitchServer = {
-                            // The token is kept: OK on the tile opens this session again
-                            reporter.signedOut()
-                            store.deactivate()
-                            session = null
-                        },
+                        onSwitchServer = switchServer,
+                        onConnectionError = reportError,
                     )
                 }
             }

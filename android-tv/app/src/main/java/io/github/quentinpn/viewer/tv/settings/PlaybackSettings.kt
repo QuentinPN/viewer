@@ -3,6 +3,9 @@ package io.github.quentinpn.viewer.tv.settings
 import android.content.Context
 import androidx.core.content.edit
 import io.github.quentinpn.viewer.tv.emby.MAX_STREAMING_BITRATE
+import io.github.quentinpn.viewer.tv.player.LANGUAGE_CHOICES
+import io.github.quentinpn.viewer.tv.player.LanguageOverrides
+import io.github.quentinpn.viewer.tv.player.SubtitleMode
 
 // Réglages (ADR 0051), ported from the Windows client: the intro and credits options
 // of src/lib/player/segments.ts (ADR 0030) and the streaming caps of
@@ -27,9 +30,19 @@ data class PlaybackSettings(
     val subtitles: SubtitleStyle = SubtitleStyle(),
     /** Compress the audio's dynamic range, for dialogue at low volume (ADR 0072). */
     val nightMode: Boolean = false,
+    /** Audio and subtitle languages set on this device (ADR 0120); all null follows the Emby account. */
+    val languages: LanguageOverrides = LanguageOverrides(),
 ) {
-    /** Drops caps outside the list, e.g. from an older version. */
-    fun sanitized() = copy(localCap = offeredCap(localCap), remoteCap = offeredCap(remoteCap))
+    /** Drops caps and languages outside the lists, e.g. from an older version. */
+    fun sanitized() = copy(
+        localCap = offeredCap(localCap),
+        remoteCap = offeredCap(remoteCap),
+        languages = LanguageOverrides(
+            audioLanguage = languages.audioLanguage?.takeIf { it in LANGUAGE_CHOICES },
+            subtitleMode = languages.subtitleMode,
+            subtitleLanguage = languages.subtitleLanguage?.takeIf { it in LANGUAGE_CHOICES },
+        ),
+    )
 
     /** The cap for a server reached through a local (or remote) address. */
     fun capFor(localAddress: Boolean): Long? = if (localAddress) localCap else remoteCap
@@ -136,6 +149,11 @@ class PlaybackSettingsStore(context: Context, private val userId: String) {
                 overrideAss = prefs.getBoolean(key(SUB_OVERRIDE_ASS), style.overrideAss),
             ),
             nightMode = prefs.getBoolean(key(NIGHT_MODE), defaults.nightMode),
+            languages = LanguageOverrides(
+                audioLanguage = prefs.getString(key(AUDIO_LANGUAGE), null),
+                subtitleMode = prefs.getString(key(SUBTITLE_MODE), null)?.let { stored -> SubtitleMode.entries.find { it.name == stored } },
+                subtitleLanguage = prefs.getString(key(SUBTITLE_LANGUAGE), null),
+            ),
         ).sanitized()
     }
 
@@ -154,6 +172,14 @@ class PlaybackSettingsStore(context: Context, private val userId: String) {
             putString(key(SUB_POSITION), style.position.stored)
             putBoolean(key(SUB_OVERRIDE_ASS), style.overrideAss)
             putBoolean(key(NIGHT_MODE), clean.nightMode)
+            val languages = clean.languages
+            for ((name, value) in listOf(
+                AUDIO_LANGUAGE to languages.audioLanguage,
+                SUBTITLE_MODE to languages.subtitleMode?.name,
+                SUBTITLE_LANGUAGE to languages.subtitleLanguage,
+            )) {
+                if (value == null) remove(key(name)) else putString(key(name), value)
+            }
         }
     }
 
@@ -171,5 +197,8 @@ class PlaybackSettingsStore(context: Context, private val userId: String) {
         const val SUB_POSITION = "subtitle.position"
         const val SUB_OVERRIDE_ASS = "subtitle.overrideAss"
         const val NIGHT_MODE = "audio.nightMode"
+        const val AUDIO_LANGUAGE = "audio.language"
+        const val SUBTITLE_MODE = "subtitle.mode"
+        const val SUBTITLE_LANGUAGE = "subtitle.language"
     }
 }

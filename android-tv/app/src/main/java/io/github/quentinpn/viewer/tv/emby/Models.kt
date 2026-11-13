@@ -144,6 +144,8 @@ data class MediaSourceDto(
     @SerialName("Size") val size: Long? = null,
     @SerialName("Bitrate") val bitrate: Long? = null,
     @SerialName("MediaStreams") val mediaStreams: List<SourceStreamDto> = emptyList(),
+    /** `mkv`, `mp4`… shown in « Informations techniques » (ADR 0119). */
+    @SerialName("Container") val container: String? = null,
 )
 
 /** The stream fields a version label needs; `Index` is not read, so its absence breaks nothing. */
@@ -158,6 +160,13 @@ data class SourceStreamDto(
     @SerialName("VideoRange") val videoRange: String? = null,
     /** `HDR 10`, `Profile 8.1 (HDR10 compatible)`, `None`. */
     @SerialName("ExtendedVideoSubTypeDescription") val extendedVideoSubTypeDescription: String? = null,
+    // Audio and subtitle details for « Informations techniques »
+    @SerialName("Language") val language: String? = null,
+    @SerialName("Title") val title: String? = null,
+    @SerialName("Channels") val channels: Int? = null,
+    @SerialName("IsDefault") val isDefault: Boolean = false,
+    @SerialName("IsForced") val isForced: Boolean = false,
+    @SerialName("IsExternal") val isExternal: Boolean = false,
 )
 
 /** `Studios[].Id` is a number on Emby 4.10, unlike other ids: only the name is read. */

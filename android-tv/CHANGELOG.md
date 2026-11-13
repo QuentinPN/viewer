@@ -7,6 +7,9 @@ Chaque version livrée sur la Shield augmente `versionName` et `versionCode` dan
 - Réglages › Mises à jour : version installée, « Rechercher une mise à jour » et, quand elle est prête, « Installer la version X » (ADR 0112).
 - Réglages › Accueil : appui long sur OK pour déplacer une rangée, ▲ ▼ pour la placer, OK ou Retour pour la poser (ADR 0114).
 - Menu du profil : ton nom puis le serveur (« HomeNAS · non chiffré » en HTTP), comme sur Windows.
+- Serveur injoignable : un écran garde ta session, réessaie tout seul (2, 4, 8… 30 s) et propose « Réessayer » ou « Changer de serveur » ; tu reviens où tu étais (ADR 0119).
+- Fiches film et épisode : « Informations techniques » (vidéo, fichier, pistes audio et sous-titres) de la version jouée (ADR 0119).
+- Réglages › Langues : langue audio, mode et langue des sous-titres. Par défaut « Comme le compte Emby » ; un choix local passe devant (ADR 0115, 0120).
 
 ## 1.1.0 — 2026-11-13
 

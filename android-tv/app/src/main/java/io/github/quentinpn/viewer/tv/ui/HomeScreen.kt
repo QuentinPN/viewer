@@ -176,6 +176,8 @@ fun HomeScreen(
     memory: HomeMemory = remember { HomeMemory() },
     /** Changes after each playback: resume points and watched marks are read again. */
     refresh: Int = 0,
+    /** A failed read: a network error is checked and may show « Connexion perdue » (ADR 0119). */
+    onConnectionError: (EmbyError) -> Unit = {},
 ) {
     var notice by remember { mutableStateOf<String?>(null) }
     // Read on each return from Réglages: the home leaves the composition while they show
@@ -207,7 +209,7 @@ fun HomeScreen(
             val playlists = if (rows.shows(PLAYLISTS_ROW)) playlistsOrNothing(client, userId) else emptyList()
             HomeState.Ready(homeShelves(rows, resume, nextUp, favorites, latest, playlists, order), hero, libraries)
         } catch (e: EmbyException) {
-            if (e.error == EmbyError.SessionExpired) onSessionExpired()
+            if (e.error == EmbyError.SessionExpired) onSessionExpired() else onConnectionError(e.error)
             HomeState.Failed(e.error.message)
         }
         // A refresh that fails keeps the shelves on screen, without their new state

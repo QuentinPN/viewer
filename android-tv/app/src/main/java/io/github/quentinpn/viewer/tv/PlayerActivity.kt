@@ -77,6 +77,7 @@ import io.github.quentinpn.viewer.tv.player.changeSleep
 import io.github.quentinpn.viewer.tv.player.changeSpeed
 import io.github.quentinpn.viewer.tv.player.chapters
 import io.github.quentinpn.viewer.tv.player.decide
+import io.github.quentinpn.viewer.tv.player.localPick
 import io.github.quentinpn.viewer.tv.player.describeTrack
 import io.github.quentinpn.viewer.tv.player.downloadThumbnails
 import io.github.quentinpn.viewer.tv.player.failed
@@ -604,7 +605,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             val server = if (type == TrackType.Audio) serverTracks.audio else serverTracks.subtitle
             // A transcode carries the server's audio only: nothing for the account to pick
             val wanted = if (type == TrackType.Audio && transcode) null else accountPick(tracks, type, prefs, audioLang)
-            val decision = decide(tracks, type, store.load(type), server, transcode, wanted)
+            // Languages set in Réglages on this device come before the server's account-based pick (ADR 0120)
+            val local = localPick(tracks, type, prefs, settings.languages, audioLang, transcode)
+            val decision = decide(tracks, type, store.load(type), server, transcode, wanted, local)
             if (type == TrackType.Audio) audioLang = playingAudioLanguage(tracks, decision)
             decision.selection?.let { player.selectTrack(type, it.id) }
             "${type.mpv}=${describeTrack(decision, player.property(type.property))}"

@@ -34,12 +34,19 @@ internal fun versionLabel(source: MediaSourceDto, index: Int): String {
 /** `4K · HEVC 10 bits · HDR 10 · 27,9 Go`: size, else bitrate; SDR is not mentioned. */
 internal fun versionDetails(source: MediaSourceDto): String {
     val video = source.mediaStreams.firstOrNull { it.type == "Video" }
-    val depth = video?.bitDepth?.takeIf { it > 8 }?.let { "$it bits" }
     return listOfNotNull(
-        video?.let(::resolutionLabel),
-        listOfNotNull(video?.codec?.takeIf { it.isNotBlank() }?.let(::codecName), depth).joinToString(" ").ifEmpty { null },
-        video?.let(::videoRange)?.takeIf { it != "SDR" },
+        video?.let(::videoLabel)?.ifEmpty { null },
         formatSize(source.size) ?: formatBitrate(source.bitrate),
+    ).joinToString(" · ")
+}
+
+/** `4K · HEVC 10 bits · HDR 10`; SDR is not mentioned. */
+internal fun videoLabel(video: SourceStreamDto): String {
+    val depth = video.bitDepth?.takeIf { it > 8 }?.let { "$it bits" }
+    return listOfNotNull(
+        resolutionLabel(video),
+        listOfNotNull(video.codec?.takeIf { it.isNotBlank() }?.let(::codecName), depth).joinToString(" ").ifEmpty { null },
+        videoRange(video)?.takeIf { it != "SDR" },
     ).joinToString(" · ")
 }
 

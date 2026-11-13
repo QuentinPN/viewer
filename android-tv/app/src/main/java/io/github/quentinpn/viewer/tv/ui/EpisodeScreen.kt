@@ -353,7 +353,11 @@ private fun Details(
             }
             if (resume) OutlinedButton(onClick = { onPlay(episode.id, 0, version) }) { Text("Lire depuis le début") }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) { actions { actionMessage = it } }
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            actions { actionMessage = it }
+            // The version the page plays (ADR 0119)
+            TechInfoButton(shownSource(episode.mediaSources, version), choices.firstOrNull { it.id == version }?.label)
+        }
         actionMessage?.let { Text(it, color = Palette.error) }
         choices.firstOrNull { it.id == version }?.let { chosen ->
             // OK goes to the next version, as on the film page

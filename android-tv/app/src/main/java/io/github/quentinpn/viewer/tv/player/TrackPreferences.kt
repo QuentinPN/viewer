@@ -49,6 +49,9 @@ enum class TrackOrigin(val log: String) {
     /** `DefaultAudioStreamIndex` / `DefaultSubtitleStreamIndex` of PlaybackInfo (ADR 0055). */
     Server("server"),
 
+    /** The languages set in Réglages on this device (ADR 0120), before the server's account-based pick. */
+    Local("local"),
+
     /** The account's preferences applied by the client (ADR 0065). */
     Account("account"),
 
@@ -70,6 +73,8 @@ data class TrackDecision(val origin: TrackOrigin, val embyIndex: Int? = null, va
  * files left out. A transcode carries the server's audio, and its subtitle pick was
  * added selected ([transcode]): nothing is left to select. When the server names no
  * track, or one not in the file, the account's pick [account] (ADR 0065), then mpv's.
+ * A language set in Réglages on this device ([local], ADR 0120) comes right after the
+ * remembered choice: the server's pick only follows the account.
  */
 fun decide(
     tracks: List<Track>,
@@ -78,9 +83,13 @@ fun decide(
     serverIndex: Int?,
     transcode: Boolean,
     account: Selection? = null,
+    local: Selection? = null,
 ): TrackDecision {
     remembered(tracks, type, preference)?.let { wanted ->
         return TrackDecision(TrackOrigin.Remembered, selection = wanted.takeUnless { isSelected(tracks, type, it) })
+    }
+    if (!transcode) {
+        local?.let { wanted -> return TrackDecision(TrackOrigin.Local, selection = wanted.takeUnless { isSelected(tracks, type, it) }) }
     }
     if (serverIndex != null) {
         if (transcode) return TrackDecision(TrackOrigin.Server, serverIndex)
@@ -115,6 +124,12 @@ class TrackPreferenceStore(context: Context, private val userId: String) {
             .putString("$key.lang", preference.lang)
             .putString("$key.title", preference.title)
             .apply()
+    }
+
+    /** Forgets the pick of [type]: a language changed in Réglages applies from the next playback (ADR 0120). */
+    fun clear(type: TrackType) {
+        val key = key(type)
+        prefs.edit().remove("$key.off").remove("$key.lang").remove("$key.title").apply()
     }
 
     private fun key(type: TrackType) = "$userId.${type.mpv}"
