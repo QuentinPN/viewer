@@ -115,10 +115,10 @@ function onKeydown(event: KeyboardEvent) {
     <p class="lead">
       {#if initial}
         {expired
-          ? `Le serveur « ${initial.name} » demande à nouveau votre mot de passe.`
-          : `Saisissez votre mot de passe pour le serveur « ${initial.name} ».`}
+          ? `Le serveur « ${initial.name} » demande à nouveau ton mot de passe.`
+          : `Saisis ton mot de passe pour le serveur « ${initial.name} ».`}
       {:else}
-        Saisissez l'adresse de votre serveur Emby et vos identifiants.
+        Saisis l'adresse de ton serveur Emby et tes identifiants.
       {/if}
     </p>
 
@@ -155,7 +155,7 @@ function onKeydown(event: KeyboardEvent) {
       {/if}
       {#if plainHttp}
         <p class="warning">
-          Connexion non chiffrée (HTTP) : acceptable sur votre réseau local uniquement.
+          Connexion non chiffrée (HTTP) : acceptable sur ton réseau local uniquement.
         </p>
       {/if}
       <label for="username">Nom d'utilisateur</label>

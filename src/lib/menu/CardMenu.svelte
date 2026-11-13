@@ -310,7 +310,7 @@ async function create(e: SubmitEvent) {
   if (!current || busy) return;
   const name = playlistName(newName);
   if (!name) {
-    panelError = `Donnez à la playlist un nom de ${PLAYLIST_NAME_MAX} caractères au plus, sans retour à la ligne.`;
+    panelError = `Donne à la playlist un nom de ${PLAYLIST_NAME_MAX} caractères au plus, sans retour à la ligne.`;
     field?.focus();
     return;
   }

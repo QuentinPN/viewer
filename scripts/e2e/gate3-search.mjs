@@ -269,7 +269,7 @@ try {
   await waitForResults(page, "the");
   check("results_from_top", (await content.evaluate((e) => e.scrollTop)) === 0);
   const more = await page.locator(".search .more").count();
-  check("more_results_hint", true, `${more} message(s) « précisez »`);
+  check("more_results_hint", true, `${more} message(s) « précise »`);
   await page.keyboard.press("Escape");
   await page
     .locator("main.content h1")

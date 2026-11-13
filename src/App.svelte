@@ -282,7 +282,7 @@ async function signOut() {
       <div class="splash">
         <Logo size={88} />
         <p class="brand">Viewer</p>
-        <p class="muted" role="status">Ouverture de votre session…</p>
+        <p class="muted" role="status">Ouverture de ta session…</p>
         <span class="bar" aria-hidden="true"></span>
       </div>
     </main>

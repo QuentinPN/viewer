@@ -227,7 +227,7 @@ function trackId(value: string): number | null {
         <button type="submit" disabled={source.trim() === ""}>Lire</button>
       </form>
       {#if info && !info.libmpvFound}
-        <p class="error" role="alert">libmpv-2.dll introuvable. Lancez scripts/fetch-libmpv.ps1.</p>
+        <p class="error" role="alert">libmpv-2.dll introuvable. Lance scripts/fetch-libmpv.ps1.</p>
       {/if}
       {#if error}<p class="error" role="alert">{error}</p>{/if}
     </main>

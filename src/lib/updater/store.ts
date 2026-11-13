@@ -16,7 +16,7 @@ export interface UpdateStore extends Readable<UpdateState> {
 }
 
 const INSTALL_FAILED =
-  "L'installation n'a pas pu démarrer. Réessayez plus tard.";
+  "L'installation n'a pas pu démarrer. Réessaie plus tard.";
 
 export function createUpdateStore(api: UpdaterApi): UpdateStore {
   const state = writable<UpdateState>({

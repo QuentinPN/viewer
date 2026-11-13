@@ -64,7 +64,7 @@ onMount(() => {
     <div class="logo"><Logo size={56} /></div>
     <h1 id="lost-title">Serveur injoignable</h1>
     <p id="lost-desc" class="lead">
-      {server.name} ne répond pas. Votre session est conservée : rien n'est perdu.
+      {server.name} ne répond pas. Ta session est conservée : rien n'est perdu.
     </p>
     <div class="server">
       <p class="server-name">{server.name}</p>

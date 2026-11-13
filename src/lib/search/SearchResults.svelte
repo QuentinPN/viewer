@@ -35,7 +35,7 @@ const empty = $derived(
     results.episodes.length === 0,
 );
 const status = $derived.by(() => {
-  if (tooShort) return "Saisissez au moins 2 caractères.";
+  if (tooShort) return "Saisis au moins 2 caractères.";
   if (error) return "La recherche a échoué.";
   if (loading || !results) return "Recherche…";
   return resultsLabel(results);
@@ -86,7 +86,7 @@ const status = $derived.by(() => {
           </ul>
           {#if results.moreMovies}
             <p class="hint more">
-              Seuls les {SEARCH_SHOWN} premiers films sont affichés : précisez la
+              Seuls les {SEARCH_SHOWN} premiers films sont affichés : précise la
               recherche.
             </p>
           {/if}
@@ -102,7 +102,7 @@ const status = $derived.by(() => {
           </ul>
           {#if results.moreSeries}
             <p class="hint more">
-              Seules les {SEARCH_SHOWN} premières séries sont affichées : précisez
+              Seules les {SEARCH_SHOWN} premières séries sont affichées : précise
               la recherche.
             </p>
           {/if}
@@ -118,7 +118,7 @@ const status = $derived.by(() => {
           </ul>
           {#if results.moreEpisodes}
             <p class="hint more">
-              D'autres épisodes peuvent correspondre : précisez la recherche.
+              D'autres épisodes peuvent correspondre : précise la recherche.
             </p>
           {/if}
         </section>

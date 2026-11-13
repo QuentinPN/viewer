@@ -1078,7 +1078,7 @@ $effect(() => {
   >
     {#if librariesError}
       <div class="state" role="alert">
-        <p class="state-title">Impossible de charger vos bibliothèques</p>
+        <p class="state-title">Impossible de charger tes bibliothèques</p>
         <p>{librariesError.message}</p>
         {#if errorHint(librariesError)}<p class="hint">{errorHint(librariesError)}</p>{/if}
         <button type="button" onclick={loadLibraries}>Réessayer</button>
@@ -1086,7 +1086,7 @@ $effect(() => {
     {:else if libraries && libraries.length === 0}
       <div class="state">
         <p class="state-title">Aucune bibliothèque de films ou de séries</p>
-        <p>Votre compte n'a accès à aucune bibliothèque de ce type sur {user.server.name}.</p>
+        <p>Ton compte n'a accès à aucune bibliothèque de ce type sur {user.server.name}.</p>
       </div>
     {:else if searching}
       <SearchResults

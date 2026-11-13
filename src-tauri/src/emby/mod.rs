@@ -46,7 +46,7 @@ pub enum EmbyError {
     NotFound,
     #[error("aucune session ouverte")]
     NotSignedIn,
-    #[error("session expirée ou révoquée : reconnectez-vous")]
+    #[error("session expirée ou révoquée : reconnecte-toi")]
     SessionExpired,
     /// The token is valid but the account is disabled or deleted (ADR 0012).
     #[error("compte désactivé ou supprimé sur le serveur")]

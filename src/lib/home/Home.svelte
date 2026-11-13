@@ -538,7 +538,7 @@ onMount(() => {
   {#if everythingEmpty}
     <div class="state">
       <p class="state-title">Rien à afficher pour l'instant</p>
-      <p>Vos bibliothèques ne contiennent encore aucun film ni épisode récent.</p>
+      <p>Tes bibliothèques ne contiennent encore aucun film ni épisode récent.</p>
     </div>
   {/if}
 </div>

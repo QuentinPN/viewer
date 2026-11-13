@@ -58,10 +58,10 @@ const titleId = $derived(
 const empty = $derived(tiles !== null && tiles.length === 0);
 const subtitle = $derived(
   manage
-    ? "Choisissez le serveur à oublier."
+    ? "Choisis le serveur à oublier."
     : empty
-      ? "Bienvenue. Ajoutez votre premier serveur Emby."
-      : "Qui regarde ? Choisissez un serveur.",
+      ? "Bienvenue. Ajoute ton premier serveur Emby."
+      : "Qui regarde ? Choisis un serveur.",
 );
 
 onMount(() => {

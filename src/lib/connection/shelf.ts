@@ -52,7 +52,7 @@ export function passwordNotice(tile: ShelfServer): EmbyError | null {
   return tile.access === "rejected"
     ? {
         kind: "sessionExpired",
-        message: "session expirée ou révoquée : reconnectez-vous",
+        message: "session expirée ou révoquée : reconnecte-toi",
       }
     : null;
 }

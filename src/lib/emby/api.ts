@@ -239,27 +239,27 @@ export function errorHint(error: EmbyError): string | null {
   switch (error.kind) {
     case "unreachable":
     case "timeout":
-      return "Vérifiez l'adresse, le port (8096 par défaut) et que le serveur est allumé.";
+      return "Vérifie l'adresse, le port (8096 par défaut) et que le serveur est allumé.";
     case "insecureRemoteUrl":
-      return "Utilisez une adresse https://, ou l'adresse locale du serveur.";
+      return "Utilise une adresse https://, ou l'adresse locale du serveur.";
     case "invalidCredentials":
       return "Le nom d'utilisateur et le mot de passe sont sensibles à la casse.";
     case "sessionExpired":
-      return "Votre session a été fermée sur le serveur. Reconnectez-vous.";
+      return "Ta session a été fermée sur le serveur. Reconnecte-toi.";
     case "accountUnavailable":
-      return "Demandez à l'administrateur du serveur de réactiver votre compte, ou utilisez-en un autre.";
+      return "Demande à l'administrateur du serveur de réactiver ton compte, ou utilises-en un autre.";
     case "serverMismatch":
-      return "Votre session n'a pas été envoyée à ce serveur. Vérifiez l'adresse ou changez de serveur.";
+      return "Ta session n'a pas été envoyée à ce serveur. Vérifie l'adresse ou change de serveur.";
     case "invalidResponse":
       return "L'adresse répond, mais ce n'est peut-être pas un serveur Emby.";
     case "notFound":
-      return "Elle a peut-être été supprimée ou masquée. Actualisez la liste.";
+      return "Elle a peut-être été supprimée ou masquée. Actualise la liste.";
     case "credentialStore":
       return "Le Gestionnaire d'identification Windows n'a pas pu enregistrer la session.";
     case "noCompatibleStream":
       return "Les informations techniques de la fiche indiquent le format du fichier.";
     case "player":
-      return "Vérifiez que libmpv-2.dll est présent (scripts/fetch-libmpv.ps1).";
+      return "Vérifie que libmpv-2.dll est présent (scripts/fetch-libmpv.ps1).";
     default:
       return null;
   }
