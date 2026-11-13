@@ -18,6 +18,7 @@ import TitleBar from "../window/TitleBar.svelte";
 import { playerApi } from "./api";
 import ChaptersPanel from "./ChaptersPanel.svelte";
 import { chapterIndex, chapterMarks, chapterTarget } from "./chapters";
+import { endLabel, formatClock, untilNextMinute } from "./endtime";
 import {
   canFallBack,
   formatRemaining,
@@ -117,6 +118,11 @@ let panel = $state<Panel | null>(null);
 let awake = $state(true);
 let overChrome = $state(false);
 let volume = $state<VolumeSetting>(readVolume(storage()));
+/** Wall clock of the clock and « Fin à » (ADR 0073): each position, and each minute. */
+let now = $state(Date.now());
+let clockTimer: ReturnType<typeof setTimeout> | undefined;
+/** Playback speed in effect; 1 is « Normale ». */
+let speed = $state(1);
 
 let audioButton = $state<HTMLButtonElement | null>(null);
 let subsButton = $state<HTMLButtonElement | null>(null);
@@ -183,6 +189,8 @@ const progress = $derived(
   duration > 0 ? Math.min(100, (position / duration) * 100) : 0,
 );
 const shownVolume = $derived(effectiveVolume(volume));
+const clock = $derived(formatClock(now));
+const endsLabel = $derived(endLabel(now, position, duration, speed));
 const chromeVisible = $derived(
   !active ||
     awake ||
@@ -313,6 +321,7 @@ function onEvent(ev: PlayerEvent) {
     case "timePos":
       everPlayed = true;
       if (!scrubbing) position = ev.seconds;
+      now = Date.now();
       break;
     case "duration":
       duration = ev.seconds;
@@ -375,9 +384,17 @@ onMount(async () => {
     // Not started yet: `fileLoaded` will come.
   }
   wake();
+  tickClock();
 });
 
+/** Moves the clock on at the start of each minute, even while paused. */
+function tickClock() {
+  now = Date.now();
+  clockTimer = setTimeout(tickClock, untilNextMinute(now));
+}
+
 onDestroy(() => {
+  clearTimeout(clockTimer);
   stopCountdown?.();
   unlisten?.();
   clearInterval(diagTimer);
@@ -711,6 +728,7 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
         <h1>{heading.name}</h1>
       </div>
       <span class="decision" title="Décision du serveur Emby">{decision}</span>
+      <span class="clock" aria-label={`Il est ${clock}`}>{clock}</span>
     </header>
 
     {#if buffering}
@@ -875,7 +893,10 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
         <div class="times">
           <span class="time">{formatTime(position)}</span>
           {#if chapterName}<span class="chapter-name">{chapterName}</span>{/if}
-          <span class="time" title="Temps restant">{formatRemaining(position, duration)}</span>
+          <span class="end-times">
+            {#if endsLabel}<span class="time ends">{endsLabel}</span>{/if}
+            <span class="time" title="Temps restant">{formatRemaining(position, duration)}</span>
+          </span>
         </div>
       </div>
 
@@ -1173,6 +1194,20 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     font-variant-numeric: tabular-nums;
     color: rgb(235 235 245 / 80%);
     text-shadow: 0 1px 3px rgb(0 0 0 / 80%);
+  }
+  .clock {
+    flex: none;
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 3px rgb(0 0 0 / 60%);
+  }
+  .end-times {
+    display: flex;
+    gap: var(--space-3);
+  }
+  .ends {
+    color: var(--color-text-secondary);
   }
   .buttons {
     display: grid;
