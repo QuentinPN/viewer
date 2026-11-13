@@ -10,6 +10,9 @@
 - Langues audio et sous-titres : par défaut, celles de ton compte Emby ; un réglage local les remplace sur ce PC seulement (ADR 0115).
 - Lecteur : heure et « Fin à 22:47 » dans les commandes ; dans « Options de lecture », vitesse, mode nuit (compression du volume), synchronisation des sous-titres et de l'audio (Z / X pour les sous-titres), format de l'image (original, remplir, étirer) et minuterie de mise en veille, dont « Fin de l'épisode ».
 - Lecteur : change la qualité pendant la lecture ; la vidéo reprend au même endroit (ADR 0117).
+- Accueil : rangée « Playlists » et page de playlist (« Tout lire » lance la première entrée ; pas encore de lecture enchaînée). Elle se range et se masque dans Réglages › Accueil (ADR 0122).
+- Recherche : tes 8 dernières recherches s'affichent sous le champ vide, par serveur et par compte ; « Effacer » les retire (ADR 0122).
+- Réglages › Audio et sous-titres : « Mode nuit » par défaut pour la lecture ; le choix des sous-titres « Comme le compte Emby » porte enfin ce nom (ADR 0115, 0122).
 
 ## 1.2.0 — 2026-11-13
 
