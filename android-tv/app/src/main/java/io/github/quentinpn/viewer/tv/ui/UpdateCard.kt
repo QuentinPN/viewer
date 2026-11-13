@@ -62,7 +62,7 @@ fun UpdateCard(
                 val subtitle = when (mode) {
                     UpdateCardMode.Ready -> "Téléchargée. Elle s'installe quand tu le décides."
                     UpdateCardMode.Permission ->
-                        "Android doit d'abord autoriser Viewer à installer des mises à jour. Active l'option sur l'écran suivant, puis reviens : l'installation continue."
+                        "Android doit d'abord autoriser Viewer à installer des mises à jour. Active l'option pour Viewer sur l'écran suivant. Android ferme alors l'app : rouvre-la et choisis de nouveau « Installer »."
                     UpdateCardMode.Installing -> "Ouverture de l'installateur d'Android…"
                 }
                 Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = Palette.textSecondary)
