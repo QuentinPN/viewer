@@ -3,7 +3,14 @@
 // on request (arrows, dots, ← and →); no automatic rotation.
 import { tick } from "svelte";
 import type { HeroItem, MediaItem } from "../emby/types";
-import { heroMeta, keptIndex, playLabel, playName, stepIndex } from "./hero";
+import {
+  heroMeta,
+  heroRemaining,
+  keptIndex,
+  playLabel,
+  playName,
+  stepIndex,
+} from "./hero";
 
 interface Props {
   items: HeroItem[];
@@ -23,6 +30,7 @@ const index = $derived(keptIndex(items, shownId, shownIndex));
 const current = $derived(items[index]);
 const label = $derived(current ? playLabel(current) : null);
 const meta = $derived(current ? heroMeta(current) : "");
+const remaining = $derived(current ? heroRemaining(current) : null);
 
 /** Shows title `i`; `refocus` moves the focus to that control of the new title. */
 async function show(i: number, refocus: string | null = null) {
@@ -86,9 +94,6 @@ function onkeydown(e: KeyboardEvent) {
           />
           <div class="scrim"></div>
           <div class="content">
-            {#if current.reason === "resume"}
-              <p class="eyebrow">Reprendre</p>
-            {/if}
             <h2 class="title">
               {#if current.logo}
                 <img
@@ -124,16 +129,19 @@ function onkeydown(e: KeyboardEvent) {
                 aria-label="Plus d'infos sur {current.detail.name}"
                 onclick={() => onOpen(current.detail)}>Plus d'infos</button
               >
-              {#if current.resume?.fraction != null}
-                <div
-                  class="progress"
-                  role="progressbar"
-                  aria-label="Déjà vu"
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                  aria-valuenow={Math.round(current.resume.fraction * 100)}
-                >
-                  <span style:width="{current.resume.fraction * 100}%"></span>
+              {#if remaining}
+                <div class="remaining">
+                  <div
+                    class="progress"
+                    role="progressbar"
+                    aria-label="Déjà vu"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow={Math.round(remaining.fraction * 100)}
+                  >
+                    <span style:width="{remaining.fraction * 100}%"></span>
+                  </div>
+                  <span class="left">{remaining.label}</span>
                 </div>
               {/if}
             </div>
@@ -223,13 +231,6 @@ function onkeydown(e: KeyboardEvent) {
     align-items: flex-start;
     gap: var(--space-3);
   }
-  .eyebrow {
-    margin: 0;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    color: var(--color-text-secondary);
-  }
   .title {
     margin: 0;
     font-size: clamp(36px, 4.6vw, 72px);
@@ -313,6 +314,17 @@ function onkeydown(e: KeyboardEvent) {
   }
   .info:hover {
     background: var(--fill-glass-hover);
+  }
+  .remaining {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .left {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
   }
   .progress {
     width: 120px;

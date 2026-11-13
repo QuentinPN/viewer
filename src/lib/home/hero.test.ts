@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { HeroItem } from "../emby/types";
-import { heroMeta, keptIndex, playLabel, playName, stepIndex } from "./hero";
+import {
+  heroMeta,
+  heroRemaining,
+  keptIndex,
+  playLabel,
+  playName,
+  stepIndex,
+} from "./hero";
 
 function hero(id: string, extra: Partial<HeroItem> = {}): HeroItem {
   return {
@@ -48,12 +55,40 @@ describe("keptIndex", () => {
   });
 });
 
+describe("heroRemaining", () => {
+  it("gives the share and the minutes left", () => {
+    expect(
+      heroRemaining(
+        hero("1", { resume: { positionSeconds: 600, fraction: 0.25 } }),
+      ),
+    ).toEqual({ fraction: 0.25, label: "Reste 30 min" });
+    expect(
+      heroRemaining(
+        hero("1", { resume: { positionSeconds: 1200, fraction: 0.2 } }),
+      ),
+    ).toEqual({ fraction: 0.2, label: "Reste 1 h 20" });
+  });
+  it("is absent without a resume point or a length", () => {
+    expect(heroRemaining(hero("1"))).toBeNull();
+    expect(
+      heroRemaining(
+        hero("1", { resume: { positionSeconds: 60, fraction: null } }),
+      ),
+    ).toBeNull();
+  });
+});
+
 describe("labels", () => {
   it("resumes a started title, plays a new one, nothing without target", () => {
     expect(playLabel(hero("1"))).toBe("Lecture");
     expect(
       playLabel(hero("1", { resume: { positionSeconds: 60, fraction: 0.1 } })),
-    ).toBe("Reprendre");
+    ).toBe("Reprendre à 1:00");
+    expect(
+      playLabel(
+        hero("1", { resume: { positionSeconds: 3725, fraction: null } }),
+      ),
+    ).toBe("Reprendre à 1:02:05");
     expect(playLabel(hero("1", { playId: null }))).toBeNull();
     expect(playName(hero("1", { playId: null }))).toBeNull();
   });
