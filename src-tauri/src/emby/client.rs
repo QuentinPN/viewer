@@ -549,6 +549,22 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
+    /// Titles of a person, collection, genre or studio (`/Users/{Id}/Items`,
+    /// ADR 0121); the query comes checked from `titles::titles_params`.
+    pub async fn titles(
+        &self,
+        user_id: &str,
+        params: &[(&str, String)],
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Users/{}/Items", path_segment(user_id)?));
+        let params: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
     /// Seasons of a series, in order (`0` = specials). Unknown series: 404.
     pub async fn seasons(
         &self,

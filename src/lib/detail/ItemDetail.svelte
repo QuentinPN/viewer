@@ -30,6 +30,7 @@ import {
   videoLabel,
 } from "./format";
 import EpisodePage from "./ItemDetail.svelte";
+import { type DetailPage, initials, personPage } from "./pages";
 import {
   loadVersion,
   saveVersion,
@@ -60,6 +61,8 @@ interface Props {
   backLabel?: string | undefined;
   /** Server and user the chosen version is remembered for (ADR 0036); none: not kept. */
   versionScope?: string | undefined;
+  /** Opens a person, another title or a list over this page (ADR 0121). */
+  onOpenPage?: ((page: DetailPage) => void) | undefined;
 }
 
 type Direction = "previous" | "next";
@@ -76,6 +79,7 @@ let {
   onLoaded,
   backLabel,
   versionScope,
+  onOpenPage,
 }: Props = $props();
 
 // Only an episode page is nested over another page: ids stay unique.
@@ -111,6 +115,8 @@ let opened = $state<{ item: MediaItem; via: Direction | null } | null>(null);
 /** Season of the episode shown, for the return to the list. */
 let openedSeason: string | null = null;
 let episodeList = $state<ReturnType<typeof EpisodeList> | null>(null);
+/** Cast photos that failed to load, by index. */
+let failedPhotos = $state<Set<number>>(new Set());
 
 const poster = $derived(detail?.poster ?? item.poster);
 const meta = $derived(detail ? metaParts(detail) : []);
@@ -550,12 +556,6 @@ onMount(() => {
               <dd>{detail.writers.join(", ")}</dd>
             </div>
           {/if}
-          {#if detail.cast.length > 0}
-            <div>
-              <dt>{detail.kind === "episode" ? "Invités" : "Avec"}</dt>
-              <dd>{detail.cast.map((c) => c.name).join(", ")}</dd>
-            </div>
-          {/if}
           {#if detail.studios.length > 0}
             <div>
               <dt>{detail.kind === "series" ? "Diffusion" : "Studio"}</dt>
@@ -576,6 +576,48 @@ onMount(() => {
           {/if}
         </dl>
       </div>
+
+      {#if detail.cast.length > 0}
+        <section class="cast" aria-labelledby="{titleId}-cast">
+          <h2 id="{titleId}-cast">{detail.kind === "episode" ? "Invités" : "Distribution"}</h2>
+          <ul>
+            {#each detail.cast as person, i (i)}
+              {@const page = onOpenPage ? personPage(person) : null}
+              <li>
+                {#snippet face()}
+                  <span class="face" aria-hidden="true">
+                    {#if person.photo && !failedPhotos.has(i)}
+                      <img
+                        src={person.photo.src}
+                        srcset={person.photo.srcset}
+                        sizes="88px"
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        onerror={() => (failedPhotos = new Set(failedPhotos).add(i))}
+                      />
+                    {:else}
+                      {initials(person.name)}
+                    {/if}
+                  </span>
+                  <span class="person-name">{person.name}</span>
+                  {#if person.role}<span class="person-role">{person.role}</span>{/if}
+                {/snippet}
+                {#if page}
+                  <button
+                    type="button"
+                    class="person"
+                    title="Voir les titres de {person.name}"
+                    onclick={() => onOpenPage?.(page)}>{@render face()}</button
+                  >
+                {:else}
+                  <div class="person">{@render face()}</div>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
 
       {#if detail.kind === "series"}
         <EpisodeList
@@ -737,6 +779,7 @@ onMount(() => {
       focusOnLoad={opened.via}
       onLoaded={(d) => (openedSeason = d.episode?.seasonId ?? null)}
       {versionScope}
+      {onOpenPage}
     />
   {/key}
 {/if}
@@ -1032,6 +1075,70 @@ onMount(() => {
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+  .cast {
+    margin-top: 40px;
+  }
+  .cast ul {
+    list-style: none;
+    margin: 0;
+    padding: 4px 4px 8px;
+    display: flex;
+    gap: var(--space-4);
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .cast li {
+    flex: none;
+    width: 112px;
+  }
+  .person {
+    width: 100%;
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    padding: var(--space-2) 0;
+    border: none;
+    border-radius: var(--radius-md);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: center;
+  }
+  button.person {
+    cursor: pointer;
+    transition: background var(--motion-fast);
+  }
+  button.person:hover {
+    background: var(--fill-glass);
+  }
+  .face {
+    width: 88px;
+    height: 88px;
+    margin-bottom: var(--space-2);
+    border-radius: 50%;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    font-size: 24px;
+    font-weight: 600;
+  }
+  .face img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .person-name {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  .person-role {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    line-height: 1.25;
   }
   .tech {
     margin-top: 40px;

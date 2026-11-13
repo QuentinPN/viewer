@@ -297,6 +297,13 @@ pub struct PersonDto {
     /// `Actor`, `Director`, `Writer`, `Producer`, `GuestStar`…
     #[serde(rename = "Type", default)]
     pub person_type: String,
+    /// Documented as a string; read as any value so that a number would not
+    /// make the whole item unreadable, as `Studios[].Id` (ADR 0121).
+    #[serde(default)]
+    pub id: Option<serde_json::Value>,
+    /// Tag of the person's photo, the `Primary` image of the person item.
+    #[serde(default)]
+    pub primary_image_tag: Option<String>,
 }
 
 /// One file (version) of an item. `Path` is left out on purpose.
@@ -672,6 +679,9 @@ pub struct ResumePoint {
 pub struct CastMember {
     pub name: String,
     pub role: Option<String>,
+    /// The person item, for its page (ADR 0121); `None` without a usable id.
+    pub id: Option<String>,
+    pub photo: Option<ImageRef>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]

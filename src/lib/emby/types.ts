@@ -226,7 +226,13 @@ export interface ResumePoint {
 export interface CastMember {
   name: string;
   role: string | null;
+  /** The person item, for its page (ADR 0121); null without a usable id. */
+  id: string | null;
+  photo: ImageRef | null;
 }
+
+/** What a list of titles opened from a detail page shows (ADR 0121). */
+export type TitlesSource = { kind: "person"; id: string };
 
 export interface VideoInfo {
   codec: string | null;

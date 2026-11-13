@@ -19,6 +19,8 @@ pub const BACKDROP_WIDTHS: &[u32] = &[960, 1440, 1920];
 pub const LOGO_WIDTHS: &[u32] = &[320, 640];
 /// 16:9 episode stills.
 pub const THUMB_WIDTHS: &[u32] = &[320, 480, 640];
+/// Round cast photos of a detail page (ADR 0121).
+pub const PHOTO_WIDTHS: &[u32] = &[120, 240];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageType {

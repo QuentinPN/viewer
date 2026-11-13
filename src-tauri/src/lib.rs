@@ -381,6 +381,7 @@ pub fn run() {
             commands::emby_search,
             commands::emby_item_detail,
             commands::emby_seasons,
+            commands::emby_titles,
             commands::emby_episodes,
             commands::emby_play,
             commands::emby_segments,
