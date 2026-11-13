@@ -34,7 +34,7 @@ export function speedBadge(speed: number): string | null {
 
 /**
  * Night mode, kept on this PC like the volume: it applies to every playback
- * until turned off. A small store that Réglages can expose later.
+ * until turned off, here or in Réglages › Audio et sous-titres (ADR 0122).
  */
 export const NIGHT_KEY = "viewer.player.nightMode";
 

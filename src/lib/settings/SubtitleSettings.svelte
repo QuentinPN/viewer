@@ -1,5 +1,6 @@
 <script lang="ts">
 import { onMount } from "svelte";
+import { readNightMode, saveNightMode } from "../player/audiomodes";
 import {
   BACKGROUNDS,
   COLORS,
@@ -27,6 +28,13 @@ let prefs = $state<PlaybackPreferences>(readPreferences(preferenceStorage()));
 // `undefined` while asking the server, `null` when it could not answer.
 let account = $state<AccountTracks | null | undefined>(undefined);
 const sources = $derived(trackSources(prefs.tracks));
+// Same store as « Mode nuit » in the player's options (ADR 0072, 0122).
+let nightMode = $state(readNightMode(preferenceStorage()));
+
+function changeNightMode(on: boolean) {
+  nightMode = on;
+  saveNightMode(preferenceStorage(), on);
+}
 
 onMount(() => {
   accountApi.tracks().then(
@@ -139,6 +147,22 @@ const subtitleLanguageHint = $derived(
       </label>
     {/if}
   </div>
+
+  <label class="check">
+    <input
+      type="checkbox"
+      checked={nightMode}
+      onchange={(e) => changeNightMode(e.currentTarget.checked)}
+    />
+    <span>
+      Mode nuit
+      <small class="muted">
+        Atténue les écarts de volume : explosions moins fortes, dialogues plus
+        audibles. Activé ici, il s'applique à chaque lecture ; « Options de
+        lecture » permet de le couper pendant un film.
+      </small>
+    </span>
+  </label>
 
   <h3>Apparence des sous-titres texte</h3>
   <div class="fields">
