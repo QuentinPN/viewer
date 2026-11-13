@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.3.1 — en cours
+
+- Réglages : les sections occupent toute la fenêtre, en colonnes selon sa largeur (une sur fenêtre étroite, jusqu'à quatre sur grand écran). Les réglages du quotidien viennent d'abord, en panneaux pleins et sans trou (Lecture et Qualité l'une sous l'autre, puis Audio et sous-titres, puis Accueil) ; mises à jour, cache, journaux et détails techniques sont regroupés plus bas sous « Informations et maintenance », en panneaux plus discrets.
+
 ## 1.3.0 — 2026-11-13
 
 - Réglages › Mises à jour : version installée et bouton « Rechercher des mises à jour ». La nouvelle version est téléchargée et vérifiée, puis « Redémarrer maintenant » l'installe. Hors du réseau de la maison, le message le dit (ADR 0112).

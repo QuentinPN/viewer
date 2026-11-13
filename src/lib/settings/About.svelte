@@ -108,14 +108,12 @@ onMount(() => {
 
 <style>
   .panel {
-    max-width: 640px;
     background: var(--color-surface);
     border-radius: var(--radius-md);
     padding: var(--space-6);
     display: grid;
     gap: var(--space-3);
     justify-items: start;
-    margin-top: var(--space-6);
   }
   h2 {
     margin: 0;

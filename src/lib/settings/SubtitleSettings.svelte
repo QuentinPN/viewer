@@ -239,8 +239,6 @@ const subtitleLanguageHint = $derived(
 <style>
   /* Same panel as the other sections of Réglages, which cannot reach this one. */
   .panel {
-    max-width: 640px;
-    margin: var(--space-6) 0;
     background: var(--color-surface);
     border-radius: var(--radius-md);
     padding: var(--space-6);

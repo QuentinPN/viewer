@@ -76,8 +76,6 @@ onMount(() => {
 <style>
   /* Same panel as the other sections of Settings.svelte. */
   .panel {
-    max-width: 640px;
-    margin-top: var(--space-6);
     background: var(--color-surface);
     border-radius: var(--radius-md);
     padding: var(--space-6);

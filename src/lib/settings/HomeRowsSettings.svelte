@@ -165,8 +165,8 @@ function reset() {
 <style>
   /* Same panel as the other sections of Settings.svelte. */
   .panel {
-    max-width: 640px;
-    margin-top: var(--space-6);
+    /* The track may shrink below the rows' widest name: names end with an ellipsis */
+    grid-template-columns: minmax(0, 1fr);
     background: var(--color-surface);
     border-radius: var(--radius-md);
     padding: var(--space-6);
@@ -197,6 +197,7 @@ function reset() {
     padding: 0;
     width: 100%;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-1);
   }
   .rows li {

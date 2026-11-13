@@ -44,7 +44,7 @@ onMount(load);
   <h2 id="settings-quality">Qualité de lecture</h2>
   <p class="lead">
     Au-delà du débit choisi, le serveur Emby convertit le film à la volée pour le
-    réduire. Utile hors de chez vous, quand la connexion ne suit pas. Réglé pour ce
+    réduire. Utile hors de chez toi, quand la connexion ne suit pas. Réglé pour ce
     serveur seulement.
   </p>
 
@@ -92,14 +92,12 @@ onMount(load);
 
 <style>
   .panel {
-    max-width: 640px;
     background: var(--color-surface);
     border-radius: var(--radius-md);
     padding: var(--space-6);
     display: grid;
     gap: var(--space-3);
     justify-items: start;
-    margin-top: var(--space-6);
   }
   h2 {
     margin: 0;

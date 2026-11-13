@@ -23,7 +23,7 @@ async function openLogs() {
   <p class="lead">
     Viewer tient un journal sur ce poste pour comprendre un problème de lecture
     ou un arrêt inattendu. Les mots de passe et jetons en sont retirés, et il n'est
-    jamais envoyé : vous seul décidez de le partager.
+    jamais envoyé : c'est toi qui décides de le partager.
   </p>
   <button
     type="button"
@@ -41,15 +41,12 @@ async function openLogs() {
 <style>
   /* Same panel as the other sections of Settings.svelte. */
   .panel {
-    max-width: 640px;
     background: var(--color-surface);
     border-radius: var(--radius-md);
     padding: var(--space-6);
     display: grid;
     gap: var(--space-3);
     justify-items: start;
-    /* Both sides: the sibling sections' `.panel + .panel` rule does not see this one. */
-    margin: var(--space-6) 0;
   }
   h2 {
     margin: 0;

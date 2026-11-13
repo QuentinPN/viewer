@@ -90,108 +90,118 @@ onMount(() => {
   <h1>Réglages</h1>
 </header>
 
-<section class="panel" aria-labelledby="settings-playback">
-  <h2 id="settings-playback">Lecture</h2>
-  <p class="lead">
-    Pendant une intro ou un générique, un bouton propose de les passer. Les repères
-    viennent d'abord du serveur Emby, puis des bases communautaires IntroDB et
-    TheIntroDB.
-  </p>
-  <label class="check">
-    <input
-      type="checkbox"
-      checked={skip.external}
-      onchange={(e) => changeSkip({ ...skip, external: e.currentTarget.checked })}
-    />
-    <span>
-      Chercher les intros et génériques sur IntroDB et TheIntroDB
-      <small class="muted">
-        Seuls les identifiants IMDb, TMDB ou TVDB du film ou de la série, la saison,
-        l'épisode et la durée sont envoyés. Jamais votre compte ni l'adresse du
-        serveur.
-      </small>
-    </span>
-  </label>
-  <label class="check">
-    <input
-      type="checkbox"
-      checked={skip.auto}
-      onchange={(e) => changeSkip({ ...skip, auto: e.currentTarget.checked })}
-    />
-    <span>
-      Passer automatiquement
-      <small class="muted">
-        Une seule fois par lecture : revenir en arrière affiche de nouveau le bouton.
-      </small>
-    </span>
-  </label>
-  <p class="credit muted">
-    Données d'intros fournies par IntroDB (introdb.app) et TheIntroDB
-    (theintrodb.org).
-  </p>
-  <p class="muted note">S'applique à la prochaine lecture.</p>
-</section>
-
-<HomeRowsSettings {libraries} storageKey={rowPrefsKey} />
-
-<PlaybackQuality />
-
-<SubtitleSettings />
-
-<section class="panel" aria-labelledby="settings-artwork">
-  <h2 id="settings-artwork">Cache des images</h2>
-  <p class="lead">
-    Les affiches et les fonds déjà vus sont gardés sur ce poste pour s'afficher
-    plus vite. Les vider ne change rien sur le serveur : ils seront téléchargés de
-    nouveau à leur prochain affichage.
-  </p>
-
-  {#if loadError}
-    <div class="problem" role="alert">
-      <p>Impossible de lire la taille du cache : {loadError.message}</p>
-      <button type="button" class="secondary" onclick={load}>Réessayer</button>
-    </div>
-  {:else if stats === undefined}
-    <p class="muted" aria-busy="true">Lecture du cache…</p>
-  {:else if stats === null}
-    <p class="muted">Le cache des images n'est pas disponible sur ce poste.</p>
-  {:else}
-    <div class="usage">
-      <p class="size">
-        <strong>{cacheUsage(stats)}</strong>
-        <span class="muted">· {imageCount(stats.entries)}</span>
-      </p>
-      <div class="bar" aria-hidden="true">
-        <span style:width="{usageRatio(stats) * 100}%"></span>
-      </div>
-      <p class="muted reads">{sessionReads(stats)}</p>
-    </div>
-  {/if}
-
-  {#if stats !== null}
-    <button
-      type="button"
-      class="primary"
-      onclick={clear}
-      aria-disabled={clearing ? "true" : undefined}
-      disabled={stats === undefined || loadError !== null}
-    >
-      {clearing ? "Vidage…" : "Vider le cache des images"}
-    </button>
-  {/if}
-  <p class="result" role="status">{announce}</p>
-  {#if clearError}
-    <p class="problem-text" role="alert">
-      Le cache n'a pas pu être vidé : {clearError.message}
+<!-- Everyday settings first, in full panels; then the quieter, rarely used ones.
+     Each group fills the window in columns, as many as fit. -->
+<div class="columns everyday">
+  <section class="panel" aria-labelledby="settings-playback">
+    <h2 id="settings-playback">Lecture</h2>
+    <p class="lead">
+      Pendant une intro ou un générique, un bouton propose de les passer. Les repères
+      viennent d'abord du serveur Emby, puis des bases communautaires IntroDB et
+      TheIntroDB.
     </p>
-  {/if}
-</section>
+    <label class="check">
+      <input
+        type="checkbox"
+        checked={skip.external}
+        onchange={(e) => changeSkip({ ...skip, external: e.currentTarget.checked })}
+      />
+      <span>
+        Chercher les intros et génériques sur IntroDB et TheIntroDB
+        <small class="muted">
+          Seuls les identifiants IMDb, TMDB ou TVDB du film ou de la série, la saison,
+          l'épisode et la durée sont envoyés. Jamais ton compte ni l'adresse du
+          serveur.
+        </small>
+      </span>
+    </label>
+    <label class="check">
+      <input
+        type="checkbox"
+        checked={skip.auto}
+        onchange={(e) => changeSkip({ ...skip, auto: e.currentTarget.checked })}
+      />
+      <span>
+        Passer automatiquement
+        <small class="muted">
+          Une seule fois par lecture : revenir en arrière affiche de nouveau le bouton.
+        </small>
+      </span>
+    </label>
+    <p class="credit muted">
+      Données d'intros fournies par IntroDB (introdb.app) et TheIntroDB
+      (theintrodb.org).
+    </p>
+    <p class="muted note">S'applique à la prochaine lecture.</p>
+  </section>
 
-<Diagnostics />
+  <PlaybackQuality />
 
-<UpdateSettings {version} />
+  <SubtitleSettings />
 
-<About />
+  <HomeRowsSettings {libraries} storageKey={rowPrefsKey} />
+</div>
+
+<header class="group">
+  <h2>Informations et maintenance</h2>
+  <p>Rarement utile au quotidien : mises à jour, cache, journaux et détails techniques.</p>
+</header>
+<div class="columns quiet">
+  <UpdateSettings {version} />
+
+  <section class="panel" aria-labelledby="settings-artwork">
+    <h2 id="settings-artwork">Cache des images</h2>
+    <p class="lead">
+      Les affiches et les fonds déjà vus sont gardés sur ce poste pour s'afficher
+      plus vite. Les vider ne change rien sur le serveur : ils seront téléchargés de
+      nouveau à leur prochain affichage.
+    </p>
+
+    {#if loadError}
+      <div class="problem" role="alert">
+        <p>Impossible de lire la taille du cache : {loadError.message}</p>
+        <button type="button" class="secondary" onclick={load}>Réessayer</button>
+      </div>
+    {:else if stats === undefined}
+      <p class="muted" aria-busy="true">Lecture du cache…</p>
+    {:else if stats === null}
+      <p class="muted">Le cache des images n'est pas disponible sur ce poste.</p>
+    {:else}
+      <div class="usage">
+        <p class="size">
+          <strong>{cacheUsage(stats)}</strong>
+          <span class="muted">· {imageCount(stats.entries)}</span>
+        </p>
+        <div class="bar" aria-hidden="true">
+          <span style:width="{usageRatio(stats) * 100}%"></span>
+        </div>
+        <p class="muted reads">{sessionReads(stats)}</p>
+      </div>
+    {/if}
+
+    {#if stats !== null}
+      <button
+        type="button"
+        class="secondary"
+        onclick={clear}
+        aria-disabled={clearing ? "true" : undefined}
+        disabled={stats === undefined || loadError !== null}
+      >
+        {clearing ? "Vidage…" : "Vider le cache des images"}
+      </button>
+    {/if}
+    <p class="result" role="status">{announce}</p>
+    {#if clearError}
+      <p class="problem-text" role="alert">
+        Le cache n'a pas pu être vidé : {clearError.message}
+      </p>
+    {/if}
+  </section>
+
+  <Diagnostics />
+
+  <About />
+</div>
 
 <style>
   .heading {
@@ -203,7 +213,6 @@ onMount(() => {
     letter-spacing: -0.01em;
   }
   .panel {
-    max-width: 640px;
     background: var(--color-surface);
     border-radius: var(--radius-md);
     padding: var(--space-6);
@@ -211,9 +220,77 @@ onMount(() => {
     gap: var(--space-3);
     justify-items: start;
   }
-  .panel + .panel,
-  :global(.panel) + .panel {
-    margin-top: var(--space-6);
+  /* As many 400px columns as the window holds, up to four; one under 860px */
+  .columns {
+    columns: 400px 4;
+    column-gap: var(--space-6);
+  }
+  .columns > :global(*) {
+    break-inside: avoid;
+    margin: 0 0 var(--space-6);
+  }
+  /* Four everyday sections placed by hand, so no column is left with a hole:
+     one column, then two (Lecture over Audio, Qualité over Accueil), then three
+     with the two short ones (Lecture, Qualité) stacked in the first. */
+  .everyday {
+    columns: auto;
+    display: grid;
+    gap: var(--space-6);
+    align-items: start;
+    grid-template-areas: "lec" "qua" "aud" "acc";
+    margin-bottom: var(--space-6);
+  }
+  .everyday > :global(*) {
+    margin: 0;
+  }
+  .everyday > :global([aria-labelledby="settings-playback"]) {
+    grid-area: lec;
+  }
+  .everyday > :global([aria-labelledby="settings-quality"]) {
+    grid-area: qua;
+  }
+  .everyday > :global([aria-labelledby="settings-subtitles"]) {
+    grid-area: aud;
+  }
+  .everyday > :global([aria-labelledby="settings-home"]) {
+    grid-area: acc;
+  }
+  @media (min-width: 1000px) {
+    .everyday {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-areas: "lec qua" "aud acc";
+    }
+  }
+  @media (min-width: 1440px) {
+    .everyday {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-rows: auto 1fr;
+      grid-template-areas: "lec aud acc" "qua aud acc";
+    }
+  }
+  .group {
+    margin: var(--space-6) 0 var(--space-4);
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--separator);
+    display: grid;
+    gap: var(--space-1);
+  }
+  .group h2 {
+    font-size: 15px;
+    color: var(--color-text-secondary);
+  }
+  .group p {
+    font-size: 13px;
+    color: var(--color-text-muted);
+  }
+  /* Quieter panels: outlined instead of filled, smaller titles */
+  .quiet > :global(section) {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--separator);
+  }
+  .quiet > :global(section h2) {
+    font-size: 15px;
+    color: var(--color-text-secondary);
   }
   h2 {
     margin: 0;
@@ -288,12 +365,6 @@ onMount(() => {
     border-radius: var(--radius-sm);
     padding: var(--space-2) var(--space-4);
     cursor: pointer;
-  }
-  .primary {
-    background: var(--color-accent);
-    color: #04121b;
-    border: 0;
-    font-weight: 600;
   }
   .secondary {
     background: transparent;
