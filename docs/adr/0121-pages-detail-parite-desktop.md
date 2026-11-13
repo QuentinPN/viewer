@@ -12,7 +12,7 @@ Le code de la TV est la référence vérifiée : mêmes points d'accès et même
 - Le détail reste `GET /Users/{UserId}/Items/{Id}` sans `Fields`. `BaseItemDto` lit en plus `People[].Id` (valeur primitive quelconque, comme la TV), `People[].PrimaryImageTag`, `LocalTrailerCount` et `Collections` (`NameLongIdPair[]`, lu en `serde_json::Value` : toute autre forme donne une liste vide).
 - `ItemDetail` gagne `cast[].id` et `cast[].photo` (image `Primary` de la personne, servie par `emby-img`), `hasLocalTrailer` et `collections` (trois au plus, identifiants validés, doublons retirés, comme `collectionRefs`).
 - Nouvelles commandes, toutes en lecture :
-  - `emby_similar(itemId)` : `GET /Items/{Id}/Similar` avec `UserId`, `Limit`, `IncludeItemTypes=Movie,Series`, `Fields=PrimaryImageAspectRatio,ProductionYear`, `EnableUserData`, `ImageTypeLimit=1`, `EnableImageTypes=Primary` ; sans le titre lui-même ni doublons.
+  - `emby_titles({ kind: "similar", id })` (12 titres max) : `GET /Items/{Id}/Similar` avec `UserId`, `Limit`, `IncludeItemTypes=Movie,Series`, `Fields=PrimaryImageAspectRatio,ProductionYear`, `EnableUserData`, `ImageTypeLimit=1`, `EnableImageTypes=Primary` ; sans le titre lui-même ni doublons.
   - `emby_titles(source)` : `GET /Users/{UserId}/Items`, une source parmi
     - personne : `PersonIds`, `Recursive`, `IncludeItemTypes=Movie,Series`, `SortBy=ProductionYear,SortName`, `SortOrder=Descending`, `Limit=100` (requête `personItemsQuery`) ;
     - collection : `ParentId={BoxSet}`, `SortBy=PremiereDate,ProductionYear,SortName`, `SortOrder=Ascending`, `Limit=100` (`collectionItemsQuery`) ;
