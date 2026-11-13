@@ -6,6 +6,13 @@
 import { onMount, tick, untrack } from "svelte";
 import { episodeItem } from "../detail/format";
 import ItemDetail from "../detail/ItemDetail.svelte";
+import {
+  type DetailPage,
+  pageKey,
+  pushPage,
+  replaceTop,
+} from "../detail/pages";
+import TitlesPage from "../detail/TitlesPage.svelte";
 import { patchPlayed } from "../detail/watched";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
 import type {
@@ -189,6 +196,10 @@ async function closePlaylist() {
 let openerId: string | null = null;
 /** Neighbour button that replaced the episode page, to focus it again. */
 let openedVia = $state<"previous" | "next" | null>(null);
+/** Pages opened over the detail (ADR 0121): people, other titles, lists. */
+let pages = $state<DetailPage[]>([]);
+/** What had the focus when each page opened, to get it back on return. */
+let pageOpeners: (Element | null)[] = [];
 
 let query = $state("");
 let searchField = $state<HTMLInputElement | null>(null);
@@ -256,6 +267,8 @@ async function loadLibraries() {
 }
 
 function open(item: MediaItem) {
+  pages = [];
+  pageOpeners = [];
   opened = item;
   openerId = item.id;
   openedVia = null;
@@ -271,6 +284,23 @@ function openEpisode(item: WatchItem) {
 function navigateEpisode(link: EpisodeLink, via: "previous" | "next") {
   opened = episodeItem(link);
   openedVia = via;
+}
+
+/** A person, another title or a list over the detail (ADR 0121). */
+function openPage(page: DetailPage) {
+  pages = pushPage(pages, page);
+  pageOpeners = [...pageOpeners, document.activeElement].slice(-pages.length);
+}
+
+/** Back to the page below, focus on what opened the one closed. */
+async function closePage() {
+  const back = pageOpeners.at(-1);
+  pages = pages.slice(0, -1);
+  pageOpeners = pageOpeners.slice(0, -1);
+  await tick();
+  if (back instanceof HTMLElement && back.isConnected) {
+    back.focus({ preventScroll: true });
+  }
 }
 
 /** Back to the grid, focus on the card (or the icon) that opened the detail. */
@@ -1405,6 +1435,7 @@ $effect(() => {
     <p class="counter" aria-hidden="true">{counter}</p>
   {/if}
   {#if opened}
+    <div class="page-layer" class:covered={pages.length > 0} inert={pages.length > 0}>
     {#key opened.id}
       <ItemDetail
         item={opened}
@@ -1417,8 +1448,41 @@ $effect(() => {
         focusOnLoad={openedVia}
         backLabel={searching ? "Retour à la recherche" : undefined}
         versionScope="{user.server.id}:{user.userId}"
+        onOpenPage={openPage}
       />
     {/key}
+    </div>
+    {#each pages as page, i (pageKey(page, i))}
+      {@const top = i === pages.length - 1}
+      <div class="page-layer" class:covered={!top} inert={!top}>
+        {#if page.kind === "item"}
+          <ItemDetail
+            item={page.item}
+            {refresh}
+            onClose={closePage}
+            onError={fail}
+            {onPlay}
+            onFavoriteChange={favoriteChanged}
+            onNavigate={(link, via) =>
+              (pages = replaceTop(pages, { kind: "item", item: episodeItem(link), via }))}
+            focusOnLoad={page.via}
+            versionScope="{user.server.id}:{user.userId}"
+            onOpenPage={openPage}
+          />
+        {:else}
+          <TitlesPage
+            source={page.source}
+            title={page.title}
+            subtitle={page.subtitle}
+            photo={page.photo}
+            {refresh}
+            onClose={closePage}
+            onError={fail}
+            onOpen={(item) => openPage({ kind: "item", item, via: null })}
+          />
+        {/if}
+      </div>
+    {/each}
   {/if}
   </div>
   <CardMenu menu={cardMenu} {onPlay} onError={fail} onFavoriteChange={favoriteChanged} />
@@ -2039,6 +2103,15 @@ $effect(() => {
     /* About 7 posters on a 1600 px window, 3 at the 640 px minimum. */
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 24px 18px;
+  }
+  /* Detail pages stacked over the grid (ADR 0121): a covered one keeps its
+     scroll position but is not painted, and its keys stay inactive. */
+  .page-layer {
+    position: absolute;
+    inset: 0;
+  }
+  .page-layer.covered {
+    content-visibility: hidden;
   }
   .counter {
     position: absolute;

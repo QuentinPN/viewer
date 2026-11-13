@@ -27,6 +27,7 @@ import type {
   ShelfServer,
   SignedInUser,
   SortNameEntry,
+  TitlesSource,
   WatchItem,
 } from "./types";
 
@@ -115,6 +116,12 @@ export const embyApi = {
   itemDetail: (itemId: string) =>
     invoke<ItemDetail>("emby_item_detail", { itemId }),
   seasons: (seriesId: string) => invoke<Season[]>("emby_seasons", { seriesId }),
+  /** Titles of a person, collection, genre or studio (ADR 0121). */
+  titles: (source: TitlesSource) =>
+    invoke<MediaItem[]>("emby_titles", { source }),
+  /** Id of the first trailer file of a film or series, to play (ADR 0121). */
+  localTrailer: (itemId: string) =>
+    invoke<string | null>("emby_local_trailer", { itemId }),
   episodes: (
     seriesId: string,
     seasonId: string,

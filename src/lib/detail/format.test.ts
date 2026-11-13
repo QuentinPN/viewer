@@ -54,6 +54,8 @@ const detail = (over: Partial<ItemDetail>): ItemDetail => ({
   unplayedCount: null,
   media: [],
   episode: null,
+  collections: [],
+  hasLocalTrailer: false,
   ...over,
 });
 

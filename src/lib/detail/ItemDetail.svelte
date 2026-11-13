@@ -31,6 +31,14 @@ import {
 } from "./format";
 import EpisodePage from "./ItemDetail.svelte";
 import {
+  collectionPage,
+  type DetailPage,
+  initials,
+  namedPage,
+  personPage,
+} from "./pages";
+import TitleRow from "./TitleRow.svelte";
+import {
   loadVersion,
   saveVersion,
   versionChoices,
@@ -60,6 +68,8 @@ interface Props {
   backLabel?: string | undefined;
   /** Server and user the chosen version is remembered for (ADR 0036); none: not kept. */
   versionScope?: string | undefined;
+  /** Opens a person, another title or a list over this page (ADR 0121). */
+  onOpenPage?: ((page: DetailPage) => void) | undefined;
 }
 
 type Direction = "previous" | "next";
@@ -76,6 +86,7 @@ let {
   onLoaded,
   backLabel,
   versionScope,
+  onOpenPage,
 }: Props = $props();
 
 // Only an episode page is nested over another page: ids stay unique.
@@ -111,6 +122,8 @@ let opened = $state<{ item: MediaItem; via: Direction | null } | null>(null);
 /** Season of the episode shown, for the return to the list. */
 let openedSeason: string | null = null;
 let episodeList = $state<ReturnType<typeof EpisodeList> | null>(null);
+/** Cast photos that failed to load, by index. */
+let failedPhotos = $state<Set<number>>(new Set());
 
 const poster = $derived(detail?.poster ?? item.poster);
 const meta = $derived(detail ? metaParts(detail) : []);
@@ -188,6 +201,34 @@ async function play(id: string, resume: boolean) {
   } finally {
     starting = null;
   }
+}
+
+/** Plays the trailer file stored with the title (ADR 0121). */
+async function playTrailer() {
+  const d = detail;
+  if (!d || starting) return;
+  starting = "trailer";
+  fromStart = false;
+  playError = null;
+  try {
+    const id = await embyApi.localTrailer(d.id);
+    if (!id) {
+      playError = {
+        kind: "server",
+        message: "Bande-annonce introuvable sur le serveur.",
+      };
+      return;
+    }
+    onPlay(await embyApi.play(id, false));
+  } catch (e) {
+    playError = onError(toEmbyError(e));
+  } finally {
+    starting = null;
+  }
+}
+
+function openTitle(item: MediaItem) {
+  onOpenPage?.({ kind: "item", item, via: null });
 }
 
 async function toggleFavorite() {
@@ -410,7 +451,21 @@ onMount(() => {
 
           {#if detail.genres.length > 0}
             <ul class="genres" aria-label="Genres">
-              {#each detail.genres as genre (genre)}<li>{genre}</li>{/each}
+              {#each detail.genres as genre (genre)}
+                {@const page = onOpenPage ? namedPage("genre", genre, detail.kind) : null}
+                <li>
+                  {#if page}
+                    <button
+                      type="button"
+                      class="chip"
+                      title="Voir les titres du genre {genre}"
+                      onclick={() => onOpenPage?.(page)}>{genre}</button
+                    >
+                  {:else}
+                    <span class="chip">{genre}</span>
+                  {/if}
+                </li>
+              {/each}
             </ul>
           {/if}
 
@@ -489,6 +544,21 @@ onMount(() => {
               Favori
             </button>
             {/if}
+            {#if detail.hasLocalTrailer}
+              <button
+                type="button"
+                class="secondary trailer"
+                aria-disabled={starting !== null}
+                aria-busy={starting === "trailer"}
+                title="Lire la bande-annonce"
+                onclick={playTrailer}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true"
+                  ><rect x="1.5" y="3" width="13" height="10" rx="1.5" /><path d="m6.5 6 3.5 2-3.5 2z" /></svg
+                >
+                {starting === "trailer" ? "Ouverture…" : "Bande-annonce"}
+              </button>
+            {/if}
           </div>
           {#if versions.length > 0 && version}
             <div class="version">
@@ -550,16 +620,28 @@ onMount(() => {
               <dd>{detail.writers.join(", ")}</dd>
             </div>
           {/if}
-          {#if detail.cast.length > 0}
-            <div>
-              <dt>{detail.kind === "episode" ? "Invités" : "Avec"}</dt>
-              <dd>{detail.cast.map((c) => c.name).join(", ")}</dd>
-            </div>
-          {/if}
           {#if detail.studios.length > 0}
             <div>
               <dt>{detail.kind === "series" ? "Diffusion" : "Studio"}</dt>
-              <dd>{detail.studios.join(", ")}</dd>
+              <dd>
+                <ul class="studios">
+                  {#each detail.studios as studio (studio)}
+                    {@const page = onOpenPage ? namedPage("studio", studio, detail.kind) : null}
+                    <li>
+                      {#if page}
+                        <button
+                          type="button"
+                          class="link"
+                          title="Voir les titres de {studio}"
+                          onclick={() => onOpenPage?.(page)}>{studio}</button
+                        >
+                      {:else}
+                        {studio}
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              </dd>
             </div>
           {/if}
           {#if premiere && detail.kind !== "episode"}
@@ -576,6 +658,63 @@ onMount(() => {
           {/if}
         </dl>
       </div>
+
+      {#if detail.cast.length > 0}
+        <section class="cast" aria-labelledby="{titleId}-cast">
+          <h2 id="{titleId}-cast">{detail.kind === "episode" ? "Invités" : "Distribution"}</h2>
+          <ul>
+            {#each detail.cast as person, i (i)}
+              {@const page = onOpenPage ? personPage(person) : null}
+              <li>
+                {#snippet face()}
+                  <span class="face" aria-hidden="true">
+                    {#if person.photo && !failedPhotos.has(i)}
+                      <img
+                        src={person.photo.src}
+                        srcset={person.photo.srcset}
+                        sizes="88px"
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        onerror={() => (failedPhotos = new Set(failedPhotos).add(i))}
+                      />
+                    {:else}
+                      {initials(person.name)}
+                    {/if}
+                  </span>
+                  <span class="person-name">{person.name}</span>
+                  {#if person.role}<span class="person-role">{person.role}</span>{/if}
+                {/snippet}
+                {#if page}
+                  <button
+                    type="button"
+                    class="person"
+                    title="Voir les titres de {person.name}"
+                    onclick={() => onOpenPage?.(page)}>{@render face()}</button
+                  >
+                {:else}
+                  <div class="person">{@render face()}</div>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
+
+      {#if onOpenPage && detail.kind !== "episode"}
+        {#each detail.collections as collection (collection.id)}
+          <TitleRow
+            source={{ kind: "collection", id: collection.id }}
+            heading="Collection : {collection.name}"
+            rowId="{titleId}-collection-{collection.id}"
+            exclude={detail.id}
+            {refresh}
+            {onError}
+            onOpen={openTitle}
+            onMore={() => onOpenPage?.(collectionPage(collection))}
+          />
+        {/each}
+      {/if}
 
       {#if detail.kind === "series"}
         <EpisodeList
@@ -685,6 +824,17 @@ onMount(() => {
           {/if}
         </nav>
       {/if}
+
+      {#if onOpenPage && detail.kind !== "episode"}
+        <TitleRow
+          source={{ kind: "similar", id: detail.id }}
+          heading="Titres similaires"
+          rowId="{titleId}-similar"
+          {refresh}
+          {onError}
+          onOpen={openTitle}
+        />
+      {/if}
     {:else}
       <div class="sk-text" aria-hidden="true">
         <div></div>
@@ -737,11 +887,19 @@ onMount(() => {
       focusOnLoad={opened.via}
       onLoaded={(d) => (openedSeason = d.episode?.seasonId ?? null)}
       {versionScope}
+      {onOpenPage}
     />
   {/key}
 {/if}
 
 <style>
+  .trailer svg rect,
+  .trailer svg path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+  }
   .detail {
     position: absolute;
     inset: 0;
@@ -947,12 +1105,47 @@ onMount(() => {
     flex-wrap: wrap;
     gap: var(--space-2);
   }
-  .genres li {
+  .chip {
+    display: inline-block;
     padding: 2px var(--space-3);
+    border: none;
     border-radius: 999px;
     background: var(--fill-glass);
+    font: inherit;
     font-size: 13px;
     color: var(--color-text-secondary);
+  }
+  button.chip {
+    cursor: pointer;
+    transition:
+      background var(--motion-fast),
+      color var(--motion-fast);
+  }
+  button.chip:hover {
+    background: var(--fill-glass-hover);
+    color: var(--color-text);
+  }
+  .studios {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--space-3);
+  }
+  .link {
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--separator);
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .link:hover {
+    text-decoration-color: currentColor;
   }
   .status {
     display: flex;
@@ -1032,6 +1225,70 @@ onMount(() => {
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+  .cast {
+    margin-top: 40px;
+  }
+  .cast ul {
+    list-style: none;
+    margin: 0;
+    padding: 4px 4px 8px;
+    display: flex;
+    gap: var(--space-4);
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .cast li {
+    flex: none;
+    width: 112px;
+  }
+  .person {
+    width: 100%;
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    padding: var(--space-2) 0;
+    border: none;
+    border-radius: var(--radius-md);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: center;
+  }
+  button.person {
+    cursor: pointer;
+    transition: background var(--motion-fast);
+  }
+  button.person:hover {
+    background: var(--fill-glass);
+  }
+  .face {
+    width: 88px;
+    height: 88px;
+    margin-bottom: var(--space-2);
+    border-radius: 50%;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    font-size: 24px;
+    font-weight: 600;
+  }
+  .face img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .person-name {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  .person-role {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    line-height: 1.25;
   }
   .tech {
     margin-top: 40px;

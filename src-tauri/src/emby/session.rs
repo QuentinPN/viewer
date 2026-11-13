@@ -29,6 +29,7 @@ use super::playback::{self, PlaybackPlan};
 use super::quality::{BITRATE_CHOICES, PlaybackQuality, QualityCaps, QualityStore, StreamingLimit};
 use super::reporting::Report;
 use super::server_url::ServerUrl;
+use super::titles::{self, TitlesSource};
 use super::tracks::{self, TrackPreferences};
 use crate::segments::{MediaIds, Segment, SegmentQuery, emby_markers};
 
@@ -1023,6 +1024,44 @@ impl EmbyService {
             (ep.previous, ep.next) = neighbours(around.items, &ep.series_id, item_id);
         }
         Ok(detail)
+    }
+
+    /// Titles of a person, collection, genre or studio opened from a detail
+    /// page (ADR 0121): films and series only, once each, in the source's order.
+    pub async fn titles(&self, source: &TitlesSource) -> Result<Vec<MediaItem>, EmbyError> {
+        let (client, user_id) = self.session()?;
+        let scope = self.scope();
+        let read = match source {
+            TitlesSource::Similar { id } => {
+                let params = titles::similar_params(id, &user_id)
+                    .ok_or_else(|| EmbyError::InvalidResponse("identifiant invalide".into()))?;
+                client.similar(id, &params).await
+            }
+            _ => {
+                client
+                    .titles(&user_id, &titles::titles_params(source)?)
+                    .await
+            }
+        };
+        let page = self.expire_on_401(&client, read)?;
+        Ok(titles::order_titles(source, page.items)
+            .into_iter()
+            .filter_map(|d| media_item(d, &scope))
+            .collect())
+    }
+
+    /// Id of the first trailer file of a film or series (ADR 0121), played like
+    /// any item; `None` when the server lists none.
+    pub async fn local_trailer(&self, item_id: &str) -> Result<Option<String>, EmbyError> {
+        if !titles::is_item_id(item_id) {
+            return Err(EmbyError::InvalidResponse("identifiant invalide".into()));
+        }
+        let (client, user_id) = self.session()?;
+        let list = self.expire_on_401(&client, client.local_trailers(&user_id, item_id).await)?;
+        Ok(list
+            .into_iter()
+            .map(|d| d.id)
+            .find(|id| titles::is_item_id(id)))
     }
 
     /// Cache key of an item's segments: one per server, user and privacy setting.
@@ -2439,9 +2478,22 @@ fn item_detail(dto: BaseItemDto, server: &str) -> Result<ItemDetail, EmbyError> 
             "Actor"
         })
         .take(MAX_CAST)
-        .map(|p| CastMember {
-            name: p.name.clone(),
-            role: text(p.role.clone()),
+        .map(|p| {
+            let id = titles::person_id(p);
+            CastMember {
+                name: p.name.clone(),
+                role: text(p.role.clone()),
+                photo: id.as_deref().and_then(|id| {
+                    images::image_ref(
+                        server,
+                        id,
+                        ImageType::Primary,
+                        p.primary_image_tag.as_deref(),
+                        images::PHOTO_WIDTHS,
+                    )
+                }),
+                id,
+            }
         })
         .collect(),
         original_title: text(dto.original_title).filter(|t| *t != name),
@@ -2490,6 +2542,12 @@ fn item_detail(dto: BaseItemDto, server: &str) -> Result<ItemDetail, EmbyError> 
         } else {
             dto.media_sources.into_iter().map(media_info).collect()
         },
+        collections: if episode.is_some() {
+            Vec::new()
+        } else {
+            titles::collection_refs(dto.collections.as_ref())
+        },
+        has_local_trailer: episode.is_none() && dto.local_trailer_count.unwrap_or(0) > 0,
         episode,
         id: dto.id,
         kind,

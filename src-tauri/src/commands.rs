@@ -19,6 +19,7 @@ use crate::emby::models::{
 use crate::emby::quality::{PlaybackQuality, QualityCaps};
 use crate::emby::reporting::{ActivePlayback, PLAYBACK_STOPPED_EVENT};
 use crate::emby::session::EmbyService;
+use crate::emby::titles::TitlesSource;
 use crate::emby::tracks::TrackPreferences;
 use crate::player::{
     MediaSource, PlaybackRequest, PlayerCommand, PlayerDiagnostics, PlayerEngine, PlayerError,
@@ -498,6 +499,24 @@ pub async fn emby_seasons(
     series_id: String,
 ) -> Result<Vec<Season>, EmbyError> {
     emby.seasons(&series_id).await
+}
+
+/// Titles of a person, collection, genre or studio (ADR 0121).
+#[tauri::command]
+pub async fn emby_titles(
+    emby: State<'_, EmbyService>,
+    source: TitlesSource,
+) -> Result<Vec<MediaItem>, EmbyError> {
+    emby.titles(&source).await
+}
+
+/// Id of the first trailer file of a film or series, to play (ADR 0121).
+#[tauri::command]
+pub async fn emby_local_trailer(
+    emby: State<'_, EmbyService>,
+    item_id: String,
+) -> Result<Option<String>, EmbyError> {
+    emby.local_trailer(&item_id).await
 }
 
 #[tauri::command]

@@ -210,6 +210,12 @@ pub struct BaseItemDto {
     pub studios: Vec<NameDto>,
     #[serde(default)]
     pub people: Vec<PersonDto>,
+    /// `[{Name, Id}]` of the collections holding the item (ADR 0121).
+    #[serde(default)]
+    pub collections: Option<serde_json::Value>,
+    /// Trailer files stored with the item (ADR 0121).
+    #[serde(default)]
+    pub local_trailer_count: Option<u32>,
     #[serde(default)]
     pub official_rating: Option<String>,
     #[serde(default)]
@@ -307,6 +313,13 @@ pub struct PersonDto {
     /// `Actor`, `Director`, `Writer`, `Producer`, `GuestStar`…
     #[serde(rename = "Type", default)]
     pub person_type: String,
+    /// Documented as a string; read as any value so that a number would not
+    /// make the whole item unreadable, as `Studios[].Id` (ADR 0121).
+    #[serde(default)]
+    pub id: Option<serde_json::Value>,
+    /// Tag of the person's photo, the `Primary` image of the person item.
+    #[serde(default)]
+    pub primary_image_tag: Option<String>,
 }
 
 /// One file (version) of an item. `Path` is left out on purpose.
@@ -682,6 +695,9 @@ pub struct ResumePoint {
 pub struct CastMember {
     pub name: String,
     pub role: Option<String>,
+    /// The person item, for its page (ADR 0121); `None` without a usable id.
+    pub id: Option<String>,
+    pub photo: Option<ImageRef>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -771,6 +787,10 @@ pub struct ItemDetail {
     pub media: Vec<MediaInfo>,
     /// Episode only.
     pub episode: Option<EpisodeContext>,
+    /// Collections holding the film or series (ADR 0121), at most three.
+    pub collections: Vec<super::titles::CollectionRef>,
+    /// A trailer file is stored with the item (ADR 0121).
+    pub has_local_trailer: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]

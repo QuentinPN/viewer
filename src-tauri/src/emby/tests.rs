@@ -317,6 +317,13 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
                         .into(),
                 )
             }
+            p if p == items && query.contains("PersonIds=30209") => (200, person_titles()),
+            p if p == items && query.contains("ParentId=120034") => (200, person_titles()),
+            "/emby/Items/30207/Similar" => (200, person_titles()),
+            p if p == format!("{items}/30207/LocalTrailers") => (
+                200,
+                r#"[{"Name":"Bande-annonce","Id":"30500","Type":"Trailer"}]"#.into(),
+            ),
             p if p == items => (200, r#"{"Items":[],"TotalRecordCount":0}"#.into()),
             "/emby/Items/101/Images/Primary" => (200, "JPEG:fake-jpeg-bytes".into()),
             "/emby/Items/102/Images/Primary" => (200, "<html>pas une image</html>".into()),
@@ -502,6 +509,7 @@ fn movie_detail() -> String {
                   {"Name":"Lance Hool","Id":"30300","Type":"Director"},
                   {"Name":"Scénariste","Id":"30301","Type":"Writer"}],
         "Studios":[{"Name":"Silver Lion Films","Id":30218}],
+        "Collections":[{"Name":"Saga 2 Coeurs","Id":120034}],"LocalTrailerCount":1,
         "Chapters":[{"StartPositionTicks":0,"Name":"Chapitre 1","MarkerType":"Chapter","ChapterIndex":0},
           {"StartPositionTicks":4875700000,"Name":"Chapitre 2","MarkerType":"Chapter","ChapterIndex":1},
           {"StartPositionTicks":7265580000,"Name":"Chapitre 3","MarkerType":"Chapter","ChapterIndex":2}],
@@ -519,6 +527,17 @@ fn movie_detail() -> String {
             {"Codec":"subrip","Language":"fre","Type":"Subtitle","IsDefault":true,"IsForced":true,"Title":"Forcés"},
             {"Codec":"PGSSUB","Language":"eng","Type":"Subtitle","IsExternal":false},
             {"Codec":"mjpeg","Type":"EmbeddedImage"}]}]}"#
+        .into()
+}
+
+/// A person's titles as `/Users/{Id}/Items?PersonIds=` answers them (ADR 0121).
+fn person_titles() -> String {
+    r#"{"Items":[
+        {"Name":"Saltburn","Id":"30400","Type":"Movie","ProductionYear":2023,"ImageTags":{"Primary":"aa11"}},
+        {"Name":"Euphoria","Id":"30401","Type":"Series","ProductionYear":2019},
+        {"Name":"2 Coeurs","Id":"30207","Type":"Movie","ProductionYear":2020},
+        {"Name":"Pilote","Id":"30402","Type":"Episode","ProductionYear":2019}],
+        "TotalRecordCount":4}"#
         .into()
 }
 
@@ -2074,6 +2093,9 @@ fn movie_detail_maps_metadata_and_tech_info_without_the_server_path() {
     assert_eq!(d.directors, ["Lance Hool"]);
     assert_eq!(d.cast.len(), 1);
     assert_eq!(d.cast[0].role.as_deref(), Some("Chris"));
+    assert_eq!(d.cast[0].id.as_deref(), Some("30209"));
+    let photo = d.cast[0].photo.as_ref().unwrap();
+    assert!(photo.src.contains("/30209/Primary?tag=4b8a&maxWidth=120"));
     assert_eq!(d.studios, ["Silver Lion Films"]);
     let resume = d.resume.unwrap();
     assert_eq!(resume.position_seconds, 1831);
@@ -2104,6 +2126,61 @@ fn movie_detail_maps_metadata_and_tech_info_without_the_server_path() {
         "embedded images are not subtitles"
     );
     assert!(media.subtitles[0].is_forced);
+}
+
+#[test]
+fn person_titles_read_with_person_ids_newest_first() {
+    let (server, fx, _) = signed_in_browser();
+    let source = super::titles::TitlesSource::Person { id: "30209".into() };
+    let titles = run(fx.service.titles(&source)).unwrap();
+    let ids: Vec<_> = titles.iter().map(|t| t.id.as_str()).collect();
+    assert_eq!(ids, ["30400", "30207", "30401"]);
+    let poster = titles[0].poster.as_ref().unwrap();
+    assert!(poster.src.contains("/30400/Primary?"));
+    let req = server.requests().into_iter().last().unwrap();
+    assert!(
+        req.path
+            .starts_with(&format!("/emby/Users/{USER_ID}/Items?"))
+    );
+    assert!(req.path.contains("PersonIds=30209"));
+    assert!(!req.path.contains(TOKEN), "token in the URL");
+
+    let bad = super::titles::TitlesSource::Person { id: "../x".into() };
+    assert!(run(fx.service.titles(&bad)).is_err());
+}
+
+#[test]
+fn similar_collection_and_trailer_of_a_movie() {
+    let (server, fx, _) = signed_in_browser();
+    let d = run(fx.service.item_detail("30207")).unwrap();
+    assert_eq!(d.collections.len(), 1);
+    assert_eq!(d.collections[0].id, "120034");
+    assert!(d.has_local_trailer);
+
+    let similar = super::titles::TitlesSource::Similar { id: "30207".into() };
+    let ids: Vec<_> = run(fx.service.titles(&similar))
+        .unwrap()
+        .into_iter()
+        .map(|t| t.id)
+        .collect();
+    assert_eq!(ids, ["30400", "30401"], "the title itself left out");
+    let req = server.requests().into_iter().last().unwrap();
+    assert!(req.path.starts_with("/emby/Items/30207/Similar?"));
+    assert!(req.path.contains(&format!("UserId={USER_ID}")));
+    assert!(!req.path.contains(TOKEN), "token in the URL");
+
+    let boxset = super::titles::TitlesSource::Collection {
+        id: "120034".into(),
+    };
+    assert_eq!(run(fx.service.titles(&boxset)).unwrap().len(), 3);
+
+    assert_eq!(
+        run(fx.service.local_trailer("30207")).unwrap().as_deref(),
+        Some("30500")
+    );
+    let req = server.requests().into_iter().last().unwrap();
+    assert!(req.path.contains("/30207/LocalTrailers?EnableImages=false"));
+    assert!(run(fx.service.local_trailer("../x")).is_err());
 }
 
 #[test]
