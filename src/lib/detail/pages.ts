@@ -3,6 +3,7 @@
 // Pure, so it can be unit tested.
 import type {
   CastMember,
+  CollectionRef,
   DetailKind,
   ImageRef,
   MediaItem,
@@ -43,8 +44,8 @@ export function pageKey(page: DetailPage, depth: number): string {
 }
 
 function sourceKey(source: TitlesSource): string {
-  return source.kind === "person"
-    ? `person:${source.id}`
+  return "id" in source
+    ? `${source.kind}:${source.id}`
     : `${source.kind}:${source.itemType}:${source.name}`;
 }
 
@@ -85,6 +86,17 @@ export function personPage(person: CastMember): DetailPage | null {
     title: person.name,
     subtitle: "Ses films et séries dans ta bibliothèque",
     photo: person.photo,
+  };
+}
+
+/** The page of a collection, its titles in release order. */
+export function collectionPage(collection: CollectionRef): DetailPage {
+  return {
+    kind: "titles",
+    source: { kind: "collection", id: collection.id },
+    title: collection.name,
+    subtitle: "Collection",
+    photo: null,
   };
 }
 

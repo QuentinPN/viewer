@@ -234,7 +234,14 @@ export interface CastMember {
 /** What a list of titles opened from a detail page shows (ADR 0121). */
 export type TitlesSource =
   | { kind: "person"; id: string }
-  | { kind: "genre" | "studio"; name: string; itemType: "Movie" | "Series" };
+  | { kind: "genre" | "studio"; name: string; itemType: "Movie" | "Series" }
+  | { kind: "collection" | "similar"; id: string };
+
+/** A collection (BoxSet) a title belongs to (ADR 0121). */
+export interface CollectionRef {
+  id: string;
+  name: string;
+}
 
 export interface VideoInfo {
   codec: string | null;
@@ -302,6 +309,10 @@ export interface ItemDetail {
   media: MediaInfo[];
   /** Episode only. */
   episode: EpisodeContext | null;
+  /** Film or series: collections holding it, at most three (ADR 0121). */
+  collections: CollectionRef[];
+  /** Film or series: a trailer file is stored with it (ADR 0121). */
+  hasLocalTrailer: boolean;
 }
 
 export interface Season {

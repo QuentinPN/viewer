@@ -10,6 +10,12 @@ use super::models::{BaseItemDto, PersonDto, is_usable_genre};
 /// Titles read for one list: one request, enough for a home library.
 pub const TITLES_LIMIT: u32 = 100;
 
+/// Similar titles shown under a film or series, as on the TV (ADR 0084).
+pub const SIMILAR_LIMIT: u32 = 12;
+
+/// Collections of a title shown on its page, as on the TV.
+pub const MAX_COLLECTIONS: usize = 3;
+
 /// Titles read for a genre or a studio, sorted by name: a genre may hold many.
 pub const NAMED_TITLES_LIMIT: u32 = 200;
 
@@ -31,6 +37,64 @@ pub enum TitlesSource {
         #[serde(rename = "itemType")]
         item_type: String,
     },
+    /// Titles of a collection (BoxSet), by premiere date.
+    Collection { id: String },
+    /// Films and series like a title (`/Items/{Id}/Similar`), the title left out.
+    Similar { id: String },
+}
+
+/// A collection a title belongs to.
+#[derive(Debug, Clone, serde::Serialize, PartialEq, Eq)]
+pub struct CollectionRef {
+    pub id: String,
+    pub name: String,
+}
+
+/// The item's `Collections` (`[{Name, Id}]`, the id a number or a string):
+/// named ones with a usable id, once each, at most `MAX_COLLECTIONS`.
+pub fn collection_refs(raw: Option<&serde_json::Value>) -> Vec<CollectionRef> {
+    let Some(serde_json::Value::Array(list)) = raw else {
+        return Vec::new();
+    };
+    let mut out: Vec<CollectionRef> = Vec::new();
+    for entry in list {
+        let id = match entry.get("Id") {
+            Some(serde_json::Value::String(s)) => s.trim().to_owned(),
+            Some(serde_json::Value::Number(n)) => n.to_string(),
+            _ => continue,
+        };
+        let name = entry
+            .get("Name")
+            .and_then(|n| n.as_str())
+            .map(str::trim)
+            .unwrap_or("");
+        if !is_item_id(&id) || name.is_empty() || out.iter().any(|c| c.id == id) {
+            continue;
+        }
+        out.push(CollectionRef {
+            id,
+            name: name.to_owned(),
+        });
+        if out.len() == MAX_COLLECTIONS {
+            break;
+        }
+    }
+    out
+}
+
+/// Query of `GET /Items/{Id}/Similar` (TV `EmbyClient.similar`); `None` for a bad id.
+pub fn similar_params(id: &str, user_id: &str) -> Option<Vec<(&'static str, String)>> {
+    is_item_id(id).then(|| {
+        vec![
+            ("UserId", user_id.to_owned()),
+            ("Limit", SIMILAR_LIMIT.to_string()),
+            ("IncludeItemTypes", "Movie,Series".into()),
+            ("Fields", "PrimaryImageAspectRatio,ProductionYear".into()),
+            ("EnableUserData", "true".into()),
+            ("ImageTypeLimit", "1".into()),
+            ("EnableImageTypes", "Primary".into()),
+        ]
+    })
 }
 
 /// Same rule as the path segments: ASCII letters, digits and `-` only.
@@ -80,6 +144,19 @@ pub fn titles_params(source: &TitlesSource) -> Result<Vec<(&'static str, String)
                 ("Limit", NAMED_TITLES_LIMIT.to_string()),
             ]
         }
+        TitlesSource::Collection { id } => {
+            if !is_item_id(id) {
+                return Err(invalid());
+            }
+            vec![
+                ("ParentId", id.clone()),
+                ("SortBy", "PremiereDate,ProductionYear,SortName".into()),
+                ("SortOrder", "Ascending".into()),
+                ("Limit", TITLES_LIMIT.to_string()),
+            ]
+        }
+        // Read from `/Items/{Id}/Similar`, with `similar_params`.
+        TitlesSource::Similar { .. } => return Err(invalid()),
     };
     params.extend(common.iter().map(|(k, v)| (*k, (*v).to_owned())));
     Ok(params)
@@ -103,8 +180,28 @@ pub fn order_titles(source: &TitlesSource, items: Vec<BaseItemDto>) -> Vec<BaseI
                 .then(b.production_year.cmp(&a.production_year))
                 .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
         }),
+        // Release order: dated titles first, by day, else by year; then A → Z.
+        TitlesSource::Collection { .. } => items.sort_by(|a, b| {
+            let key = |i: &BaseItemDto| {
+                i.premiere_date
+                    .as_deref()
+                    .and_then(|d| d.get(..10))
+                    .map(str::to_owned)
+                    .or_else(|| i.production_year.map(|y| format!("{y:04}")))
+            };
+            let (ka, kb) = (key(a), key(b));
+            ka.is_none()
+                .cmp(&kb.is_none())
+                .then(ka.cmp(&kb))
+                .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+        }),
         // Sorted by the server on the sort name, which the client does not read.
         TitlesSource::Genre { .. } | TitlesSource::Studio { .. } => {}
+        // The server's order of likeness, the title itself left out.
+        TitlesSource::Similar { id } => {
+            items.retain(|i| i.id != *id);
+            items.truncate(SIMILAR_LIMIT as usize);
+        }
     }
     items
 }
@@ -122,6 +219,63 @@ pub fn person_id(person: &PersonDto) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn collections_parse_like_the_tv() {
+        let raw = serde_json::json!([
+            {"Name": "Dune - Saga", "Id": 120034},
+            {"Name": "Dune - Saga", "Id": "120034"},
+            {"Name": "  ", "Id": "5"},
+            {"Name": "Sans id"},
+            {"Name": "Mauvais", "Id": "../x"},
+            {"Name": "B", "Id": "2"},
+            {"Name": "C", "Id": "3"},
+            {"Name": "D", "Id": "4"}
+        ]);
+        let refs = collection_refs(Some(&raw));
+        let ids: Vec<_> = refs.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["120034", "2", "3"]);
+        assert_eq!(refs[0].name, "Dune - Saga");
+        assert!(collection_refs(None).is_empty());
+        assert!(collection_refs(Some(&serde_json::json!({"Id": 1}))).is_empty());
+    }
+
+    #[test]
+    fn collection_titles_in_release_order() {
+        let mut a = item("a", "Movie", "Dune 2", Some(2024));
+        a.premiere_date = Some("2024-02-27T23:00:00.0000000Z".into());
+        let mut b = item("b", "Movie", "Dune", Some(2021));
+        b.premiere_date = Some("2021-09-14T22:00:00.0000000Z".into());
+        let c = item("c", "Movie", "Dune 1984", Some(1984));
+        let d = item("d", "Movie", "Inédit", None);
+        let source = TitlesSource::Collection { id: "9".into() };
+        let ids: Vec<_> = order_titles(&source, vec![d, a, b, c])
+            .into_iter()
+            .map(|i| i.id)
+            .collect();
+        assert_eq!(ids, ["c", "b", "a", "d"]);
+        let p = titles_params(&source).unwrap();
+        assert!(p.contains(&("ParentId", "9".into())));
+        assert!(p.contains(&("SortBy", "PremiereDate,ProductionYear,SortName".into())));
+    }
+
+    #[test]
+    fn similar_leaves_the_title_out() {
+        let source = TitlesSource::Similar { id: "a".into() };
+        let mut list = vec![
+            item("a", "Movie", "Soi", None),
+            item("b", "Series", "B", None),
+        ];
+        list.extend((0..20).map(|n| item(&format!("x{n}"), "Movie", "X", None)));
+        list.push(item("b", "Series", "B", None));
+        let out = order_titles(&source, list);
+        assert_eq!(out.len(), SIMILAR_LIMIT as usize);
+        assert_eq!(out[0].id, "b");
+        assert!(titles_params(&source).is_err());
+        assert!(similar_params("../x", "u").is_none());
+        let p = similar_params("a", "u").unwrap();
+        assert!(p.contains(&("IncludeItemTypes", "Movie,Series".into())));
+    }
 
     fn item(id: &str, kind: &str, name: &str, year: Option<i32>) -> BaseItemDto {
         serde_json::from_value(serde_json::json!({

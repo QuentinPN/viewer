@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MediaItem } from "../emby/types";
 import {
+  collectionPage,
   type DetailPage,
   initials,
   isUsableName,
@@ -98,6 +99,17 @@ describe("namedPage", () => {
     expect(isUsableName("  ")).toBe(false);
     expect(isUsableName("x".repeat(101))).toBe(false);
     expect(isUsableName("Science-Fiction")).toBe(true);
+  });
+});
+
+describe("collectionPage", () => {
+  it("opens the titles of a collection by id", () => {
+    const page = collectionPage({ id: "120034", name: "Dune - Saga" });
+    expect(page).toMatchObject({
+      source: { kind: "collection", id: "120034" },
+      title: "Dune - Saga",
+    });
+    expect(pageKey(page, 0)).toBe("0:titles:collection:120034");
   });
 });
 

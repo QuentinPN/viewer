@@ -478,6 +478,15 @@ pub async fn emby_titles(
     emby.titles(&source).await
 }
 
+/// Id of the first trailer file of a film or series, to play (ADR 0121).
+#[tauri::command]
+pub async fn emby_local_trailer(
+    emby: State<'_, EmbyService>,
+    item_id: String,
+) -> Result<Option<String>, EmbyError> {
+    emby.local_trailer(&item_id).await
+}
+
 #[tauri::command]
 pub async fn emby_episodes(
     emby: State<'_, EmbyService>,

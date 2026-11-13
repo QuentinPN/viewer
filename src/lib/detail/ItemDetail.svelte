@@ -30,7 +30,14 @@ import {
   videoLabel,
 } from "./format";
 import EpisodePage from "./ItemDetail.svelte";
-import { type DetailPage, initials, namedPage, personPage } from "./pages";
+import {
+  collectionPage,
+  type DetailPage,
+  initials,
+  namedPage,
+  personPage,
+} from "./pages";
+import TitleRow from "./TitleRow.svelte";
 import {
   loadVersion,
   saveVersion,
@@ -194,6 +201,34 @@ async function play(id: string, resume: boolean) {
   } finally {
     starting = null;
   }
+}
+
+/** Plays the trailer file stored with the title (ADR 0121). */
+async function playTrailer() {
+  const d = detail;
+  if (!d || starting) return;
+  starting = "trailer";
+  fromStart = false;
+  playError = null;
+  try {
+    const id = await embyApi.localTrailer(d.id);
+    if (!id) {
+      playError = {
+        kind: "server",
+        message: "Bande-annonce introuvable sur le serveur.",
+      };
+      return;
+    }
+    onPlay(await embyApi.play(id, false));
+  } catch (e) {
+    playError = onError(toEmbyError(e));
+  } finally {
+    starting = null;
+  }
+}
+
+function openTitle(item: MediaItem) {
+  onOpenPage?.({ kind: "item", item, via: null });
 }
 
 async function toggleFavorite() {
@@ -509,6 +544,21 @@ onMount(() => {
               Favori
             </button>
             {/if}
+            {#if detail.hasLocalTrailer}
+              <button
+                type="button"
+                class="secondary trailer"
+                aria-disabled={starting !== null}
+                aria-busy={starting === "trailer"}
+                title="Lire la bande-annonce"
+                onclick={playTrailer}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true"
+                  ><rect x="1.5" y="3" width="13" height="10" rx="1.5" /><path d="m6.5 6 3.5 2-3.5 2z" /></svg
+                >
+                {starting === "trailer" ? "Ouverture…" : "Bande-annonce"}
+              </button>
+            {/if}
           </div>
           {#if versions.length > 0 && version}
             <div class="version">
@@ -651,6 +701,21 @@ onMount(() => {
         </section>
       {/if}
 
+      {#if onOpenPage && detail.kind !== "episode"}
+        {#each detail.collections as collection (collection.id)}
+          <TitleRow
+            source={{ kind: "collection", id: collection.id }}
+            heading="Collection : {collection.name}"
+            rowId="{titleId}-collection-{collection.id}"
+            exclude={detail.id}
+            {refresh}
+            {onError}
+            onOpen={openTitle}
+            onMore={() => onOpenPage?.(collectionPage(collection))}
+          />
+        {/each}
+      {/if}
+
       {#if detail.kind === "series"}
         <EpisodeList
           bind:this={episodeList}
@@ -759,6 +824,17 @@ onMount(() => {
           {/if}
         </nav>
       {/if}
+
+      {#if onOpenPage && detail.kind !== "episode"}
+        <TitleRow
+          source={{ kind: "similar", id: detail.id }}
+          heading="Titres similaires"
+          rowId="{titleId}-similar"
+          {refresh}
+          {onError}
+          onOpen={openTitle}
+        />
+      {/if}
     {:else}
       <div class="sk-text" aria-hidden="true">
         <div></div>
@@ -817,6 +893,13 @@ onMount(() => {
 {/if}
 
 <style>
+  .trailer svg rect,
+  .trailer svg path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+  }
   .detail {
     position: absolute;
     inset: 0;

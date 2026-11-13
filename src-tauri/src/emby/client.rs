@@ -565,6 +565,40 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
+    /// Films and series like an item (`/Items/{Id}/Similar`, ADR 0121); the
+    /// query comes checked from `titles::similar_params`.
+    pub async fn similar(
+        &self,
+        item_id: &str,
+        params: &[(&str, String)],
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Items/{}/Similar", path_segment(item_id)?));
+        let params: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// Trailer files of an item (`/Users/{Id}/Items/{Id}/LocalTrailers`, a bare
+    /// `BaseItemDto[]`), as the TV reads them (ADR 0121).
+    pub async fn local_trailers(
+        &self,
+        user_id: &str,
+        item_id: &str,
+    ) -> Result<Vec<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self.server.api(&format!(
+            "/Users/{}/Items/{}/LocalTrailers",
+            path_segment(user_id)?,
+            path_segment(item_id)?
+        ));
+        let params = [("EnableImages", "false"), ("EnableUserData", "false")];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
     /// Seasons of a series, in order (`0` = specials). Unknown series: 404.
     pub async fn seasons(
         &self,

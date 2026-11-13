@@ -200,6 +200,12 @@ pub struct BaseItemDto {
     pub studios: Vec<NameDto>,
     #[serde(default)]
     pub people: Vec<PersonDto>,
+    /// `[{Name, Id}]` of the collections holding the item (ADR 0121).
+    #[serde(default)]
+    pub collections: Option<serde_json::Value>,
+    /// Trailer files stored with the item (ADR 0121).
+    #[serde(default)]
+    pub local_trailer_count: Option<u32>,
     #[serde(default)]
     pub official_rating: Option<String>,
     #[serde(default)]
@@ -771,6 +777,10 @@ pub struct ItemDetail {
     pub media: Vec<MediaInfo>,
     /// Episode only.
     pub episode: Option<EpisodeContext>,
+    /// Collections holding the film or series (ADR 0121), at most three.
+    pub collections: Vec<super::titles::CollectionRef>,
+    /// A trailer file is stored with the item (ADR 0121).
+    pub has_local_trailer: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
