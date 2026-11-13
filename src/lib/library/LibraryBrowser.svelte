@@ -25,6 +25,12 @@ import { prefsKey, readPrefs } from "../home/rows";
 import CardMenu from "../menu/CardMenu.svelte";
 import { CardMenuState, provideCardMenu } from "../menu/menuState.svelte";
 import {
+  addSearch,
+  historyKey,
+  readHistory,
+  saveHistory,
+} from "../search/history";
+import {
   cleanQuery,
   isSearchable,
   SEARCH_DEBOUNCE_MS,
@@ -177,6 +183,13 @@ let searchGeneration = 0;
 let debounce: ReturnType<typeof setTimeout> | undefined;
 /** Scroll of the view the search replaced, restored when leaving it. */
 let scrollBeforeSearch: number | null = null;
+/** Recent searches (ADR 0122), shown under the empty field while it has the focus. */
+const recentKey = untrack(() => historyKey(user.server.id, user.userId));
+let recent = $state<string[]>(readHistory(storage(), recentKey));
+let searchFocused = $state(false);
+const recentShown = $derived(
+  searchFocused && query === "" && recent.length > 0 && opened === null,
+);
 
 /** Bumped after a favorite change on a detail page (ADR 0014). */
 let favoritesVersion = $state(0);
@@ -293,12 +306,38 @@ async function runSearch(again = false) {
     const answer = await embyApi.search(q);
     if (gen !== searchGeneration) return;
     found = answer;
+    remember(q);
   } catch (e) {
     if (gen !== searchGeneration) return;
     searchError = fail(e);
   } finally {
     if (gen === searchGeneration) searchLoading = false;
   }
+}
+
+/** A search whose results arrived goes first in the recent searches. */
+function remember(term: string) {
+  const next = addSearch(recent, term);
+  if (next === recent) return;
+  recent = next;
+  saveHistory(storage(), recentKey, next);
+}
+
+function clearRecent() {
+  recent = [];
+  saveHistory(storage(), recentKey, []);
+  searchField?.focus();
+}
+
+/** Searches a recent term at once, as if typed then confirmed. */
+function searchRecent(term: string) {
+  if (scrollBeforeSearch === null)
+    scrollBeforeSearch = scroller?.scrollTop ?? 0;
+  query = term;
+  opened = null;
+  scroller?.scrollTo({ top: 0 });
+  searchField?.focus();
+  void runSearch();
 }
 
 /** Empties the field; `restore` brings back the scroll of the view it replaced. */
@@ -831,6 +870,12 @@ $effect(() => {
       <form
         class="search-box"
         role="search"
+        onfocusin={() => (searchFocused = true)}
+        onfocusout={(e) => {
+          const next = e.relatedTarget;
+          if (!(next instanceof Node && e.currentTarget.contains(next)))
+            searchFocused = false;
+        }}
         onsubmit={(e) => {
           e.preventDefault();
           void runSearch();
@@ -855,6 +900,25 @@ $effect(() => {
           oninput={onSearchInput}
           onkeydown={onSearchKeydown}
         />
+        {#if recentShown}
+          <div class="recent" role="group" aria-labelledby="recent-title">
+            <div class="recent-head">
+              <p id="recent-title">Recherches récentes</p>
+              <button type="button" class="recent-clear" onclick={clearRecent}>
+                Effacer
+              </button>
+            </div>
+            <ul>
+              {#each recent as term (term)}
+                <li>
+                  <button type="button" onclick={() => searchRecent(term)}>
+                    {term}
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
       </form>
       {#if libraries === null && !librariesError}
         <span class="nav-note" aria-busy="true">Chargement…</span>
@@ -1399,6 +1463,62 @@ $effect(() => {
   }
   .search-box input::placeholder {
     color: var(--color-text-secondary);
+  }
+  /* Recent searches (ADR 0122): a small panel under the field. */
+  .recent {
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    left: 0;
+    width: 260px;
+    padding: var(--space-2);
+    border-radius: var(--radius-md);
+    background: var(--material);
+    backdrop-filter: var(--material-blur);
+    border: 1px solid var(--separator);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+  }
+  .recent-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--space-2);
+  }
+  .recent-head p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+  .recent ul {
+    list-style: none;
+    margin: var(--space-1) 0 0;
+    padding: 0;
+  }
+  .recent button {
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm);
+    padding: var(--space-2);
+    color: var(--color-text);
+    font: inherit;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .recent button.recent-clear {
+    width: auto;
+    padding: var(--space-1) var(--space-2);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+  .recent button:hover {
+    background: rgb(255 255 255 / 0.08);
+  }
+  .recent button:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
   }
   /* Narrow window: the search shrinks to its icon so the whole pill fits, and
      covers the pill while it has the focus. */
