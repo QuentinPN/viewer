@@ -2,6 +2,11 @@
 
 Chaque version livrée sur la Shield augmente `versionName` et `versionCode` dans `app/build.gradle.kts` et ajoute sa section ici.
 
+## 1.2.0 — en cours
+
+- Réglages › Mises à jour : version installée, « Rechercher une mise à jour » et, quand elle est prête, « Installer la version X » (ADR 0112).
+- Réglages › Accueil : appui long sur OK pour déplacer une rangée, ▲ ▼ pour la placer, OK ou Retour pour la poser (ADR 0114).
+
 ## 1.1.0 — 2026-11-13
 
 - Mises à jour automatiques : l'app télécharge la nouvelle version en arrière-plan (taille, SHA-256 et certificat de signature vérifiés), puis une carte « Mise à jour prête » sur l'accueil propose « Installer » ou « Plus tard ». Android demande une confirmation, et une seule fois l'autorisation d'installer des applications (ADR 0112). Rouvrir l'app après l'installation.

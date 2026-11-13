@@ -1,5 +1,10 @@
 # Journal des versions
 
+## 1.3.0 — en cours
+
+- Réglages › Mises à jour : version installée et bouton « Rechercher des mises à jour ». La nouvelle version est téléchargée et vérifiée, puis « Redémarrer maintenant » l'installe. Hors du réseau de la maison, le message le dit (ADR 0112).
+- Réglages › Accueil : choisis l'ordre des rangées de l'accueil (glisser-déposer ou « Monter / Descendre ») et masque celles que tu ne veux pas ; une rangée masquée n'est plus demandée au serveur (ADR 0113).
+
 ## 1.2.0 — 2026-11-13
 
 - Mises à jour automatiques : l'app télécharge la nouvelle version en arrière-plan, puis une pastille « Mise à jour prête » propose de redémarrer. Un clic installe sans assistant et relance l'app ; « Plus tard » la garde pour le prochain démarrage. Jamais pendant la lecture. L'installeur est signé et vérifié avant d'être lancé (ADR 0112).
