@@ -1,13 +1,17 @@
 //! Lists of titles opened from a detail page (ADR 0121): a person's films and
-//! series. Same queries as the Android TV (ADR 0068), the verified reference.
+//! series, the titles of a genre or a studio. Same queries and parameters as the
+//! Android TV (ADR 0068, 0079, 0087), the verified reference.
 
 use serde::Deserialize;
 
 use super::EmbyError;
-use super::models::{BaseItemDto, PersonDto};
+use super::models::{BaseItemDto, PersonDto, is_usable_genre};
 
 /// Titles read for one list: one request, enough for a home library.
 pub const TITLES_LIMIT: u32 = 100;
+
+/// Titles read for a genre or a studio, sorted by name: a genre may hold many.
+pub const NAMED_TITLES_LIMIT: u32 = 200;
 
 /// What a list of titles shows, as the UI asks for it.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -15,6 +19,18 @@ pub const TITLES_LIMIT: u32 = 100;
 pub enum TitlesSource {
     /// Films and series of a person, newest first.
     Person { id: String },
+    /// Films or series of one genre, by name.
+    Genre {
+        name: String,
+        #[serde(rename = "itemType")]
+        item_type: String,
+    },
+    /// Films or series of one studio or network, by name.
+    Studio {
+        name: String,
+        #[serde(rename = "itemType")]
+        item_type: String,
+    },
 }
 
 /// Same rule as the path segments: ASCII letters, digits and `-` only.
@@ -45,6 +61,25 @@ pub fn titles_params(source: &TitlesSource) -> Result<Vec<(&'static str, String)
                 ("Limit", TITLES_LIMIT.to_string()),
             ]
         }
+        TitlesSource::Genre { name, item_type } | TitlesSource::Studio { name, item_type } => {
+            let filter = if matches!(source, TitlesSource::Genre { .. }) {
+                "Genres"
+            } else {
+                "Studios"
+            };
+            // `|` separates names in these filters and has no escape (ADR 0079, 0087).
+            if !is_usable_genre(name) || !matches!(item_type.as_str(), "Movie" | "Series") {
+                return Err(EmbyError::InvalidResponse("filtre invalide".into()));
+            }
+            vec![
+                (filter, name.trim().to_owned()),
+                ("Recursive", "true".into()),
+                ("IncludeItemTypes", item_type.clone()),
+                ("SortBy", "SortName".into()),
+                ("SortOrder", "Ascending".into()),
+                ("Limit", NAMED_TITLES_LIMIT.to_string()),
+            ]
+        }
     };
     params.extend(common.iter().map(|(k, v)| (*k, (*v).to_owned())));
     Ok(params)
@@ -68,6 +103,8 @@ pub fn order_titles(source: &TitlesSource, items: Vec<BaseItemDto>) -> Vec<BaseI
                 .then(b.production_year.cmp(&a.production_year))
                 .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
         }),
+        // Sorted by the server on the sort name, which the client does not read.
+        TitlesSource::Genre { .. } | TitlesSource::Studio { .. } => {}
     }
     items
 }
@@ -118,6 +155,67 @@ mod tests {
                 "{id}"
             );
         }
+    }
+
+    #[test]
+    fn genre_and_studio_queries_filter_by_name_and_type() {
+        let genre = TitlesSource::Genre {
+            name: " Science-Fiction ".into(),
+            item_type: "Movie".into(),
+        };
+        let p = titles_params(&genre).unwrap();
+        let get = |k: &str| p.iter().find(|(n, _)| *n == k).map(|(_, v)| v.clone());
+        assert_eq!(get("Genres").as_deref(), Some("Science-Fiction"));
+        assert_eq!(get("IncludeItemTypes").as_deref(), Some("Movie"));
+        assert_eq!(get("Recursive").as_deref(), Some("true"));
+        assert_eq!(get("SortBy").as_deref(), Some("SortName"));
+        assert_eq!(get("Limit").as_deref(), Some("200"));
+        assert_eq!(get("Studios"), None);
+
+        let studio = TitlesSource::Studio {
+            name: "HBO".into(),
+            item_type: "Series".into(),
+        };
+        let p = titles_params(&studio).unwrap();
+        assert!(p.contains(&("Studios", "HBO".into())));
+        assert!(p.contains(&("IncludeItemTypes", "Series".into())));
+    }
+
+    #[test]
+    fn unusable_names_and_types_are_refused() {
+        for (name, kind) in [
+            ("Drame|Comédie", "Movie"),
+            ("", "Movie"),
+            ("  ", "Series"),
+            ("Drame", "Episode"),
+            ("Drame", "Movie,Series"),
+        ] {
+            let source = TitlesSource::Genre {
+                name: name.into(),
+                item_type: kind.into(),
+            };
+            assert!(titles_params(&source).is_err(), "{name} {kind}");
+        }
+        let long = TitlesSource::Studio {
+            name: "x".repeat(101),
+            item_type: "Movie".into(),
+        };
+        assert!(titles_params(&long).is_err());
+    }
+
+    #[test]
+    fn sources_decode_from_the_ui_shape() {
+        let s: TitlesSource =
+            serde_json::from_str(r#"{"kind":"studio","name":"HBO","itemType":"Series"}"#).unwrap();
+        assert_eq!(
+            s,
+            TitlesSource::Studio {
+                name: "HBO".into(),
+                item_type: "Series".into()
+            }
+        );
+        let p: TitlesSource = serde_json::from_str(r#"{"kind":"person","id":"1"}"#).unwrap();
+        assert_eq!(p, TitlesSource::Person { id: "1".into() });
     }
 
     #[test]

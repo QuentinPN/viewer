@@ -3,7 +3,9 @@ import type { MediaItem } from "../emby/types";
 import {
   type DetailPage,
   initials,
+  isUsableName,
   MAX_PAGES,
+  namedPage,
   pageKey,
   personPage,
   pushPage,
@@ -71,6 +73,31 @@ describe("personPage", () => {
     expect(
       personPage({ name: "Inconnu", role: null, id: null, photo: null }),
     ).toBeNull();
+  });
+});
+
+describe("namedPage", () => {
+  it("opens the films of a genre", () => {
+    const page = namedPage("genre", "Drame", "movie");
+    expect(page).toMatchObject({
+      source: { kind: "genre", name: "Drame", itemType: "Movie" },
+      subtitle: "Films de ce genre",
+    });
+    expect(pageKey(page as DetailPage, 2)).toBe("2:titles:genre:Movie:Drame");
+  });
+
+  it("calls a series studio a channel", () => {
+    expect(namedPage("studio", "HBO", "series")).toMatchObject({
+      subtitle: "Séries de cette chaîne",
+    });
+  });
+
+  it("has no page on an episode or for an unusable name", () => {
+    expect(namedPage("genre", "Drame", "episode")).toBeNull();
+    expect(namedPage("genre", "A|B", "movie")).toBeNull();
+    expect(isUsableName("  ")).toBe(false);
+    expect(isUsableName("x".repeat(101))).toBe(false);
+    expect(isUsableName("Science-Fiction")).toBe(true);
   });
 });
 

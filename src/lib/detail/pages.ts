@@ -3,6 +3,7 @@
 // Pure, so it can be unit tested.
 import type {
   CastMember,
+  DetailKind,
   ImageRef,
   MediaItem,
   TitlesSource,
@@ -42,7 +43,37 @@ export function pageKey(page: DetailPage, depth: number): string {
 }
 
 function sourceKey(source: TitlesSource): string {
-  return `${source.kind}:${source.id}`;
+  return source.kind === "person"
+    ? `person:${source.id}`
+    : `${source.kind}:${source.itemType}:${source.name}`;
+}
+
+/** Same bounds as Rust (`is_usable_genre`): `|` separates names on Emby. */
+export function isUsableName(name: string): boolean {
+  return (
+    name.trim() !== "" && [...name].length <= 100 && !/[|\p{Cc}]/u.test(name)
+  );
+}
+
+/**
+ * The list of the films (or series) of a genre or studio of a film or series
+ * page; null on an episode page or for a name the server could not filter on.
+ */
+export function namedPage(
+  kind: "genre" | "studio",
+  name: string,
+  detail: DetailKind,
+): DetailPage | null {
+  if (detail === "episode" || !isUsableName(name)) return null;
+  const itemType = detail === "movie" ? "Movie" : "Series";
+  const what = detail === "movie" ? "Films" : "Séries";
+  return {
+    kind: "titles",
+    source: { kind, name, itemType },
+    title: name,
+    subtitle: `${what} ${kind === "genre" ? "de ce genre" : detail === "series" ? "de cette chaîne" : "de ce studio"}`,
+    photo: null,
+  };
 }
 
 /** The page of a cast member; null when the server gave no usable id. */

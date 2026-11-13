@@ -30,7 +30,7 @@ import {
   videoLabel,
 } from "./format";
 import EpisodePage from "./ItemDetail.svelte";
-import { type DetailPage, initials, personPage } from "./pages";
+import { type DetailPage, initials, namedPage, personPage } from "./pages";
 import {
   loadVersion,
   saveVersion,
@@ -416,7 +416,21 @@ onMount(() => {
 
           {#if detail.genres.length > 0}
             <ul class="genres" aria-label="Genres">
-              {#each detail.genres as genre (genre)}<li>{genre}</li>{/each}
+              {#each detail.genres as genre (genre)}
+                {@const page = onOpenPage ? namedPage("genre", genre, detail.kind) : null}
+                <li>
+                  {#if page}
+                    <button
+                      type="button"
+                      class="chip"
+                      title="Voir les titres du genre {genre}"
+                      onclick={() => onOpenPage?.(page)}>{genre}</button
+                    >
+                  {:else}
+                    <span class="chip">{genre}</span>
+                  {/if}
+                </li>
+              {/each}
             </ul>
           {/if}
 
@@ -559,7 +573,25 @@ onMount(() => {
           {#if detail.studios.length > 0}
             <div>
               <dt>{detail.kind === "series" ? "Diffusion" : "Studio"}</dt>
-              <dd>{detail.studios.join(", ")}</dd>
+              <dd>
+                <ul class="studios">
+                  {#each detail.studios as studio (studio)}
+                    {@const page = onOpenPage ? namedPage("studio", studio, detail.kind) : null}
+                    <li>
+                      {#if page}
+                        <button
+                          type="button"
+                          class="link"
+                          title="Voir les titres de {studio}"
+                          onclick={() => onOpenPage?.(page)}>{studio}</button
+                        >
+                      {:else}
+                        {studio}
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              </dd>
             </div>
           {/if}
           {#if premiere && detail.kind !== "episode"}
@@ -990,12 +1022,47 @@ onMount(() => {
     flex-wrap: wrap;
     gap: var(--space-2);
   }
-  .genres li {
+  .chip {
+    display: inline-block;
     padding: 2px var(--space-3);
+    border: none;
     border-radius: 999px;
     background: var(--fill-glass);
+    font: inherit;
     font-size: 13px;
     color: var(--color-text-secondary);
+  }
+  button.chip {
+    cursor: pointer;
+    transition:
+      background var(--motion-fast),
+      color var(--motion-fast);
+  }
+  button.chip:hover {
+    background: var(--fill-glass-hover);
+    color: var(--color-text);
+  }
+  .studios {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--space-3);
+  }
+  .link {
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--separator);
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .link:hover {
+    text-decoration-color: currentColor;
   }
   .status {
     display: flex;

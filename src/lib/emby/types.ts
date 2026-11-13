@@ -232,7 +232,9 @@ export interface CastMember {
 }
 
 /** What a list of titles opened from a detail page shows (ADR 0121). */
-export type TitlesSource = { kind: "person"; id: string };
+export type TitlesSource =
+  | { kind: "person"; id: string }
+  | { kind: "genre" | "studio"; name: string; itemType: "Movie" | "Series" };
 
 export interface VideoInfo {
   codec: string | null;
