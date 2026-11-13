@@ -57,6 +57,19 @@ import {
   skipShown,
   trackSkipShown,
 } from "./segments";
+import {
+  holdsNext,
+  SLEEP_NOTICE,
+  SLEEP_OFF,
+  type SleepChoice,
+  type SleepTimer,
+  sameChoice,
+  sleepBadge,
+  sleepChoices,
+  sleepDue,
+  sleepTimer,
+  sleepValue,
+} from "./sleep";
 import type {
   EndReason,
   PlayerCommand,
@@ -146,6 +159,10 @@ let optionsButton = $state<HTMLButtonElement | null>(null);
 let delays = $state<Delays>({ ...NO_DELAYS });
 /** Picture format, for this player session (ADR 0078). */
 let fit = $state<VideoFit>("original");
+/** « Minuterie », for this player session (ADR 0073). */
+let sleep = $state<SleepTimer>(SLEEP_OFF);
+/** The timer ran out and paused: said over the picture until playback resumes. */
+let sleepNotice = $state(false);
 
 let audioButton = $state<HTMLButtonElement | null>(null);
 let subsButton = $state<HTMLButtonElement | null>(null);
@@ -214,6 +231,8 @@ const progress = $derived(
 const shownVolume = $derived(effectiveVolume(volume));
 const clock = $derived(formatClock(now));
 const badge = $derived(speedBadge(speed));
+const sleepItem = $derived(isEpisode(playback.title) ? "episode" : "movie");
+const sleepLabel = $derived(sleepBadge(sleep, now, sleepItem));
 const endsLabel = $derived(endLabel(now, position, duration, speed));
 const chromeVisible = $derived(
   !active ||
@@ -284,6 +303,8 @@ $effect(() => {
 // it shows the button again.
 $effect(() => {
   if (!segment || !skip || !skipSetting.auto) return;
+  // « Fin de l'épisode » pauses at the credits instead.
+  if (skip.kind === "next" && holdsNext(sleep)) return;
   const key = segmentKey(segment);
   if (autoSkipped.has(key)) return;
   autoSkipped.add(key);
@@ -347,12 +368,14 @@ function onEvent(ev: PlayerEvent) {
       everPlayed = true;
       if (!scrubbing) position = ev.seconds;
       now = Date.now();
+      checkSleep();
       break;
     case "duration":
       duration = ev.seconds;
       break;
     case "paused":
       paused = ev.paused;
+      if (!ev.paused) sleepNotice = false;
       break;
     case "buffering":
       buffering = ev.active;
@@ -372,7 +395,7 @@ function onEvent(ev: PlayerEvent) {
           error = openFailure(ev.error);
         }
       } else if (ev.reason === "eof") {
-        if (active && nextEpisode) void offerNext();
+        if (active && nextEpisode && !holdsNext(sleep)) void offerNext();
         else void close();
       }
       break;
@@ -386,6 +409,7 @@ onMount(async () => {
   unlisten = await playerApi.onEvent(onEvent);
   diagTimer = setInterval(async () => {
     if (!active) return;
+    checkSleep();
     try {
       diag = await playerApi.diagnostics();
       // Engine state is authoritative: resync when an event was missed.
@@ -465,6 +489,21 @@ function changeDelayOf(kind: DelayKind, change: DelayChange) {
   );
 }
 
+/** Pauses once the timer ran out or « Fin de… » reached its stop (ADR 0073). */
+function checkSleep() {
+  if (!active || !sleepDue(sleep, Date.now(), position, duration, segments))
+    return;
+  sleep = SLEEP_OFF;
+  sleepNotice = true;
+  void run({ type: "setPaused", paused: true });
+  wake();
+}
+
+function changeSleep(choice: SleepChoice) {
+  sleep = sleepTimer(choice, Date.now(), position);
+  now = Date.now();
+}
+
 function changeFit(next: VideoFit) {
   fit = next;
   if (active) void run({ type: "setVideoFit", fit: next });
@@ -536,6 +575,9 @@ async function playNext() {
   const next = nextEpisode;
   if (!next || launching) return;
   dismissNext();
+  // « Fin de l'épisode » was about the one that ends.
+  if (holdsNext(sleep)) sleep = SLEEP_OFF;
+  sleepNotice = false;
   launching = next;
   active = false;
   everPlayed = false;
@@ -812,6 +854,7 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
       </div>
     {/if}
     {#if error}<p class="error floating" role="alert">{error}</p>{/if}
+    {#if sleepNotice && !error}<p class="floating" role="status">{SLEEP_NOTICE}</p>{/if}
 
     {#if skip && skipVisible}
       <div class="skip" role="group" aria-label={skip.label}>
@@ -970,6 +1013,20 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
               {/each}
             </fieldset>
             <fieldset>
+              <legend>Minuterie</legend>
+              {#each sleepChoices() as choice (sleepValue(choice, sleepItem))}
+                <label class="choice">
+                  <input
+                    type="radio"
+                    name="sleep"
+                    checked={sameChoice(sleep.choice, choice)}
+                    onchange={() => changeSleep(choice)}
+                  />
+                  <span>{sleepValue(choice, sleepItem)}</span>
+                </label>
+              {/each}
+            </fieldset>
+            <fieldset>
               <legend>Son</legend>
               <label class="choice">
                 <input
@@ -1044,6 +1101,7 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
           <span class="end-times">
             {#if delays.subtitle !== 0}<span class="time ends" role="status" title="Décalage des sous-titres">Sous-titres {formatDelay(delays.subtitle)}</span>{/if}
             {#if fitBadge(fit)}<span class="time ends" title="Format de l'image">{fitBadge(fit)}</span>{/if}
+            {#if sleepLabel}<span class="time ends" title="Minuterie">{sleepLabel}</span>{/if}
             {#if badge}<span class="time ends" title="Vitesse de lecture">{badge}</span>{/if}
             {#if endsLabel}<span class="time ends">{endsLabel}</span>{/if}
             <span class="time" title="Temps restant">{formatRemaining(position, duration)}</span>
