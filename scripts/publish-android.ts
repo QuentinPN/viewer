@@ -2,8 +2,9 @@
 // Android TV app at the versionName of android-tv/app/build.gradle.kts. Refuses unless
 // the tree is clean, HEAD is on main, android-tv/CHANGELOG.md has the version's section
 // and no Gitea release exists for android-vX.Y.Z (ADR 0111); then fetches libmpv, runs the unit tests, the release
-// build and its lint, tags HEAD android-vX.Y.Z, pushes main and the tag, and creates the
-// Gitea release with the APK.
+// build and its lint, tags HEAD android-vX.Y.Z, pushes main and the tag, creates the
+// release with the APK on the public releases repository, then rewrites
+// android/latest.json there for the in-app updater (ADR 0112).
 // --dry-run turns the refusals into warnings and stops after the build, printing the
 // notes: nothing is tagged, pushed or published.
 import { execFileSync, spawnSync } from "node:child_process";
@@ -11,6 +12,7 @@ import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { androidManifest } from "../src/release/manifest.ts";
 import {
   androidReleaseNotes,
   changelogSection,
@@ -108,6 +110,11 @@ const release = await releases.publish(
   apk,
   sha256,
 );
+await releases.writeFile(
+  "android/latest.json",
+  `${JSON.stringify(androidManifest(version, section, release.fileUrl, { bytes: statSync(apk).size, sha256 }), null, 2)}\n`,
+  `Viewer Android TV ${version.name}`,
+);
 console.log(
-  `\n${tag} publiée : ${release.url}\nSHA-256 ${sha256} vérifié en ligne.`,
+  `\n${tag} publiée : ${release.url}\nSHA-256 ${sha256} vérifié en ligne.\nManifeste ${releases.page}/raw/branch/main/android/latest.json à jour.`,
 );

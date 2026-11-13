@@ -11,6 +11,7 @@ import LibraryBrowser from "./lib/library/LibraryBrowser.svelte";
 import { playerApi } from "./lib/player/api";
 import PlayerSpike from "./lib/player/PlayerSpike.svelte";
 import PlayerView from "./lib/player/PlayerView.svelte";
+import UpdatePrompt from "./lib/updater/UpdatePrompt.svelte";
 import Logo from "./lib/window/Logo.svelte";
 import TitleBar from "./lib/window/TitleBar.svelte";
 
@@ -180,6 +181,8 @@ async function signOut() {
 <svelte:window ononline={() => void coordinator.online()} />
 
 {#if playing === null}<TitleBar />{/if}
+<!-- Never during playback (ADR 0112). -->
+<UpdatePrompt visible={playing === null && spike === "none"} />
 
 {#if spike !== "none"}
   {#if spike === "prototype"}

@@ -2,13 +2,16 @@
 // builds and publishes the tagged version. Refuses unless HEAD is the release commit
 // on main with its tag vX.Y.Z and no release exists for it on Gitea (ADR 0111); then fetches
 // libmpv, runs verify:web and verify:rust, builds the NSIS installer, pushes main and
-// the tag, and creates the Gitea release with the installer and its CHANGELOG.md
-// section. --dry-run turns the refusals into warnings and stops after the build,
+// the tag, creates the release with the signed installer and its CHANGELOG.md
+// section on the public releases repository, then rewrites desktop/latest.json
+// there for the auto-updater (ADR 0112). --dry-run turns the refusals into warnings and stops after the build,
 // printing the notes: nothing is pushed or published.
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
+import { desktopManifest } from "../src/release/manifest.ts";
 import { changelogSection, releaseNotes } from "../src/release/version.ts";
 import { gitea } from "./gitea.ts";
 
@@ -65,6 +68,17 @@ if (!section) {
   process.exit(1);
 }
 
+// Updater signing key (ADR 0112), outside the repository, without password
+const signingKey =
+  process.env.TAURI_SIGNING_PRIVATE_KEY ??
+  join(homedir(), ".viewer", "updater.key");
+if (!process.env.TAURI_SIGNING_PRIVATE_KEY && !existsSync(signingKey)) {
+  console.error(`clé de signature des mises à jour absente : ${signingKey}`);
+  process.exit(1);
+}
+process.env.TAURI_SIGNING_PRIVATE_KEY = signingKey;
+process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ??= "";
+
 step("libmpv", "powershell", powershell("scripts/fetch-libmpv.ps1"));
 step("verify:web", "npm", ["run", "verify:web"]);
 step(
@@ -83,6 +97,7 @@ const installer = join(root, "src-tauri/target/release/bundle/nsis", name);
 const sha256 = createHash("sha256")
   .update(readFileSync(installer))
   .digest("hex");
+const signature = readFileSync(`${installer}.sig`, "utf8");
 const notes = releaseNotes(version, section, {
   name,
   bytes: statSync(installer).size,
@@ -103,6 +118,11 @@ const release = await releases.publish(
   installer,
   sha256,
 );
+await releases.writeFile(
+  "desktop/latest.json",
+  `${JSON.stringify(desktopManifest(version, section, release.fileUrl, signature, new Date()), null, 2)}\n`,
+  `Viewer ${version}`,
+);
 console.log(
-  `\n${tag} publiée : ${release.url}\nSHA-256 ${sha256} vérifié en ligne.`,
+  `\n${tag} publiée : ${release.url}\nSHA-256 ${sha256} vérifié en ligne.\nManifeste ${releases.page}/raw/branch/main/desktop/latest.json à jour.`,
 );

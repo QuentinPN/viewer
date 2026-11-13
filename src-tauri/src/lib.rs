@@ -5,6 +5,7 @@ pub mod player;
 pub mod segments;
 #[cfg(debug_assertions)]
 mod spike;
+mod updater;
 mod video_surface;
 
 use std::path::PathBuf;
@@ -230,6 +231,8 @@ fn context() -> tauri::Context<tauri::Wry> {
 
 pub fn run() {
     let app = tauri::Builder::default()
+        // Driven from Rust only (ADR 0112): no updater permission for the WebView.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .register_asynchronous_uri_scheme_protocol(
             emby::images::SCHEME,
             |ctx, request, responder| {
@@ -288,6 +291,10 @@ pub fn run() {
                 #[cfg(windows)]
                 _surface: surface,
             });
+
+            app.manage(updater::UpdateState::default());
+            #[cfg(not(debug_assertions))]
+            updater::spawn(app.handle().clone());
 
             #[cfg(debug_assertions)]
             spike::maybe_start(app.handle().clone());
@@ -379,6 +386,8 @@ pub fn run() {
             commands::emby_segments,
             commands::emby_chapters,
             diagnostics::diagnostics_open_log_dir,
+            updater::app_update_pending,
+            updater::app_update_install,
         ])
         .build(context())
         .expect("error while building Viewer");

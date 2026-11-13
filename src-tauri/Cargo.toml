@@ -1,6 +1,6 @@
 [package]
 name = "viewer"
-version = "1.1.1"
+version = "1.2.0"
 description = "Client Windows natif pour serveur Emby"
 edition = "2024"
 rust-version = "1.88"
@@ -28,6 +28,8 @@ tokio = { version = "1", features = ["macros", "sync", "time"] }
 base64 = "0.23"
 tokio-tungstenite = { version = "0.30.0", features = ["native-tls"] }
 futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
+# Called from Rust only, no JS permission (ADR 0112).
+tauri-plugin-updater = "2.14.1"
 
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3", features = ["windows-native"] }

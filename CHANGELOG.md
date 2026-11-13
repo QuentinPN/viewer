@@ -1,5 +1,10 @@
 # Journal des versions
 
+## 1.2.0 — 2026-11-13
+
+- Mises à jour automatiques : l'app télécharge la nouvelle version en arrière-plan, puis une pastille « Mise à jour prête » propose de redémarrer. Un clic installe sans assistant et relance l'app ; « Plus tard » la garde pour le prochain démarrage. Jamais pendant la lecture. L'installeur est signé et vérifié avant d'être lancé (ADR 0112).
+- Les versions sont publiées sur le Gitea personnel (ADR 0111). Cette version s'installe encore à la main ; les suivantes arriveront toutes seules.
+
 ## 1.1.1 — 2026-11-13
 
 - L'accueil se met à jour tout seul : un film ou une série ajouté sur le serveur apparaît dans « Ajoutés récemment » quelques secondes après, tant que l'accueil est affiché (ADR 0110). Sinon, au plus 5 min après ou dès le retour dans l'app (ADR 0109).

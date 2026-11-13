@@ -2,6 +2,11 @@
 
 Chaque version livrée sur la Shield augmente `versionName` et `versionCode` dans `app/build.gradle.kts` et ajoute sa section ici.
 
+## 1.1.0 — 2026-11-13
+
+- Mises à jour automatiques : l'app télécharge la nouvelle version en arrière-plan (taille, SHA-256 et certificat de signature vérifiés), puis une carte « Mise à jour prête » sur l'accueil propose « Installer » ou « Plus tard ». Android demande une confirmation, et une seule fois l'autorisation d'installer des applications (ADR 0112). Rouvrir l'app après l'installation.
+- Cette version s'installe encore avec adb ; les suivantes arriveront toutes seules.
+
 ## 1.0.3 — 2026-11-13
 
 - L'accueil se met à jour tout seul : un film ou une série ajouté sur le serveur apparaît dans « Ajoutés récemment » quelques secondes après, tant que l'accueil est affiché (ADR 0110). Sinon, au plus 5 min après ou au retour dans l'app depuis l'écran d'accueil de la TV. Le focus reste sur la même carte (ADR 0109).

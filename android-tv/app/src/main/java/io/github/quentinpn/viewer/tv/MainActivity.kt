@@ -16,6 +16,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.session.SearchHistoryStore
@@ -56,15 +59,35 @@ import io.github.quentinpn.viewer.tv.ui.replaceTop
 import io.github.quentinpn.viewer.tv.ui.similarPage
 import io.github.quentinpn.viewer.tv.ui.studioOptions
 import io.github.quentinpn.viewer.tv.ui.titleLibrary
+import io.github.quentinpn.viewer.tv.update.HomeUpdate
+import io.github.quentinpn.viewer.tv.update.Updater
 import kotlinx.coroutines.launch
 
 /** Launcher: the server shelf when no session is open (ADR 0104), else the home shelves, a library grid or the search, the settings, the series and film pages. */
 class MainActivity : ComponentActivity() {
+    override fun onResume() {
+        super.onResume()
+        // Back from « sources inconnues »: the install the user asked for goes on if allowed
+        if (Updater.awaitingPermission) {
+            Updater.awaitingPermission = false
+            if (Updater.canInstall(this)) lifecycleScope.launch { Updater.install(this@MainActivity) }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val store = AppServices.store(this)
         val device = AppServices.device(this)
         val reporter = AppServices.reporter(this)
+        // Updates (ADR 0112): checked at start, then every 6 h while the app is in front
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (true) {
+                    Updater.checkIfDue(this@MainActivity, AppServices.http)
+                    kotlinx.coroutines.delay(Updater.CHECK_INTERVAL_MS)
+                }
+            }
+        }
         setContent {
             ViewerTheme {
                 var session by remember { mutableStateOf(store.load()) }
@@ -324,6 +347,8 @@ class MainActivity : ComponentActivity() {
                         )
                         return@ViewerTheme
                     }
+                    // Over the home only, never over a page or the player
+                    HomeUpdate()
                     HomeScreen(
                         client = client,
                         userId = current.userId,

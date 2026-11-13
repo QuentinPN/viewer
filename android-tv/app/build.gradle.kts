@@ -12,8 +12,8 @@ android {
         applicationId = "io.github.quentinpn.viewer.tv"
         minSdk = 28
         targetSdk = 37
-        versionCode = 5
-        versionName = "1.0.3"
+        versionCode = 6
+        versionName = "1.1.0"
         // Only arm64-v8a libmpv is fetched (ADR 0038)
         ndk { abiFilters += "arm64-v8a" }
     }
@@ -25,9 +25,12 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             manifestPlaceholders["appLabel"] = "Viewer Debug"
+            // Test channel of the updater (ADR 0112)
+            buildConfigField("String", "UPDATE_MANIFEST_URL", "\"http://git.example.com/QuentinPN/Viewer-releases/raw/branch/main/android-debug/latest.json\"")
         }
         release {
             manifestPlaceholders["appLabel"] = "Viewer"
+            buildConfigField("String", "UPDATE_MANIFEST_URL", "\"http://git.example.com/QuentinPN/Viewer-releases/raw/branch/main/android/latest.json\"")
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Personal use only: the release build is signed with the debug key
@@ -40,7 +43,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     // A few lines of C that keep libmpv's verbose log out of logcat (ADR 0052)
     externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }

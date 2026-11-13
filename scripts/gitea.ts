@@ -1,12 +1,13 @@
-// Releases on the self-hosted Gitea (ADR 0111). The repository is the `origin`
-// remote; the token comes from GITEA_TOKEN in the environment, else from the
+// Releases on the self-hosted Gitea (ADR 0111, 0112). The code is the `origin`
+// remote; releases and update manifests go to the public `<repo>-releases`
+// next to it. The token comes from GITEA_TOKEN in the environment, else from the
 // gitignored debug.env at the root of the main checkout. It is never printed.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 
-export type Release = { id: number; url: string };
+export type Release = { id: number; url: string; fileUrl: string };
 
 /** `http://host/Owner/Repo(.git)` → API base and page URL. */
 export function giteaRepo(remote: string): { api: string; page: string } {
@@ -40,7 +41,7 @@ export function gitea(root: string) {
     cwd: root,
     encoding: "utf8",
   }).trim();
-  const { api, page } = giteaRepo(remote);
+  const { api, page } = giteaRepo(remote.replace(/(\.git)?\/?$/, "-releases"));
   const auth = { Authorization: `token ${token(root)}` };
 
   async function call(path: string, init: RequestInit = {}) {
@@ -61,8 +62,12 @@ export function gitea(root: string) {
       return true;
     },
 
-    /** Creates the release on an already pushed tag, uploads the file and
-     *  downloads it back to check its SHA-256. */
+    /** Page of the public releases repository. */
+    page,
+
+    /** Creates the release (and its tag on the releases repository's main),
+     *  uploads the file and downloads it back without the token, as the apps
+     *  will, to check its SHA-256. */
     async publish(
       tag: string,
       title: string,
@@ -73,7 +78,12 @@ export function gitea(root: string) {
       const created = await call("/releases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tag_name: tag, name: title, body: notes }),
+        body: JSON.stringify({
+          tag_name: tag,
+          target_commitish: "main",
+          name: title,
+          body: notes,
+        }),
       });
       const { id } = (await created.json()) as { id: number };
       const name = basename(file);
@@ -86,7 +96,7 @@ export function gitea(root: string) {
       const { browser_download_url } = (await up.json()) as {
         browser_download_url: string;
       };
-      const back = await fetch(browser_download_url, { headers: auth });
+      const back = await fetch(browser_download_url);
       if (!back.ok)
         throw new Error(`téléchargement de contrôle : ${back.status}`);
       const online = createHash("sha256")
@@ -94,7 +104,37 @@ export function gitea(root: string) {
         .digest("hex");
       if (online !== sha256)
         throw new Error(`le fichier en ligne ne correspond pas : ${online}`);
-      return { id, url: `${page}/releases/tag/${tag}` };
+      return {
+        id,
+        url: `${page}/releases/tag/${tag}`,
+        fileUrl: browser_download_url,
+      };
+    },
+
+    /** Writes `path` on main of the releases repository (update manifests),
+     *  then reads it back without the token. */
+    async writeFile(path: string, content: string, message: string) {
+      const current = await fetch(`${api}/contents/${path}?ref=main`, {
+        headers: auth,
+      });
+      if (!current.ok && current.status !== 404)
+        throw new Error(`Gitea ${path} : ${current.status}`);
+      const sha = current.ok
+        ? ((await current.json()) as { sha: string }).sha
+        : undefined;
+      await call(`/contents/${path}`, {
+        method: sha ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          branch: "main",
+          message,
+          content: Buffer.from(content).toString("base64"),
+          ...(sha ? { sha } : {}),
+        }),
+      });
+      const raw = await fetch(`${page}/raw/branch/main/${path}`);
+      if (!raw.ok || (await raw.text()) !== content)
+        throw new Error(`${path} illisible sans jeton après écriture`);
     },
   };
 }

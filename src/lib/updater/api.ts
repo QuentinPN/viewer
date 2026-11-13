@@ -1,0 +1,27 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+
+// Thin typed wrapper over the update commands of src-tauri/src/updater.rs (ADR 0112).
+
+export const UPDATE_READY_EVENT = "app://update-ready";
+
+/** A downloaded, verified update waiting to be installed. */
+export interface UpdateInfo {
+  version: string;
+  /** Markdown release notes, empty when there are none. */
+  notes: string;
+}
+
+export interface UpdaterApi {
+  pending: () => Promise<UpdateInfo | null>;
+  /** Runs the installer; on success the app exits and is relaunched. */
+  install: () => Promise<void>;
+  onReady: (handler: (info: UpdateInfo) => void) => Promise<UnlistenFn>;
+}
+
+export const updaterApi: UpdaterApi = {
+  pending: () => invoke<UpdateInfo | null>("app_update_pending"),
+  install: () => invoke<void>("app_update_install"),
+  onReady: (handler) =>
+    listen<UpdateInfo>(UPDATE_READY_EVENT, (e) => handler(e.payload)),
+};
