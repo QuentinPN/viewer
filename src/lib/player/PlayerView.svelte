@@ -25,6 +25,14 @@ import {
 } from "./audiomodes";
 import ChaptersPanel from "./ChaptersPanel.svelte";
 import { chapterIndex, chapterMarks, chapterTarget } from "./chapters";
+import {
+  changeDelay,
+  type DelayChange,
+  type DelayKind,
+  type Delays,
+  formatDelay,
+  NO_DELAYS,
+} from "./delay";
 import { endLabel, formatClock, untilNextMinute } from "./endtime";
 import {
   canFallBack,
@@ -133,6 +141,8 @@ let speed = $state(1);
 /** Night mode, kept on this PC (ADR 0072). */
 let nightMode = $state(readNightMode(storage()));
 let optionsButton = $state<HTMLButtonElement | null>(null);
+/** Delays of the file being played; each new file starts from none (ADR 0062). */
+let delays = $state<Delays>({ ...NO_DELAYS });
 
 let audioButton = $state<HTMLButtonElement | null>(null);
 let subsButton = $state<HTMLButtonElement | null>(null);
@@ -429,6 +439,9 @@ function applyVolume() {
 
 /** Speed and night mode are engine options: set again for each file. */
 async function applyModes() {
+  delays = { ...NO_DELAYS };
+  await run({ type: "setSubtitleDelay", seconds: 0 });
+  await run({ type: "setAudioDelay", seconds: 0 });
   await run({ type: "setSpeed", speed });
   await run({ type: "setNightMode", on: nightMode });
 }
@@ -436,6 +449,16 @@ async function applyModes() {
 function changeSpeed(next: number) {
   speed = next;
   if (active) void run({ type: "setSpeed", speed: next });
+}
+
+function changeDelayOf(kind: DelayKind, change: DelayChange) {
+  const seconds = changeDelay(delays[kind], change);
+  delays = { ...delays, [kind]: seconds };
+  void run(
+    kind === "subtitle"
+      ? { type: "setSubtitleDelay", seconds }
+      : { type: "setAudioDelay", seconds },
+  );
 }
 
 function changeNightMode(on: boolean) {
@@ -626,6 +649,9 @@ function onKeydown(e: KeyboardEvent) {
       break;
     case "toggleInfo":
       void openPanel("info");
+      break;
+    case "subtitleDelay":
+      changeDelayOf("subtitle", action.change);
       break;
     case "chapter": {
       const to = chapterTarget(chapters, position, action.delta);
@@ -892,6 +918,35 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
               {/each}
             </fieldset>
             <fieldset>
+              <legend>Synchronisation</legend>
+              {#each [["subtitle", "Sous-titres", "Z / X"], ["audio", "Audio", null]] as const as [kind, name, keys] (kind)}
+                <div class="stepper" role="group" aria-label={`Décalage ${kind === "subtitle" ? "des sous-titres" : "audio"}`}>
+                  <span class="stepper-name">{name}</span>
+                  <button
+                    type="button"
+                    class="step"
+                    aria-label="Plus tôt"
+                    title={keys ? `Plus tôt (${keys.split(" / ")[0]})` : "Plus tôt"}
+                    onclick={() => changeDelayOf(kind, "earlier")}
+                  >−</button>
+                  <button
+                    type="button"
+                    class="step-value"
+                    title="Remettre à zéro"
+                    aria-label={`${formatDelay(delays[kind])}, remettre à zéro`}
+                    onclick={() => changeDelayOf(kind, "reset")}
+                  >{formatDelay(delays[kind])}</button>
+                  <button
+                    type="button"
+                    class="step"
+                    aria-label="Plus tard"
+                    title={keys ? `Plus tard (${keys.split(" / ")[1]})` : "Plus tard"}
+                    onclick={() => changeDelayOf(kind, "later")}
+                  >+</button>
+                </div>
+              {/each}
+            </fieldset>
+            <fieldset>
               <legend>Son</legend>
               <label class="choice">
                 <input
@@ -964,6 +1019,7 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
           <span class="time">{formatTime(position)}</span>
           {#if chapterName}<span class="chapter-name">{chapterName}</span>{/if}
           <span class="end-times">
+            {#if delays.subtitle !== 0}<span class="time ends" role="status" title="Décalage des sous-titres">Sous-titres {formatDelay(delays.subtitle)}</span>{/if}
             {#if badge}<span class="time ends" title="Vitesse de lecture">{badge}</span>{/if}
             {#if endsLabel}<span class="time ends">{endsLabel}</span>{/if}
             <span class="time" title="Temps restant">{formatRemaining(position, duration)}</span>
@@ -1481,6 +1537,33 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   }
   .choice:has(input:checked) {
     background: rgb(235 235 245 / 14%);
+  }
+  .stepper {
+    display: grid;
+    grid-template-columns: 1fr 36px minmax(80px, auto) 36px;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 40px;
+    padding: 0 10px;
+    font-size: 15px;
+  }
+  .stepper button {
+    height: 32px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--fill-glass);
+    color: var(--color-text);
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+  }
+  .stepper button:hover {
+    background: var(--fill-glass-hover);
+  }
+  .stepper button:focus-visible,
+  .choice:has(input:focus-visible) {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
   }
   .stacked {
     display: grid;

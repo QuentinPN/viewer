@@ -199,6 +199,14 @@ pub enum PlayerCommand {
     SetNightMode {
         on: bool,
     },
+    /// Subtitle delay in seconds, positive shows them later; held within ±10 (ADR 0062).
+    SetSubtitleDelay {
+        seconds: f64,
+    },
+    /// Audio delay in seconds, positive plays it later; held within ±10 (ADR 0062).
+    SetAudioDelay {
+        seconds: f64,
+    },
     Stop,
 }
 
@@ -601,5 +609,11 @@ mod tests {
         let cmd: PlayerCommand =
             serde_json::from_str(r#"{"type":"setNightMode","on":true}"#).unwrap();
         assert_eq!(cmd, PlayerCommand::SetNightMode { on: true });
+        let cmd: PlayerCommand =
+            serde_json::from_str(r#"{"type":"setSubtitleDelay","seconds":-0.3}"#).unwrap();
+        assert_eq!(cmd, PlayerCommand::SetSubtitleDelay { seconds: -0.3 });
+        let cmd: PlayerCommand =
+            serde_json::from_str(r#"{"type":"setAudioDelay","seconds":0.2}"#).unwrap();
+        assert_eq!(cmd, PlayerCommand::SetAudioDelay { seconds: 0.2 });
     }
 }

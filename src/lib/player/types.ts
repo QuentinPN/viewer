@@ -29,6 +29,8 @@ export type PlayerCommand =
   | { type: "setVolume"; percent: number }
   | { type: "setSpeed"; speed: number }
   | { type: "setNightMode"; on: boolean }
+  | { type: "setSubtitleDelay"; seconds: number }
+  | { type: "setAudioDelay"; seconds: number }
   | { type: "stop" };
 
 export type EndReason = "eof" | "stopped" | "quit" | "error" | "other";

@@ -405,6 +405,12 @@ impl PlayerEngine for MpvEngine {
                 inner.set_property("speed", &finite(speed.clamp(0.25, 4.0))?.to_string())
             }
             PlayerCommand::SetNightMode { on } => inner.set_property("af", night_filter(*on)),
+            PlayerCommand::SetSubtitleDelay { seconds } => {
+                inner.set_property("sub-delay", &delay_value(*seconds)?)
+            }
+            PlayerCommand::SetAudioDelay { seconds } => {
+                inner.set_property("audio-delay", &delay_value(*seconds)?)
+            }
             PlayerCommand::Stop => inner.command(&["stop"]),
         }
     }
@@ -494,6 +500,15 @@ const NIGHT_FILTER: &str =
 /// The `af` value for night mode on or off: it is the chain's only filter.
 fn night_filter(on: bool) -> &'static str {
     if on { NIGHT_FILTER } else { "" }
+}
+
+/// Past ten seconds either way, the file itself is out of sync (ADR 0062).
+const DELAY_MAX_SECONDS: f64 = 10.0;
+
+fn delay_value(seconds: f64) -> Result<String, PlayerError> {
+    Ok(finite(seconds)?
+        .clamp(-DELAY_MAX_SECONDS, DELAY_MAX_SECONDS)
+        .to_string())
 }
 
 fn track_value(id: Option<i64>) -> String {
@@ -809,6 +824,14 @@ mod tests {
     use super::*;
     use std::sync::mpsc;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn delays_are_held_within_ten_seconds() {
+        assert_eq!(delay_value(-0.3).unwrap(), "-0.3");
+        assert_eq!(delay_value(42.0).unwrap(), "10");
+        assert_eq!(delay_value(-42.0).unwrap(), "-10");
+        assert!(delay_value(f64::NAN).is_err());
+    }
 
     #[test]
     fn night_filter_is_the_compressor_or_nothing() {

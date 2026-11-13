@@ -1,3 +1,4 @@
+import type { DelayChange } from "./delay";
 import type { PlayerCommand } from "./types";
 
 export type PlayerAction =
@@ -7,7 +8,8 @@ export type PlayerAction =
   | { kind: "toggleMute" }
   | { kind: "volume"; delta: number }
   | { kind: "toggleInfo" }
-  | { kind: "chapter"; delta: -1 | 1 };
+  | { kind: "chapter"; delta: -1 | 1 }
+  | { kind: "subtitleDelay"; change: DelayChange };
 
 /** Volume step of the arrow keys, in percent. */
 export const VOLUME_STEP = 5;
@@ -54,6 +56,11 @@ export function mapPlayerKey(
       return { kind: "chapter", delta: -1 };
     case "PageDown":
       return { kind: "chapter", delta: 1 };
+    // Subtitle delay (ADR 0062), as in mpv.
+    case "z":
+      return { kind: "subtitleDelay", change: "earlier" };
+    case "x":
+      return { kind: "subtitleDelay", change: "later" };
     default:
       return null;
   }
