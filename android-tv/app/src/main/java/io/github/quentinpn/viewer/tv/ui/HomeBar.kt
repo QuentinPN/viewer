@@ -88,6 +88,8 @@ private val idleText = Color(0xD1EBEBF5)
 @Composable
 internal fun HomeBar(
     userName: String,
+    /** Under the user's name in the account menu: « HomeNAS · non chiffré ». */
+    serverLine: String,
     libraries: List<Library>,
     home: FocusRequester,
     below: FocusRequester?,
@@ -156,7 +158,7 @@ internal fun HomeBar(
                     idle = Palette.surfaceRaised,
                     onClick = { account = true },
                 ) { color -> Label(initial(userName), color, bold = true) }
-                if (account) AccountMenu(userName, onDismiss = { account = false }, onSignOut = onSignOut, onSwitchServer = onSwitchServer)
+                if (account) AccountMenu(userName, serverLine, onDismiss = { account = false }, onSignOut = onSignOut, onSwitchServer = onSwitchServer)
             }
         }
     }
@@ -214,9 +216,13 @@ private fun Label(text: String, color: Color, bold: Boolean = false) {
     Text(text, color = color, fontSize = 12.sp, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
 }
 
-/** Under the avatar: who is signed in, « Changer de serveur » and « Se déconnecter »; Back closes it. */
+/** The server line of the account menu, as on Windows: its name, and « non chiffré » over HTTP. */
+internal fun accountServerLine(serverName: String, https: Boolean): String =
+    if (https) serverName else "$serverName · non chiffré"
+
+/** Under the avatar: who is signed in and on which server, « Changer de serveur » and « Se déconnecter »; Back closes it. */
 @Composable
-private fun AccountMenu(userName: String, onDismiss: () -> Unit, onSignOut: () -> Unit, onSwitchServer: () -> Unit) {
+private fun AccountMenu(userName: String, serverLine: String, onDismiss: () -> Unit, onSignOut: () -> Unit, onSwitchServer: () -> Unit) {
     val first = remember { FocusRequester() }
     Popup(
         alignment = Alignment.TopEnd,
@@ -228,7 +234,10 @@ private fun AccountMenu(userName: String, onDismiss: () -> Unit, onSignOut: () -
             Modifier.background(Palette.surface, RoundedCornerShape(12.dp)).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Connecté : $userName", color = Palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(userName, color = Palette.text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(serverLine, color = Palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
+            }
             // The session stays saved: its tile on the shelf opens it again without a password (ADR 0104)
             OutlinedButton(onClick = onSwitchServer, modifier = Modifier.focusRequester(first)) { Text("Changer de serveur") }
             OutlinedButton(onClick = onSignOut) { Text("Se déconnecter") }

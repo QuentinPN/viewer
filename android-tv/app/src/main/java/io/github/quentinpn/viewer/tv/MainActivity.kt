@@ -23,6 +23,7 @@ import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.session.SearchHistoryStore
 import io.github.quentinpn.viewer.tv.session.Session
+import io.github.quentinpn.viewer.tv.session.hostLabel
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
 import io.github.quentinpn.viewer.tv.ui.CastMember
 import io.github.quentinpn.viewer.tv.ui.DetailPage
@@ -30,6 +31,7 @@ import io.github.quentinpn.viewer.tv.ui.EpisodeScreen
 import io.github.quentinpn.viewer.tv.ui.HomeMemory
 import io.github.quentinpn.viewer.tv.ui.HomeRowStore
 import io.github.quentinpn.viewer.tv.ui.HomeScreen
+import io.github.quentinpn.viewer.tv.ui.accountServerLine
 import io.github.quentinpn.viewer.tv.ui.HomeState
 import io.github.quentinpn.viewer.tv.ui.LibraryMemory
 import io.github.quentinpn.viewer.tv.ui.LibraryPreferenceStore
@@ -353,6 +355,10 @@ class MainActivity : ComponentActivity() {
                         client = client,
                         userId = current.userId,
                         userName = current.userName,
+                        serverLine = remember(current) {
+                            val name = store.servers().firstOrNull { it.key == current.key }?.displayName ?: hostLabel(current.server)
+                            accountServerLine(name, client.server.isHttps)
+                        },
                         images = images,
                         onPlay = play,
                         onOpenSeries = { openSeries(SeriesTarget(it)) },

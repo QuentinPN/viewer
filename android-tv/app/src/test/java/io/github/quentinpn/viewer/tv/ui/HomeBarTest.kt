@@ -37,4 +37,10 @@ class HomeBarTest {
         assertEquals("7", initial("_7up"))
         assertEquals("?", initial(""))
     }
+
+    @Test
+    fun theAccountMenuNamesTheServerAndSaysWhenItIsNotEncrypted() {
+        assertEquals("HomeNAS · non chiffré", accountServerLine("HomeNAS", https = false))
+        assertEquals("HomeNAS", accountServerLine("HomeNAS", https = true))
+    }
 }

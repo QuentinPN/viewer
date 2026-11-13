@@ -157,6 +157,8 @@ fun HomeScreen(
     client: EmbyClient,
     userId: String,
     userName: String,
+    /** Server name and « non chiffré » over HTTP, for the account menu. */
+    serverLine: String,
     images: ImageLoader,
     onPlay: (itemId: String, startTicks: Long) -> Unit,
     onOpenSeries: (seriesId: String) -> Unit,
@@ -286,6 +288,7 @@ fun HomeScreen(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             HomeBar(
                 userName = userName,
+                serverLine = serverLine,
                 libraries = barLibraries(libraries),
                 home = home,
                 below = heroMain.takeIf { ready?.hero?.isNotEmpty() == true },
