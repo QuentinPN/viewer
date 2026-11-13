@@ -16,6 +16,14 @@ class HomeRowsTest {
         override fun put(key: String, value: Set<String>) {
             values[key] = value
         }
+
+        val strings = mutableMapOf<String, String>()
+
+        override fun getString(key: String) = strings[key]
+
+        override fun putString(key: String, value: String) {
+            strings[key] = value
+        }
     }
 
     private val anime = Library("a", "Anime", "Series")

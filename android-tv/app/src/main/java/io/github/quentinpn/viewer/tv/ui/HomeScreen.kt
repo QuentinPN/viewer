@@ -178,6 +178,8 @@ fun HomeScreen(
     var notice by remember { mutableStateOf<String?>(null) }
     // Read on each return from Réglages: the home leaves the composition while they show
     val rows = remember(rowStore) { rowStore.load() }
+    // The user's row order (ADR 0114), read again likewise
+    val order = remember(rowStore) { rowStore.loadOrder() }
     // Up from the hero's buttons lands on « Accueil »; Down from the bar on the hero's main button
     val home = remember { FocusRequester() }
     val heroMain = remember { FocusRequester() }
@@ -201,7 +203,7 @@ fun HomeScreen(
             val libraries = homeLibraries(client.views(userId).items)
             val latest = rows.latestLibraries(libraries).map { it to client.latest(userId, it.id, LATEST_LIMIT) }
             val playlists = if (rows.shows(PLAYLISTS_ROW)) playlistsOrNothing(client, userId) else emptyList()
-            HomeState.Ready(homeShelves(rows, resume, nextUp, favorites, latest, playlists), hero, libraries)
+            HomeState.Ready(homeShelves(rows, resume, nextUp, favorites, latest, playlists, order), hero, libraries)
         } catch (e: EmbyException) {
             if (e.error == EmbyError.SessionExpired) onSessionExpired()
             HomeState.Failed(e.error.message)
@@ -313,7 +315,7 @@ fun HomeScreen(
 
     Column(Modifier.fillMaxSize().background(Palette.background)) {
         // A row hidden since the last load leaves at once, before the shelves are read again
-        val s = memory.state.let { if (it is HomeState.Ready) it.copy(shelves = rows.visibleShelves(it.shelves)) else it }
+        val s = memory.state.let { if (it is HomeState.Ready) it.copy(shelves = arrangedShelves(rows.visibleShelves(it.shelves), order)) else it }
         // With shelves the header scrolls with them, laid over the hero's backdrop; the first
         // load shows the loading screen alone
         if (s is HomeState.Failed || (s is HomeState.Ready && s.shelves.isEmpty() && s.hero.isEmpty())) header()
@@ -398,8 +400,8 @@ private suspend fun heroOrNothing(client: EmbyClient, userId: String, resumed: L
 }
 
 /**
- * The home's shelves in their order, without the rows [rows] hides (ADR 0094) and without the
- * empty ones. [latest]: each library with its latest additions.
+ * The home's shelves in the user's [order] (ADR 0114), without the rows [rows] hides (ADR 0094)
+ * and without the empty ones. [latest]: each library with its latest additions.
  */
 internal fun homeShelves(
     rows: HomeRowVisibility,
@@ -408,19 +410,23 @@ internal fun homeShelves(
     favorites: List<BaseItemDto>,
     latest: List<Pair<Library, List<BaseItemDto>>>,
     playlists: List<BaseItemDto>,
-): List<Shelf> = rows.visibleShelves(
-    buildList {
-        val resumeShown = rows.shows(RESUME_ROW)
-        if (resumeShown && resume.isNotEmpty()) add(Shelf(RESUME_SHELF, resume, landscape = true, resume = true))
-        // With "Reprendre" hidden, its episodes are not on screen: "À suivre" keeps them
-        val upNext = if (resumeShown) withoutDuplicates(nextUp, resume) else nextUp
-        if (upNext.isNotEmpty()) add(Shelf(NEXT_UP_SHELF, upNext, landscape = true, resume = false))
-        favoriteShelf(favorites)?.let(::add)
-        for ((library, items) in latest) {
-            if (items.isNotEmpty()) add(Shelf(latestShelfTitle(library), items, landscape = false, resume = false, library))
-        }
-        playlistShelf(playlists)?.let(::add)
-    },
+    order: List<String> = emptyList(),
+): List<Shelf> = arrangedShelves(
+    rows.visibleShelves(
+        buildList {
+            val resumeShown = rows.shows(RESUME_ROW)
+            if (resumeShown && resume.isNotEmpty()) add(Shelf(RESUME_SHELF, resume, landscape = true, resume = true))
+            // With "Reprendre" hidden, its episodes are not on screen: "À suivre" keeps them
+            val upNext = if (resumeShown) withoutDuplicates(nextUp, resume) else nextUp
+            if (upNext.isNotEmpty()) add(Shelf(NEXT_UP_SHELF, upNext, landscape = true, resume = false))
+            favoriteShelf(favorites)?.let(::add)
+            for ((library, items) in latest) {
+                if (items.isNotEmpty()) add(Shelf(latestShelfTitle(library), items, landscape = false, resume = false, library))
+            }
+            playlistShelf(playlists)?.let(::add)
+        },
+    ),
+    order,
 )
 
 /** What the home reads in parallel before the libraries. */

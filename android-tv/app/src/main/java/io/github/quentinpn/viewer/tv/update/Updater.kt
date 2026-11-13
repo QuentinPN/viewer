@@ -36,10 +36,32 @@ sealed interface UpdateState {
     data class Error(val message: String, val ready: Ready) : UpdateState
 }
 
+/** The outcome of a check, shown only by the manual check of Réglages (ADR 0112). */
+sealed interface CheckResult {
+    data object UpToDate : CheckResult
+
+    data class Ready(val versionName: String) : CheckResult
+
+    data class Failed(val message: String) : CheckResult
+}
+
+/** What a running check does, for the status line of Réglages. */
+enum class CheckActivity { Checking, Downloading }
+
+/** French message of a check that failed on [e]. */
+internal fun checkFailure(e: Exception): String = when (e) {
+    is ManifestException -> e.message ?: "Le serveur de mises à jour a répondu une erreur."
+    is SecurityException -> "Android a refusé la vérification."
+    else -> "Serveur de mises à jour injoignable. Il ne répond que sur le réseau de la maison."
+}
+
+/** A manifest or APK that cannot be used; its message is French and shown as is. */
+internal class ManifestException(message: String) : IOException(message)
+
 /**
  * Checks the manifest, downloads and checks the APK in `cacheDir/updates`, then installs it
- * through [PackageInstaller]. A check or download that fails stays silent (logged): off the
- * home network there is simply no update.
+ * through [PackageInstaller]. A background check or download that fails stays silent (logged):
+ * off the home network there is simply no update. [checkNow] returns the outcome instead.
  */
 object Updater {
     private const val TAG = "ViewerUpdate"
@@ -70,56 +92,83 @@ object Updater {
         val now = SystemClock.elapsedRealtime()
         if (lastCheck != 0L && now - lastCheck < CHECK_INTERVAL_MS) return
         lastCheck = now
+        // Silent: a failure is only logged
         check(context.applicationContext, http)
     }
 
-    private suspend fun check(context: Context, http: OkHttpClient) = checking.withLock {
+    private val mutableActivity = MutableStateFlow<CheckActivity?>(null)
+    val activity: StateFlow<CheckActivity?> = mutableActivity.asStateFlow()
+
+    /**
+     * « Rechercher une mise à jour » of Réglages: no 6 h throttle, and a « Plus tard » given
+     * earlier no longer hides the card. Shares [check]'s lock: a background check running now
+     * finishes first, and its download is reused, never made twice.
+     */
+    suspend fun checkNow(context: Context, http: OkHttpClient): CheckResult {
+        dismissedVersion = 0
+        lastCheck = SystemClock.elapsedRealtime()
+        return check(context.applicationContext, http)
+    }
+
+    private suspend fun check(context: Context, http: OkHttpClient): CheckResult = checking.withLock {
         // Busy with an install: the next check will see the new version, or the same one
-        if (state.value is UpdateState.Installing) return@withLock
-        withContext(Dispatchers.IO) {
-            try {
-                val manifest = fetchManifest(http) ?: return@withContext
-                val installed = installedInfo(context) ?: return@withContext
-                val folder = File(context.cacheDir, FOLDER).apply { mkdirs() }
-                val target = File(folder, apkName(manifest.versionCode))
-                // Older or partial downloads go; the current APK stays if it is still the one
-                folder.listFiles()?.filter { it != target || !isNewer(manifest, installed.longVersionCode) }?.forEach { it.delete() }
-                if (!isNewer(manifest, installed.longVersionCode)) {
-                    mutableState.value = UpdateState.Idle
-                    return@withContext
-                }
-                val current = state.value
-                if (current is UpdateState.Ready && current.versionCode == manifest.versionCode && current.file.isFile) return@withContext
-                if (!matchesManifest(target, manifest.size, manifest.sha256)) {
-                    download(http, manifest, target)
-                    if (!matchesManifest(target, manifest.size, manifest.sha256)) {
-                        target.delete()
-                        Log.w(TAG, "APK ${manifest.versionName} : taille ou SHA-256 différents du manifeste, ignoré")
-                        return@withContext
-                    }
-                }
-                if (!sameSigner(context, installed, target)) {
-                    target.delete()
-                    Log.w(TAG, "APK ${manifest.versionName} : certificat de signature différent de l'app installée, ignoré")
-                    return@withContext
-                }
-                mutableState.value = UpdateState.Ready(manifest.versionCode, manifest.versionName, manifest.notes.trim(), target)
-            } catch (e: IOException) {
-                Log.i(TAG, "vérification impossible (${e.javaClass.simpleName})")
-            } catch (e: SecurityException) {
-                Log.w(TAG, "vérification refusée (${e.javaClass.simpleName})")
-            }
+        (state.value as? UpdateState.Installing)?.let { return@withLock CheckResult.Ready(it.ready.versionName) }
+        mutableActivity.value = CheckActivity.Checking
+        try {
+            withContext(Dispatchers.IO) { checkLocked(context, http) }
+        } catch (e: IOException) {
+            Log.i(TAG, "vérification impossible (${e.javaClass.simpleName})")
+            CheckResult.Failed(checkFailure(e))
+        } catch (e: SecurityException) {
+            Log.w(TAG, "vérification refusée (${e.javaClass.simpleName})")
+            CheckResult.Failed(checkFailure(e))
+        } finally {
+            mutableActivity.value = null
         }
     }
 
-    private fun fetchManifest(http: OkHttpClient): UpdateManifest? {
+    private fun checkLocked(context: Context, http: OkHttpClient): CheckResult {
+        val manifest = fetchManifest(http)
+        val installed = installedInfo(context) ?: throw ManifestException("Version installée illisible.")
+        val folder = File(context.cacheDir, FOLDER).apply { mkdirs() }
+        val target = File(folder, apkName(manifest.versionCode))
+        // Older or partial downloads go; the current APK stays if it is still the one
+        folder.listFiles()?.filter { it != target || !isNewer(manifest, installed.longVersionCode) }?.forEach { it.delete() }
+        if (!isNewer(manifest, installed.longVersionCode)) {
+            mutableState.value = UpdateState.Idle
+            return CheckResult.UpToDate
+        }
+        val current = state.value
+        if (current is UpdateState.Ready && current.versionCode == manifest.versionCode && current.file.isFile) {
+            return CheckResult.Ready(current.versionName)
+        }
+        if (!matchesManifest(target, manifest.size, manifest.sha256)) {
+            mutableActivity.value = CheckActivity.Downloading
+            download(http, manifest, target)
+            if (!matchesManifest(target, manifest.size, manifest.sha256)) {
+                target.delete()
+                Log.w(TAG, "APK ${manifest.versionName} : taille ou SHA-256 différents du manifeste, ignoré")
+                throw ManifestException("Le fichier téléchargé ne correspond pas au manifeste.")
+            }
+        }
+        if (!sameSigner(context, installed, target)) {
+            target.delete()
+            Log.w(TAG, "APK ${manifest.versionName} : certificat de signature différent de l'app installée, ignoré")
+            throw ManifestException("La mise à jour n'est pas signée comme l'app installée.")
+        }
+        mutableState.value = UpdateState.Ready(manifest.versionCode, manifest.versionName, manifest.notes.trim(), target)
+        return CheckResult.Ready(manifest.versionName)
+    }
+
+    private fun fetchManifest(http: OkHttpClient): UpdateManifest {
         val request = Request.Builder().url(BuildConfig.UPDATE_MANIFEST_URL).header("Cache-Control", "no-cache").build()
         http.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 Log.i(TAG, "manifeste indisponible (HTTP ${response.code})")
-                return null
+                throw ManifestException("Le serveur de mises à jour a répondu une erreur (HTTP ${response.code}).")
             }
-            return parseManifest(response.body.string()).also { if (it == null) Log.w(TAG, "manifeste illisible") }
+            return parseManifest(response.body.string())
+                ?: throw ManifestException("Le manifeste de mise à jour est illisible.").also { Log.w(TAG, "manifeste illisible") }
         }
     }
 

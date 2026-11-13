@@ -7,6 +7,7 @@ import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 
 // Rangées de l'accueil (ADR 0094): each home row can be hidden from Réglages › Accueil.
 // Kept on the device per Emby user, never on the server. The hero is not a row.
+// Their order can be changed too (ADR 0114).
 
 /** Stored key of the « Reprendre » row. */
 internal const val RESUME_ROW = "resume"
@@ -73,11 +74,71 @@ internal fun rowKey(shelf: Shelf): String = shelf.library?.let { latestRowKey(it
 
 internal fun rowLabel(shown: Boolean) = if (shown) "Affichée" else "Masquée"
 
-/** Where [HomeRowStore] keeps its sets: plain preferences on the device, a map in tests. */
+// Ordre des rangées (ADR 0114): the user's order is a list of keys. A stored key no longer
+// among the rows is ignored (kept, for a library that comes back); a row missing from it, such
+// as a new library, goes right after the row that precedes it by default, else before the one
+// that follows it, else at the end.
+
+/** [defaults], the rows' keys in their default order, arranged by the user's [stored] order. */
+internal fun arrangedKeys(stored: List<String>, defaults: List<String>): List<String> {
+    val known = defaults.toSet()
+    val result = stored.filter { it in known }.distinct().toMutableList()
+    for ((index, key) in defaults.withIndex()) {
+        if (key in result) continue
+        val before = defaults.subList(0, index).lastOrNull { it in result }
+        val after = defaults.subList(index + 1, defaults.size).firstOrNull { it in result }
+        when {
+            before != null -> result.add(result.indexOf(before) + 1, key)
+            after != null -> result.add(result.indexOf(after), key)
+            else -> result.add(key)
+        }
+    }
+    return result
+}
+
+/** [rows] sorted by the arranged [order] of their keys. */
+internal fun arrangedRows(rows: List<HomeRow>, stored: List<String>): List<HomeRow> {
+    val byKey = rows.associateBy { it.key }
+    return arrangedKeys(stored, rows.map { it.key }).mapNotNull { byKey[it] }
+}
+
+/**
+ * [shelves] sorted by [stored]; shelves keep their relative order when the order says nothing
+ * of them. Sorting is stable, so an absent key keeps the shelf where the home built it.
+ */
+internal fun arrangedShelves(shelves: List<Shelf>, stored: List<String>): List<Shelf> {
+    if (stored.isEmpty()) return shelves
+    val order = arrangedKeys(stored, shelves.map(::rowKey))
+    return shelves.sortedBy { order.indexOf(rowKey(it)) }
+}
+
+/**
+ * [keys] with [key] moved by [delta] places (-1 up, +1 down), clamped at the ends. Unchanged
+ * when [key] is absent.
+ */
+internal fun movedKey(keys: List<String>, key: String, delta: Int): List<String> {
+    val from = keys.indexOf(key)
+    if (from < 0) return keys
+    val to = (from + delta).coerceIn(0, keys.size - 1)
+    if (to == from) return keys
+    return keys.toMutableList().apply { add(to, removeAt(from)) }
+}
+
+/** The stored form of an order: keys never hold a line break (fixed names and Emby ids). */
+internal fun encodeOrder(keys: List<String>) = keys.joinToString("\n")
+
+internal fun decodeOrder(text: String?): List<String> = text?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
+
+/** Where [HomeRowStore] keeps its values: plain preferences on the device, a map in tests. */
 interface StringSetPrefs {
     fun get(key: String): Set<String>?
 
     fun put(key: String, value: Set<String>)
+
+    /** A set has no order: the rows' order is one string. */
+    fun getString(key: String): String?
+
+    fun putString(key: String, value: String)
 }
 
 private class SharedStringSetPrefs(private val prefs: SharedPreferences) : StringSetPrefs {
@@ -85,6 +146,10 @@ private class SharedStringSetPrefs(private val prefs: SharedPreferences) : Strin
     override fun get(key: String): Set<String>? = prefs.getStringSet(key, null)?.toSet()
 
     override fun put(key: String, value: Set<String>) = prefs.edit { putStringSet(key, value) }
+
+    override fun getString(key: String): String? = prefs.getString(key, null)
+
+    override fun putString(key: String, value: String) = prefs.edit { putString(key, value) }
 }
 
 /** The hidden home rows, per Emby user, in plain preferences: none is a secret. */
@@ -102,7 +167,24 @@ class HomeRowStore(private val prefs: StringSetPrefs, private val userId: String
         return next
     }
 
+    /** The user's order of the row keys (ADR 0114); empty when never changed. Arrange it with [arrangedKeys]. */
+    fun loadOrder(): List<String> = decodeOrder(prefs.getString(orderKey()))
+
+    /**
+     * Moves [rowKey] by [delta] among [rows], the rows listed now, and returns their new order.
+     * Keys of rows not listed now (a library gone) stay stored, after the others.
+     */
+    internal fun move(rows: List<HomeRow>, rowKey: String, delta: Int): List<String> {
+        val stored = loadOrder()
+        val arranged = arrangedKeys(stored, rows.map { it.key })
+        val next = movedKey(arranged, rowKey, delta)
+        prefs.putString(orderKey(), encodeOrder(next + stored.filter { it !in next }))
+        return next
+    }
+
     private fun key() = "$userId.hidden"
+
+    private fun orderKey() = "$userId.order"
 
     private companion object {
         const val PREFS = "home"

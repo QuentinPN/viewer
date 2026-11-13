@@ -24,18 +24,25 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun HomeUpdate() {
+    var dismissed by remember { mutableIntStateOf(Updater.dismissedVersion) }
+    UpdatePrompt(hidden = dismissed) {
+        Updater.dismiss()
+        dismissed = Updater.dismissedVersion
+    }
+}
+
+/**
+ * The update card and its install flow, shared by the home and Réglages (ADR 0112): nothing
+ * while no APK is ready or when the ready version is [hidden]. [onLater] closes it.
+ */
+@Composable
+fun UpdatePrompt(hidden: Int = 0, onLater: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val state by Updater.state.collectAsState()
-    var dismissed by remember { mutableIntStateOf(Updater.dismissedVersion) }
     var explaining by remember { mutableStateOf(false) }
-    val ready = when (val s = state) {
-        is UpdateState.Ready -> s
-        is UpdateState.Installing -> s.ready
-        is UpdateState.Error -> s.ready
-        UpdateState.Idle -> null
-    } ?: return
-    if (ready.versionCode == dismissed) return
+    val ready = readyOf(state) ?: return
+    if (ready.versionCode == hidden) return
     val mode = when {
         state is UpdateState.Installing -> UpdateCardMode.Installing
         explaining -> UpdateCardMode.Permission
@@ -68,9 +75,14 @@ fun HomeUpdate() {
                 }
             }
         },
-        onLater = {
-            Updater.dismiss()
-            dismissed = Updater.dismissedVersion
-        },
+        onLater = onLater,
     )
+}
+
+/** The downloaded update behind [state], whatever its install stage; null when none is. */
+fun readyOf(state: UpdateState): UpdateState.Ready? = when (state) {
+    is UpdateState.Ready -> state
+    is UpdateState.Installing -> state.ready
+    is UpdateState.Error -> state.ready
+    UpdateState.Idle -> null
 }

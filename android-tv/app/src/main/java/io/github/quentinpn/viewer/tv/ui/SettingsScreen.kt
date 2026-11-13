@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -20,12 +21,19 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.ImageLoader
+import io.github.quentinpn.viewer.tv.AppServices
+import io.github.quentinpn.viewer.tv.BuildConfig
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.settings.CacheClearing
@@ -49,6 +57,11 @@ import io.github.quentinpn.viewer.tv.settings.nextChoice
 import io.github.quentinpn.viewer.tv.settings.serverAddress
 import io.github.quentinpn.viewer.tv.settings.serverRows
 import io.github.quentinpn.viewer.tv.settings.usageLabel
+import io.github.quentinpn.viewer.tv.update.CheckActivity
+import io.github.quentinpn.viewer.tv.update.CheckResult
+import io.github.quentinpn.viewer.tv.update.UpdatePrompt
+import io.github.quentinpn.viewer.tv.update.Updater
+import io.github.quentinpn.viewer.tv.update.readyOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -56,7 +69,8 @@ import kotlinx.coroutines.withContext
 /**
  * Réglages (ADR 0051): the Windows playback settings that make sense on a TV, kept
  * on the device for this Emby user. Each row changes on OK and is saved at once.
- * « Accueil » shows or hides each home row (ADR 0094). « Stockage » shows and clears the
+ * « Accueil » shows or hides each home row (ADR 0094); a long OK moves one (ADR 0114).
+ * « Mises à jour » checks for an update on demand and installs it (ADR 0112). « Stockage » shows and clears the
  * image cache (ADR 0080); « À propos » ends it with read-only diagnostics (ADR 0076).
  */
 @Composable
@@ -70,6 +84,14 @@ fun SettingsScreen(
 ) {
     var settings by remember { mutableStateOf(store.load()) }
     var rows by remember { mutableStateOf(rowStore.load()) }
+    var order by remember { mutableStateOf(rowStore.loadOrder()) }
+    // The row being moved with ▲ ▼ (ADR 0114); null when none is
+    var moving by remember { mutableStateOf<String?>(null) }
+    val still = reducedMotion()
+    val update by Updater.state.collectAsState()
+    val updateActivity by Updater.activity.collectAsState()
+    var checkResult by remember { mutableStateOf<CheckResult?>(null) }
+    var updateCard by remember { mutableStateOf(false) }
     // The libraries of the home's « Derniers ajouts » rows, from the same views query
     val homeRowList by produceState<HomeRowList>(HomeRowList.Loading, client, userId) {
         value = try {
@@ -208,16 +230,67 @@ fun SettingsScreen(
         item {
             Note(
                 "Les rangées affichées sur l'accueil, sous le bandeau. OK affiche ou masque une rangée ; une rangée " +
-                    "masquée n'est plus demandée au serveur. Le changement s'applique au retour à l'accueil.",
+                    "masquée n'est plus demandée au serveur. Un appui long sur OK la déplace : ▲ ▼ la montent ou la " +
+                    "descendent, OK ou Retour la posent. Le changement s'applique au retour à l'accueil.",
             )
         }
         when (val list = homeRowList) {
             HomeRowList.Loading -> item { Info(InfoRow("Bibliothèques", "Chargement…")) }
             is HomeRowList.Loaded, is HomeRowList.Failed -> {
-                items(list.rows, key = { "home-" + it.key }) { row ->
-                    Choice(row.label, null, rowLabel(rows.shows(row.key))) { rows = rowStore.toggle(row.key) }
+                items(arrangedRows(list.rows, order), key = { "home-" + it.key }) { row ->
+                    val isMoving = moving == row.key
+                    Choice(
+                        row.label,
+                        if (isMoving) "▲ ▼ pour déplacer, OK ou Retour pour poser" else null,
+                        if (isMoving) "Déplacement" else rowLabel(rows.shows(row.key)),
+                        (if (still) Modifier else Modifier.animateItem())
+                            .onPreviewKeyEvent { event ->
+                                if (!isMoving) return@onPreviewKeyEvent false
+                                val down = event.type == KeyEventType.KeyDown
+                                when (event.key) {
+                                    Key.DirectionUp, Key.DirectionDown -> {
+                                        val delta = if (event.key == Key.DirectionUp) -1 else 1
+                                        if (down) order = rowStore.move(list.rows, row.key, delta)
+                                    }
+                                    // The long press's own repeats and release do not end the move
+                                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.Back -> {
+                                        if (down && event.nativeKeyEvent.repeatCount == 0) moving = null
+                                    }
+                                    // Focus stays on the row being moved
+                                    Key.DirectionLeft, Key.DirectionRight -> Unit
+                                    else -> return@onPreviewKeyEvent false
+                                }
+                                true
+                            },
+                        selected = isMoving,
+                        onLongClick = { moving = row.key },
+                    ) { rows = rowStore.toggle(row.key) }
                 }
                 if (list is HomeRowList.Failed) item { Note("Bibliothèques illisibles : " + list.message) }
+            }
+        }
+
+        item { Section("Mises à jour") }
+        item {
+            Note(
+                "Viewer cherche lui-même une mise à jour au lancement puis toutes les 6 heures, sur le réseau " +
+                    "de la maison. Tu peux aussi lancer la recherche maintenant.",
+            )
+        }
+        item { Info(InfoRow("Version installée", BuildConfig.VERSION_NAME)) }
+        item {
+            Choice("Rechercher une mise à jour", null, updateStatus(updateActivity, checkResult, readyOf(update)?.versionName)) {
+                if (updateActivity == null) {
+                    checkResult = null
+                    scope.launch { checkResult = Updater.checkNow(context, AppServices.http) }
+                }
+            }
+        }
+        readyOf(update)?.let { ready ->
+            item {
+                Choice("Installer la version ${ready.versionName}", ready.notes.takeIf { it.isNotBlank() }, "") {
+                    updateCard = true
+                }
             }
         }
 
@@ -268,9 +341,22 @@ fun SettingsScreen(
             items(rows, key = { "playback-" + it.label }) { Info(it) }
         }
     }
+    // The home's card and install flow, « sources inconnues » step included; « Plus tard » here
+    // only closes it, the home still offers the update
+    if (updateCard) UpdatePrompt { updateCard = false }
 }
 
 private fun onOff(on: Boolean) = if (on) "Activé" else "Désactivé"
+
+/** The status of « Rechercher une mise à jour »: what runs now, else the last manual result. */
+internal fun updateStatus(activity: CheckActivity?, result: CheckResult?, readyVersion: String?): String = when {
+    activity == CheckActivity.Checking -> "Recherche…"
+    activity == CheckActivity.Downloading -> "Téléchargement…"
+    readyVersion != null -> "Version $readyVersion prête"
+    result == CheckResult.UpToDate -> "Viewer est à jour"
+    result is CheckResult.Failed -> result.message
+    else -> ""
+}
 
 /** The rows of « Accueil »: those of the libraries come from the server. */
 private sealed interface HomeRowList {
@@ -326,10 +412,19 @@ private fun Note(text: String) {
 
 /** One focusable row: OK changes [value]. A ListItem stays the same node, so focus stays on it. */
 @Composable
-private fun Choice(title: String, detail: String?, value: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun Choice(
+    title: String,
+    detail: String?,
+    value: String,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     ListItem(
-        selected = false,
+        selected = selected,
         onClick = onClick,
+        onLongClick = onLongClick,
         headlineContent = { Text(title) },
         supportingContent = detail?.let { { Text(it) } },
         trailingContent = { Text(value) },
