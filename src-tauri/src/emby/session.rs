@@ -1158,11 +1158,71 @@ impl EmbyService {
         force_transcode: bool,
         prefs: &TrackPreferences,
     ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
+        self.prepare_with(
+            item_id,
+            media_source_id,
+            resume,
+            force_transcode,
+            prefs,
+            None,
+        )
+        .await
+    }
+
+    /// A new negotiation of the version playing at another bitrate cap, for this
+    /// playback only (ADR 0117): Réglages is left as it is. `None` is « Maximale ».
+    /// The plan starts at `start_ticks`, the position reached.
+    pub async fn prepare_at_cap(
+        &self,
+        item_id: &str,
+        media_source_id: &str,
+        cap: Option<u64>,
+        start_ticks: i64,
+        prefs: &TrackPreferences,
+    ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
+        if cap.is_some_and(|c| !BITRATE_CHOICES.contains(&c)) {
+            return Err(EmbyError::Settings("débit de lecture non proposé".into()));
+        }
+        let (mut plan, headers) = self
+            .prepare_with(
+                item_id,
+                Some(media_source_id),
+                false,
+                false,
+                prefs,
+                Some(cap),
+            )
+            .await?;
+        plan.start_ticks = start_ticks.max(0);
+        Ok((plan, headers))
+    }
+
+    /// Stops the transcode of a replaced play session (`DELETE
+    /// /Videos/ActiveEncodings`, ADR 0117); the token stays in the header.
+    pub async fn stop_encoding(&self, play_session_id: &str) -> Result<(), EmbyError> {
+        let client = self.client()?;
+        self.expire_on_401(&client, client.stop_active_encodings(play_session_id).await)
+    }
+
+    /// `prepare_source`, with `cap` in place of the cap of Réglages when given.
+    async fn prepare_with(
+        &self,
+        item_id: &str,
+        media_source_id: Option<&str>,
+        resume: bool,
+        force_transcode: bool,
+        prefs: &TrackPreferences,
+        cap: Option<Option<u64>>,
+    ) -> Result<(PlaybackPlan, Vec<(String, String)>), EmbyError> {
         if media_source_id.is_some_and(|id| !is_source_id(id)) {
             return Err(EmbyError::InvalidResponse("version invalide".into()));
         }
         let (client, user_id) = self.session()?;
-        let limit = self.streaming_limit(&client);
+        let mut limit = self.streaming_limit(&client);
+        if let Some(cap) = cap {
+            limit.cap = cap;
+            limit.bitrate = cap.unwrap_or(playback::MAX_STREAMING_BITRATE);
+        }
         let profile = playback::device_profile(limit.bitrate);
         let (info, item) = tokio::join!(
             client.playback_info(

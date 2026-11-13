@@ -61,6 +61,17 @@ describe("mapPlayerKey", () => {
     expect(mapPlayerKey("f", { inTextField: true })).toBeNull();
   });
 
+  it("moves the subtitles earlier and later with Z and X, as in mpv", () => {
+    expect(mapPlayerKey("z", { inTextField: false })).toEqual({
+      kind: "subtitleDelay",
+      change: "earlier",
+    });
+    expect(mapPlayerKey("X", { inTextField: false })).toEqual({
+      kind: "subtitleDelay",
+      change: "later",
+    });
+  });
+
   it("ignores unrelated keys", () => {
     expect(mapPlayerKey("a", { inTextField: false })).toBeNull();
   });

@@ -503,6 +503,68 @@ pub struct PlaybackPreferences {
     subtitle_style: SubtitleStyle,
 }
 
+/// Changes the bitrate cap of the playback in progress (ADR 0117): a new
+/// PlaybackInfo for the version playing at `cap` (`None`: « Maximale »), loaded at
+/// `position_seconds` in the same engine. The session goes on: a `QualityChange`
+/// progress, no stop. Réglages is left as it is.
+#[tauri::command]
+pub async fn emby_change_quality(
+    state: State<'_, AppState>,
+    emby: State<'_, EmbyService>,
+    item_id: String,
+    media_source_id: String,
+    cap: Option<u64>,
+    position_seconds: f64,
+    preferences: Option<PlaybackPreferences>,
+) -> Result<PlaybackStart, EmbyError> {
+    if !position_seconds.is_finite() || position_seconds < 0.0 {
+        return Err(EmbyError::InvalidResponse("position invalide".into()));
+    }
+    let preferences = preferences.unwrap_or_default();
+    preferences.tracks.validate()?;
+    let start_ticks = (position_seconds * 10_000_000.0).round() as i64;
+    let (plan, http_headers) = emby
+        .prepare_at_cap(
+            &item_id,
+            &media_source_id,
+            cap,
+            start_ticks,
+            &preferences.tracks,
+        )
+        .await?;
+    let limit = plan.bitrate_limit;
+    let start_seconds = (plan.start_ticks > 0).then(|| plan.start_ticks as f64 / 10_000_000.0);
+    let request = PlaybackRequest {
+        source: plan.url.clone(),
+        http_headers,
+        start_seconds,
+        subtitles: plan.subtitles.clone(),
+        tracks: plan.tracks,
+        subtitle_style: preferences.subtitle_style,
+    };
+    // Checked before the switch is announced: a bad URL leaves the stream playing.
+    let source =
+        MediaSource::parse(&request.source).map_err(|e| EmbyError::Player(e.to_string()))?;
+    let engine = state
+        .engine()
+        .map_err(|e| EmbyError::Player(e.to_string()))?;
+    state.reporter.switch(ActivePlayback::new(&item_id, &plan));
+    engine
+        .load(&request, &source)
+        .map_err(|e| EmbyError::Player(e.to_string()))?;
+    Ok(PlaybackStart {
+        media_source_id: plan.media_source_id,
+        item_id,
+        resume: true,
+        method: plan.method,
+        container: plan.container,
+        transcode_reasons: plan.transcode_reasons,
+        title: plan.title,
+        bitrate_cap: limit.and_then(|l| l.cap),
+        local_address: limit.is_none_or(|l| l.local_address),
+    })
+}
+
 /// Plays a film or episode from the server (ADR 0007): PlaybackInfo, choice of the
 /// source, then the player. The UI gets the method only, never the URL or token.
 /// With `resume`, starts where the server says the user stopped; the playback is

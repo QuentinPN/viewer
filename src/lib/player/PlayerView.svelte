@@ -16,8 +16,24 @@ import type {
 import { capInEffect } from "../settings/quality";
 import TitleBar from "../window/TitleBar.svelte";
 import { playerApi } from "./api";
+import {
+  formatSpeed,
+  readNightMode,
+  SPEEDS,
+  saveNightMode,
+  speedBadge,
+} from "./audiomodes";
 import ChaptersPanel from "./ChaptersPanel.svelte";
 import { chapterIndex, chapterMarks, chapterTarget } from "./chapters";
+import {
+  changeDelay,
+  type DelayChange,
+  type DelayKind,
+  type Delays,
+  formatDelay,
+  NO_DELAYS,
+} from "./delay";
+import { endLabel, formatClock, untilNextMinute } from "./endtime";
 import {
   canFallBack,
   formatRemaining,
@@ -28,6 +44,14 @@ import {
   trackLabel,
 } from "./format";
 import { mapPlayerKey } from "./keyboard";
+import {
+  canApply,
+  QUALITY_IDLE,
+  type QualityPhase,
+  qualityChoices,
+  qualityLabel,
+  qualityNote,
+} from "./quality";
 import {
   activeSegment,
   NO_SKIP_SHOWN,
@@ -41,6 +65,19 @@ import {
   skipShown,
   trackSkipShown,
 } from "./segments";
+import {
+  holdsNext,
+  SLEEP_NOTICE,
+  SLEEP_OFF,
+  type SleepChoice,
+  type SleepTimer,
+  sameChoice,
+  sleepBadge,
+  sleepChoices,
+  sleepDue,
+  sleepTimer,
+  sleepValue,
+} from "./sleep";
 import type {
   EndReason,
   PlayerCommand,
@@ -54,6 +91,7 @@ import {
   startCountdown,
   UP_NEXT_SECONDS,
 } from "./upnext";
+import { FITS, fitBadge, type VideoFit } from "./videofit";
 import {
   effectiveVolume,
   readVolume,
@@ -83,10 +121,55 @@ interface Props {
    * once the app shows it.
    */
   onFallback: (itemId: string, resume: boolean) => Promise<string | null>;
+  /**
+   * Another bitrate cap for this playback (ADR 0117), from `position` seconds;
+   * resolves with an error message, `null` once the app shows the new stream.
+   */
+  onChangeQuality: (
+    cap: number | null,
+    position: number,
+  ) => Promise<string | null>;
 }
 
-let { playback, onExit, onInterrupted, onPlayNext, onFallback }: Props =
-  $props();
+let {
+  playback,
+  onExit,
+  onInterrupted,
+  onPlayNext,
+  onFallback,
+  onChangeQuality,
+}: Props = $props();
+
+let qualityCaps = $state<(number | null)[]>([]);
+let pendingCap = $state<number | null>(null);
+let qualityPhase = $state<QualityPhase>(QUALITY_IDLE);
+/** A quality change is loading: the delays set are kept. */
+let switchingQuality = false;
+
+onMount(() => {
+  pendingCap = untrack(() => playback.bitrateCap);
+  embyApi
+    .playbackQuality()
+    .then((q) => {
+      qualityCaps = qualityChoices(q.choices);
+    })
+    .catch(() => {
+      qualityCaps = [];
+    });
+});
+
+async function applyQuality() {
+  if (!canApply(pendingCap, playback.bitrateCap, qualityPhase)) return;
+  qualityPhase = { kind: "applying" };
+  switchingQuality = true;
+  const failure = await onChangeQuality(pendingCap, position);
+  if (failure) {
+    switchingQuality = false;
+    qualityPhase = { kind: "failed", message: failure };
+  } else {
+    qualityPhase = QUALITY_IDLE;
+  }
+}
 
 /** Same margin as Rust's early end of file (`EARLY_EOF_TICKS`). */
 const EARLY_EOF_SECONDS = 30;
@@ -94,7 +177,7 @@ const EARLY_EOF_SECONDS = 30;
 const HIDE_AFTER_MS = 3000;
 const SKIP_SECONDS = 10;
 
-type Panel = "audio" | "subs" | "info" | "chapters";
+type Panel = "audio" | "subs" | "info" | "chapters" | "options";
 
 let active = $state(false);
 /**
@@ -117,6 +200,22 @@ let panel = $state<Panel | null>(null);
 let awake = $state(true);
 let overChrome = $state(false);
 let volume = $state<VolumeSetting>(readVolume(storage()));
+/** Wall clock of the clock and « Fin à » (ADR 0073): each position, and each minute. */
+let now = $state(Date.now());
+let clockTimer: ReturnType<typeof setTimeout> | undefined;
+/** Playback speed in effect; 1 is « Normale ». */
+let speed = $state(1);
+/** Night mode, kept on this PC (ADR 0072). */
+let nightMode = $state(readNightMode(storage()));
+let optionsButton = $state<HTMLButtonElement | null>(null);
+/** Delays of the file being played; each new file starts from none (ADR 0062). */
+let delays = $state<Delays>({ ...NO_DELAYS });
+/** Picture format, for this player session (ADR 0078). */
+let fit = $state<VideoFit>("original");
+/** « Minuterie », for this player session (ADR 0073). */
+let sleep = $state<SleepTimer>(SLEEP_OFF);
+/** The timer ran out and paused: said over the picture until playback resumes. */
+let sleepNotice = $state(false);
 
 let audioButton = $state<HTMLButtonElement | null>(null);
 let subsButton = $state<HTMLButtonElement | null>(null);
@@ -183,6 +282,11 @@ const progress = $derived(
   duration > 0 ? Math.min(100, (position / duration) * 100) : 0,
 );
 const shownVolume = $derived(effectiveVolume(volume));
+const clock = $derived(formatClock(now));
+const badge = $derived(speedBadge(speed));
+const sleepItem = $derived(isEpisode(playback.title) ? "episode" : "movie");
+const sleepLabel = $derived(sleepBadge(sleep, now, sleepItem));
+const endsLabel = $derived(endLabel(now, position, duration, speed));
 const chromeVisible = $derived(
   !active ||
     awake ||
@@ -252,6 +356,8 @@ $effect(() => {
 // it shows the button again.
 $effect(() => {
   if (!segment || !skip || !skipSetting.auto) return;
+  // « Fin de l'épisode » pauses at the credits instead.
+  if (skip.kind === "next" && holdsNext(sleep)) return;
   const key = segmentKey(segment);
   if (autoSkipped.has(key)) return;
   autoSkipped.add(key);
@@ -308,17 +414,21 @@ function onEvent(ev: PlayerEvent) {
       active = true;
       error = null;
       void applyVolume();
+      void applyModes();
       wake();
       break;
     case "timePos":
       everPlayed = true;
       if (!scrubbing) position = ev.seconds;
+      now = Date.now();
+      checkSleep();
       break;
     case "duration":
       duration = ev.seconds;
       break;
     case "paused":
       paused = ev.paused;
+      if (!ev.paused) sleepNotice = false;
       break;
     case "buffering":
       buffering = ev.active;
@@ -338,7 +448,7 @@ function onEvent(ev: PlayerEvent) {
           error = openFailure(ev.error);
         }
       } else if (ev.reason === "eof") {
-        if (active && nextEpisode) void offerNext();
+        if (active && nextEpisode && !holdsNext(sleep)) void offerNext();
         else void close();
       }
       break;
@@ -352,6 +462,7 @@ onMount(async () => {
   unlisten = await playerApi.onEvent(onEvent);
   diagTimer = setInterval(async () => {
     if (!active) return;
+    checkSleep();
     try {
       diag = await playerApi.diagnostics();
       // Engine state is authoritative: resync when an event was missed.
@@ -371,13 +482,22 @@ onMount(async () => {
     if (diag.container != null) active = true;
     tracks = await playerApi.tracks();
     await applyVolume();
+    await applyModes();
   } catch {
     // Not started yet: `fileLoaded` will come.
   }
   wake();
+  tickClock();
 });
 
+/** Moves the clock on at the start of each minute, even while paused. */
+function tickClock() {
+  now = Date.now();
+  clockTimer = setTimeout(tickClock, untilNextMinute(now));
+}
+
 onDestroy(() => {
+  clearTimeout(clockTimer);
   stopCountdown?.();
   unlisten?.();
   clearInterval(diagTimer);
@@ -395,6 +515,59 @@ async function run(command: PlayerCommand) {
 
 function applyVolume() {
   return run({ type: "setVolume", percent: effectiveVolume(volume) });
+}
+
+/** Speed and night mode are engine options: set again for each file. */
+async function applyModes() {
+  // A new item starts in sync; the same one at another quality keeps its delays.
+  if (!switchingQuality) delays = { ...NO_DELAYS };
+  switchingQuality = false;
+  await run({ type: "setSubtitleDelay", seconds: delays.subtitle });
+  await run({ type: "setAudioDelay", seconds: delays.audio });
+  await run({ type: "setSpeed", speed });
+  await run({ type: "setVideoFit", fit });
+  await run({ type: "setNightMode", on: nightMode });
+}
+
+function changeSpeed(next: number) {
+  speed = next;
+  if (active) void run({ type: "setSpeed", speed: next });
+}
+
+function changeDelayOf(kind: DelayKind, change: DelayChange) {
+  const seconds = changeDelay(delays[kind], change);
+  delays = { ...delays, [kind]: seconds };
+  void run(
+    kind === "subtitle"
+      ? { type: "setSubtitleDelay", seconds }
+      : { type: "setAudioDelay", seconds },
+  );
+}
+
+/** Pauses once the timer ran out or « Fin de… » reached its stop (ADR 0073). */
+function checkSleep() {
+  if (!active || !sleepDue(sleep, Date.now(), position, duration, segments))
+    return;
+  sleep = SLEEP_OFF;
+  sleepNotice = true;
+  void run({ type: "setPaused", paused: true });
+  wake();
+}
+
+function changeSleep(choice: SleepChoice) {
+  sleep = sleepTimer(choice, Date.now(), position);
+  now = Date.now();
+}
+
+function changeFit(next: VideoFit) {
+  fit = next;
+  if (active) void run({ type: "setVideoFit", fit: next });
+}
+
+function changeNightMode(on: boolean) {
+  nightMode = on;
+  saveNightMode(storage(), on);
+  if (active) void run({ type: "setNightMode", on });
 }
 
 function changeVolume(next: VolumeSetting) {
@@ -457,6 +630,9 @@ async function playNext() {
   const next = nextEpisode;
   if (!next || launching) return;
   dismissNext();
+  // « Fin de l'épisode » was about the one that ends.
+  if (holdsNext(sleep)) sleep = SLEEP_OFF;
+  sleepNotice = false;
   launching = next;
   active = false;
   everPlayed = false;
@@ -497,7 +673,9 @@ function toggleButton(which: Panel) {
       ? subsButton
       : which === "chapters"
         ? chaptersButton
-        : infoButton;
+        : which === "options"
+          ? optionsButton
+          : infoButton;
 }
 
 async function openPanel(which: Panel) {
@@ -541,6 +719,9 @@ function onKeydown(e: KeyboardEvent) {
   // In a panel, Space picks a track and the arrows move between tracks.
   const inRadio = target instanceof HTMLInputElement && target.type === "radio";
   if (inRadio && (e.key === " " || e.key.startsWith("Arrow"))) return;
+  const inCheckbox =
+    target instanceof HTMLInputElement && target.type === "checkbox";
+  if (inCheckbox && e.key === " ") return;
   const inTextField =
     target instanceof HTMLInputElement && target.type === "text";
   // Enter skips while the button shows, whatever control has the focus. Once
@@ -574,6 +755,9 @@ function onKeydown(e: KeyboardEvent) {
       break;
     case "toggleInfo":
       void openPanel("info");
+      break;
+    case "subtitleDelay":
+      changeDelayOf("subtitle", action.change);
       break;
     case "chapter": {
       const to = chapterTarget(chapters, position, action.delta);
@@ -649,6 +833,10 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     {:else if name === "chapters"}
       <path d="M9 6.5h11M9 12h11M9 17.5h11" />
       <path d="M4.5 6.5h.2M4.5 12h.2M4.5 17.5h.2" />
+    {:else if name === "options"}
+      <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+      <circle cx="16" cy="7" r="2" />
+      <circle cx="10" cy="17" r="2" />
     {:else if name === "info"}
       <circle cx="12" cy="12" r="8.5" />
       <path d="M12 11v5.5M12 7.6v.2" />
@@ -711,6 +899,7 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
         <h1>{heading.name}</h1>
       </div>
       <span class="decision" title="Décision du serveur Emby">{decision}</span>
+      <span class="clock" aria-label={`Il est ${clock}`}>{clock}</span>
     </header>
 
     {#if buffering}
@@ -720,6 +909,7 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
       </div>
     {/if}
     {#if error}<p class="error floating" role="alert">{error}</p>{/if}
+    {#if sleepNotice && !error}<p class="floating" role="status">{SLEEP_NOTICE}</p>{/if}
 
     {#if skip && skipVisible}
       <div class="skip" role="group" aria-label={skip.label}>
@@ -773,7 +963,9 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
               ? "Sous-titres"
               : panel === "chapters"
                 ? "Chapitres"
-                : "Informations de lecture"}
+                : panel === "options"
+                  ? "Options de lecture"
+                  : "Informations de lecture"}
           bind:this={panelElement}
         >
           {#if panel === "audio"}
@@ -816,6 +1008,117 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
                   <span>{trackLabel(t)}</span>
                 </label>
               {/each}
+            </fieldset>
+          {:else if panel === "options"}
+            <fieldset>
+              <legend>Vitesse</legend>
+              {#each SPEEDS as s (s)}
+                <label class="choice">
+                  <input
+                    type="radio"
+                    name="speed"
+                    checked={speed === s}
+                    onchange={() => changeSpeed(s)}
+                  />
+                  <span>{formatSpeed(s)}</span>
+                </label>
+              {/each}
+            </fieldset>
+            <fieldset>
+              <legend>Format de l'image</legend>
+              {#each FITS as f (f.fit)}
+                <label class="choice">
+                  <input
+                    type="radio"
+                    name="fit"
+                    checked={fit === f.fit}
+                    onchange={() => changeFit(f.fit)}
+                  />
+                  <span>{f.label}</span>
+                </label>
+              {/each}
+            </fieldset>
+            <fieldset>
+              <legend>Synchronisation</legend>
+              {#each [["subtitle", "Sous-titres", "Z / X"], ["audio", "Audio", null]] as const as [kind, name, keys] (kind)}
+                <div class="stepper" role="group" aria-label={`Décalage ${kind === "subtitle" ? "des sous-titres" : "audio"}`}>
+                  <span class="stepper-name">{name}</span>
+                  <button
+                    type="button"
+                    class="step"
+                    aria-label="Plus tôt"
+                    title={keys ? `Plus tôt (${keys.split(" / ")[0]})` : "Plus tôt"}
+                    onclick={() => changeDelayOf(kind, "earlier")}
+                  >−</button>
+                  <button
+                    type="button"
+                    class="step-value"
+                    title="Remettre à zéro"
+                    aria-label={`${formatDelay(delays[kind])}, remettre à zéro`}
+                    onclick={() => changeDelayOf(kind, "reset")}
+                  >{formatDelay(delays[kind])}</button>
+                  <button
+                    type="button"
+                    class="step"
+                    aria-label="Plus tard"
+                    title={keys ? `Plus tard (${keys.split(" / ")[1]})` : "Plus tard"}
+                    onclick={() => changeDelayOf(kind, "later")}
+                  >+</button>
+                </div>
+              {/each}
+            </fieldset>
+            <fieldset>
+              <legend>Minuterie</legend>
+              {#each sleepChoices() as choice (sleepValue(choice, sleepItem))}
+                <label class="choice">
+                  <input
+                    type="radio"
+                    name="sleep"
+                    checked={sameChoice(sleep.choice, choice)}
+                    onchange={() => changeSleep(choice)}
+                  />
+                  <span>{sleepValue(choice, sleepItem)}</span>
+                </label>
+              {/each}
+            </fieldset>
+            {#if qualityCaps.length > 0}
+              <fieldset>
+                <legend>Qualité</legend>
+                {#each qualityCaps as cap (cap ?? "max")}
+                  <label class="choice">
+                    <input
+                      type="radio"
+                      name="quality"
+                      checked={pendingCap === cap}
+                      onchange={() => (pendingCap = cap)}
+                    />
+                    <span>{qualityLabel(cap)}</span>
+                  </label>
+                {/each}
+                <button
+                  type="button"
+                  class="apply"
+                  disabled={!canApply(pendingCap, playback.bitrateCap, qualityPhase)}
+                  onclick={() => void applyQuality()}
+                >Appliquer</button>
+                {#if qualityNote(qualityPhase)}
+                  <p class="muted" role="status">{qualityNote(qualityPhase)}</p>
+                {/if}
+              </fieldset>
+            {/if}
+            <fieldset>
+              <legend>Son</legend>
+              <label class="choice">
+                <input
+                  type="checkbox"
+                  checked={nightMode}
+                  onchange={(e) => changeNightMode(e.currentTarget.checked)}
+                />
+                <span class="stacked">
+                  Mode nuit
+                  <small>Réduit l'écart entre dialogues et explosions</small>
+                </span>
+              </label>
             </fieldset>
           {:else if panel === "chapters"}
             <ChaptersPanel {chapters} current={chapterNow} onSelect={goToChapter} />
@@ -875,7 +1178,14 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
         <div class="times">
           <span class="time">{formatTime(position)}</span>
           {#if chapterName}<span class="chapter-name">{chapterName}</span>{/if}
-          <span class="time" title="Temps restant">{formatRemaining(position, duration)}</span>
+          <span class="end-times">
+            {#if delays.subtitle !== 0}<span class="time ends" role="status" title="Décalage des sous-titres">Sous-titres {formatDelay(delays.subtitle)}</span>{/if}
+            {#if fitBadge(fit)}<span class="time ends" title="Format de l'image">{fitBadge(fit)}</span>{/if}
+            {#if sleepLabel}<span class="time ends" title="Minuterie">{sleepLabel}</span>{/if}
+            {#if badge}<span class="time ends" title="Vitesse de lecture">{badge}</span>{/if}
+            {#if endsLabel}<span class="time ends">{endsLabel}</span>{/if}
+            <span class="time" title="Temps restant">{formatRemaining(position, duration)}</span>
+          </span>
         </div>
       </div>
 
@@ -974,6 +1284,18 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
             onclick={() => openPanel("subs")}
           >
             {@render icon("subs")}
+          </button>
+          <button
+            type="button"
+            class="round"
+            class:on={panel === "options"}
+            aria-label="Options de lecture"
+            aria-expanded={panel === "options"}
+            title="Options de lecture"
+            bind:this={optionsButton}
+            onclick={() => openPanel("options")}
+          >
+            {@render icon("options")}
           </button>
           <button
             type="button"
@@ -1174,6 +1496,20 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     color: rgb(235 235 245 / 80%);
     text-shadow: 0 1px 3px rgb(0 0 0 / 80%);
   }
+  .clock {
+    flex: none;
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 3px rgb(0 0 0 / 60%);
+  }
+  .end-times {
+    display: flex;
+    gap: var(--space-3);
+  }
+  .ends {
+    color: var(--color-text-secondary);
+  }
   .buttons {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
@@ -1363,6 +1699,61 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   }
   .choice:has(input:checked) {
     background: rgb(235 235 245 / 14%);
+  }
+  .stepper {
+    display: grid;
+    grid-template-columns: 1fr 36px minmax(80px, auto) 36px;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 40px;
+    padding: 0 10px;
+    font-size: 15px;
+  }
+  .stepper button {
+    height: 32px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--fill-glass);
+    color: var(--color-text);
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+  }
+  .stepper button:hover,
+  .apply:enabled:hover {
+    background: var(--fill-glass-hover);
+  }
+  .apply {
+    margin: var(--space-1) 10px 0;
+    height: 36px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--fill-glass);
+    color: var(--color-text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .apply:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .apply:focus-visible,
+  .stepper button:focus-visible,
+  .choice:has(input:focus-visible) {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+  .stacked {
+    display: grid;
+    padding: var(--space-1) 0;
+  }
+  .stacked small {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+  fieldset + fieldset {
+    margin-top: var(--space-3);
   }
   .choice input {
     accent-color: var(--color-accent);
