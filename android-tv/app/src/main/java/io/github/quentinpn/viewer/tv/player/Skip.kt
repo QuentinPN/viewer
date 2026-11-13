@@ -72,6 +72,26 @@ data class SkipShown(val button: SkipPrompt.Button? = null, val since: Long = 0L
 fun trackSkipShown(prev: SkipShown, button: SkipPrompt.Button?, now: Long): SkipShown =
     if (button == prev.button) prev else SkipShown(button, now)
 
+/**
+ * Whether OK presses the visible skip button (ADR 0108). Armed when the button
+ * appears during plain playback, when OK brings it back, and when the controls
+ * fade; a ◀ ▶ seek disarms it, so the OK that follows a seek plays or pauses.
+ */
+object SkipArm {
+    /** A new button: armed unless it came during a seek, the controls still up. */
+    fun appeared(controls: Boolean): Boolean = !controls
+
+    /** What OK does with the button on screen ([visible]) and [armed]. */
+    fun onOk(visible: Boolean, armed: Boolean): SkipOk = when {
+        !visible -> SkipOk.Reveal
+        armed -> SkipOk.Skip
+        else -> SkipOk.PlayPause
+    }
+}
+
+/** The answer to OK during a segment with a button. */
+enum class SkipOk { Skip, Reveal, PlayPause }
+
 /** Whether the button shows: for [SKIP_SHOWN_MS] after it appeared, then only with the [controls], until the segment ends. */
 fun skipShown(shown: SkipShown, now: Long, controls: Boolean): Boolean =
     shown.button != null && (controls || now - shown.since < SKIP_SHOWN_MS)

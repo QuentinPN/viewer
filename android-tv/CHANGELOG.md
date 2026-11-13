@@ -2,6 +2,11 @@
 
 Chaque version livrée sur la Shield augmente `versionName` et `versionCode` dans `app/build.gradle.kts` et ajoute sa section ici.
 
+## 1.0.2 — 2026-11-13
+
+- Correctif : après une avance ou un recul (◀ ▶) pendant l'intro ou le générique, OK met en lecture ou en pause au lieu de « Passer l'intro ». Le bouton reste visible sans le focus ; il le reprend quand les commandes disparaissent (ADR 0108).
+- Lecture en réseau : mémoire tampon plus grande (150 Mo) et quelques secondes chargées avant de démarrer et après une coupure, pour une seule courte attente au lieu de micro-coupures répétées sur un Wi-Fi juste (ADR 0108).
+
 ## 1.0.1 — 2026-11-11
 
 - Correctif : avec une télécommande qui passe par la TV (HDMI-CEC, comme la LG Magic Remote), l'appui long qui ouvre le menu d'une carte ne lance plus la lecture quand on descend ensuite dans le menu.

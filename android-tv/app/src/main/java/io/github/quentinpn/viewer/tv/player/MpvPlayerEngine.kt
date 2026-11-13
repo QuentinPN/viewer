@@ -264,6 +264,9 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
 
         const val RELEASE_WAIT_MS = 2_000L
 
+        // Seconds of stream mpv buffers before playing on after an underrun (default 1)
+        const val CACHE_PAUSE_WAIT_SECONDS = 4
+
         // Same hardening as Windows (ADR 0002, 0025); render/decode settings from mpv-android.
         val OPTIONS = listOf(
             "config" to "no",
@@ -287,9 +290,15 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
             "audio-pitch-correction" to "yes",
             // French subtitles when neither the track menu (ADR 0042) nor the server (ADR 0055) picks one
             "slang" to "fr,fre,fra",
-            // The Shield has 3 GB of RAM: a bounded demuxer cache
-            "demuxer-max-bytes" to "${64 * 1024 * 1024}",
+            // The Shield has 3 GB of RAM: a bounded demuxer cache, mpv's own default ahead (ADR 0108).
+            // 64 MiB held 8 s of a 60 Mb/s file: too little over Wi-Fi
+            "demuxer-max-bytes" to "${150 * 1024 * 1024}",
             "demuxer-max-back-bytes" to "${32 * 1024 * 1024}",
+            "cache" to "yes",
+            // A few seconds buffered before the first frame and after each underrun: one
+            // short wait instead of a cut every second while the network barely keeps up
+            "cache-pause-initial" to "yes",
+            "cache-pause-wait" to "$CACHE_PAUSE_WAIT_SECONDS",
         )
     }
 }

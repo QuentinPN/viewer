@@ -143,4 +143,17 @@ class SkipTest {
         assertFalse(at(45.0, 12_000))
         assertTrue("back into the intro", at(50.0, 17_000))
     }
+
+    @Test
+    fun okAfterASeekPlaysOrPausesInsteadOfSkipping() {
+        // Shown during plain playback: armed, OK skips
+        assertTrue(SkipArm.appeared(controls = false))
+        assertEquals(SkipOk.Skip, SkipArm.onOk(visible = true, armed = true))
+        // Entered by ◀ ▶, the controls up: OK plays or pauses
+        assertFalse(SkipArm.appeared(controls = true))
+        assertEquals(SkipOk.PlayPause, SkipArm.onOk(visible = true, armed = false))
+        // Hidden after its 10 s: OK only brings it back (ADR 0089)
+        assertEquals(SkipOk.Reveal, SkipArm.onOk(visible = false, armed = false))
+        assertEquals(SkipOk.Reveal, SkipArm.onOk(visible = false, armed = true))
+    }
 }

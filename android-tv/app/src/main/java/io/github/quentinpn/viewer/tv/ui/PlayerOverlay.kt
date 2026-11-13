@@ -52,6 +52,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
@@ -145,6 +146,9 @@ class PlayerUi {
     /** [skip] is on screen; read again at each position, through [now]. */
     val skipVisible get() = skip != null && skipShown(skipSince, now, controls || paused)
 
+    /** OK presses [skip] and it holds the focus; off after a ◀ ▶ seek until the controls fade (ADR 0108). */
+    var skipArmed by mutableStateOf(true)
+
     /** Chapters of the item, none with fewer than two (ADR 0057). */
     var chapters by mutableStateOf<List<Chapter>>(emptyList())
 
@@ -214,6 +218,7 @@ class PlayerUi {
 
     fun hide() {
         controls = false
+        skipArmed = true
     }
 
     /** Before another file: nothing of the previous one stays on screen. */
@@ -227,6 +232,7 @@ class PlayerUi {
         upNext = null
         skip = null
         skipSince = SkipShown()
+        skipArmed = true
         chapters = emptyList()
         chapterMenu = false
         info = null
@@ -250,7 +256,7 @@ class PlayerUi {
         LaunchedEffect(shown, paused, menuOpen) {
             if (controls && !paused && !menuOpen) {
                 delay(HIDE_AFTER_MS)
-                controls = false
+                hide()
             }
         }
         LaunchedEffect(seeks) {
@@ -317,7 +323,8 @@ fun PlayerOverlay(
         if (skip != null && upNext == null && ui.status == null && ui.skipVisible) {
             // Above the text of the controls while they show; stays 10 s when they fade (ADR 0089).
             // Gone while focused, the focus goes back to the player: OK then shows it again
-            SkipButton(skip, !ui.menuOpen, onSkip, Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
+            // Disarmed after a seek: shown without the focus, OK plays or pauses (ADR 0108)
+            SkipButton(skip, !ui.menuOpen && ui.skipArmed, !ui.menuOpen, onSkip,Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
         }
         ui.tracks?.let {
             TrackMenu(it, MenuState(ui.delays, ui.speed, ui.fit, ui.night, ui.sleep.choice, ui.item, ui.quality), MenuActions(onSelect, onDelay, onSpeed, onFit, onNight, onSleep, onInfo, onQualityStep, onQualityApply), Modifier.align(Alignment.CenterEnd))
@@ -327,14 +334,14 @@ fun PlayerOverlay(
     }
 }
 
-/** Focused when it appears or a menu closes, never while a menu is open. */
+/** Focused when it appears or a menu closes while armed, never while a menu is open; unfocused once disarmed ([release]). */
 @Composable
-private fun SkipButton(skip: SkipPrompt.Button, focus: Boolean, onSkip: () -> Unit, modifier: Modifier) {
+private fun SkipButton(skip: SkipPrompt.Button, focus: Boolean, release: Boolean, onSkip: () -> Unit, modifier: Modifier) {
     val requester = remember { FocusRequester() }
-    LaunchedEffect(skip.label, focus) {
-        if (!focus) return@LaunchedEffect
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(skip.label, focus, release) {
         withFrameNanos {}
-        runCatching { requester.requestFocus() }
+        if (focus) runCatching { requester.requestFocus() } else if (release) focusManager.clearFocus()
     }
     Button(onClick = onSkip, modifier = modifier.focusRequester(requester)) { Text(skip.label) }
 }

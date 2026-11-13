@@ -55,6 +55,8 @@ import io.github.quentinpn.viewer.tv.player.SeekThumbnails
 import io.github.quentinpn.viewer.tv.player.SkipPlan
 import io.github.quentinpn.viewer.tv.player.SLEEP_NOTICE
 import io.github.quentinpn.viewer.tv.player.SkipPrompt
+import io.github.quentinpn.viewer.tv.player.SkipArm
+import io.github.quentinpn.viewer.tv.player.SkipOk
 import io.github.quentinpn.viewer.tv.player.trackSkipShown
 import io.github.quentinpn.viewer.tv.player.SleepChange
 import io.github.quentinpn.viewer.tv.player.SleepChoice
@@ -734,7 +736,10 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             }
         }
         ui.skip = prompt as? SkipPrompt.Button
-        ui.skipSince = trackSkipShown(ui.skipSince, ui.skip, System.currentTimeMillis())
+        val since = trackSkipShown(ui.skipSince, ui.skip, System.currentTimeMillis())
+        // Entered by a seek (◀ back into the intro): no focus, OK keeps playing or pausing (ADR 0108)
+        if (since !== ui.skipSince && since.button != null) ui.skipArmed = SkipArm.appeared(ui.controls)
+        ui.skipSince = since
     }
 
     /** Seeks past the segment; past the end of the file, mpv ends it as a natural end. */
@@ -783,8 +788,17 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         // OK presses the skip button while it shows; play / pause keys still pause.
         // Once it hid (ADR 0089), OK only brings it back with the controls
         val ok = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER
-        if (ok && ui.skip != null) {
-            if (event.action == KeyEvent.ACTION_DOWN) if (ui.skipVisible) skip() else ui.show()
+        // After a ◀ ▶ seek the button is disarmed: OK plays or pauses (ADR 0108)
+        val okDoes = if (ok && ui.skip != null) SkipArm.onOk(ui.skipVisible, ui.skipArmed) else SkipOk.PlayPause
+        if (okDoes != SkipOk.PlayPause) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (okDoes == SkipOk.Skip) {
+                    skip()
+                } else {
+                    ui.skipArmed = true
+                    ui.show()
+                }
+            }
             return true
         }
         val action = action(event) ?: return false
@@ -822,6 +836,8 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     private fun seek(player: PlayerEngine, seconds: Double) {
         player.seekBy(seconds)
+        // The OK that follows a seek plays or pauses, never skips (ADR 0108)
+        ui.skipArmed = false
         // Shown at once; mpv's next position replaces it
         val end = if (ui.duration > 0) ui.duration else Double.MAX_VALUE
         ui.position = (ui.position + seconds).coerceIn(0.0, end)
