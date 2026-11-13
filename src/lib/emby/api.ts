@@ -142,6 +142,23 @@ export const embyApi = {
       preferences: readPreferences(preferenceStorage()),
     }),
   /**
+   * Another bitrate cap for the playback in progress (ADR 0117), from `position`
+   * seconds; `null` is « Maximale ». Réglages is left as it is.
+   */
+  changeQuality: (
+    itemId: string,
+    mediaSourceId: string,
+    cap: number | null,
+    positionSeconds: number,
+  ) =>
+    invoke<PlaybackStart>("emby_change_quality", {
+      itemId,
+      mediaSourceId,
+      cap,
+      positionSeconds,
+      preferences: readPreferences(preferenceStorage()),
+    }),
+  /**
    * Intro and credits to offer skipping (ADR 0030). `external: false` asks the
    * Emby server only. Never fails for an unreachable external source.
    */

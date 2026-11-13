@@ -96,6 +96,9 @@ impl Report {
 #[derive(Debug, Default)]
 pub struct Tracker {
     phase: Phase,
+    /// Play session of a transcode replaced by a quality change, to stop on the
+    /// server once the new stream is loaded (ADR 0117).
+    ended_encoding: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -105,6 +108,9 @@ enum Phase {
     /// Announced, file not loaded yet: nothing is reported if loading fails.
     Pending(ActivePlayback),
     Playing(Playing),
+    /// A quality change (ADR 0117): the old stream plays on until the new one,
+    /// same item, is loaded. Neither stop nor start is reported.
+    Switching(Playing, ActivePlayback),
 }
 
 #[derive(Debug)]
@@ -161,7 +167,85 @@ impl Tracker {
         out
     }
 
+    /// A quality change of the item playing (ADR 0117): no stop, no new start; a
+    /// `QualityChange` progress with the new session once its file is loaded.
+    /// Anything else playing (or nothing) is a new playback, as `begin`.
+    pub fn switch(&mut self, playback: ActivePlayback, now: Instant) -> Vec<Report> {
+        match std::mem::take(&mut self.phase) {
+            Phase::Playing(old) | Phase::Switching(old, _)
+                if old.playback.item_id == playback.item_id =>
+            {
+                self.phase = Phase::Switching(old, playback);
+                Vec::new()
+            }
+            other => {
+                self.phase = other;
+                self.begin(playback, now)
+            }
+        }
+    }
+
+    /// The transcode a quality change replaced, once; see `ended_encoding`.
+    pub fn take_ended_encoding(&mut self) -> Option<String> {
+        self.ended_encoding.take()
+    }
+
+    /// Events while a quality change loads. `None`: the switch fell back to the
+    /// old playback, to be handled as usual.
+    fn on_switching(&mut self, event: &PlayerEvent, now: Instant) -> Option<Vec<Report>> {
+        let Phase::Switching(old, _) = &mut self.phase else {
+            return Some(Vec::new());
+        };
+        match event {
+            // The old file ends as the new one replaces it.
+            PlayerEvent::EndFile {
+                reason: EndReason::Stopped,
+                ..
+            } => Some(Vec::new()),
+            PlayerEvent::TimePos { seconds } => {
+                if let Some(t) = ticks(*seconds) {
+                    old.position_ticks = t;
+                }
+                Some(Vec::new())
+            }
+            PlayerEvent::FileLoaded => {
+                let Phase::Switching(old, new) = std::mem::take(&mut self.phase) else {
+                    return Some(Vec::new());
+                };
+                let replaced = &old.playback;
+                if replaced.method == PlayMethod::Transcode
+                    && replaced.play_session_id != new.play_session_id
+                {
+                    self.ended_encoding = replaced.play_session_id.clone();
+                }
+                let mut playing = Playing {
+                    position_ticks: new.start_ticks,
+                    playback: new,
+                    paused: false,
+                    last_sent: now,
+                    seeked: false,
+                };
+                let report = playing.report(ReportKind::Progress, Some("QualityChange"), now);
+                self.phase = Phase::Playing(playing);
+                Some(vec![report])
+            }
+            // The new stream failed or the player closed: the old playback ends.
+            PlayerEvent::EndFile { .. } | PlayerEvent::Shutdown => {
+                if let Phase::Switching(old, _) = std::mem::take(&mut self.phase) {
+                    self.phase = Phase::Playing(old);
+                }
+                None
+            }
+            _ => Some(Vec::new()),
+        }
+    }
+
     pub fn on_event(&mut self, event: &PlayerEvent, now: Instant) -> Vec<Report> {
+        if matches!(self.phase, Phase::Switching(..))
+            && let Some(reports) = self.on_switching(event, now)
+        {
+            return reports;
+        }
         if let Phase::Playing(p) = &self.phase {
             match event {
                 PlayerEvent::EndFile { reason, .. } => {
@@ -245,7 +329,7 @@ impl Tracker {
 
     fn stop(&mut self, failed: bool, now: Instant) -> Vec<Report> {
         match std::mem::take(&mut self.phase) {
-            Phase::Playing(mut p) => {
+            Phase::Playing(mut p) | Phase::Switching(mut p, _) => {
                 let mut report = p.report(ReportKind::Stopped, None, now);
                 report.body.failed = Some(failed);
                 vec![report]
@@ -308,6 +392,7 @@ fn is_transient(error: &EmbyError) -> bool {
 
 enum Message {
     Begin(ActivePlayback),
+    Switch(ActivePlayback),
     Player(PlayerEvent),
     Flush(std::sync::mpsc::Sender<()>),
     ResendStop(tokio::sync::oneshot::Sender<()>),
@@ -328,6 +413,11 @@ impl Reporter {
 
     pub fn begin(&self, playback: ActivePlayback) {
         let _ = self.tx.send(Message::Begin(playback));
+    }
+
+    /// A quality change of the playback in progress (ADR 0117).
+    pub fn switch(&self, playback: ActivePlayback) {
+        let _ = self.tx.send(Message::Switch(playback));
     }
 
     /// Forwards the events the tracker uses (track lists are left out).
@@ -374,6 +464,7 @@ async fn run(app: tauri::AppHandle, mut rx: tokio::sync::mpsc::UnboundedReceiver
                 lost = None;
                 tracker.begin(p, now)
             }
+            Some(Message::Switch(p)) => tracker.switch(p, now),
             Some(Message::Player(e)) => tracker.on_event(&e, now),
             // Earlier messages were fully handled: their reports are sent.
             Some(Message::Flush(ack)) => {
@@ -389,6 +480,12 @@ async fn run(app: tauri::AppHandle, mut rx: tokio::sync::mpsc::UnboundedReceiver
             None => Vec::new(),
         };
         reports.extend(tracker.tick(now));
+        if let Some(session) = tracker.take_ended_encoding() {
+            // Only once mpv reads the new stream; a failure is only logged.
+            if let Err(e) = app.state::<EmbyService>().stop_encoding(&session).await {
+                log::warn!("replaced transcode not stopped: {}", e.kind());
+            }
+        }
         for report in reports {
             // The stop of a playback replaced by a new one stays lost, same rule as Begin.
             if let Some(stop) = deliver(&app, report).await
@@ -716,5 +813,76 @@ mod tests {
         assert_eq!(stop[0].body.item_id, "30207");
         let start = t.on_event(&PlayerEvent::FileLoaded, t0);
         assert_eq!(start[0].body.item_id, "80475");
+    }
+
+    fn switched(method: PlayMethod, session: &str) -> ActivePlayback {
+        ActivePlayback {
+            play_session_id: Some(session.into()),
+            method,
+            start_ticks: 900_000_000,
+            ..playback()
+        }
+    }
+
+    #[test]
+    fn quality_switch_goes_on_with_a_quality_change_progress() {
+        let t0 = Instant::now();
+        let mut t = loaded(t0);
+        assert!(
+            t.switch(switched(PlayMethod::Transcode, "ps2"), t0)
+                .is_empty()
+        );
+        let old_end = PlayerEvent::EndFile {
+            reason: EndReason::Stopped,
+            error: None,
+        };
+        assert!(t.on_event(&old_end, t0).is_empty(), "no stop");
+        let reports = t.on_event(&PlayerEvent::FileLoaded, t0);
+        assert_eq!(
+            kinds(&reports),
+            vec![(ReportKind::Progress, Some("QualityChange"))]
+        );
+        assert_eq!(reports[0].body.play_session_id.as_deref(), Some("ps2"));
+        assert_eq!(reports[0].body.position_ticks, 900_000_000);
+        // The old stream was direct play: nothing to stop on the server.
+        assert_eq!(t.take_ended_encoding(), None);
+    }
+
+    #[test]
+    fn a_replaced_transcode_is_stopped_once() {
+        let t0 = Instant::now();
+        let mut t = loaded(t0);
+        t.switch(switched(PlayMethod::Transcode, "ps2"), t0);
+        t.on_event(&PlayerEvent::FileLoaded, t0);
+        t.switch(switched(PlayMethod::DirectPlay, "ps3"), t0);
+        t.on_event(&PlayerEvent::FileLoaded, t0);
+        assert_eq!(t.take_ended_encoding().as_deref(), Some("ps2"));
+        assert_eq!(t.take_ended_encoding(), None);
+    }
+
+    #[test]
+    fn a_failed_switch_stops_the_old_playback() {
+        let t0 = Instant::now();
+        let mut t = loaded(t0);
+        t.switch(switched(PlayMethod::Transcode, "ps2"), t0);
+        let failed = PlayerEvent::EndFile {
+            reason: EndReason::Error,
+            error: Some("x".into()),
+        };
+        let stop = t.on_event(&failed, t0);
+        assert_eq!(kinds(&stop), vec![(ReportKind::Stopped, None)]);
+        assert_eq!(stop[0].body.play_session_id.as_deref(), Some("ps1"));
+    }
+
+    #[test]
+    fn a_switch_to_another_item_is_a_new_playback() {
+        let t0 = Instant::now();
+        let mut t = loaded(t0);
+        let other = ActivePlayback {
+            item_id: "80475".into(),
+            ..playback()
+        };
+        let stop = t.switch(other, t0);
+        assert_eq!(kinds(&stop), vec![(ReportKind::Stopped, None)]);
     }
 }

@@ -669,6 +669,22 @@ impl EmbyClient {
         check(res, true).map(drop)
     }
 
+    /// Stops the server's encodings of one play session of this device (`DELETE
+    /// /Videos/ActiveEncodings?DeviceId=&PlaySessionId=`, ADR 0117).
+    pub async fn stop_active_encodings(&self, play_session_id: &str) -> Result<(), EmbyError> {
+        self.require_token()?;
+        let url = self.server.api("/Videos/ActiveEncodings");
+        let params = [
+            ("DeviceId", self.device.id.as_str()),
+            ("PlaySessionId", path_segment(play_session_id)?),
+        ];
+        let res = self
+            .request_url(Method::DELETE, &url, &params)
+            .send()
+            .await?;
+        check(res, true).map(drop)
+    }
+
     /// Adds or removes a favorite (`POST` / `DELETE /Users/{Id}/FavoriteItems/{Id}`);
     /// the server answers with the item's new user data.
     pub async fn set_favorite(

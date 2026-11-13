@@ -115,6 +115,27 @@ async function playNext(itemId: string): Promise<string | null> {
   }
 }
 
+/** Another quality for the playback in progress (ADR 0117); the player stays open. */
+async function changeQuality(
+  cap: number | null,
+  position: number,
+): Promise<string | null> {
+  if (!appActive || playing === null) return "La session n'est pas disponible.";
+  try {
+    playing = await embyApi.changeQuality(
+      playing.itemId,
+      playing.mediaSourceId,
+      cap,
+      position,
+    );
+    return null;
+  } catch (e) {
+    const error = toEmbyError(e);
+    void coordinator.report(error);
+    return error.message;
+  }
+}
+
 /**
  * The player could not open the direct source (ADR 0023): the same item again, with
  * direct play refused so the server transcodes. Like `playNext`, the player stays open.
@@ -249,6 +270,7 @@ async function signOut() {
         onInterrupted={playbackInterrupted}
         onPlayNext={playNext}
         onFallback={playTranscoded}
+        onChangeQuality={changeQuality}
       />
     {/if}
   {/if}

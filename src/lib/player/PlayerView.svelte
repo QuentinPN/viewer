@@ -45,6 +45,14 @@ import {
 } from "./format";
 import { mapPlayerKey } from "./keyboard";
 import {
+  canApply,
+  QUALITY_IDLE,
+  type QualityPhase,
+  qualityChoices,
+  qualityLabel,
+  qualityNote,
+} from "./quality";
+import {
   activeSegment,
   NO_SKIP_SHOWN,
   offersNextToo,
@@ -113,10 +121,55 @@ interface Props {
    * once the app shows it.
    */
   onFallback: (itemId: string, resume: boolean) => Promise<string | null>;
+  /**
+   * Another bitrate cap for this playback (ADR 0117), from `position` seconds;
+   * resolves with an error message, `null` once the app shows the new stream.
+   */
+  onChangeQuality: (
+    cap: number | null,
+    position: number,
+  ) => Promise<string | null>;
 }
 
-let { playback, onExit, onInterrupted, onPlayNext, onFallback }: Props =
-  $props();
+let {
+  playback,
+  onExit,
+  onInterrupted,
+  onPlayNext,
+  onFallback,
+  onChangeQuality,
+}: Props = $props();
+
+let qualityCaps = $state<(number | null)[]>([]);
+let pendingCap = $state<number | null>(null);
+let qualityPhase = $state<QualityPhase>(QUALITY_IDLE);
+/** A quality change is loading: the delays set are kept. */
+let switchingQuality = false;
+
+onMount(() => {
+  pendingCap = untrack(() => playback.bitrateCap);
+  embyApi
+    .playbackQuality()
+    .then((q) => {
+      qualityCaps = qualityChoices(q.choices);
+    })
+    .catch(() => {
+      qualityCaps = [];
+    });
+});
+
+async function applyQuality() {
+  if (!canApply(pendingCap, playback.bitrateCap, qualityPhase)) return;
+  qualityPhase = { kind: "applying" };
+  switchingQuality = true;
+  const failure = await onChangeQuality(pendingCap, position);
+  if (failure) {
+    switchingQuality = false;
+    qualityPhase = { kind: "failed", message: failure };
+  } else {
+    qualityPhase = QUALITY_IDLE;
+  }
+}
 
 /** Same margin as Rust's early end of file (`EARLY_EOF_TICKS`). */
 const EARLY_EOF_SECONDS = 30;
@@ -466,9 +519,11 @@ function applyVolume() {
 
 /** Speed and night mode are engine options: set again for each file. */
 async function applyModes() {
-  delays = { ...NO_DELAYS };
-  await run({ type: "setSubtitleDelay", seconds: 0 });
-  await run({ type: "setAudioDelay", seconds: 0 });
+  // A new item starts in sync; the same one at another quality keeps its delays.
+  if (!switchingQuality) delays = { ...NO_DELAYS };
+  switchingQuality = false;
+  await run({ type: "setSubtitleDelay", seconds: delays.subtitle });
+  await run({ type: "setAudioDelay", seconds: delays.audio });
   await run({ type: "setSpeed", speed });
   await run({ type: "setVideoFit", fit });
   await run({ type: "setNightMode", on: nightMode });
@@ -1026,6 +1081,31 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
                 </label>
               {/each}
             </fieldset>
+            {#if qualityCaps.length > 0}
+              <fieldset>
+                <legend>Qualité</legend>
+                {#each qualityCaps as cap (cap ?? "max")}
+                  <label class="choice">
+                    <input
+                      type="radio"
+                      name="quality"
+                      checked={pendingCap === cap}
+                      onchange={() => (pendingCap = cap)}
+                    />
+                    <span>{qualityLabel(cap)}</span>
+                  </label>
+                {/each}
+                <button
+                  type="button"
+                  class="apply"
+                  disabled={!canApply(pendingCap, playback.bitrateCap, qualityPhase)}
+                  onclick={() => void applyQuality()}
+                >Appliquer</button>
+                {#if qualityNote(qualityPhase)}
+                  <p class="muted" role="status">{qualityNote(qualityPhase)}</p>
+                {/if}
+              </fieldset>
+            {/if}
             <fieldset>
               <legend>Son</legend>
               <label class="choice">
@@ -1639,9 +1719,26 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     font-variant-numeric: tabular-nums;
     cursor: pointer;
   }
-  .stepper button:hover {
+  .stepper button:hover,
+  .apply:enabled:hover {
     background: var(--fill-glass-hover);
   }
+  .apply {
+    margin: var(--space-1) 10px 0;
+    height: 36px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--fill-glass);
+    color: var(--color-text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .apply:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .apply:focus-visible,
   .stepper button:focus-visible,
   .choice:has(input:focus-visible) {
     outline: 2px solid var(--color-accent);
