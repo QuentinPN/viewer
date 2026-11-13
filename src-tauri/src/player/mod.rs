@@ -191,6 +191,14 @@ pub enum PlayerCommand {
     SetVolume {
         percent: f64,
     },
+    /// Playback speed factor, held within 0.25–4 (ADR 0072).
+    SetSpeed {
+        speed: f64,
+    },
+    /// Night mode: a compressor in mpv's audio filter chain (ADR 0072).
+    SetNightMode {
+        on: bool,
+    },
     Stop,
 }
 
@@ -587,5 +595,11 @@ mod tests {
         let cmd: PlayerCommand =
             serde_json::from_str(r#"{"type":"seekAbsolute","seconds":12.5}"#).unwrap();
         assert_eq!(cmd, PlayerCommand::SeekAbsolute { seconds: 12.5 });
+        let cmd: PlayerCommand =
+            serde_json::from_str(r#"{"type":"setSpeed","speed":1.5}"#).unwrap();
+        assert_eq!(cmd, PlayerCommand::SetSpeed { speed: 1.5 });
+        let cmd: PlayerCommand =
+            serde_json::from_str(r#"{"type":"setNightMode","on":true}"#).unwrap();
+        assert_eq!(cmd, PlayerCommand::SetNightMode { on: true });
     }
 }

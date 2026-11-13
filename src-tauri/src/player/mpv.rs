@@ -401,6 +401,10 @@ impl PlayerEngine for MpvEngine {
             PlayerCommand::SetVolume { percent } => {
                 inner.set_property("volume", &finite(percent.clamp(0.0, 130.0))?.to_string())
             }
+            PlayerCommand::SetSpeed { speed } => {
+                inner.set_property("speed", &finite(speed.clamp(0.25, 4.0))?.to_string())
+            }
+            PlayerCommand::SetNightMode { on } => inner.set_property("af", night_filter(*on)),
             PlayerCommand::Stop => inner.command(&["stop"]),
         }
     }
@@ -479,6 +483,17 @@ fn finite(v: f64) -> Result<f64, PlayerError> {
     } else {
         Err(PlayerError::InvalidSource("valeur non finie".into()))
     }
+}
+
+/// Night mode (ADR 0072), as on the TV: FFmpeg's `acompressor` through mpv's
+/// `lavfi`, labelled `@night`. Peaks above about -24 dBFS are compressed 4:1,
+/// then a makeup gain of about +6 dB lifts speech; no look-ahead, so no latency.
+const NIGHT_FILTER: &str =
+    "@night:lavfi=[acompressor=threshold=0.063:ratio=4:attack=20:release=250:makeup=2]";
+
+/// The `af` value for night mode on or off: it is the chain's only filter.
+fn night_filter(on: bool) -> &'static str {
+    if on { NIGHT_FILTER } else { "" }
 }
 
 fn track_value(id: Option<i64>) -> String {
@@ -794,6 +809,12 @@ mod tests {
     use super::*;
     use std::sync::mpsc;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn night_filter_is_the_compressor_or_nothing() {
+        assert!(night_filter(true).contains("acompressor"));
+        assert_eq!(night_filter(false), "");
+    }
 
     #[test]
     fn parses_mpv_track_list_json() {

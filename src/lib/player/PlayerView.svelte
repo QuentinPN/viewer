@@ -16,6 +16,13 @@ import type {
 import { capInEffect } from "../settings/quality";
 import TitleBar from "../window/TitleBar.svelte";
 import { playerApi } from "./api";
+import {
+  formatSpeed,
+  readNightMode,
+  SPEEDS,
+  saveNightMode,
+  speedBadge,
+} from "./audiomodes";
 import ChaptersPanel from "./ChaptersPanel.svelte";
 import { chapterIndex, chapterMarks, chapterTarget } from "./chapters";
 import { endLabel, formatClock, untilNextMinute } from "./endtime";
@@ -95,7 +102,7 @@ const EARLY_EOF_SECONDS = 30;
 const HIDE_AFTER_MS = 3000;
 const SKIP_SECONDS = 10;
 
-type Panel = "audio" | "subs" | "info" | "chapters";
+type Panel = "audio" | "subs" | "info" | "chapters" | "options";
 
 let active = $state(false);
 /**
@@ -123,6 +130,9 @@ let now = $state(Date.now());
 let clockTimer: ReturnType<typeof setTimeout> | undefined;
 /** Playback speed in effect; 1 is « Normale ». */
 let speed = $state(1);
+/** Night mode, kept on this PC (ADR 0072). */
+let nightMode = $state(readNightMode(storage()));
+let optionsButton = $state<HTMLButtonElement | null>(null);
 
 let audioButton = $state<HTMLButtonElement | null>(null);
 let subsButton = $state<HTMLButtonElement | null>(null);
@@ -190,6 +200,7 @@ const progress = $derived(
 );
 const shownVolume = $derived(effectiveVolume(volume));
 const clock = $derived(formatClock(now));
+const badge = $derived(speedBadge(speed));
 const endsLabel = $derived(endLabel(now, position, duration, speed));
 const chromeVisible = $derived(
   !active ||
@@ -316,6 +327,7 @@ function onEvent(ev: PlayerEvent) {
       active = true;
       error = null;
       void applyVolume();
+      void applyModes();
       wake();
       break;
     case "timePos":
@@ -380,6 +392,7 @@ onMount(async () => {
     if (diag.container != null) active = true;
     tracks = await playerApi.tracks();
     await applyVolume();
+    await applyModes();
   } catch {
     // Not started yet: `fileLoaded` will come.
   }
@@ -412,6 +425,23 @@ async function run(command: PlayerCommand) {
 
 function applyVolume() {
   return run({ type: "setVolume", percent: effectiveVolume(volume) });
+}
+
+/** Speed and night mode are engine options: set again for each file. */
+async function applyModes() {
+  await run({ type: "setSpeed", speed });
+  await run({ type: "setNightMode", on: nightMode });
+}
+
+function changeSpeed(next: number) {
+  speed = next;
+  if (active) void run({ type: "setSpeed", speed: next });
+}
+
+function changeNightMode(on: boolean) {
+  nightMode = on;
+  saveNightMode(storage(), on);
+  if (active) void run({ type: "setNightMode", on });
 }
 
 function changeVolume(next: VolumeSetting) {
@@ -514,7 +544,9 @@ function toggleButton(which: Panel) {
       ? subsButton
       : which === "chapters"
         ? chaptersButton
-        : infoButton;
+        : which === "options"
+          ? optionsButton
+          : infoButton;
 }
 
 async function openPanel(which: Panel) {
@@ -558,6 +590,9 @@ function onKeydown(e: KeyboardEvent) {
   // In a panel, Space picks a track and the arrows move between tracks.
   const inRadio = target instanceof HTMLInputElement && target.type === "radio";
   if (inRadio && (e.key === " " || e.key.startsWith("Arrow"))) return;
+  const inCheckbox =
+    target instanceof HTMLInputElement && target.type === "checkbox";
+  if (inCheckbox && e.key === " ") return;
   const inTextField =
     target instanceof HTMLInputElement && target.type === "text";
   // Enter skips while the button shows, whatever control has the focus. Once
@@ -666,6 +701,10 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     {:else if name === "chapters"}
       <path d="M9 6.5h11M9 12h11M9 17.5h11" />
       <path d="M4.5 6.5h.2M4.5 12h.2M4.5 17.5h.2" />
+    {:else if name === "options"}
+      <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+      <circle cx="16" cy="7" r="2" />
+      <circle cx="10" cy="17" r="2" />
     {:else if name === "info"}
       <circle cx="12" cy="12" r="8.5" />
       <path d="M12 11v5.5M12 7.6v.2" />
@@ -791,7 +830,9 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
               ? "Sous-titres"
               : panel === "chapters"
                 ? "Chapitres"
-                : "Informations de lecture"}
+                : panel === "options"
+                  ? "Options de lecture"
+                  : "Informations de lecture"}
           bind:this={panelElement}
         >
           {#if panel === "audio"}
@@ -834,6 +875,35 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
                   <span>{trackLabel(t)}</span>
                 </label>
               {/each}
+            </fieldset>
+          {:else if panel === "options"}
+            <fieldset>
+              <legend>Vitesse</legend>
+              {#each SPEEDS as s (s)}
+                <label class="choice">
+                  <input
+                    type="radio"
+                    name="speed"
+                    checked={speed === s}
+                    onchange={() => changeSpeed(s)}
+                  />
+                  <span>{formatSpeed(s)}</span>
+                </label>
+              {/each}
+            </fieldset>
+            <fieldset>
+              <legend>Son</legend>
+              <label class="choice">
+                <input
+                  type="checkbox"
+                  checked={nightMode}
+                  onchange={(e) => changeNightMode(e.currentTarget.checked)}
+                />
+                <span class="stacked">
+                  Mode nuit
+                  <small>Réduit l'écart entre dialogues et explosions</small>
+                </span>
+              </label>
             </fieldset>
           {:else if panel === "chapters"}
             <ChaptersPanel {chapters} current={chapterNow} onSelect={goToChapter} />
@@ -894,6 +964,7 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
           <span class="time">{formatTime(position)}</span>
           {#if chapterName}<span class="chapter-name">{chapterName}</span>{/if}
           <span class="end-times">
+            {#if badge}<span class="time ends" title="Vitesse de lecture">{badge}</span>{/if}
             {#if endsLabel}<span class="time ends">{endsLabel}</span>{/if}
             <span class="time" title="Temps restant">{formatRemaining(position, duration)}</span>
           </span>
@@ -995,6 +1066,18 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
             onclick={() => openPanel("subs")}
           >
             {@render icon("subs")}
+          </button>
+          <button
+            type="button"
+            class="round"
+            class:on={panel === "options"}
+            aria-label="Options de lecture"
+            aria-expanded={panel === "options"}
+            title="Options de lecture"
+            bind:this={optionsButton}
+            onclick={() => openPanel("options")}
+          >
+            {@render icon("options")}
           </button>
           <button
             type="button"
@@ -1398,6 +1481,17 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   }
   .choice:has(input:checked) {
     background: rgb(235 235 245 / 14%);
+  }
+  .stacked {
+    display: grid;
+    padding: var(--space-1) 0;
+  }
+  .stacked small {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+  fieldset + fieldset {
+    margin-top: var(--space-3);
   }
   .choice input {
     accent-color: var(--color-accent);
