@@ -4,7 +4,8 @@
 // of each library open their detail page. Rows load in parallel; every row is read
 // again in place after a playback (played marks, episode counts), "Favoris" also
 // after every favorite change. A "Reprendre" card can be taken out of the row, or
-// marked played (ADR 0096), from its menu (ADR 0100).
+// marked played (ADR 0096), from its menu (ADR 0100). Every row is also read again
+// in place after 5 min shown, or 30 s away from the app, so new titles show (ADR 0109).
 import { onMount, tick, untrack } from "svelte";
 import { patchPlayed, restoreItem, withoutItem } from "../detail/watched";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
@@ -18,6 +19,12 @@ import type {
   WatchItem,
 } from "../emby/types";
 import PosterCard from "../library/PosterCard.svelte";
+import {
+  HOME_CHECK_MS,
+  HOME_STALE_MS,
+  HOME_STALE_ON_RETURN_MS,
+  isStale,
+} from "./autoRefresh";
 import { watchTitle, withoutDuplicates } from "./format";
 import Hero from "./Hero.svelte";
 import Row from "./Row.svelte";
@@ -76,6 +83,8 @@ let resumeList = $state<HTMLElement | null>(null);
 let watchGeneration = 0;
 let favoritesGeneration = 0;
 const latestGeneration: Record<string, number> = {};
+/** When every row was last asked for (ADR 0109). */
+let loadedAt = Date.now();
 
 const nextUpShown = $derived(
   nextUp.items ? withoutDuplicates(nextUp.items, inProgress.items ?? []) : null,
@@ -146,6 +155,7 @@ function loadLatest(library: Library, inPlace = false) {
 
 /** Played state and episode counts changed: every row showing them is read again. */
 function afterPlayback() {
+  loadedAt = Date.now();
   loadWatchRows();
   loadFavorites();
   for (const library of libraries) loadLatest(library, true);
@@ -247,12 +257,29 @@ $effect(() => {
   untrack(loadFavorites);
 });
 
+/** New titles on the server: rows read again in place while the app is shown (ADR 0109). */
+function reloadIfStale(after: number) {
+  if (document.visibilityState !== "visible") return;
+  if (isStale(loadedAt, Date.now(), after)) afterPlayback();
+}
+
+function onReturn() {
+  reloadIfStale(HOME_STALE_ON_RETURN_MS);
+}
+
 onMount(() => {
+  loadedAt = Date.now();
   loadWatchRows();
   loadFavorites();
   for (const library of libraries) loadLatest(library);
   const unlisten = embyApi.onPlaybackStopped(onStopped);
+  const timer = setInterval(() => reloadIfStale(HOME_STALE_MS), HOME_CHECK_MS);
+  window.addEventListener("focus", onReturn);
+  document.addEventListener("visibilitychange", onReturn);
   return () => {
+    clearInterval(timer);
+    window.removeEventListener("focus", onReturn);
+    document.removeEventListener("visibilitychange", onReturn);
     void unlisten.then((stop) => stop());
   };
 });

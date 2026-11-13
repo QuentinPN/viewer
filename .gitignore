@@ -34,3 +34,6 @@ artifacts/
 .DS_Store
 Thumbs.db
 .idea/
+
+# Local demo-account credentials for testing (never committed)
+debug.env

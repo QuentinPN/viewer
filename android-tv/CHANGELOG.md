@@ -2,6 +2,10 @@
 
 Chaque version livrée sur la Shield augmente `versionName` et `versionCode` dans `app/build.gradle.kts` et ajoute sa section ici.
 
+## 1.0.3 — 2026-11-13
+
+- L'accueil se met à jour tout seul : un film ou une série ajouté sur le serveur apparaît dans « Ajoutés récemment » au plus 5 min après, ou au retour dans l'app depuis l'écran d'accueil de la TV, sans la relancer. Le focus reste sur la même carte (ADR 0109).
+
 ## 1.0.2 — 2026-11-13
 
 - Correctif : après une avance ou un recul (◀ ▶) pendant l'intro ou le générique, OK met en lecture ou en pause au lieu de « Passer l'intro ». Le bouton reste visible sans le focus ; il le reprend quand les commandes disparaissent (ADR 0108).

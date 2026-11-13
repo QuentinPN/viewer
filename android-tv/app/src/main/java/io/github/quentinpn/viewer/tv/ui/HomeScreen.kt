@@ -1,5 +1,6 @@
 package io.github.quentinpn.viewer.tv.ui
 
+import android.os.SystemClock
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +40,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.tv.material3.Border
 import androidx.tv.material3.Button
 import androidx.tv.material3.Card
@@ -58,6 +62,7 @@ import io.github.quentinpn.viewer.tv.emby.homeHero
 import io.github.quentinpn.viewer.tv.emby.nextUpRow
 import io.github.quentinpn.viewer.tv.emby.withoutDuplicates
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -126,6 +131,9 @@ class HomeMemory {
 
     /** The [changes] value the shelves were loaded for. */
     internal var loadedChanges = 0
+
+    /** `elapsedRealtime` of the last shelves read (ADR 0109); 0 before the first. */
+    internal var loadedAt = 0L
 
     /** A page wrote the user's data: the shelves are read again, in place, when the home shows. */
     fun userDataChanged() {
@@ -197,9 +205,27 @@ fun HomeScreen(
         }
         // A refresh that fails keeps the shelves on screen, without their new state
         if (!shown || next is HomeState.Ready) memory.state = next
+        if (next is HomeState.Ready) memory.loadedAt = SystemClock.elapsedRealtime()
         memory.loadedFor = refresh
         memory.loadedRows = rows
         memory.loadedChanges = changes
+    }
+
+    // New titles on the server (ADR 0109): while the app is in front, shelves 5 min old are read
+    // again in place; back from the launcher, after 30 s. The focused card is kept by id.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(lifecycle, memory) {
+        var returning = false
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            if (returning && homeIsStale(memory.loadedAt, SystemClock.elapsedRealtime(), HOME_STALE_ON_RETURN_MS)) {
+                memory.userDataChanged()
+            }
+            returning = true
+            while (true) {
+                delay(HOME_CHECK_MS)
+                if (homeIsStale(memory.loadedAt, SystemClock.elapsedRealtime(), HOME_STALE_MS)) memory.userDataChanged()
+            }
+        }
     }
 
     // A card's menu (ADR 0097): the answer updates the shelves at once, then they are read again.

@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.1.1 — 2026-11-13
+
+- L'accueil se met à jour tout seul : un film ou une série ajouté sur le serveur apparaît dans « Ajoutés récemment » au plus 5 min après, ou dès le retour dans l'app, sans la relancer (ADR 0109).
+
 ## 1.1.0 — 2026-11-11
 
 - Écran de pré-connexion « L'étagère » : une vignette par serveur et compte enregistrés, reconnexion sans mot de passe tant que la session est valide, « Gérer » pour oublier un serveur, connexion manuelle (ADR 0103).
