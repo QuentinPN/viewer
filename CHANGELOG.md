@@ -5,6 +5,11 @@
 - Réglages › Mises à jour : version installée et bouton « Rechercher des mises à jour ». La nouvelle version est téléchargée et vérifiée, puis « Redémarrer maintenant » l'installe. Hors du réseau de la maison, le message le dit (ADR 0112).
 - Réglages › Accueil : choisis l'ordre des rangées de l'accueil (glisser-déposer ou « Monter / Descendre ») et masque celles que tu ne veux pas ; une rangée masquée n'est plus demandée au serveur (ADR 0113).
 - Accueil : le bandeau ressemble à celui de la TV. Plus d'étiquette « Reprendre » au-dessus du titre ; le bouton dit « Reprendre à 12:34 » et « Reste 22 min » s'affiche à côté de la barre de progression.
+- Réglages › À propos et Serveur, comme sur la TV : version de l'app, de libmpv et de Windows, nom et version du serveur Emby, adresse et chiffrement de la connexion (ADR 0116).
+- Réglages › Capacités de lecture : ce que ce PC sait décoder en matériel (HEVC, AV1, HDR…) d'après sa carte graphique (ADR 0116).
+- Langues audio et sous-titres : par défaut, celles de ton compte Emby ; un réglage local les remplace sur ce PC seulement (ADR 0115).
+- Lecteur : heure et « Fin à 22:47 » dans les commandes ; dans « Options de lecture », vitesse, mode nuit (compression du volume), synchronisation des sous-titres et de l'audio (Z / X pour les sous-titres), format de l'image (original, remplir, étirer) et minuterie de mise en veille, dont « Fin de l'épisode ».
+- Lecteur : change la qualité pendant la lecture ; la vidéo reprend au même endroit (ADR 0117).
 
 ## 1.2.0 — 2026-11-13
 
