@@ -23,4 +23,9 @@ Deux retours du propriétaire sur la Shield (2026-11-12) :
 
 ## Vérification
 - `testDebugUnitTest` (`SkipTest`, 1 nouveau cas, 15/15), `assembleDebug`, `lintDebug` : réussis.
-- **Non vérifié sur la Shield** : séquence ◀ ◀ OK dans l'intro, OK pendant les 10 s d'apparition, comportement du tampon sur le même épisode en Wi-Fi.
+- **Sur la Shield (2026-11-13, build debug 1.0.2, Overgeared S1É7, lecture directe 1080p H.264, intro 40–128 s)** :
+  - 16 × ◀ depuis 4:22 jusqu'à 1:58 : « Passer l'intro » affiché sans le focus ; OK met en pause, aucun `skip` dans les journaux.
+  - Intro atteinte en lecture normale : bouton focalisé ; OK dans ses 10 s → `skip to 128.0`.
+  - OK après les 10 s : le bouton revient focalisé avec les commandes, sans pause (ADR 0089 inchangé).
+  - Tampon : 140 à 146 s d'avance pour un débit mesuré de 4 à 10 Mb/s, aucune image perdue.
+- **Réseau mesuré** : Shield en Wi-Fi 2,4 GHz (canal 11, lien 78 Mb/s, RSSI −48 dBm). 20 pings vers le serveur : 3 à 143 ms (moyenne 42 ms), sans perte. Les coupures de la veille n'ont pas été reproduites ; leur cause reste le débit Wi-Fi.
