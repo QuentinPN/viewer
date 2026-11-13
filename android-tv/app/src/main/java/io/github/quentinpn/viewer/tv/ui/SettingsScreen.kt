@@ -28,6 +28,17 @@ import androidx.tv.material3.Text
 import coil3.ImageLoader
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyException
+import io.github.quentinpn.viewer.tv.AppServices
+import io.github.quentinpn.viewer.tv.player.AccountTracks
+import io.github.quentinpn.viewer.tv.player.LANGUAGE_CHOICES
+import io.github.quentinpn.viewer.tv.player.LanguageOverrides
+import io.github.quentinpn.viewer.tv.player.SUBTITLE_MODE_CHOICES
+import io.github.quentinpn.viewer.tv.player.TrackPreferenceStore
+import io.github.quentinpn.viewer.tv.player.TrackType
+import io.github.quentinpn.viewer.tv.player.accountLabel
+import io.github.quentinpn.viewer.tv.player.languageLabel
+import io.github.quentinpn.viewer.tv.player.nextOverride
+import io.github.quentinpn.viewer.tv.player.subtitleModeLabel
 import io.github.quentinpn.viewer.tv.settings.CacheClearing
 import io.github.quentinpn.viewer.tv.settings.DeviceReport
 import io.github.quentinpn.viewer.tv.settings.ImageCacheUsage
@@ -108,6 +119,15 @@ fun SettingsScreen(
         store.save(next)
     }
     fun change(next: SubtitleStyle) = change(settings.copy(subtitles = next))
+    // What the Emby account says, shown next to « Comme le compte Emby » (ADR 0120)
+    val account by produceState<AccountTracks?>(null, client, userId) { value = AppServices.accountTracks(client, userId) }
+    val trackMemory = remember(userId) { TrackPreferenceStore(context, userId) }
+    val languages = settings.languages
+    fun changeLanguages(type: TrackType, next: LanguageOverrides) {
+        // The pick remembered from the player would hide the new choice: it is forgotten
+        trackMemory.clear(type)
+        change(settings.copy(languages = next))
+    }
     val style = settings.subtitles
     LaunchedEffect(Unit) {
         withFrameNanos {}
@@ -171,6 +191,34 @@ fun SettingsScreen(
                 onOff(settings.nightMode),
             ) { change(settings.copy(nightMode = !settings.nightMode)) }
         }
+
+        item { Section("Langues") }
+        item {
+            Note(
+                "Par défaut, l'app suit les préférences de ton compte Emby. Un choix fait ici ne vaut que sur cet " +
+                    "appareil et passe avant celles du compte. OK passe à la valeur suivante.",
+            )
+        }
+        item {
+            Choice("Langue audio", null, languages.audioLanguage?.let(::languageLabel) ?: accountLabel(account?.audioLanguages?.map(::languageLabel))) {
+                changeLanguages(TrackType.Audio, languages.copy(audioLanguage = nextOverride(languages.audioLanguage, LANGUAGE_CHOICES)))
+            }
+        }
+        item {
+            Choice(
+                "Mode des sous-titres",
+                "« Intelligent » : sous-titres quand l'audio n'est pas dans ta langue, sinon les forcés seulement.",
+                languages.subtitleMode?.let(::subtitleModeLabel) ?: accountLabel(account?.let { listOfNotNull(it.subtitleMode?.let(::subtitleModeLabel)) }),
+            ) {
+                changeLanguages(TrackType.Subtitle, languages.copy(subtitleMode = nextOverride(languages.subtitleMode, SUBTITLE_MODE_CHOICES)))
+            }
+        }
+        item {
+            Choice("Langue des sous-titres", null, languages.subtitleLanguage?.let(::languageLabel) ?: accountLabel(account?.subtitleLanguages?.map(::languageLabel))) {
+                changeLanguages(TrackType.Subtitle, languages.copy(subtitleLanguage = nextOverride(languages.subtitleLanguage, LANGUAGE_CHOICES)))
+            }
+        }
+        item { Note("Une piste choisie pendant la lecture reste prioritaire, jusqu'à ce que tu changes le réglage correspondant ici.") }
 
         item { Section("Sous-titres") }
         item {
