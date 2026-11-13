@@ -134,7 +134,8 @@ internal fun subtitleLabel(stream: SourceStreamDto): String = listOfNotNull(
 internal fun TechInfoButton(source: MediaSourceDto?, versionName: String?) {
     source ?: return
     var open by remember { mutableStateOf(false) }
-    OutlinedButton(onClick = { open = true }) { Text("Informations techniques") }
+    // Short label: « Informations techniques » wrapped on two lines beside the other actions (Shield, 1.2.0)
+    OutlinedButton(onClick = { open = true }) { Text("Infos techniques", maxLines = 1, softWrap = false) }
     if (open) TechInfoPanel(source, versionName) { open = false }
 }
 

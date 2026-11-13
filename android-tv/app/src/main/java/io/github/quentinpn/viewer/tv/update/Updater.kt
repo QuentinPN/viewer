@@ -55,6 +55,10 @@ internal fun checkFailure(e: Exception): String = when (e) {
     else -> "Serveur de mises à jour injoignable. Il ne répond que sur le réseau de la maison."
 }
 
+/** French message for a manifest answer that is not 2xx; 404 means nothing published on this channel yet. */
+internal fun manifestHttpMessage(code: Int): String =
+    if (code == 404) "Aucune version publiée pour l'instant." else "Le serveur de mises à jour a répondu une erreur (HTTP $code)."
+
 /** A manifest or APK that cannot be used; its message is French and shown as is. */
 internal class ManifestException(message: String) : IOException(message)
 
@@ -165,7 +169,7 @@ object Updater {
         http.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 Log.i(TAG, "manifeste indisponible (HTTP ${response.code})")
-                throw ManifestException("Le serveur de mises à jour a répondu une erreur (HTTP ${response.code}).")
+                throw ManifestException(manifestHttpMessage(response.code))
             }
             return parseManifest(response.body.string())
                 ?: throw ManifestException("Le manifeste de mise à jour est illisible.").also { Log.w(TAG, "manifeste illisible") }

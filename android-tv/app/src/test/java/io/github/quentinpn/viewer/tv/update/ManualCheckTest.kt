@@ -28,5 +28,7 @@ class ManualCheckTest {
         assertEquals(checkFailure(IOException()), checkFailure(UnknownHostException()))
         assertEquals("Le manifeste de mise à jour est illisible.", checkFailure(ManifestException("Le manifeste de mise à jour est illisible.")))
         assertEquals("Android a refusé la vérification.", checkFailure(SecurityException()))
+        assertEquals("Aucune version publiée pour l'instant.", manifestHttpMessage(404))
+        assertEquals("Le serveur de mises à jour a répondu une erreur (HTTP 500).", manifestHttpMessage(500))
     }
 }
