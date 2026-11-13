@@ -20,9 +20,10 @@ use super::models::{
     BaseItemDto, CastMember, DetailKind, Episode, EpisodeContext, EpisodeLink, EpisodePage,
     HeroEpisode, HeroItem, HeroReason, ImageRef, ItemDetail, ItemPage, ItemsOptions, Library,
     LibraryKind, MediaInfo, MediaItem, MediaSourceDto, MediaStreamDto, PlayMethod, PlaybackStopped,
-    PlaybackTitle, Playlist, PlaylistCreated, ResumePoint, SavedServer, SearchResults, Season,
-    ServerSummary, SessionStatus, ShelfAccess, ShelfServer, SignedInUser, SortNameEntry,
-    StreamInfo, UserItemData, VideoInfo, WatchItem, WatchKind, is_usable_decade, is_usable_genre,
+    PlaybackTitle, Playlist, PlaylistCard, PlaylistCreated, ResumePoint, SavedServer,
+    SearchResults, Season, ServerSummary, SessionStatus, ShelfAccess, ShelfServer, SignedInUser,
+    SortNameEntry, StreamInfo, UserItemData, VideoInfo, WatchItem, WatchKind, is_usable_decade,
+    is_usable_genre,
 };
 use super::playback::{self, PlaybackPlan};
 use super::quality::{BITRATE_CHOICES, PlaybackQuality, QualityCaps, QualityStore, StreamingLimit};
@@ -167,6 +168,10 @@ const IMAGE_CONCURRENCY: usize = 6;
 pub const MAX_SAVED: usize = 8;
 /// Playlists the card menu offers (ADR 0100).
 const PLAYLISTS_MAX: u32 = 200;
+/// Playlists on the home row (ADR 0122): more would make a row nobody scrolls through.
+const HOME_PLAYLISTS: u32 = 50;
+/// Entries read for one playlist: one request, no paging (ADR 0122).
+const PLAYLIST_ITEMS_MAX: u32 = 300;
 /// Longest playlist name accepted, in characters.
 pub const PLAYLIST_NAME_MAX: usize = 200;
 
@@ -908,6 +913,33 @@ impl EmbyService {
                 id: p.id,
             })
             .collect())
+    }
+
+    /// Home row « Playlists » (ADR 0122): the user's video playlists, A → Z.
+    pub async fn home_playlists(&self) -> Result<Vec<PlaylistCard>, EmbyError> {
+        let (client, user_id) = self.session()?;
+        let scope = self.scope();
+        let page = self.expire_on_401(
+            &client,
+            client.home_playlists(&user_id, HOME_PLAYLISTS).await,
+        )?;
+        Ok(video_playlists(page.items, &scope))
+    }
+
+    /// Films and episodes of a playlist, in its order (ADR 0122).
+    pub async fn playlist_items(&self, playlist_id: &str) -> Result<Vec<WatchItem>, EmbyError> {
+        if !is_id(playlist_id) {
+            return Err(EmbyError::InvalidResponse("identifiant invalide".into()));
+        }
+        let (client, user_id) = self.session()?;
+        let scope = self.scope();
+        let page = self.expire_on_401(
+            &client,
+            client
+                .playlist_items(&user_id, playlist_id, PLAYLIST_ITEMS_MAX)
+                .await,
+        )?;
+        Ok(playlist_entries(page.items, &scope))
     }
 
     /// Appends a film or episode to one of the user's playlists (ADR 0100);
@@ -1833,6 +1865,50 @@ fn check_options(options: &ItemsOptions) -> Result<(), EmbyError> {
         return Err(EmbyError::InvalidResponse("décennie invalide".into()));
     }
     Ok(())
+}
+
+/// Video playlists, once each, in the server's order; one without `MediaType`
+/// is kept, audio ones are dropped (ADR 0122).
+fn video_playlists(items: Vec<BaseItemDto>, server: &str) -> Vec<PlaylistCard> {
+    let mut cards: Vec<PlaylistCard> = Vec::new();
+    for dto in items {
+        let video = dto.media_type.as_deref().is_none_or(|m| m == "Video");
+        if dto.item_type != "Playlist"
+            || !video
+            || !is_id(&dto.id)
+            || cards.iter().any(|c| c.id == dto.id)
+        {
+            continue;
+        }
+        cards.push(PlaylistCard {
+            poster: images::image_ref(
+                server,
+                &dto.id,
+                ImageType::Primary,
+                dto.image_tags.get("Primary").map(String::as_str),
+                images::POSTER_WIDTHS,
+            ),
+            aspect_ratio: dto
+                .primary_image_aspect_ratio
+                .filter(|r| r.is_finite() && *r > 0.0),
+            count: dto.child_count,
+            name: text(Some(dto.name)).unwrap_or_else(|| "Sans titre".into()),
+            id: dto.id,
+        });
+    }
+    cards
+}
+
+/// Films and episodes of a playlist in its order; anything else has no page to
+/// open. An item listed twice shows once, where it comes first (ADR 0122).
+fn playlist_entries(items: Vec<BaseItemDto>, server: &str) -> Vec<WatchItem> {
+    let mut entries: Vec<WatchItem> = Vec::new();
+    for item in items.into_iter().filter_map(|d| watch_item(d, server)) {
+        if entries.iter().all(|e| e.id != item.id) {
+            entries.push(item);
+        }
+    }
+    entries
 }
 
 fn media_item(dto: BaseItemDto, server: &str) -> Option<MediaItem> {

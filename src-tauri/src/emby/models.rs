@@ -176,6 +176,12 @@ pub struct BaseItemDto {
     pub item_type: String,
     #[serde(default)]
     pub collection_type: Option<String>,
+    /// `Video` or `Audio` on a playlist (ADR 0122).
+    #[serde(default)]
+    pub media_type: Option<String>,
+    /// Only when asked in `Fields`: the entries of a playlist (ADR 0122).
+    #[serde(default)]
+    pub child_count: Option<u32>,
     /// Only when asked in `Fields` (letter index, ADR 0101).
     #[serde(default)]
     pub sort_name: Option<String>,
@@ -1037,6 +1043,19 @@ pub struct PlaylistCreationResultDto {
 pub struct Playlist {
     pub id: String,
     pub name: String,
+}
+
+/// A video playlist of the home row « Playlists » (ADR 0122).
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaylistCard {
+    pub id: String,
+    pub name: String,
+    pub poster: Option<ImageRef>,
+    /// Width / height of the poster, when the server knows it.
+    pub aspect_ratio: Option<f64>,
+    /// Entries the server counts, of any kind; absent when it does not say.
+    pub count: Option<u32>,
 }
 
 /// A playlist just created, and how many items the server says it holds.

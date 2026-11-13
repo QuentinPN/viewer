@@ -240,7 +240,14 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
                 (401, String::new())
             }
             p if p == views_path => (200, views()),
+            p if p == items
+                && query.contains("IncludeItemTypes=Playlist")
+                && query.contains("Fields=ChildCount") =>
+            {
+                (200, home_playlists())
+            }
             p if p == items && query.contains("IncludeItemTypes=Playlist") => (200, playlists()),
+            "/emby/Playlists/60001/Items" if r.method == "GET" => (200, playlist_items()),
             "/emby/Playlists/60001/Items" if r.method == "POST" => (
                 200,
                 format!(
@@ -659,6 +666,35 @@ fn playlists() -> String {
         {"Name":"  ","Id":"60002","Type":"Playlist","MediaType":"Video"},
         {"Name":"Id douteux","Id":"../x","Type":"Playlist"},
         {"Name":"Pas une playlist","Id":"30207","Type":"Movie"}
+    ],"TotalRecordCount":4}"#
+        .into()
+}
+
+/// `/Users/{Id}/Items?IncludeItemTypes=Playlist&Fields=ChildCount,…` (trimmed):
+/// video, audio, untyped, duplicated and unusable playlists.
+fn home_playlists() -> String {
+    r#"{"Items":[
+        {"Name":"À revoir","Id":"60001","Type":"Playlist","MediaType":"Video","ChildCount":3,
+         "PrimaryImageAspectRatio":1.0,"ImageTags":{"Primary":"aa11"}},
+        {"Name":"Musique","Id":"60003","Type":"Playlist","MediaType":"Audio","ChildCount":12},
+        {"Name":"  ","Id":"60002","Type":"Playlist"},
+        {"Name":"À revoir","Id":"60001","Type":"Playlist","MediaType":"Video"},
+        {"Name":"Id douteux","Id":"../x","Type":"Playlist","MediaType":"Video"},
+        {"Name":"Pas une playlist","Id":"30207","Type":"Movie","MediaType":"Video"}
+    ],"TotalRecordCount":6}"#
+        .into()
+}
+
+/// `GET /Playlists/60001/Items` (trimmed): an episode, a film listed twice, a song.
+fn playlist_items() -> String {
+    r#"{"Items":[
+        {"Name":"Épisode 4","Id":"70229","Type":"Episode","IndexNumber":4,"ParentIndexNumber":5,
+         "SeriesName":"La casa de papel","SeriesId":"70185","RunTimeTicks":30000000000,
+         "UserData":{"PlaybackPositionTicks":0,"Played":true}},
+        {"Name":"Dune","Id":"30207","Type":"Movie","RunTimeTicks":93600000000,
+         "UserData":{"PlaybackPositionTicks":18000000000,"Played":false}},
+        {"Name":"Chanson","Id":"90001","Type":"Audio"},
+        {"Name":"Dune","Id":"30207","Type":"Movie","RunTimeTicks":93600000000}
     ],"TotalRecordCount":4}"#
         .into()
 }
@@ -1689,6 +1725,71 @@ fn playlists_are_listed_by_name_with_unusable_entries_dropped() {
     assert!(query.contains("Recursive=true"), "{query}");
     assert!(sent.auth.as_deref().unwrap().contains(TOKEN));
     assert!(server.requests().iter().all(|r| !r.path.contains(TOKEN)));
+}
+
+#[test]
+fn home_playlists_keep_video_ones_once_with_their_count() {
+    let (server, fx, _) = signed_in_browser();
+    let cards = run(fx.service.home_playlists()).unwrap();
+    let seen: Vec<_> = cards
+        .iter()
+        .map(|c| (c.id.as_str(), c.name.as_str(), c.count))
+        .collect();
+    assert_eq!(
+        seen,
+        [
+            ("60001", "À revoir", Some(3)),
+            ("60002", "Sans titre", None)
+        ]
+    );
+    assert!(cards[0].poster.is_some() && cards[1].poster.is_none());
+    assert_eq!(cards[0].aspect_ratio, Some(1.0));
+    let sent = server.requests().into_iter().last().unwrap();
+    let (path, query) = sent.path.split_once('?').unwrap();
+    assert_eq!(path, format!("/emby/Users/{USER_ID}/Items"));
+    for part in [
+        "IncludeItemTypes=Playlist",
+        "Recursive=true",
+        "SortBy=SortName",
+        "Limit=50",
+        "Fields=ChildCount%2CPrimaryImageAspectRatio",
+    ] {
+        assert!(query.contains(part), "{part} in {query}");
+    }
+    assert!(!query.contains("MediaTypes"), "{query}");
+    assert!(server.requests().iter().all(|r| !r.path.contains(TOKEN)));
+}
+
+#[test]
+fn playlist_entries_are_films_and_episodes_once_in_order() {
+    let (server, fx, revoked) = signed_in_browser();
+    let entries = run(fx.service.playlist_items("60001")).unwrap();
+    let ids: Vec<_> = entries.iter().map(|e| e.id.as_str()).collect();
+    assert_eq!(ids, ["70229", "30207"]);
+    assert_eq!(entries[0].series_name.as_deref(), Some("La casa de papel"));
+    assert!(entries[0].played);
+    assert!(entries[1].resume.is_some());
+    let sent = server.requests().into_iter().last().unwrap();
+    assert_eq!(sent.method, "GET");
+    let (path, query) = sent.path.split_once('?').unwrap();
+    assert_eq!(path, "/emby/Playlists/60001/Items");
+    assert!(query.contains(&format!("UserId={USER_ID}")), "{query}");
+    assert!(query.contains("Limit=300"), "{query}");
+
+    let before = server.requests().len();
+    for bad in ["", "../60001", "60001&UserId=x"] {
+        let err = run(fx.service.playlist_items(bad)).unwrap_err();
+        assert!(matches!(err, EmbyError::InvalidResponse(_)), "{err:?}");
+    }
+    assert_eq!(server.requests().len(), before);
+
+    let err = run(fx.service.playlist_items("69999")).unwrap_err();
+    assert!(matches!(err, EmbyError::NotFound), "{err:?}");
+
+    revoked.store(true, Ordering::SeqCst);
+    let err = run(fx.service.playlist_items("60001")).unwrap_err();
+    assert!(matches!(err, EmbyError::SessionExpired), "{err:?}");
+    assert!(stored_token(&fx).is_none());
 }
 
 #[test]

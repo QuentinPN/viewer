@@ -413,6 +413,17 @@ export interface Playlist {
   name: string;
 }
 
+/** A video playlist of the home row « Playlists » (ADR 0122). */
+export interface PlaylistCard {
+  id: string;
+  name: string;
+  poster: ImageRef | null;
+  /** Width / height of the poster, when the server knows it. */
+  aspectRatio: number | null;
+  /** Entries the server counts, of any kind. */
+  count: number | null;
+}
+
 /** A playlist just created, and how many items the server says it holds. */
 export interface PlaylistCreated {
   id: string;

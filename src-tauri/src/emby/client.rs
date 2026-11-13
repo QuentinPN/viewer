@@ -805,6 +805,60 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
+    /// Playlists of the home row, A → Z with their entry count (ADR 0122, as the
+    /// TV's ADR 0088). No `MediaTypes`: on Emby 4.10.2.0 `MediaTypes=Video` next to
+    /// `IncludeItemTypes=Playlist` answered every video of the server; audio
+    /// playlists are left out by the caller.
+    pub async fn home_playlists(
+        &self,
+        user_id: &str,
+        limit: u32,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Users/{}/Items", path_segment(user_id)?));
+        let limit = limit.to_string();
+        let params = [
+            ("IncludeItemTypes", "Playlist"),
+            ("Recursive", "true"),
+            ("SortBy", "SortName"),
+            ("SortOrder", "Ascending"),
+            ("Limit", limit.as_str()),
+            ("Fields", "ChildCount,PrimaryImageAspectRatio"),
+            ("EnableUserData", "false"),
+            ("ImageTypeLimit", "1"),
+            ("EnableImageTypes", "Primary"),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
+    /// Entries of a playlist in its order (`GET /Playlists/{Id}/Items?UserId=`,
+    /// `PlaylistService`; ADR 0122, as the TV's ADR 0088).
+    pub async fn playlist_items(
+        &self,
+        user_id: &str,
+        playlist_id: &str,
+        limit: u32,
+    ) -> Result<QueryResult<BaseItemDto>, EmbyError> {
+        self.require_token()?;
+        let url = self
+            .server
+            .api(&format!("/Playlists/{}/Items", path_segment(playlist_id)?));
+        let limit = limit.to_string();
+        let params = [
+            ("UserId", path_segment(user_id)?),
+            ("Limit", limit.as_str()),
+            ("Fields", "PrimaryImageAspectRatio"),
+            ("EnableUserData", "true"),
+            ("ImageTypeLimit", "1"),
+            ("EnableImageTypes", "Primary,Backdrop,Thumb"),
+        ];
+        let res = self.request_url(Method::GET, &url, &params).send().await?;
+        json(check(res, true)?).await
+    }
+
     /// Appends an item to a playlist
     /// (`POST /Playlists/{Id}/Items?Ids=&UserId=` → `AddToPlaylistResult`, ADR 0100).
     pub async fn add_to_playlist(

@@ -13,7 +13,7 @@ use crate::emby::chapters::Chapter;
 use crate::emby::library_events::LibraryEvents;
 use crate::emby::models::{
     EpisodePage, HeroItem, ItemDetail, ItemPage, ItemsOptions, Library, MediaItem, PlaybackStart,
-    PlaybackStopped, Playlist, PlaylistCreated, SearchResults, Season, ServerSummary,
+    PlaybackStopped, Playlist, PlaylistCard, PlaylistCreated, SearchResults, Season, ServerSummary,
     SessionStatus, ShelfServer, SignedInUser, SortNameEntry, WatchItem,
 };
 use crate::emby::quality::{PlaybackQuality, QualityCaps};
@@ -417,6 +417,23 @@ pub async fn emby_series_next_episode(
 #[tauri::command]
 pub async fn emby_playlists(emby: State<'_, EmbyService>) -> Result<Vec<Playlist>, EmbyError> {
     emby.playlists().await
+}
+
+/// Home row « Playlists »: the user's video playlists (ADR 0122).
+#[tauri::command]
+pub async fn emby_home_playlists(
+    emby: State<'_, EmbyService>,
+) -> Result<Vec<PlaylistCard>, EmbyError> {
+    emby.home_playlists().await
+}
+
+/// Films and episodes of a playlist, in its order (ADR 0122).
+#[tauri::command]
+pub async fn emby_playlist_items(
+    emby: State<'_, EmbyService>,
+    playlist_id: String,
+) -> Result<Vec<WatchItem>, EmbyError> {
+    emby.playlist_items(&playlist_id).await
 }
 
 /// Appends an item to a playlist; returns how many items the server added.

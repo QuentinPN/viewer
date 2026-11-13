@@ -47,15 +47,24 @@ describe("home rows", () => {
       "favorites",
       "latest.a",
       "latest.b",
+      "playlists",
     ]);
     expect(rows[3]?.label).toBe("Ajoutés récemment · A");
+    expect(rows[5]?.label).toBe("Playlists");
   });
 
   it("follows the stored order, ignores unknown and duplicate keys", () => {
     expect(
       keys(orderedRows(rows, ["latest.b", "gone", "favorites", "latest.b"])),
       // resume has no default predecessor: first; nextUp follows it; latest.a follows favorites.
-    ).toEqual(["resume", "nextUp", "latest.b", "favorites", "latest.a"]);
+    ).toEqual([
+      "resume",
+      "nextUp",
+      "latest.b",
+      "playlists",
+      "favorites",
+      "latest.a",
+    ]);
     expect(
       keys(
         orderedRows(rows, [
@@ -67,7 +76,31 @@ describe("home rows", () => {
           "gone",
         ]),
       ),
-    ).toEqual(["latest.b", "latest.a", "favorites", "nextUp", "resume"]);
+    ).toEqual([
+      "latest.b",
+      "playlists",
+      "latest.a",
+      "favorites",
+      "nextUp",
+      "resume",
+    ]);
+  });
+
+  it("adds « Playlists » to a layout stored before it existed", () => {
+    // Stored before the row existed: it comes right after the row that precedes
+    // it by default, the last « Ajoutés récemment »; the default order is untouched.
+    const stored = ["latest.b", "favorites", "resume", "nextUp", "latest.a"];
+    expect(keys(orderedRows(rows, stored))).toEqual([
+      "latest.b",
+      "playlists",
+      "favorites",
+      "resume",
+      "nextUp",
+      "latest.a",
+    ]);
+    expect(keys(orderedRows(rows, []))).toEqual(keys(rows));
+    const prefs = { order: ["latest.b", "latest.a"], hidden: ["playlists"] };
+    expect(keys(visibleRows(rows, prefs))).not.toContain("playlists");
   });
 
   it("places a new library after its default predecessor", () => {
@@ -77,6 +110,7 @@ describe("home rows", () => {
       "latest.a",
       "latest.c",
       "latest.b",
+      "playlists",
       "favorites",
       "nextUp",
       "resume",
@@ -90,6 +124,7 @@ describe("home rows", () => {
       "nextUp",
       "favorites",
       "latest.b",
+      "playlists",
     ]);
     expect(isShown(toggled(prefs, "resume"), "resume")).toBe(true);
   });
@@ -101,7 +136,14 @@ describe("home rows", () => {
     expect(moved(rows, DEFAULT_PREFS, "missing", 1)).toBe(DEFAULT_PREFS);
     expect(
       keys(orderedRows(rows, movedTo(rows, down, "latest.b", "nextUp").order)),
-    ).toEqual(["latest.b", "nextUp", "resume", "favorites", "latest.a"]);
+    ).toEqual([
+      "latest.b",
+      "nextUp",
+      "resume",
+      "favorites",
+      "latest.a",
+      "playlists",
+    ]);
   });
 
   it("stores per server and user, survives bad data", () => {

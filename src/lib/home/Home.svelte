@@ -8,7 +8,8 @@
 // in place after 5 min shown, or 30 s away from the app, so new titles show (ADR 0109),
 // and at once when the server announces a library change (ADR 0110).
 // Rows follow the order and visibility of Réglages › Accueil (ADR 0113), read when
-// the home opens; a hidden row is never requested.
+// the home opens; a hidden row is never requested. « Playlists » (ADR 0122)
+// lists the user's video playlists, each opening its page.
 import { onMount, tick, untrack } from "svelte";
 import { patchPlayed, restoreItem, withoutItem } from "../detail/watched";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
@@ -19,6 +20,7 @@ import type {
   MediaItem,
   PlaybackStart,
   PlaybackStopped,
+  PlaylistCard,
   WatchItem,
 } from "../emby/types";
 import PosterCard from "../library/PosterCard.svelte";
@@ -30,12 +32,14 @@ import {
 } from "./autoRefresh";
 import { watchTitle, withoutDuplicates } from "./format";
 import Hero from "./Hero.svelte";
+import PlaylistPoster from "./PlaylistPoster.svelte";
 import Row from "./Row.svelte";
 import {
   defaultRows,
   FAVORITES_ROW,
   type HomeRowPrefs,
   NEXT_UP_ROW,
+  PLAYLISTS_ROW,
   RESUME_ROW,
   visibleRows,
 } from "./rows";
@@ -46,6 +50,7 @@ interface Props {
   userName: string;
   onOpen: (item: MediaItem) => void;
   onShowLibrary: (library: Library) => void;
+  onOpenPlaylist: (playlist: PlaylistCard) => void;
   onPlay: (start: PlaybackStart) => void;
   /** Bumped when the connection comes back (ADR 0012). */
   refresh: number;
@@ -62,6 +67,7 @@ let {
   userName,
   onOpen,
   onShowLibrary,
+  onOpenPlaylist,
   onPlay,
   refresh,
   favoritesVersion,
@@ -95,6 +101,8 @@ let inProgress = $state<RowState<WatchItem>>(loadingRow());
 let nextUp = $state<RowState<WatchItem>>(loadingRow());
 let favorites = $state<RowState<MediaItem>>(loadingRow());
 let latest = $state<Record<string, RowState<MediaItem>>>({});
+let playlists = $state<RowState<PlaylistCard>>(loadingRow());
+let playlistsGeneration = 0;
 let starting = $state<string | null>(null);
 let playError = $state<{ title: string; error: EmbyError } | null>(null);
 /** "Reprendre" card being taken out: one at a time (ADR 0096). */
@@ -125,6 +133,7 @@ const everythingEmpty = $derived(
     inProgress.items?.length === 0 &&
     nextUpShown?.length === 0 &&
     favorites.items?.length === 0 &&
+    playlists.items?.length === 0 &&
     shownLibraries.every((l) => latest[l.id]?.items?.length === 0),
 );
 
@@ -168,6 +177,25 @@ function loadFavorites() {
   );
 }
 
+/** Read again in place: the cards shown stay until the answer comes. */
+function loadPlaylists() {
+  if (!shows(PLAYLISTS_ROW)) {
+    playlists = hiddenRow();
+    return;
+  }
+  const gen = ++playlistsGeneration;
+  void loadRow(
+    embyApi.homePlaylists,
+    (r) => (playlists = r),
+    () => gen === playlistsGeneration,
+  );
+}
+
+function retryPlaylists() {
+  playlists = loadingRow();
+  loadPlaylists();
+}
+
 function retryFavorites() {
   favorites = loadingRow();
   loadFavorites();
@@ -193,6 +221,7 @@ function afterPlayback() {
   loadedAt = Date.now();
   loadWatchRows();
   loadFavorites();
+  loadPlaylists();
   for (const library of shownLibraries) loadLatest(library, true);
 }
 
@@ -279,6 +308,7 @@ $effect(() => {
   untrack(() => {
     loadWatchRows();
     loadFavorites();
+    if (playlists.error) retryPlaylists();
     for (const library of shownLibraries) {
       if (latest[library.id]?.error) loadLatest(library);
     }
@@ -306,6 +336,7 @@ onMount(() => {
   loadedAt = Date.now();
   loadWatchRows();
   loadFavorites();
+  loadPlaylists();
   for (const library of shownLibraries) loadLatest(library);
   const unlisten = embyApi.onPlaybackStopped(onStopped);
   // Without the socket, the timer and the return to the app still refresh.
@@ -445,6 +476,23 @@ onMount(() => {
           {#if favorites.items}
             {#each favorites.items as item (item.id)}
               <li><PosterCard {item} onOpen={onOpen} /></li>
+            {/each}
+          {:else}
+            {@render skeleton(false, 8)}
+          {/if}
+        </Row>
+      {/if}
+    {:else if homeRow.key === PLAYLISTS_ROW}
+      {#if playlists.error}
+        <section class="row-failed" aria-labelledby="row-playlists">
+          <h2 id="row-playlists">{homeRow.label}</h2>
+          {@render rowError(playlists.error, retryPlaylists)}
+        </section>
+      {:else if !playlists.items || playlists.items.length > 0}
+        <Row title={homeRow.label} id="row-playlists">
+          {#if playlists.items}
+            {#each playlists.items as playlist (playlist.id)}
+              <li><PlaylistPoster {playlist} onOpen={onOpenPlaylist} /></li>
             {/each}
           {:else}
             {@render skeleton(false, 8)}

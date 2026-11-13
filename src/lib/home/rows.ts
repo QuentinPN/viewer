@@ -7,6 +7,8 @@ import type { Library } from "../emby/types";
 export const RESUME_ROW = "resume";
 export const NEXT_UP_ROW = "nextUp";
 export const FAVORITES_ROW = "favorites";
+/** Last by default, as on the TV (ADR 0122). */
+export const PLAYLISTS_ROW = "playlists";
 
 /** By library id, so a renamed library keeps its place and choice. */
 export const latestRowKey = (libraryId: string) => `latest.${libraryId}`;
@@ -37,6 +39,7 @@ export function defaultRows(libraries: Library[]): HomeRow[] {
       label: `Ajoutés récemment · ${library.name}`,
       library,
     })),
+    { key: PLAYLISTS_ROW, label: "Playlists", library: null },
   ];
 }
 

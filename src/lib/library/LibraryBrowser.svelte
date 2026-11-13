@@ -16,11 +16,13 @@ import type {
   Library,
   MediaItem,
   PlaybackStart,
+  PlaylistCard,
   SignedInUser,
   SortKey,
   WatchItem,
 } from "../emby/types";
 import Home from "../home/Home.svelte";
+import PlaylistPage from "../home/PlaylistPage.svelte";
 import { prefsKey, readPrefs } from "../home/rows";
 import CardMenu from "../menu/CardMenu.svelte";
 import { CardMenuState, provideCardMenu } from "../menu/menuState.svelte";
@@ -165,6 +167,24 @@ let observer: IntersectionObserver | null = null;
 let opened = $state<MediaItem | null>(null);
 /** The settings screen replaces the content; a search still takes over. */
 let settingsOpen = $state(false);
+/** A playlist's page replaces the home (ADR 0122); a search still takes over. */
+let openedPlaylist = $state<PlaylistCard | null>(null);
+
+function openPlaylist(playlist: PlaylistCard) {
+  opened = null;
+  openedPlaylist = playlist;
+  scroller?.scrollTo({ top: 0 });
+}
+
+/** Back to the home, focus on the playlist's card. */
+async function closePlaylist() {
+  const id = openedPlaylist?.id ?? "";
+  openedPlaylist = null;
+  await tick();
+  scroller
+    ?.querySelector<HTMLElement>(`[data-playlist-id="${CSS.escape(id)}"]`)
+    ?.focus();
+}
 /** Card that opened the detail: an episode page may move to its neighbours. */
 let openerId: string | null = null;
 /** Neighbour button that replaced the episode page, to focus it again. */
@@ -462,6 +482,7 @@ async function focusSearch() {
 
 function openSettings() {
   opened = null;
+  openedPlaylist = null;
   if (searching) void leaveSearch(false);
   settingsOpen = true;
   scroller?.scrollTo({ top: 0 });
@@ -469,6 +490,7 @@ function openSettings() {
 
 function showHome() {
   opened = null;
+  openedPlaylist = null;
   settingsOpen = false;
   if (searching) void leaveSearch(false);
   if (selected === null) return;
@@ -514,6 +536,7 @@ function restartGrid() {
 
 function select(library: Library) {
   opened = null;
+  openedPlaylist = null;
   settingsOpen = false;
   if (searching) void leaveSearch(false);
   if (selected?.id === library.id && pager.total !== null) return;
@@ -1050,12 +1073,22 @@ $effect(() => {
         libraries={libraries ?? []}
         rowPrefsKey={prefsKey(user.server.id, user.userId)}
       />
+    {:else if libraries && selected === null && openedPlaylist}
+      {#key openedPlaylist.id}
+        <PlaylistPage
+          playlist={openedPlaylist}
+          onBack={() => void closePlaylist()}
+          {onPlay}
+          onError={fail}
+        />
+      {/key}
     {:else if libraries && selected === null}
       <Home
         {libraries}
         userName={user.userName}
         onOpen={open}
         onShowLibrary={select}
+        onOpenPlaylist={openPlaylist}
         {onPlay}
         {refresh}
         {favoritesVersion}

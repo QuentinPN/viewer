@@ -17,6 +17,7 @@ import type {
   PlaybackStart,
   PlaybackStopped,
   Playlist,
+  PlaylistCard,
   PlaylistCreated,
   SearchResults,
   Season,
@@ -99,6 +100,11 @@ export const embyApi = {
     invoke<WatchItem | null>("emby_series_next_episode", { seriesId }),
   /** Playlists of the user, by name (ADR 0100). */
   playlists: () => invoke<Playlist[]>("emby_playlists"),
+  /** Home row « Playlists »: video playlists, A → Z (ADR 0122). */
+  homePlaylists: () => invoke<PlaylistCard[]>("emby_home_playlists"),
+  /** Films and episodes of a playlist, in its order (ADR 0122). */
+  playlistItems: (playlistId: string) =>
+    invoke<WatchItem[]>("emby_playlist_items", { playlistId }),
   /** Returns how many items the server says it added. */
   addToPlaylist: (playlistId: string, itemId: string) =>
     invoke<number>("emby_add_to_playlist", { playlistId, itemId }),

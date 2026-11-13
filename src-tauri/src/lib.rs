@@ -380,6 +380,8 @@ pub fn run() {
             commands::emby_hide_from_resume,
             commands::emby_series_next_episode,
             commands::emby_playlists,
+            commands::emby_home_playlists,
+            commands::emby_playlist_items,
             commands::emby_add_to_playlist,
             commands::emby_create_playlist,
             commands::emby_search,
