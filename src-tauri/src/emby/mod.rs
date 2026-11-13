@@ -6,6 +6,7 @@ pub mod chapters;
 pub mod client;
 pub mod credentials;
 pub mod images;
+pub mod library_events;
 pub mod models;
 pub mod playback;
 pub mod quality;

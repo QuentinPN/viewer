@@ -32,6 +32,8 @@ import type {
 // Thin typed wrapper over the Emby commands of src-tauri/src/commands.rs.
 
 export const PLAYBACK_STOPPED_EVENT = "emby://playback-stopped";
+/** Titles added, changed or removed on the server (ADR 0110). */
+export const LIBRARY_CHANGED_EVENT = "emby://library-changed";
 
 export const embyApi = {
   probe: (url: string) => invoke<ServerSummary>("emby_probe", { url }),
@@ -160,6 +162,23 @@ export const embyApi = {
    * The item's new state, once a playback stopped and was reported, or once it
    * was marked played or unplayed or taken out of "Reprendre" (ADR 0096).
    */
+  /**
+   * Calls `handler` each time titles were added, changed or removed on the
+   * server (ADR 0110), while the returned function has not been called.
+   */
+  watchLibrary: async (handler: () => void): Promise<() => void> => {
+    const unlisten = await listen(LIBRARY_CHANGED_EVENT, () => handler());
+    try {
+      await invoke("emby_library_events_start");
+    } catch (e) {
+      unlisten();
+      throw e;
+    }
+    return () => {
+      unlisten();
+      void invoke("emby_library_events_stop").catch(() => {});
+    };
+  },
   onPlaybackStopped: (
     handler: (state: PlaybackStopped) => void,
   ): Promise<UnlistenFn> =>

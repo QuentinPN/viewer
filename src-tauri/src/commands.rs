@@ -10,6 +10,7 @@ use crate::AppState;
 use crate::emby::EmbyError;
 use crate::emby::artwork_cache::{ArtworkCacheCleared, ArtworkCacheStats};
 use crate::emby::chapters::Chapter;
+use crate::emby::library_events::LibraryEvents;
 use crate::emby::models::{
     EpisodePage, HeroItem, ItemDetail, ItemPage, ItemsOptions, Library, MediaItem, PlaybackStart,
     PlaybackStopped, Playlist, PlaylistCreated, SearchResults, Season, ServerSummary,
@@ -342,6 +343,24 @@ pub async fn emby_set_favorite(
     favorite: bool,
 ) -> Result<bool, EmbyError> {
     emby.set_favorite(&item_id, favorite).await
+}
+
+/// Listens for titles added on the server while the home is shown (ADR 0110);
+/// each settled burst emits `emby://library-changed`. Replaces a running listener.
+#[tauri::command]
+pub fn emby_library_events_start(
+    app: tauri::AppHandle,
+    emby: State<'_, EmbyService>,
+    events: State<'_, LibraryEvents>,
+) -> Result<(), EmbyError> {
+    events.start(app, emby.client()?);
+    Ok(())
+}
+
+/// Closes the library socket: the home is no longer shown.
+#[tauri::command]
+pub fn emby_library_events_stop(events: State<'_, LibraryEvents>) {
+    events.stop();
 }
 
 /// Marks an item played or unplayed (ADR 0096). The new state goes to every view

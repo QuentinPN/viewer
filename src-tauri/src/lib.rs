@@ -275,6 +275,7 @@ pub fn run() {
             let wid = None;
 
             app.manage(emby_service(app)?);
+            app.manage(emby::library_events::LibraryEvents::default());
             app.manage(segments::SegmentService::new(env!("CARGO_PKG_VERSION")));
 
             app.manage(AppState {
@@ -338,6 +339,8 @@ pub fn run() {
             commands::window_set_fullscreen,
             commands::app_info,
             commands::emby_probe,
+            commands::emby_library_events_start,
+            commands::emby_library_events_stop,
             commands::emby_sign_in,
             commands::emby_restore,
             commands::emby_change_server,

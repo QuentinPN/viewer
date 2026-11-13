@@ -13,7 +13,7 @@ Retour du propriétaire (2026-11-13) : « lorsqu'une nouvelle série / film est 
 - Desktop : `src/lib/home/autoRefresh.ts`, branché dans `Home.svelte` sur le même chemin que l'après-lecture. Android TV : `ui/HomeRefresh.kt`, branché dans `HomeScreen` via `repeatOnLifecycle(STARTED)` et `HomeMemory.userDataChanged()`.
 
 ## Alternatives
-- **WebSocket Emby (`LibraryChanged`)** : immédiat, mais une connexion persistante de plus à maintenir (reconnexion, authentification, veille) sur les deux apps, pour un besoin où quelques minutes de retard suffisent. Écarté pour cette tranche ; reste possible.
+- **WebSocket Emby (`LibraryChanged`)** : immédiat, mais une connexion persistante de plus à maintenir (reconnexion, authentification, veille) sur les deux apps, pour un besoin où quelques minutes de retard suffisent. Écarté pour cette tranche, puis retenu à la demande du propriétaire (ADR 0110) ; la relecture périodique reste en secours.
 - **Bouton « Actualiser »** : demande une action, ce que le retour veut éviter. Écarté.
 - **Relire seulement « Ajoutés récemment »** : « Reprendre » et « À suivre » changent aussi depuis d'autres appareils ; la relecture complète coûte une dizaine de petites requêtes toutes les 5 min. Écarté.
 

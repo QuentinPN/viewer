@@ -13,6 +13,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
 import java.io.IOException
 
 private const val CLIENT_NAME = "Viewer TV"
@@ -26,7 +28,8 @@ data class DeviceIdentity(val name: String, val id: String, val version: String)
 
 /**
  * Typed Emby operations, ported from the Windows client (ADR 0004, 0007). The token
- * travels in the `X-Emby-Authorization` header, never in a URL.
+ * travels in the `X-Emby-Authorization` header, never in a URL, except for the event
+ * socket that Emby only binds through `api_key` (see [openEventSocket]).
  */
 class EmbyClient(
     val server: ServerUrl,
@@ -49,6 +52,26 @@ class EmbyClient(
 
     /** Headers the player sends with stream requests. */
     fun streamHeaders(): Map<String, String> = mapOf("X-Emby-Token" to requireToken())
+
+    /**
+     * Opens Emby's event socket for this session (library changes). Emby binds the socket
+     * to the user only when the token is in the `api_key` query parameter (a header opens
+     * a socket that receives nothing), so this URL is a secret: it is built here, handed
+     * to OkHttp and never returned, logged or shown. No read timeout: the server may stay
+     * silent for long; pings keep dead connections detected.
+     */
+    internal fun openEventSocket(listener: WebSocketListener): WebSocket {
+        val url = server.url.newBuilder()
+            .addPathSegment("embywebsocket")
+            .addQueryParameter("api_key", requireToken())
+            .addQueryParameter("deviceId", device.id)
+            .build()
+        val socketHttp = http.newBuilder()
+            .readTimeout(java.time.Duration.ZERO)
+            .pingInterval(java.time.Duration.ofSeconds(30))
+            .build()
+        return socketHttp.newWebSocket(Request.Builder().url(url).build(), listener)
+    }
 
     suspend fun publicInfo(): PublicSystemInfo =
         call(get(server.api("/System/Info/Public")), PublicSystemInfo.serializer(), authenticated = false)

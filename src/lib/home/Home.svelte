@@ -5,7 +5,8 @@
 // again in place after a playback (played marks, episode counts), "Favoris" also
 // after every favorite change. A "Reprendre" card can be taken out of the row, or
 // marked played (ADR 0096), from its menu (ADR 0100). Every row is also read again
-// in place after 5 min shown, or 30 s away from the app, so new titles show (ADR 0109).
+// in place after 5 min shown, or 30 s away from the app, so new titles show (ADR 0109),
+// and at once when the server announces a library change (ADR 0110).
 import { onMount, tick, untrack } from "svelte";
 import { patchPlayed, restoreItem, withoutItem } from "../detail/watched";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
@@ -273,6 +274,8 @@ onMount(() => {
   loadFavorites();
   for (const library of libraries) loadLatest(library);
   const unlisten = embyApi.onPlaybackStopped(onStopped);
+  // Without the socket, the timer and the return to the app still refresh.
+  const unwatch = embyApi.watchLibrary(afterPlayback).catch(() => null);
   const timer = setInterval(() => reloadIfStale(HOME_STALE_MS), HOME_CHECK_MS);
   window.addEventListener("focus", onReturn);
   document.addEventListener("visibilitychange", onReturn);
@@ -281,6 +284,7 @@ onMount(() => {
     window.removeEventListener("focus", onReturn);
     document.removeEventListener("visibilitychange", onReturn);
     void unlisten.then((stop) => stop());
+    void unwatch.then((stop) => stop?.());
   };
 });
 </script>

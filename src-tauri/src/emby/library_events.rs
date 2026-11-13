@@ -1,0 +1,254 @@
+//! Library events (ADR 0110): while the home is shown, one WebSocket to the Emby
+//! server listens for `LibraryChanged`, and a title added on the server reaches
+//! « Ajoutés récemment » at once. The UI only receives an event without payload;
+//! the socket URL carries the token and is never logged.
+
+use std::sync::Mutex;
+use std::time::Duration;
+
+use futures_util::{SinkExt, StreamExt};
+use serde::Deserialize;
+use tauri::Emitter;
+use tokio::time::{Instant, sleep, sleep_until};
+use tokio_tungstenite::tungstenite::Message;
+
+use super::client::EmbyClient;
+
+/// Emitted (no payload) once a burst of library changes has settled.
+pub const LIBRARY_CHANGED_EVENT: &str = "emby://library-changed";
+
+/// A scan sends changes in bursts, posters often in a later `ItemsUpdated`:
+/// the home is read again once nothing came for this long.
+pub const SETTLE: Duration = Duration::from_secs(2);
+/// Sent so idle sockets are not closed by the server or a proxy.
+pub const KEEP_ALIVE: Duration = Duration::from_secs(30);
+
+/// Delay before reconnect attempt `attempt` (0-based): 2 s, 5 s, 15 s, then 30 s.
+pub fn backoff(attempt: u32) -> Duration {
+    Duration::from_secs(match attempt {
+        0 => 2,
+        1 => 5,
+        2 => 15,
+        _ => 30,
+    })
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct SocketMessage {
+    message_type: String,
+    #[serde(default)]
+    data: Option<serde_json::Value>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "PascalCase", default)]
+struct LibraryChange {
+    items_added: Vec<serde_json::Value>,
+    items_updated: Vec<serde_json::Value>,
+    items_removed: Vec<serde_json::Value>,
+}
+
+/// True for a `LibraryChanged` frame that adds, updates or removes items.
+/// Anything else (user data, sessions, malformed text) is ignored.
+pub fn is_library_change(text: &str) -> bool {
+    let Ok(msg) = serde_json::from_str::<SocketMessage>(text) else {
+        return false;
+    };
+    if msg.message_type != "LibraryChanged" {
+        return false;
+    }
+    let change = msg
+        .data
+        .and_then(|d| serde_json::from_value::<LibraryChange>(d).ok())
+        .unwrap_or_default();
+    !(change.items_added.is_empty()
+        && change.items_updated.is_empty()
+        && change.items_removed.is_empty())
+}
+
+/// The listener task, if any. Starting again replaces it (new session or server).
+#[derive(Default)]
+pub struct LibraryEvents {
+    task: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
+}
+
+impl LibraryEvents {
+    pub fn start(&self, app: tauri::AppHandle, client: EmbyClient) {
+        let mut task = self.task.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some(old) = task.take() {
+            old.abort();
+        }
+        *task = Some(tauri::async_runtime::spawn(run(app, client)));
+    }
+
+    pub fn stop(&self) {
+        if let Some(old) = self.task.lock().unwrap_or_else(|p| p.into_inner()).take() {
+            old.abort();
+        }
+    }
+}
+
+async fn run(app: tauri::AppHandle, client: EmbyClient) {
+    let Ok(url) = client.library_socket_url() else {
+        return;
+    };
+    let mut attempt = 0;
+    loop {
+        match tokio_tungstenite::connect_async(url.as_str()).await {
+            Ok((socket, _)) => {
+                log::info!("library events: connected");
+                attempt = 0;
+                listen(&app, socket).await;
+                log::info!("library events: disconnected");
+            }
+            // The error text never holds the URL; its kind is enough to diagnose.
+            Err(e) => log::warn!("library events: connection failed ({})", error_kind(&e)),
+        }
+        sleep(backoff(attempt)).await;
+        attempt = attempt.saturating_add(1);
+    }
+}
+
+fn error_kind(e: &tokio_tungstenite::tungstenite::Error) -> &'static str {
+    use tokio_tungstenite::tungstenite::Error;
+    match e {
+        Error::Io(_) => "réseau",
+        Error::Tls(_) => "TLS",
+        Error::Http(r) if r.status().as_u16() == 401 => "jeton refusé",
+        Error::Http(_) => "réponse HTTP",
+        Error::Url(_) => "adresse",
+        _ => "protocole",
+    }
+}
+
+async fn listen<S>(app: &tauri::AppHandle, socket: S)
+where
+    S: futures_util::Stream<Item = Result<Message, tokio_tungstenite::tungstenite::Error>>
+        + futures_util::Sink<Message>
+        + Unpin,
+{
+    let (mut tx, mut rx) = socket.split();
+    let mut keep_alive = tokio::time::interval(KEEP_ALIVE);
+    // Set by a library change: the event goes out once nothing more came.
+    let mut due: Option<Instant> = None;
+    loop {
+        tokio::select! {
+            frame = rx.next() => match frame {
+                Some(Ok(Message::Text(text))) => {
+                    if is_library_change(text.as_str()) {
+                        due = Some(Instant::now() + SETTLE);
+                    }
+                }
+                Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
+                Some(Ok(_)) => {}
+            },
+            _ = keep_alive.tick() => {
+                let alive = Message::text(r#"{"MessageType":"KeepAlive"}"#);
+                if tx.send(alive).await.is_err() {
+                    break;
+                }
+            }
+            _ = sleep_until(due.unwrap_or_else(Instant::now)), if due.is_some() => {
+                due = None;
+                let _ = app.emit(LIBRARY_CHANGED_EVENT, ());
+            }
+        }
+    }
+    // A change seen just before the socket dropped is still announced.
+    if due.is_some() {
+        let _ = app.emit(LIBRARY_CHANGED_EVENT, ());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn added_items_are_a_change() {
+        let text = r#"{"MessageType":"LibraryChanged","Data":{"ItemsAdded":["1","2"],"ItemsUpdated":[],"ItemsRemoved":[],"FoldersAddedTo":["9"]}}"#;
+        assert!(is_library_change(text));
+    }
+
+    #[test]
+    fn updated_or_removed_items_are_a_change() {
+        assert!(is_library_change(
+            r#"{"MessageType":"LibraryChanged","Data":{"ItemsUpdated":["1"]}}"#
+        ));
+        assert!(is_library_change(
+            r#"{"MessageType":"LibraryChanged","Data":{"ItemsRemoved":["1"]}}"#
+        ));
+    }
+
+    #[test]
+    fn empty_change_is_ignored() {
+        assert!(!is_library_change(
+            r#"{"MessageType":"LibraryChanged","Data":{"FoldersAddedTo":["9"]}}"#
+        ));
+        assert!(!is_library_change(r#"{"MessageType":"LibraryChanged"}"#));
+    }
+
+    #[test]
+    fn other_messages_are_ignored() {
+        // Frame as sent by Emby 4.10.2 on a favourite change (2026-11-13).
+        let user_data = r#"{"MessageType":"UserDataChanged","MessageId":"582e","Data":{"UserId":"5f82","UserDataList":[{"IsFavorite":true,"ItemId":"68397"}]}}"#;
+        assert!(!is_library_change(user_data));
+        assert!(!is_library_change("not json"));
+        assert!(!is_library_change(
+            r#"{"MessageType":"ForceKeepAlive","Data":60}"#
+        ));
+    }
+
+    fn client(server: &str) -> EmbyClient {
+        use super::super::client::{AccessToken, DeviceIdentity};
+        use super::super::server_url::ServerUrl;
+        let device = DeviceIdentity {
+            name: "pc".into(),
+            id: "dev-1".into(),
+            version: "1.0.0".into(),
+        };
+        EmbyClient::new(ServerUrl::parse(server).unwrap(), device)
+            .unwrap()
+            .with_token(AccessToken::new("tok".into()))
+    }
+
+    #[test]
+    fn socket_url_follows_the_server_scheme() {
+        assert_eq!(
+            client("http://192.168.1.14:8096")
+                .library_socket_url()
+                .unwrap(),
+            "ws://192.168.1.14:8096/embywebsocket?api_key=tok&deviceId=dev-1"
+        );
+        assert_eq!(
+            client("https://emby.example.com/")
+                .library_socket_url()
+                .unwrap(),
+            "wss://emby.example.com/embywebsocket?api_key=tok&deviceId=dev-1"
+        );
+    }
+
+    #[test]
+    fn socket_url_needs_a_session() {
+        use super::super::client::DeviceIdentity;
+        use super::super::server_url::ServerUrl;
+        let device = DeviceIdentity {
+            name: "pc".into(),
+            id: "dev-1".into(),
+            version: "1.0.0".into(),
+        };
+        let anonymous = EmbyClient::new(
+            ServerUrl::parse("http://192.168.1.14:8096").unwrap(),
+            device,
+        )
+        .unwrap();
+        assert!(anonymous.library_socket_url().is_err());
+    }
+
+    #[test]
+    fn backoff_grows_then_caps() {
+        let secs: Vec<u64> = (0..6).map(|a| backoff(a).as_secs()).collect();
+        assert_eq!(secs, vec![2, 5, 15, 30, 30, 30]);
+    }
+}

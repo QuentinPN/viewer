@@ -103,6 +103,22 @@ impl EmbyClient {
         &self.server
     }
 
+    /// `ws(s)://…/embywebsocket` of the library events (ADR 0110). Emby 4.10 only
+    /// binds the socket to the session with the token in `api_key` (the header is
+    /// accepted but nothing is pushed), so this URL holds a secret: never log it.
+    pub fn library_socket_url(&self) -> Result<String, EmbyError> {
+        let token = self.token.as_ref().ok_or(EmbyError::NotSignedIn)?;
+        let base = format!("{}/embywebsocket", self.server.as_str());
+        let mut url = url::Url::parse(&base).map_err(|e| EmbyError::InvalidUrl(e.to_string()))?;
+        let scheme = if self.server.is_https() { "wss" } else { "ws" };
+        url.set_scheme(scheme)
+            .map_err(|()| EmbyError::InvalidUrl("ws".into()))?;
+        url.query_pairs_mut()
+            .append_pair("api_key", token.expose())
+            .append_pair("deviceId", &self.device.id);
+        Ok(url.into())
+    }
+
     /// `X-Emby-Authorization` value. Quotes and commas are stripped from values so a
     /// device name cannot break the header syntax.
     pub fn authorization_header(&self) -> String {

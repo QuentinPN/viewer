@@ -57,6 +57,9 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.HeroTitle
+import io.github.quentinpn.viewer.tv.emby.LIBRARY_DEBOUNCE_MS
+import io.github.quentinpn.viewer.tv.emby.libraryChanges
+import io.github.quentinpn.viewer.tv.emby.settled
 import io.github.quentinpn.viewer.tv.emby.favoriteTitles
 import io.github.quentinpn.viewer.tv.emby.homeHero
 import io.github.quentinpn.viewer.tv.emby.nextUpRow
@@ -225,6 +228,15 @@ fun HomeScreen(
                 delay(HOME_CHECK_MS)
                 if (homeIsStale(memory.loadedAt, SystemClock.elapsedRealtime(), HOME_STALE_MS)) memory.userDataChanged()
             }
+        }
+    }
+
+    // Titles added, updated or removed on the server are pushed through Emby's event socket:
+    // the shelves are read again ~2 s after a burst settles. Open only while the home is shown
+    // and the app started; the poll above stays as a fallback.
+    LaunchedEffect(lifecycle, memory, client) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            client.libraryChanges().settled(LIBRARY_DEBOUNCE_MS).collect { memory.userDataChanged() }
         }
     }
 

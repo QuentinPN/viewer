@@ -2,7 +2,7 @@
 
 ## 1.1.1 — 2026-11-13
 
-- L'accueil se met à jour tout seul : un film ou une série ajouté sur le serveur apparaît dans « Ajoutés récemment » au plus 5 min après, ou dès le retour dans l'app, sans la relancer (ADR 0109).
+- L'accueil se met à jour tout seul : un film ou une série ajouté sur le serveur apparaît dans « Ajoutés récemment » quelques secondes après, tant que l'accueil est affiché (ADR 0110). Sinon, au plus 5 min après ou dès le retour dans l'app (ADR 0109).
 
 ## 1.1.0 — 2026-11-11
 
