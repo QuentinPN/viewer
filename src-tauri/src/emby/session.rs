@@ -1360,6 +1360,13 @@ impl EmbyService {
     }
 
     /// Validates the address and reads the server's public identity.
+    /// Audio and subtitle preferences of the signed-in Emby account (ADR 0115).
+    pub async fn account_tracks(&self) -> Result<tracks::AccountTracks, EmbyError> {
+        let (client, user_id) = self.session()?;
+        let dto = self.expire_on_401(&client, client.user(&user_id).await)?;
+        Ok(tracks::account_tracks(dto.configuration.as_ref()))
+    }
+
     /// The open session's server as it answers now (Réglages › Serveur).
     pub async fn server_info(&self) -> Result<ServerSummary, EmbyError> {
         let client = self.client()?;

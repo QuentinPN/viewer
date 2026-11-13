@@ -141,6 +141,14 @@ pub async fn emby_server_info(emby: State<'_, EmbyService>) -> Result<ServerSumm
     emby.server_info().await
 }
 
+/// Audio and subtitle preferences of the Emby account, for Réglages (ADR 0115).
+#[tauri::command]
+pub async fn emby_account_tracks(
+    emby: State<'_, EmbyService>,
+) -> Result<crate::emby::tracks::AccountTracks, EmbyError> {
+    emby.account_tracks().await
+}
+
 #[tauri::command]
 pub async fn emby_probe(
     emby: State<'_, EmbyService>,

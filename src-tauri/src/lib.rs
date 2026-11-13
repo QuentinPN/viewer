@@ -348,6 +348,7 @@ pub fn run() {
             commands::app_info,
             system_info::system_report,
             commands::emby_server_info,
+            commands::emby_account_tracks,
             commands::emby_probe,
             commands::emby_library_events_start,
             commands::emby_library_events_stop,
