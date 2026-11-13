@@ -31,6 +31,7 @@ export type PlayerCommand =
   | { type: "setNightMode"; on: boolean }
   | { type: "setSubtitleDelay"; seconds: number }
   | { type: "setAudioDelay"; seconds: number }
+  | { type: "setVideoFit"; fit: "original" | "fill" | "stretch" }
   | { type: "stop" };
 
 export type EndReason = "eof" | "stopped" | "quit" | "error" | "other";

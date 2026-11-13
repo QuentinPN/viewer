@@ -411,6 +411,12 @@ impl PlayerEngine for MpvEngine {
             PlayerCommand::SetAudioDelay { seconds } => {
                 inner.set_property("audio-delay", &delay_value(*seconds)?)
             }
+            PlayerCommand::SetVideoFit { fit } => {
+                for (name, value) in fit.mpv_properties() {
+                    inner.set_property(name, value)?;
+                }
+                Ok(())
+            }
             PlayerCommand::Stop => inner.command(&["stop"]),
         }
     }

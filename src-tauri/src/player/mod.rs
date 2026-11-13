@@ -207,7 +207,35 @@ pub enum PlayerCommand {
     SetAudioDelay {
         seconds: f64,
     },
+    /// How the picture fills the window (ADR 0078).
+    SetVideoFit {
+        fit: VideoFit,
+    },
     Stop,
+}
+
+/// How the picture fills the window, as on the TV (ADR 0078).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum VideoFit {
+    /// Aspect kept, black bands where it does not match: mpv's default.
+    Original,
+    /// Aspect kept, cropped until no band is left.
+    Fill,
+    /// The whole window, the picture distorted to it.
+    Stretch,
+}
+
+impl VideoFit {
+    /// `panscan` and `keepaspect`, both always set so nothing of the previous
+    /// fit lingers. `video-unscaled` stays `no`: it would disable `panscan`.
+    pub fn mpv_properties(self) -> [(&'static str, &'static str); 2] {
+        match self {
+            Self::Original => [("panscan", "0"), ("keepaspect", "yes")],
+            Self::Fill => [("panscan", "1"), ("keepaspect", "yes")],
+            Self::Stretch => [("panscan", "0"), ("keepaspect", "no")],
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -615,5 +643,33 @@ mod tests {
         let cmd: PlayerCommand =
             serde_json::from_str(r#"{"type":"setAudioDelay","seconds":0.2}"#).unwrap();
         assert_eq!(cmd, PlayerCommand::SetAudioDelay { seconds: 0.2 });
+        let cmd: PlayerCommand =
+            serde_json::from_str(r#"{"type":"setVideoFit","fit":"fill"}"#).unwrap();
+        assert_eq!(
+            cmd,
+            PlayerCommand::SetVideoFit {
+                fit: VideoFit::Fill
+            }
+        );
+        assert!(
+            serde_json::from_str::<PlayerCommand>(r#"{"type":"setVideoFit","fit":"zoom"}"#)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn video_fit_sets_both_properties() {
+        assert_eq!(
+            VideoFit::Fill.mpv_properties(),
+            [("panscan", "1"), ("keepaspect", "yes")]
+        );
+        assert_eq!(
+            VideoFit::Stretch.mpv_properties(),
+            [("panscan", "0"), ("keepaspect", "no")]
+        );
+        assert_eq!(
+            VideoFit::Original.mpv_properties(),
+            [("panscan", "0"), ("keepaspect", "yes")]
+        );
     }
 }

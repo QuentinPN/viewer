@@ -70,6 +70,7 @@ import {
   startCountdown,
   UP_NEXT_SECONDS,
 } from "./upnext";
+import { FITS, fitBadge, type VideoFit } from "./videofit";
 import {
   effectiveVolume,
   readVolume,
@@ -143,6 +144,8 @@ let nightMode = $state(readNightMode(storage()));
 let optionsButton = $state<HTMLButtonElement | null>(null);
 /** Delays of the file being played; each new file starts from none (ADR 0062). */
 let delays = $state<Delays>({ ...NO_DELAYS });
+/** Picture format, for this player session (ADR 0078). */
+let fit = $state<VideoFit>("original");
 
 let audioButton = $state<HTMLButtonElement | null>(null);
 let subsButton = $state<HTMLButtonElement | null>(null);
@@ -443,6 +446,7 @@ async function applyModes() {
   await run({ type: "setSubtitleDelay", seconds: 0 });
   await run({ type: "setAudioDelay", seconds: 0 });
   await run({ type: "setSpeed", speed });
+  await run({ type: "setVideoFit", fit });
   await run({ type: "setNightMode", on: nightMode });
 }
 
@@ -459,6 +463,11 @@ function changeDelayOf(kind: DelayKind, change: DelayChange) {
       ? { type: "setSubtitleDelay", seconds }
       : { type: "setAudioDelay", seconds },
   );
+}
+
+function changeFit(next: VideoFit) {
+  fit = next;
+  if (active) void run({ type: "setVideoFit", fit: next });
 }
 
 function changeNightMode(on: boolean) {
@@ -918,6 +927,20 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
               {/each}
             </fieldset>
             <fieldset>
+              <legend>Format de l'image</legend>
+              {#each FITS as f (f.fit)}
+                <label class="choice">
+                  <input
+                    type="radio"
+                    name="fit"
+                    checked={fit === f.fit}
+                    onchange={() => changeFit(f.fit)}
+                  />
+                  <span>{f.label}</span>
+                </label>
+              {/each}
+            </fieldset>
+            <fieldset>
               <legend>Synchronisation</legend>
               {#each [["subtitle", "Sous-titres", "Z / X"], ["audio", "Audio", null]] as const as [kind, name, keys] (kind)}
                 <div class="stepper" role="group" aria-label={`Décalage ${kind === "subtitle" ? "des sous-titres" : "audio"}`}>
@@ -1020,6 +1043,7 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
           {#if chapterName}<span class="chapter-name">{chapterName}</span>{/if}
           <span class="end-times">
             {#if delays.subtitle !== 0}<span class="time ends" role="status" title="Décalage des sous-titres">Sous-titres {formatDelay(delays.subtitle)}</span>{/if}
+            {#if fitBadge(fit)}<span class="time ends" title="Format de l'image">{fitBadge(fit)}</span>{/if}
             {#if badge}<span class="time ends" title="Vitesse de lecture">{badge}</span>{/if}
             {#if endsLabel}<span class="time ends">{endsLabel}</span>{/if}
             <span class="time" title="Temps restant">{formatRemaining(position, duration)}</span>
