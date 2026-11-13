@@ -46,6 +46,10 @@ pub struct UserDto {
     pub name: String,
     #[serde(default)]
     pub policy: Option<UserPolicy>,
+    /// An object, or an array of one as the documentation types it (ADR 0065):
+    /// read by [`super::tracks::account_tracks`], which keeps four fields only.
+    #[serde(default)]
+    pub configuration: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

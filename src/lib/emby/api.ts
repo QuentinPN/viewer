@@ -37,6 +37,8 @@ export const LIBRARY_CHANGED_EVENT = "emby://library-changed";
 
 export const embyApi = {
   probe: (url: string) => invoke<ServerSummary>("emby_probe", { url }),
+  /** The signed-in server as it answers now; rejects when it cannot be reached. */
+  serverInfo: () => invoke<ServerSummary>("emby_server_info"),
   signIn: (url: string, username: string, password: string) =>
     invoke<SignedInUser>("emby_sign_in", { url, username, password }),
   /** Validates the saved session (ADR 0012); `cancelled` if superseded. */

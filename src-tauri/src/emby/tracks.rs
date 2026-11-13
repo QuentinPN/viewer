@@ -1,7 +1,7 @@
 //! Audio and subtitle preferences kept on this PC (ADR 0035): which streams of the
 //! source to play, from the server's own picks and the user's languages and mode.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::EmbyError;
 use super::models::{MediaStreamDto, PlayMethod};
@@ -239,9 +239,110 @@ pub fn apply(plan: &mut PlaybackPlan, prefs: &TrackPreferences) -> Choice {
     choice
 }
 
+/// The audio and subtitle preferences of the Emby account (ADR 0115), shown next to
+/// the local settings. The server applies them itself when it picks the default
+/// streams of PlaybackInfo, which is what [`SubtitleMode::Server`] and an empty
+/// audio language keep.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountTracks {
+    /// Emby codes in preference order ("fre", "eng").
+    pub audio_languages: Vec<String>,
+    /// `PlayDefaultAudioTrack`: the file's default audio, whatever its language.
+    pub play_default_audio: bool,
+    pub subtitle_languages: Vec<String>,
+    /// `SubtitleMode` among the documented values; `None` when absent or unknown.
+    pub subtitle_mode: Option<String>,
+}
+
+/// Values of `SubtitlePlaybackMode` in the Emby documentation.
+const ACCOUNT_SUBTITLE_MODES: [&str; 6] = [
+    "Default",
+    "Always",
+    "OnlyForced",
+    "None",
+    "Smart",
+    "HearingImpaired",
+];
+
+/// "fre,eng" in order; anything that is not a language code is dropped.
+fn account_languages(preference: Option<&str>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for code in preference.unwrap_or_default().split(',').map(str::trim) {
+        let usable = (2..=8).contains(&code.len())
+            && code.chars().all(|c| c.is_ascii_alphabetic() || c == '-');
+        let code = code.to_ascii_lowercase();
+        if usable && !out.contains(&code) {
+            out.push(code);
+        }
+    }
+    out
+}
+
+/// Reads the four fields from the user's `Configuration`, an object or the first
+/// object of an array; anything else (`ProfilePin`…) is never read.
+pub fn account_tracks(configuration: Option<&serde_json::Value>) -> AccountTracks {
+    let config = match configuration {
+        Some(serde_json::Value::Array(items)) => items.first(),
+        other => other,
+    };
+    let Some(config) = config.and_then(|c| c.as_object()) else {
+        return AccountTracks::default();
+    };
+    let text = |key: &str| config.get(key).and_then(|v| v.as_str());
+    AccountTracks {
+        audio_languages: account_languages(text("AudioLanguagePreference")),
+        play_default_audio: config
+            .get("PlayDefaultAudioTrack")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        subtitle_languages: account_languages(text("SubtitleLanguagePreference")),
+        subtitle_mode: text("SubtitleMode").and_then(|mode| {
+            ACCOUNT_SUBTITLE_MODES
+                .into_iter()
+                .find(|m| m.eq_ignore_ascii_case(mode.trim()))
+                .map(str::to_owned)
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn account_preferences_are_read_from_an_object_or_an_array() {
+        let object = serde_json::json!({
+            "AudioLanguagePreference": "fre, ENG,fre,not a code",
+            "PlayDefaultAudioTrack": true,
+            "SubtitleLanguagePreference": "fre",
+            "SubtitleMode": "onlyforced",
+            "ProfilePin": "1234"
+        });
+        let read = account_tracks(Some(&object));
+        assert_eq!(
+            read,
+            AccountTracks {
+                audio_languages: vec!["fre".into(), "eng".into()],
+                play_default_audio: true,
+                subtitle_languages: vec!["fre".into()],
+                subtitle_mode: Some("OnlyForced".into()),
+            }
+        );
+        let array = serde_json::json!([object]);
+        assert_eq!(account_tracks(Some(&array)), read);
+    }
+
+    #[test]
+    fn missing_or_unknown_account_preferences_ask_for_nothing() {
+        assert_eq!(account_tracks(None), AccountTracks::default());
+        assert_eq!(
+            account_tracks(Some(&serde_json::json!([]))),
+            AccountTracks::default()
+        );
+        let odd = serde_json::json!({ "SubtitleMode": "Sometimes", "AudioLanguagePreference": "" });
+        assert_eq!(account_tracks(Some(&odd)), AccountTracks::default());
+    }
 
     fn streams(json: &str) -> Vec<MediaStreamDto> {
         serde_json::from_str(json).unwrap()

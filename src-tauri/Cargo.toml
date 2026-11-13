@@ -38,7 +38,15 @@ windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
   "Win32_System_LibraryLoader",
+  "Win32_System_Registry",
   "Win32_UI_WindowsAndMessaging",
+] }
+# COM interfaces for Réglages › À propos (ADR 0116); already in the lockfile through Tauri.
+windows = { version = "0.62", features = [
+  "Win32_Graphics_Direct3D",
+  "Win32_Graphics_Direct3D11",
+  "Win32_Graphics_Dxgi",
+  "Win32_Graphics_Dxgi_Common",
 ] }
 
 [profile.release]

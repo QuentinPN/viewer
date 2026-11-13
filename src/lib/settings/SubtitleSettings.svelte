@@ -1,4 +1,5 @@
 <script lang="ts">
+import { onMount } from "svelte";
 import {
   BACKGROUNDS,
   COLORS,
@@ -13,8 +14,40 @@ import {
   savePreferences,
   type TrackPreferences,
 } from "../player/subtitles";
+import {
+  ACCOUNT_DEFAULT,
+  type AccountTracks,
+  accountApi,
+  accountAudioLabel,
+  accountSubtitleLabel,
+  trackSources,
+} from "./accountTracks";
 
 let prefs = $state<PlaybackPreferences>(readPreferences(preferenceStorage()));
+// `undefined` while asking the server, `null` when it could not answer.
+let account = $state<AccountTracks | null | undefined>(undefined);
+const sources = $derived(trackSources(prefs.tracks));
+
+onMount(() => {
+  accountApi.tracks().then(
+    (a) => (account = a),
+    () => (account = null),
+  );
+});
+
+/** "Compte Emby : Français" and whether the local choice replaces it. */
+function accountLine(
+  label: string | null,
+  source: "account" | "local",
+): string {
+  const said =
+    account === undefined
+      ? "Compte Emby : lecture…"
+      : label === null
+        ? "Compte Emby : préférences illisibles, le serveur choisit."
+        : `Compte Emby : ${label}.`;
+  return source === "local" ? `${said} Remplacé par ton choix.` : said;
+}
 
 function changeTracks(next: Partial<TrackPreferences>) {
   prefs = { ...prefs, tracks: { ...prefs.tracks, ...next } };
@@ -40,9 +73,10 @@ const subtitleLanguageHint = $derived(
 <section class="panel" aria-labelledby="settings-subtitles">
   <h2 id="settings-subtitles">Audio et sous-titres</h2>
   <p class="lead">
-    Ces choix restent sur ce poste. Sans piste audio dans la langue demandée, celle
-    proposée par le serveur Emby est gardée ; sans sous-titres dans la langue
-    demandée, aucun n'est affiché. Pendant la lecture, le menu des pistes permet
+    Par défaut, les langues suivent les préférences de ton compte Emby. Un choix fait
+    ici les remplace sur ce PC seulement. Sans piste audio dans la langue choisie,
+    celle proposée par le serveur est gardée ; sans sous-titres dans la langue
+    choisie, aucun n'est affiché. Pendant la lecture, le menu des pistes permet
     toujours d'en changer.
   </p>
 
@@ -51,28 +85,41 @@ const subtitleLanguageHint = $derived(
       <span>Langue audio</span>
       <select
         value={prefs.tracks.audioLanguage ?? ""}
+        aria-describedby="account-audio"
         onchange={(e) =>
           changeTracks({ audioLanguage: language(e.currentTarget.value) })}
       >
-        <option value="">Comme sur le serveur Emby</option>
+        <option value="">{ACCOUNT_DEFAULT}</option>
         {#each LANGUAGES as l (l.code)}
           <option value={l.code}>{l.label}</option>
         {/each}
       </select>
+      <small id="account-audio" class="muted">
+        {accountLine(account ? accountAudioLabel(account) : null, sources.audio)}
+      </small>
     </label>
     <label class="field">
       <span>Sous-titres</span>
       <select
         value={prefs.tracks.subtitleMode}
+        aria-describedby="account-subtitles"
         onchange={(e) =>
           changeTracks({
             subtitleMode: e.currentTarget.value as TrackPreferences["subtitleMode"],
           })}
       >
         {#each SUBTITLE_MODES as m (m.value)}
-          <option value={m.value}>{m.label}</option>
+          <option value={m.value}>
+            {m.value === "server" ? ACCOUNT_DEFAULT : m.label}
+          </option>
         {/each}
       </select>
+      <small id="account-subtitles" class="muted">
+        {accountLine(
+          account ? accountSubtitleLabel(account) : null,
+          sources.subtitles,
+        )}
+      </small>
     </label>
     {#if prefs.tracks.subtitleMode === "forcedOnly" || prefs.tracks.subtitleMode === "always"}
       <label class="field">

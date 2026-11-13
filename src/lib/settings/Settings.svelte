@@ -4,6 +4,7 @@ import { embyApi, toEmbyError } from "../emby/api";
 import type { ArtworkCacheStats, EmbyError, Library } from "../emby/types";
 import { playerApi } from "../player/api";
 import { readSkip, type SkipSetting, saveSkip } from "../player/segments";
+import About from "./About.svelte";
 import Diagnostics from "./Diagnostics.svelte";
 import {
   cacheUsage,
@@ -77,11 +78,11 @@ async function clear() {
 }
 
 onMount(() => {
-  void load();
   playerApi.appInfo().then(
     (info) => (version = info.version),
     () => {},
   );
+  void load();
 });
 </script>
 
@@ -189,6 +190,8 @@ onMount(() => {
 <Diagnostics />
 
 <UpdateSettings {version} />
+
+<About />
 
 <style>
   .heading {
