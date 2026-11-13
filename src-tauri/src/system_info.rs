@@ -1,6 +1,7 @@
 //! What this PC says about itself, for Réglages › À propos (ADR 0116): the build,
-//! the Windows edition and build, and the graphics adapters. Read only: registry
-//! values and DXGI descriptions, no shell, nothing created but a DXGI factory.
+//! the Windows edition and build, the graphics adapters, their hardware decoders and
+//! the displays' HDR state. Read only: registry values, DXGI descriptions and a
+//! short-lived D3D11 video device; no shell.
 
 use serde::Serialize;
 
@@ -13,6 +14,32 @@ pub struct SystemReport {
     pub os: Option<OsInfo>,
     /// Hardware adapters, the software renderer left out; empty when DXGI failed.
     pub gpus: Vec<GpuInfo>,
+    /// Codecs the first hardware adapter decodes through D3D11 Video, the API of
+    /// mpv's `d3d11va` hwdec; `None` when its video device could not be opened.
+    pub decoders: Option<Vec<Codec>>,
+    /// Each display of the hardware adapters; empty when none could be read.
+    pub displays: Vec<DisplayInfo>,
+}
+
+/// A hardware decoding profile the driver lists (DXVA/D3D11 Video profile GUIDs).
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "camelCase")]
+pub enum Codec {
+    H264,
+    Hevc,
+    Hevc10,
+    Vp9,
+    Vp9Profile2,
+    Av1,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DisplayInfo {
+    /// `\\.\DISPLAY1`: Windows' name, the one its display settings number.
+    pub name: String,
+    /// HDR on in Windows: the output's colour space is BT.2020 with PQ.
+    pub hdr: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -79,6 +106,8 @@ pub fn report() -> SystemReport {
         debug_build: cfg!(debug_assertions),
         os: platform::os(),
         gpus: platform::gpus(),
+        decoders: platform::decoders(),
+        displays: platform::displays(),
     }
 }
 
@@ -93,10 +122,23 @@ pub async fn system_report() -> Result<SystemReport, String> {
 mod platform {
     use std::ffi::c_void;
 
-    use windows::Win32::Graphics::Dxgi::{
-        CreateDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE, IDXGIDevice, IDXGIFactory1,
+    use windows::Win32::Foundation::HMODULE;
+    use windows::Win32::Graphics::Direct3D::D3D_DRIVER_TYPE_UNKNOWN;
+    use windows::Win32::Graphics::Direct3D11::{
+        D3D11_CREATE_DEVICE_VIDEO_SUPPORT, D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0,
+        D3D11_DECODER_PROFILE_H264_VLD_NOFGT, D3D11_DECODER_PROFILE_HEVC_VLD_MAIN,
+        D3D11_DECODER_PROFILE_HEVC_VLD_MAIN10, D3D11_DECODER_PROFILE_VP9_VLD_10BIT_PROFILE2,
+        D3D11_DECODER_PROFILE_VP9_VLD_PROFILE0, D3D11_SDK_VERSION, D3D11CreateDevice, ID3D11Device,
+        ID3D11VideoDevice,
     };
-    use windows::core::Interface;
+    use windows::Win32::Graphics::Dxgi::Common::DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
+    use windows::Win32::Graphics::Dxgi::{
+        CreateDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE, IDXGIAdapter1, IDXGIDevice, IDXGIFactory1,
+        IDXGIOutput6,
+    };
+    use windows::core::{GUID, Interface};
+
+    use super::{Codec, DisplayInfo};
     use windows_sys::Win32::Foundation::ERROR_SUCCESS;
     use windows_sys::Win32::System::Registry::{
         HKEY_LOCAL_MACHINE, RRF_RT_REG_DWORD, RRF_RT_REG_SZ, RegGetValueW,
@@ -200,14 +242,121 @@ mod platform {
         }
         found
     }
+
+    fn hardware_adapters() -> Vec<IDXGIAdapter1> {
+        // SAFETY: plain DXGI calls on interfaces owned by this function.
+        let Ok(factory) = (unsafe { CreateDXGIFactory1::<IDXGIFactory1>() }) else {
+            return Vec::new();
+        };
+        let mut adapters = Vec::new();
+        for i in 0.. {
+            // SAFETY: COM call on the factory owned above; an index past the end errs.
+            let Ok(adapter) = (unsafe { factory.EnumAdapters1(i) }) else {
+                break;
+            };
+            // SAFETY: COM call on an adapter the factory just returned.
+            let software = unsafe { adapter.GetDesc1() }
+                .map_or(true, |d| d.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0);
+            if !software {
+                adapters.push(adapter);
+            }
+        }
+        adapters
+    }
+
+    /// Codecs of the profiles a driver lists, in [`Codec`] order.
+    pub fn codecs(profiles: &[GUID]) -> Vec<Codec> {
+        let known = [
+            (D3D11_DECODER_PROFILE_H264_VLD_NOFGT, Codec::H264),
+            (D3D11_DECODER_PROFILE_HEVC_VLD_MAIN, Codec::Hevc),
+            (D3D11_DECODER_PROFILE_HEVC_VLD_MAIN10, Codec::Hevc10),
+            (D3D11_DECODER_PROFILE_VP9_VLD_PROFILE0, Codec::Vp9),
+            (
+                D3D11_DECODER_PROFILE_VP9_VLD_10BIT_PROFILE2,
+                Codec::Vp9Profile2,
+            ),
+            (D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0, Codec::Av1),
+        ];
+        let mut found: Vec<Codec> = known
+            .iter()
+            .filter(|(guid, _)| profiles.contains(guid))
+            .map(|(_, codec)| *codec)
+            .collect();
+        found.sort_unstable();
+        found
+    }
+
+    /// The first hardware adapter is the one D3D11 (and mpv) use by default.
+    pub fn decoders() -> Option<Vec<Codec>> {
+        let adapter = hardware_adapters().into_iter().next()?;
+        let mut device: Option<ID3D11Device> = None;
+        // SAFETY: a video-capable device on that adapter, written to `device`.
+        let created = unsafe {
+            D3D11CreateDevice(
+                &adapter,
+                D3D_DRIVER_TYPE_UNKNOWN,
+                HMODULE::default(),
+                D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
+                None,
+                D3D11_SDK_VERSION,
+                Some(&mut device),
+                None,
+                None,
+            )
+        };
+        if let Err(e) = created {
+            log::info!("D3D11 video device unavailable: {e}");
+            return None;
+        }
+        let video: ID3D11VideoDevice = device?.cast().ok()?;
+        // SAFETY: COM calls on the video device owned here; indexes below the count.
+        let count = unsafe { video.GetVideoDecoderProfileCount() };
+        let profiles: Vec<GUID> = (0..count)
+            // SAFETY: as above.
+            .filter_map(|i| unsafe { video.GetVideoDecoderProfile(i) }.ok())
+            .collect();
+        Some(codecs(&profiles))
+    }
+
+    pub fn displays() -> Vec<DisplayInfo> {
+        let mut displays = Vec::new();
+        for adapter in hardware_adapters() {
+            for j in 0.. {
+                // SAFETY: COM call on an adapter owned here; an index past the end errs.
+                let Ok(output) = (unsafe { adapter.EnumOutputs(j) }) else {
+                    break;
+                };
+                let Ok(output) = output.cast::<IDXGIOutput6>() else {
+                    continue;
+                };
+                // SAFETY: COM call on the output owned here.
+                let Ok(desc) = (unsafe { output.GetDesc1() }) else {
+                    continue;
+                };
+                displays.push(DisplayInfo {
+                    name: wide_to_string(&desc.DeviceName),
+                    hdr: desc.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020,
+                });
+            }
+        }
+        displays
+    }
 }
 
 #[cfg(not(windows))]
 mod platform {
-    use super::{GpuInfo, OsInfo};
+    use super::{Codec, DisplayInfo, GpuInfo, OsInfo};
 
     pub fn os() -> Option<OsInfo> {
         None
+    }
+
+    pub fn decoders() -> Option<Vec<Codec>> {
+        None
+    }
+
+    pub fn displays() -> Vec<DisplayInfo> {
+        Vec::new()
     }
 
     pub fn gpus() -> Vec<GpuInfo> {
@@ -246,6 +395,31 @@ mod tests {
             buf[i] = c;
         }
         assert_eq!(wide_to_string(&buf), "GPU");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn decoder_profiles_map_to_codecs() {
+        use windows::Win32::Graphics::Direct3D11::{
+            D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0, D3D11_DECODER_PROFILE_HEVC_VLD_MAIN10,
+            D3D11_DECODER_PROFILE_MPEG2_VLD,
+        };
+        assert_eq!(
+            platform::codecs(&[
+                D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0,
+                D3D11_DECODER_PROFILE_MPEG2_VLD,
+                D3D11_DECODER_PROFILE_HEVC_VLD_MAIN10,
+            ]),
+            vec![Codec::Hevc10, Codec::Av1]
+        );
+        assert!(platform::codecs(&[]).is_empty());
+    }
+
+    /// `cargo test print_report -- --ignored --nocapture` shows what this PC reports.
+    #[test]
+    #[ignore]
+    fn print_report() {
+        eprintln!("{:#?}", report());
     }
 
     #[test]

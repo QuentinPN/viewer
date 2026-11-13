@@ -14,10 +14,60 @@ export interface GpuInfo {
   driver: string | null;
 }
 
+export type Codec = "h264" | "hevc" | "hevc10" | "vp9" | "vp9Profile2" | "av1";
+
+export interface DisplayInfo {
+  name: string;
+  hdr: boolean;
+}
+
 export interface SystemReport {
   debugBuild: boolean;
   os: OsInfo | null;
   gpus: GpuInfo[];
+  /** D3D11 Video profiles of the first GPU; `null` when they could not be read. */
+  decoders: Codec[] | null;
+  displays: DisplayInfo[];
+}
+
+/** The codecs shown, in this order, whether decoded by the GPU or not. */
+export const CODECS: readonly { codec: Codec; label: string }[] = [
+  { codec: "h264", label: "H.264" },
+  { codec: "hevc", label: "HEVC" },
+  { codec: "hevc10", label: "HEVC 10 bits" },
+  { codec: "vp9", label: "VP9" },
+  { codec: "vp9Profile2", label: "VP9 10 bits" },
+  { codec: "av1", label: "AV1" },
+];
+
+/**
+ * One row per codec: "Matériel" when the GPU's driver lists it, else "Logiciel"
+ * (mpv still decodes it, on the processor). "Inconnu" when nothing was read.
+ */
+export function decoderRows(decoders: Codec[] | null): InfoRow[] {
+  return CODECS.map(({ codec, label }) => ({
+    label,
+    value:
+      decoders === null
+        ? UNKNOWN
+        : decoders.includes(codec)
+          ? "Matériel"
+          : "Logiciel",
+  }));
+}
+
+/** "\\.\DISPLAY2" is "Écran 2", as Windows' display settings number it. */
+export function displayName(name: string, index: number): string {
+  const n = /DISPLAY(\d+)$/i.exec(name)?.[1];
+  return `Écran ${n ?? index + 1}`;
+}
+
+export function hdrRows(displays: DisplayInfo[]): InfoRow[] {
+  if (displays.length === 0) return [{ label: "HDR", value: UNKNOWN }];
+  return displays.map((d, i) => ({
+    label: `HDR · ${displayName(d.name, i)}`,
+    value: d.hdr ? "Activé" : "Désactivé dans Windows",
+  }));
 }
 
 export const systemApi = {
