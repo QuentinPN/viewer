@@ -1,6 +1,6 @@
 # Journal des versions
 
-## 1.3.0 — en cours
+## 1.3.0 — 2026-11-13
 
 - Réglages › Mises à jour : version installée et bouton « Rechercher des mises à jour ». La nouvelle version est téléchargée et vérifiée, puis « Redémarrer maintenant » l'installe. Hors du réseau de la maison, le message le dit (ADR 0112).
 - Réglages › Accueil : choisis l'ordre des rangées de l'accueil (glisser-déposer ou « Monter / Descendre ») et masque celles que tu ne veux pas ; une rangée masquée n'est plus demandée au serveur (ADR 0113).

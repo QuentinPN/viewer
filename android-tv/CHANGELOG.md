@@ -2,7 +2,7 @@
 
 Chaque version livrée sur la Shield augmente `versionName` et `versionCode` dans `app/build.gradle.kts` et ajoute sa section ici.
 
-## 1.2.0 — en cours
+## 1.2.0 — 2026-11-13
 
 - Réglages › Mises à jour : version installée, « Rechercher une mise à jour » et, quand elle est prête, « Installer la version X » (ADR 0112).
 - Réglages › Accueil : appui long sur OK pour déplacer une rangée, ▲ ▼ pour la placer, OK ou Retour pour la poser (ADR 0114).
