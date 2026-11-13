@@ -127,7 +127,7 @@ class CardMenuTest {
     @Test
     fun messagesAreInFrench() {
         assertEquals("Ajouté à Soirée", addedTo("Soirée"))
-        assertEquals("Ajout impossible. Session expirée. Reconnectez-vous.", playlistFailed(EmbyError.SessionExpired))
+        assertEquals("Ajout impossible. Session expirée. Reconnecte-toi.", playlistFailed(EmbyError.SessionExpired))
     }
 
     @Test

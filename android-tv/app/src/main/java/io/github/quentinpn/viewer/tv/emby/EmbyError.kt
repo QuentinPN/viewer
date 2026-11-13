@@ -5,17 +5,17 @@ sealed class EmbyError(val message: String) {
     class InvalidUrl(reason: String) : EmbyError("Adresse invalide : $reason.")
 
     data object InsecureRemoteUrl :
-        EmbyError("HTTP non chiffré n'est accepté que sur le réseau local. Utilisez https://.")
+        EmbyError("HTTP non chiffré n'est accepté que sur le réseau local. Utilise https://.")
 
-    data object Unreachable : EmbyError("Serveur injoignable. Vérifiez l'adresse et le réseau.")
+    data object Unreachable : EmbyError("Serveur injoignable. Vérifie l'adresse et le réseau.")
 
     /** Another server answers at a saved address (ADR 0012, 0104): its token is never sent there. */
     data object ServerMismatch :
-        EmbyError("Un autre serveur répond à cette adresse. Vérifiez l'adresse ou connectez-vous manuellement.")
+        EmbyError("Un autre serveur répond à cette adresse. Vérifie l'adresse ou connecte-toi manuellement.")
 
     data object InvalidCredentials :EmbyError("Nom d'utilisateur ou mot de passe incorrect.")
 
-    data object SessionExpired : EmbyError("Session expirée. Reconnectez-vous.")
+    data object SessionExpired : EmbyError("Session expirée. Reconnecte-toi.")
 
     data object Forbidden : EmbyError("Accès refusé par le serveur.")
 

@@ -82,7 +82,7 @@ class ItemActionsTest {
 
     @Test
     fun aFailureSaysSoInFrench() {
-        assertEquals("Action impossible. Serveur injoignable. Vérifiez l'adresse et le réseau.", actionFailed(EmbyError.Unreachable))
+        assertEquals("Action impossible. Serveur injoignable. Vérifie l'adresse et le réseau.", actionFailed(EmbyError.Unreachable))
     }
 
     @Test

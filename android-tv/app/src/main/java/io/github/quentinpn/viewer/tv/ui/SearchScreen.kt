@@ -80,19 +80,19 @@ internal fun searchGroups(results: SearchResults): List<SearchGroup> = listOfNot
         "Films",
         results.movies,
         landscape = false,
-        note = if (results.moreMovies) "Seuls les $SEARCH_SHOWN premiers films sont affichés : précisez la recherche." else null,
+        note = if (results.moreMovies) "Seuls les $SEARCH_SHOWN premiers films sont affichés : précise la recherche." else null,
     ).takeIf { it.items.isNotEmpty() },
     SearchGroup(
         "Séries",
         results.series,
         landscape = false,
-        note = if (results.moreSeries) "Seules les $SEARCH_SHOWN premières séries sont affichées : précisez la recherche." else null,
+        note = if (results.moreSeries) "Seules les $SEARCH_SHOWN premières séries sont affichées : précise la recherche." else null,
     ).takeIf { it.items.isNotEmpty() },
     SearchGroup(
         "Épisodes",
         results.episodes,
         landscape = true,
-        note = if (results.moreEpisodes) "D'autres épisodes peuvent correspondre : précisez la recherche." else null,
+        note = if (results.moreEpisodes) "D'autres épisodes peuvent correspondre : précise la recherche." else null,
     ).takeIf { it.items.isNotEmpty() },
 )
 
@@ -235,7 +235,7 @@ fun SearchScreen(
             return@Column
         }
         when (val s = memory.state) {
-            SearchState.Idle -> Centered("Saisissez au moins deux lettres d'un titre de film, de série ou d'épisode.")
+            SearchState.Idle -> Centered("Saisis au moins deux lettres d'un titre de film, de série ou d'épisode.")
             SearchState.Loading -> Centered("Recherche…")
             is SearchState.Failed -> Retry("Impossible de lancer la recherche : ${s.message}") { memory.attempt++ }
             is SearchState.Ready -> if (s.results.isEmpty) {

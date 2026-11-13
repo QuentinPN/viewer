@@ -75,6 +75,6 @@ class ReconnectTest {
         val gone = SavedServer(server = "http://127.0.0.1:$port", userId = "u1", userName = "Quentin", sealedToken = "x")
         val result = reconnect(gone, "secret-token", device, http)
         assertEquals(Reconnect.Failed(EmbyError.Unreachable), result)
-        assertEquals("Serveur injoignable. Vérifiez l'adresse et le réseau.", (result as Reconnect.Failed).error.message)
+        assertEquals("Serveur injoignable. Vérifie l'adresse et le réseau.", (result as Reconnect.Failed).error.message)
     }
 }

@@ -10,6 +10,7 @@ Chaque version livrée sur la Shield augmente `versionName` et `versionCode` dan
 - Serveur injoignable : un écran garde ta session, réessaie tout seul (2, 4, 8… 30 s) et propose « Réessayer » ou « Changer de serveur » ; tu reviens où tu étais (ADR 0119).
 - Fiches film et épisode : bouton « Infos techniques » (vidéo, fichier, pistes audio et sous-titres) de la version jouée (ADR 0119).
 - « Rechercher une mise à jour » sans version publiée sur le canal : « Aucune version publiée pour l'instant. » au lieu d'une erreur HTTP 404.
+- Tous les textes te tutoient, comme sur Windows (accueil, connexion, recherche, erreurs, réglages).
 - Réglages › Langues : langue audio, mode et langue des sous-titres. Par défaut « Comme le compte Emby » ; un choix local passe devant (ADR 0115, 0120).
 
 ## 1.1.0 — 2026-11-13

@@ -172,7 +172,7 @@ fun SettingsScreen(
             Choice(
                 "Chercher les intros et génériques sur IntroDB et TheIntroDB",
                 "Seuls les identifiants IMDb, TMDB ou TVDB du film ou de la série, la saison, l'épisode et la durée " +
-                    "sont envoyés. Jamais votre compte ni l'adresse du serveur.",
+                    "sont envoyés. Jamais ton compte ni l'adresse du serveur.",
                 onOff(settings.externalSegments),
                 Modifier.focusRequester(first),
             ) { change(settings.copy(externalSegments = !settings.externalSegments)) }
@@ -190,7 +190,7 @@ fun SettingsScreen(
         item {
             Note(
                 "Au-delà du débit choisi, le serveur Emby convertit le film à la volée pour le réduire. Utile hors " +
-                    "de chez vous, quand la connexion ne suit pas. OK passe au débit suivant.",
+                    "de chez toi, quand la connexion ne suit pas. OK passe au débit suivant.",
             )
         }
         item {

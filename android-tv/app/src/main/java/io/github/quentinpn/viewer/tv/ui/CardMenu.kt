@@ -376,7 +376,7 @@ internal fun CardMenu(
                     MenuRow("Créer", MenuIcon.PlaylistAdd, busy, Modifier) {
                         val chosen = playlistName(name)
                         if (chosen == null) {
-                            message = "Saisissez un nom."
+                            message = "Saisis un nom."
                         } else {
                             run {
                                 val created = client.createPlaylist(userId, chosen, item.id)

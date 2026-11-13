@@ -18,7 +18,7 @@ class SearchGroupsTest {
         assertEquals(listOf("Films", "Épisodes"), groups.map { it.title })
         assertEquals(listOf(false, true), groups.map { it.landscape })
         assertNull(groups[0].note)
-        assertEquals("D'autres épisodes peuvent correspondre : précisez la recherche.", groups[1].note)
+        assertEquals("D'autres épisodes peuvent correspondre : précise la recherche.", groups[1].note)
     }
 
     @Test
@@ -26,8 +26,8 @@ class SearchGroupsTest {
         val groups = searchGroups(
             SearchResults("le", movies = listOf(item("m", "Movie")), series = listOf(item("s", "Series")), moreMovies = true, moreSeries = true),
         )
-        assertEquals("Seuls les 24 premiers films sont affichés : précisez la recherche.", groups[0].note)
-        assertEquals("Seules les 24 premières séries sont affichées : précisez la recherche.", groups[1].note)
+        assertEquals("Seuls les 24 premiers films sont affichés : précise la recherche.", groups[0].note)
+        assertEquals("Seules les 24 premières séries sont affichées : précise la recherche.", groups[1].note)
     }
 
     @Test

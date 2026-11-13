@@ -100,9 +100,9 @@ internal fun firstStep(reauthKey: String?, servers: List<SavedServer>): ShelfSte
     if (reauthKey != null && servers.any { it.key == reauthKey }) ShelfStep.Reauth(reauthKey) else ShelfStep.Shelf
 
 internal fun shelfMessage(manage: Boolean, count: Int): String = when {
-    manage -> "Choisissez le serveur à oublier."
-    count > 0 -> "Qui regarde ? Choisissez un serveur."
-    else -> "Bienvenue. Ajoutez votre premier serveur Emby."
+    manage -> "Choisis le serveur à oublier."
+    count > 0 -> "Qui regarde ? Choisis un serveur."
+    else -> "Bienvenue. Ajoute ton premier serveur Emby."
 }
 
 /** Under a tile's name: who signs in, and where. */
@@ -271,7 +271,7 @@ fun PreConnectionScreen(
         ShelfStep.Manual -> ShelfCard(::back) {
             SignInForm(
                 title = "Connexion manuelle",
-                message = "Saisissez l'adresse de votre serveur Emby et vos identifiants.",
+                message = "Saisis l'adresse de ton serveur Emby et tes identifiants.",
                 fixedServer = null,
                 initialServer = store.lastServer,
                 initialUser = "",
@@ -285,7 +285,7 @@ fun PreConnectionScreen(
             ShelfCard(::back) {
                 SignInForm(
                     title = "Session expirée",
-                    message = "Le serveur « ${entry.displayName} » demande à nouveau votre mot de passe.",
+                    message = "Le serveur « ${entry.displayName} » demande à nouveau ton mot de passe.",
                     fixedServer = entry.server,
                     initialServer = null,
                     initialUser = entry.userName,

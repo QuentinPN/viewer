@@ -336,7 +336,7 @@ fun HomeScreen(
             is HomeState.Ready -> if (s.shelves.isEmpty() && s.hero.isEmpty()) {
                 Message(
                     if (rows.hidden.isEmpty()) {
-                        "Aucun film ni série dans vos bibliothèques."
+                        "Aucun film ni série dans tes bibliothèques."
                     } else {
                         "Rien à afficher. Les rangées masquées se rétablissent dans Réglages › Accueil."
                     },

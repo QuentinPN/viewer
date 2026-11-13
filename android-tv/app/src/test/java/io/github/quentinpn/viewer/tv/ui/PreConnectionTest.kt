@@ -53,9 +53,9 @@ class PreConnectionTest {
 
     @Test
     fun shelfMessages() {
-        assertEquals("Choisissez le serveur à oublier.", shelfMessage(manage = true, count = 2))
-        assertEquals("Qui regarde ? Choisissez un serveur.", shelfMessage(manage = false, count = 1))
-        assertEquals("Bienvenue. Ajoutez votre premier serveur Emby.", shelfMessage(manage = false, count = 0))
+        assertEquals("Choisis le serveur à oublier.", shelfMessage(manage = true, count = 2))
+        assertEquals("Qui regarde ? Choisis un serveur.", shelfMessage(manage = false, count = 1))
+        assertEquals("Bienvenue. Ajoute ton premier serveur Emby.", shelfMessage(manage = false, count = 0))
     }
 
     @Test
