@@ -4,7 +4,7 @@
 
 > « Je stream mon écran à mes amis sur discord pour regarder des épisodes d'animés, j'aimerais pouvoir leur stream mon écran, et moi regarder sur ma télé en même temps (synchronisé) l'épisode qu'eux voient sur mon partage d'écran, et si je fait une action sur la TV ça la fait sur l'ordi aussi (ex, pause, skip >>>, ou <<<, skip intro etc.) »
 
-Il a demandé un plan avant de coder ; le plan ci-dessous a été présenté. **Étape 0 faite le 2026-11-14** : le relais Emby convient (ADR 0123, preuve `docs/evidence/synchro-tv-relais-emby-2026-11-14.md`). Prochaine étape : l'étape 1.
+Il a demandé un plan avant de coder ; le plan ci-dessous a été présenté. **Étape 0 faite le 2026-11-14** : le relais Emby convient (ADR 0123, preuve `docs/evidence/synchro-tv-relais-emby-2026-11-14.md`). **Étapes 1 à 6 faites le 2026-11-14** (ADR 0124, desktop 1.4.0, Android TV 1.3.0). Test réel : `docs/evidence/synchro-tv-reel-2026-11-14.md`. Tout passe sauf la dérive en régime établi : p95 230 ms pour une cible de 150 ms. L'écart restant vient de `time-pos` de mpv sur la Shield, pas du relais.
 
 ## Constat dans le dépôt
 
