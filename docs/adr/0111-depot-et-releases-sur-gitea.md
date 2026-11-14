@@ -3,7 +3,7 @@
 Statut : Accepté (2026-11-13). Remplace la partie « release GitHub » des ADR 0106 et 0107.
 
 ## Contexte
-Le propriétaire veut un auto-updater sur le desktop et la Shield. Le dépôt GitHub est privé : les apps ne pourraient télécharger les releases qu'avec un jeton GitHub stocké sur chaque appareil. Il a choisi d'héberger ses dépôts sur un Gitea à lui (Docker, sur le mini-PC `192.0.2.14`, port 3300, Gitea 1.24.7), joignable seulement sur son réseau local.
+Le propriétaire veut un auto-updater sur le desktop et la Shield. Le dépôt GitHub est privé : les apps ne pourraient télécharger les releases qu'avec un jeton GitHub stocké sur chaque appareil. Il a choisi d'héberger ses dépôts sur un Gitea à lui (Docker, sur le mini-PC `192.0.2.14`, port 3300, Gitea 1.24.7 à la création, 28.3.0 depuis novembre 2026 : endpoints utilisés revérifiés, inchangés), joignable seulement sur son réseau local.
 
 ## Décision
 - **Migration** : dépôt privé `QuentinPN/Viewer` créé sur Gitea, `git push --mirror` depuis GitHub (branches et tags identiques ; les refs `refs/pull/*` de GitHub sont refusées par Gitea, sans conséquence), puis les 6 releases recopiées depuis le PC avec leurs notes et fichiers. Le jeton GitHub n'a pas été confié à Gitea.
