@@ -1,5 +1,17 @@
 # Journal des versions
 
+## 1.4.0 — 2026-11-14
+
+- Gate 7: real PC + Shield linked playback test and its evidence
+- Android TV: steadier linked recalage on the Shield (ADR 0124)
+- Linked playback: accept underscores in ids, log kinds only, keep the TV socket across screens
+- Desktop: lead linked playback with the TV over the Emby relay (ADR 0124)
+- Android TV: follow the desktop playback over the Emby relay (ADR 0124)
+- ADR 0124: linked playback protocol and shared test vectors
+- ADR 0123: linked TV playback goes through the Emby session relay
+- Add the claude-boilerplate setup and the TV sync hand-off
+- ADR 0111: note the Gitea 28.3.0 upgrade, release API unchanged
+
 ## 1.3.1 — 2026-11-13
 
 - Réglages : les sections occupent toute la fenêtre, en colonnes selon sa largeur (une sur fenêtre étroite, jusqu'à quatre sur grand écran). Les réglages du quotidien viennent d'abord, en panneaux pleins et sans trou (Lecture et Qualité l'une sous l'autre, puis Audio et sous-titres, puis Accueil) ; mises à jour, cache, journaux et détails techniques sont regroupés plus bas sous « Informations et maintenance », en panneaux plus discrets.
