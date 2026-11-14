@@ -1,0 +1,875 @@
+{
+  "comment": "Shared test vectors for ADR 0124. Desktop (Rust) and Android TV (Kotlin) tests read this file.",
+  "maxBytes": 1024,
+  "valid": [
+    {
+      "name": "join",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"join\"}",
+      "kind": "join",
+      "fields": {},
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "load full",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"load\",\"itemId\":\"68397\",\"mediaSourceId\":\"mediasource-68397\",\"positionMs\":754000,\"audioStreamIndex\":1,\"subtitleStreamIndex\":3}",
+      "kind": "load",
+      "fields": {
+        "itemId": "68397",
+        "mediaSourceId": "mediasource-68397",
+        "positionMs": 754000,
+        "audioStreamIndex": 1,
+        "subtitleStreamIndex": 3
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "load minimal",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"load\",\"itemId\":\"68397\",\"positionMs\":0}",
+      "kind": "load",
+      "fields": {
+        "itemId": "68397",
+        "positionMs": 0
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "load no subtitles",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"load\",\"itemId\":\"1\",\"positionMs\":5,\"subtitleStreamIndex\":-1}",
+      "kind": "load",
+      "fields": {
+        "itemId": "1",
+        "positionMs": 5,
+        "subtitleStreamIndex": -1
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "ready",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"ready\",\"itemId\":\"68397\",\"positionMs\":754000}",
+      "kind": "ready",
+      "fields": {
+        "itemId": "68397",
+        "positionMs": 754000
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "state playing",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"state\",\"itemId\":\"68397\",\"positionMs\":755012,\"paused\":false,\"buffering\":false}",
+      "kind": "state",
+      "fields": {
+        "itemId": "68397",
+        "positionMs": 755012,
+        "paused": false,
+        "buffering": false
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "state paused buffering",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"state\",\"itemId\":\"68397\",\"positionMs\":1,\"paused\":true,\"buffering\":true}",
+      "kind": "state",
+      "fields": {
+        "itemId": "68397",
+        "positionMs": 1,
+        "paused": true,
+        "buffering": true
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "cmd pause",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"cmd\",\"action\":\"pause\"}",
+      "kind": "cmd",
+      "fields": {
+        "action": "pause"
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "cmd play",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"cmd\",\"action\":\"play\"}",
+      "kind": "cmd",
+      "fields": {
+        "action": "play"
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "cmd seek",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"cmd\",\"action\":\"seek\",\"positionMs\":128000}",
+      "kind": "cmd",
+      "fields": {
+        "action": "seek",
+        "positionMs": 128000
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "cmd next",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"cmd\",\"action\":\"next\"}",
+      "kind": "cmd",
+      "fields": {
+        "action": "next"
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "cmd previous",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"cmd\",\"action\":\"previous\"}",
+      "kind": "cmd",
+      "fields": {
+        "action": "previous"
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "buffering on",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"buffering\",\"on\":true}",
+      "kind": "buffering",
+      "fields": {
+        "on": true
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "ping with drift",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"ping\",\"t\":123456789,\"driftMs\":-42}",
+      "kind": "ping",
+      "fields": {
+        "t": 123456789,
+        "driftMs": -42
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "ping without drift",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"ping\",\"t\":0}",
+      "kind": "ping",
+      "fields": {
+        "t": 0
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "pong",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"pong\",\"t\":123456789}",
+      "kind": "pong",
+      "fields": {
+        "t": 123456789
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "bye stopped",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"bye\",\"reason\":\"stopped\"}",
+      "kind": "bye",
+      "fields": {
+        "reason": "stopped"
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "bye timeout",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"bye\",\"reason\":\"timeout\"}",
+      "kind": "bye",
+      "fields": {
+        "reason": "timeout"
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "unknown field ignored",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"cmd\",\"action\":\"pause\",\"later\":{\"x\":1}}",
+      "kind": "cmd",
+      "fields": {
+        "action": "pause"
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    },
+    {
+      "name": "max position",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"ready\",\"itemId\":\"a\",\"positionMs\":86400000}",
+      "kind": "ready",
+      "fields": {
+        "itemId": "a",
+        "positionMs": 86400000
+      },
+      "from": "sess-a1",
+      "link": "link-0001",
+      "seq": 7
+    }
+  ],
+  "invalid": [
+    {
+      "name": "not json",
+      "raw": "{tv:sync",
+      "reason": "json"
+    },
+    {
+      "name": "json array",
+      "raw": "[1,2]",
+      "reason": "json"
+    },
+    {
+      "name": "too long",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"cmd\",\"action\":\"pause\",\"pad\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}",
+      "reason": "size"
+    },
+    {
+      "name": "not ours",
+      "raw": "{\"tv\":\"other\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":1,\"kind\":\"join\"}",
+      "reason": "version"
+    },
+    {
+      "name": "other version",
+      "raw": "{\"tv\":\"sync\",\"v\":2,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"join\"}",
+      "reason": "version"
+    },
+    {
+      "name": "missing from",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"link\":\"link-0001\",\"seq\":1,\"kind\":\"join\"}",
+      "reason": "field"
+    },
+    {
+      "name": "bad from chars",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"a b\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"join\"}",
+      "reason": "field"
+    },
+    {
+      "name": "short link",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"abc\",\"seq\":7,\"kind\":\"join\"}",
+      "reason": "field"
+    },
+    {
+      "name": "negative seq",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":-1,\"kind\":\"join\"}",
+      "reason": "field"
+    },
+    {
+      "name": "fractional seq",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":1.5,\"kind\":\"join\"}",
+      "reason": "field"
+    },
+    {
+      "name": "unknown kind",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"dance\"}",
+      "reason": "kind"
+    },
+    {
+      "name": "load without item",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"load\",\"positionMs\":1}",
+      "reason": "field"
+    },
+    {
+      "name": "load position too big",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"load\",\"itemId\":\"1\",\"positionMs\":86400001}",
+      "reason": "field"
+    },
+    {
+      "name": "load negative position",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"load\",\"itemId\":\"1\",\"positionMs\":-5}",
+      "reason": "field"
+    },
+    {
+      "name": "load bad item chars",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"load\",\"itemId\":\"../x\",\"positionMs\":1}",
+      "reason": "field"
+    },
+    {
+      "name": "load audio index too big",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"load\",\"itemId\":\"1\",\"positionMs\":1,\"audioStreamIndex\":1000}",
+      "reason": "field"
+    },
+    {
+      "name": "state paused not boolean",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"state\",\"itemId\":\"1\",\"positionMs\":1,\"paused\":\"no\",\"buffering\":false}",
+      "reason": "field"
+    },
+    {
+      "name": "cmd unknown action",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"cmd\",\"action\":\"volume\"}",
+      "reason": "field"
+    },
+    {
+      "name": "cmd seek without position",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"cmd\",\"action\":\"seek\"}",
+      "reason": "field"
+    },
+    {
+      "name": "bye unknown reason",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"bye\",\"reason\":\"bored\"}",
+      "reason": "field"
+    },
+    {
+      "name": "ping without t",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"ping\"}",
+      "reason": "field"
+    }
+  ],
+  "accept": [
+    {
+      "name": "join when idle starts a link",
+      "state": null,
+      "msg": {
+        "from": "tv-1",
+        "link": "link-new1",
+        "seq": 0,
+        "kind": "join"
+      },
+      "accept": true
+    },
+    {
+      "name": "load when idle starts a link",
+      "state": null,
+      "msg": {
+        "from": "pc-1",
+        "link": "link-new1",
+        "seq": 0,
+        "kind": "load"
+      },
+      "accept": true
+    },
+    {
+      "name": "state when idle is ignored",
+      "state": null,
+      "msg": {
+        "from": "pc-1",
+        "link": "link-new1",
+        "seq": 3,
+        "kind": "state"
+      },
+      "accept": false
+    },
+    {
+      "name": "peer, same link, newer seq",
+      "state": {
+        "peer": "pc-1",
+        "link": "link-0001",
+        "lastSeq": 4
+      },
+      "msg": {
+        "from": "pc-1",
+        "link": "link-0001",
+        "seq": 5,
+        "kind": "state"
+      },
+      "accept": true
+    },
+    {
+      "name": "duplicate seq",
+      "state": {
+        "peer": "pc-1",
+        "link": "link-0001",
+        "lastSeq": 5
+      },
+      "msg": {
+        "from": "pc-1",
+        "link": "link-0001",
+        "seq": 5,
+        "kind": "state"
+      },
+      "accept": false
+    },
+    {
+      "name": "older seq",
+      "state": {
+        "peer": "pc-1",
+        "link": "link-0001",
+        "lastSeq": 9
+      },
+      "msg": {
+        "from": "pc-1",
+        "link": "link-0001",
+        "seq": 2,
+        "kind": "state"
+      },
+      "accept": false
+    },
+    {
+      "name": "first message from peer in link",
+      "state": {
+        "peer": "pc-1",
+        "link": "link-0001",
+        "lastSeq": null
+      },
+      "msg": {
+        "from": "pc-1",
+        "link": "link-0001",
+        "seq": 0,
+        "kind": "load"
+      },
+      "accept": true
+    },
+    {
+      "name": "other session",
+      "state": {
+        "peer": "pc-1",
+        "link": "link-0001",
+        "lastSeq": 4
+      },
+      "msg": {
+        "from": "pc-2",
+        "link": "link-0001",
+        "seq": 5,
+        "kind": "state"
+      },
+      "accept": false
+    },
+    {
+      "name": "peer, other link",
+      "state": {
+        "peer": "pc-1",
+        "link": "link-0001",
+        "lastSeq": 4
+      },
+      "msg": {
+        "from": "pc-1",
+        "link": "link-0002",
+        "seq": 5,
+        "kind": "state"
+      },
+      "accept": false
+    },
+    {
+      "name": "a new join while linked is still read (to answer busy)",
+      "state": {
+        "peer": "tv-1",
+        "link": "link-0001",
+        "lastSeq": 4
+      },
+      "msg": {
+        "from": "tv-2",
+        "link": "link-0009",
+        "seq": 0,
+        "kind": "join"
+      },
+      "accept": "busy"
+    },
+    {
+      "name": "a new load while linked is still read (to answer busy)",
+      "state": {
+        "peer": "pc-1",
+        "link": "link-0001",
+        "lastSeq": 4
+      },
+      "msg": {
+        "from": "pc-2",
+        "link": "link-0009",
+        "seq": 0,
+        "kind": "load"
+      },
+      "accept": "busy"
+    }
+  ],
+  "rtt": [
+    {
+      "samples": [],
+      "rttMs": 0
+    },
+    {
+      "samples": [40],
+      "rttMs": 40
+    },
+    {
+      "samples": [10, 50, 30],
+      "rttMs": 30
+    },
+    {
+      "samples": [10, 20, 30, 40],
+      "rttMs": 30
+    },
+    {
+      "samples": [100, 10, 20, 30, 40, 50],
+      "rttMs": 30
+    },
+    {
+      "samples": [5, 5, 300, 5, 5],
+      "rttMs": 5
+    }
+  ],
+  "projection": [
+    {
+      "name": "playing",
+      "state": {
+        "positionMs": 10000,
+        "paused": false,
+        "buffering": false
+      },
+      "recvAt": 1000,
+      "now": 1500,
+      "rttMs": 40,
+      "offsetMs": 0,
+      "targetMs": 10520
+    },
+    {
+      "name": "paused does not move",
+      "state": {
+        "positionMs": 10000,
+        "paused": true,
+        "buffering": false
+      },
+      "recvAt": 1000,
+      "now": 1500,
+      "rttMs": 40,
+      "offsetMs": 0,
+      "targetMs": 10000
+    },
+    {
+      "name": "buffering does not move",
+      "state": {
+        "positionMs": 10000,
+        "paused": false,
+        "buffering": true
+      },
+      "recvAt": 1000,
+      "now": 1500,
+      "rttMs": 40,
+      "offsetMs": 0,
+      "targetMs": 10000
+    },
+    {
+      "name": "tv offset",
+      "state": {
+        "positionMs": 10000,
+        "paused": false,
+        "buffering": false
+      },
+      "recvAt": 1000,
+      "now": 1500,
+      "rttMs": 40,
+      "offsetMs": 300,
+      "targetMs": 10220
+    },
+    {
+      "name": "odd rtt halves down",
+      "state": {
+        "positionMs": 0,
+        "paused": false,
+        "buffering": false
+      },
+      "recvAt": 0,
+      "now": 0,
+      "rttMs": 41,
+      "offsetMs": 0,
+      "targetMs": 20
+    },
+    {
+      "name": "offset never goes below zero",
+      "state": {
+        "positionMs": 100,
+        "paused": true,
+        "buffering": false
+      },
+      "recvAt": 0,
+      "now": 0,
+      "rttMs": 0,
+      "offsetMs": 500,
+      "targetMs": 0
+    }
+  ],
+  "decide": [
+    {
+      "name": "seek settling",
+      "input": {
+        "leaderPaused": false,
+        "tvPaused": false,
+        "correcting": false,
+        "sinceSeekMs": 500,
+        "targetMs": 100000,
+        "tvPositionMs": 105000
+      },
+      "out": {}
+    },
+    {
+      "name": "leader paused, tv playing, close",
+      "input": {
+        "leaderPaused": true,
+        "tvPaused": false,
+        "correcting": false,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 100010
+      },
+      "out": {
+        "pause": true
+      }
+    },
+    {
+      "name": "leader paused, tv paused, off by 200",
+      "input": {
+        "leaderPaused": true,
+        "tvPaused": true,
+        "correcting": false,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 100200
+      },
+      "out": {
+        "seekTo": 100000
+      }
+    },
+    {
+      "name": "leader paused, tv paused, exactly 60 is fine",
+      "input": {
+        "leaderPaused": true,
+        "tvPaused": true,
+        "correcting": false,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 100060
+      },
+      "out": {}
+    },
+    {
+      "name": "leader paused while correcting",
+      "input": {
+        "leaderPaused": true,
+        "tvPaused": true,
+        "correcting": true,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 100000
+      },
+      "out": {
+        "speed": 1
+      }
+    },
+    {
+      "name": "leader paused, tv playing, far",
+      "input": {
+        "leaderPaused": true,
+        "tvPaused": false,
+        "correcting": true,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 98000
+      },
+      "out": {
+        "pause": true,
+        "speed": 1,
+        "seekTo": 100000
+      }
+    },
+    {
+      "name": "leader plays, tv paused, aligned",
+      "input": {
+        "leaderPaused": false,
+        "tvPaused": true,
+        "correcting": false,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 100000
+      },
+      "out": {
+        "resume": true
+      }
+    },
+    {
+      "name": "leader plays, tv paused, far",
+      "input": {
+        "leaderPaused": false,
+        "tvPaused": true,
+        "correcting": false,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 101200
+      },
+      "out": {
+        "resume": true,
+        "seekTo": 100000
+      }
+    },
+    {
+      "name": "far ahead",
+      "input": {
+        "leaderPaused": false,
+        "tvPaused": false,
+        "correcting": false,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 101500
+      },
+      "out": {
+        "seekTo": 100000
+      }
+    },
+    {
+      "name": "far behind while correcting",
+      "input": {
+        "leaderPaused": false,
+        "tvPaused": false,
+        "correcting": true,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 98500
+      },
+      "out": {
+        "seekTo": 100000,
+        "speed": 1
+      }
+    },
+    {
+      "name": "1000 is not far",
+      "input": {
+        "leaderPaused": false,
+        "tvPaused": false,
+        "correcting": false,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 101000
+      },
+      "out": {
+        "speed": 0.96
+      }
+    },
+    {
+      "name": "small ahead",
+      "input": {
+        "leaderPaused": false,
+        "tvPaused": false,
+        "correcting": false,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 100030
+      },
+      "out": {}
+    },
+    {
+      "name": "60 starts correcting",
+      "input": {
+        "leaderPaused": false,
+        "tvPaused": false,
+        "correcting": false,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 100060
+      },
+      "out": {
+        "speed": 0.96
+      }
+    },
+    {
+      "name": "ahead 80",
+      "input": {
+        "leaderPaused": false,
+        "tvPaused": false,
+        "correcting": false,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 100080
+      },
+      "out": {
+        "speed": 0.96
+      }
+    },
+    {
+      "name": "behind 80",
+      "input": {
+        "leaderPaused": false,
+        "tvPaused": false,
+        "correcting": false,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 99920
+      },
+      "out": {
+        "speed": 1.04
+      }
+    },
+    {
+      "name": "correcting keeps going above 20",
+      "input": {
+        "leaderPaused": false,
+        "tvPaused": false,
+        "correcting": true,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 100040
+      },
+      "out": {
+        "speed": 0.96
+      }
+    },
+    {
+      "name": "correcting behind keeps going",
+      "input": {
+        "leaderPaused": false,
+        "tvPaused": false,
+        "correcting": true,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 99979
+      },
+      "out": {
+        "speed": 1.04
+      }
+    },
+    {
+      "name": "correcting stops at 20",
+      "input": {
+        "leaderPaused": false,
+        "tvPaused": false,
+        "correcting": true,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 99980
+      },
+      "out": {
+        "speed": 1
+      }
+    },
+    {
+      "name": "correcting stops near zero",
+      "input": {
+        "leaderPaused": false,
+        "tvPaused": false,
+        "correcting": true,
+        "sinceSeekMs": 10000,
+        "targetMs": 100000,
+        "tvPositionMs": 100015
+      },
+      "out": {
+        "speed": 1
+      }
+    }
+  ]
+}
