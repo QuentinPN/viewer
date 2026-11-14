@@ -123,6 +123,14 @@ impl Body {
         }
     }
 
+    /// The kind, with the reason of a `bye`: what the logs keep of a message.
+    pub fn label(&self) -> String {
+        match self {
+            Self::Bye { reason } => format!("bye {}", reason.as_str()),
+            _ => self.kind().to_owned(),
+        }
+    }
+
     /// The fields of the kind, as they go on the wire.
     pub fn fields(&self) -> Map<String, Value> {
         let mut m = Map::new();
@@ -239,9 +247,11 @@ impl Envelope {
     }
 }
 
-/// `[A-Za-z0-9-]` of `min` to 64 characters: session, link, item and source ids.
+/// `[A-Za-z0-9_-]` of `min` to 64 characters: session, link, item and source ids.
 pub fn is_id(s: &str, min: usize) -> bool {
-    (min..=64).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    (min..=64).contains(&s.len())
+        && s.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
 /// `Ok(None)` when absent, `Err` when present but out of bounds.

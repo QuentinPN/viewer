@@ -19,8 +19,8 @@ const val MAX_POSITION_MS = 86_400_000L
 
 private const val MAX_SEQ = Int.MAX_VALUE.toLong()
 
-private val SESSION_ID = Regex("[A-Za-z0-9-]{1,64}")
-private val LINK_ID = Regex("[A-Za-z0-9-]{8,64}")
+private val SESSION_ID = Regex("[A-Za-z0-9_-]{1,64}")
+private val LINK_ID = Regex("[A-Za-z0-9_-]{8,64}")
 private val INTEGER = Regex("-?[0-9]{1,18}")
 
 enum class Kind(val wire: String) { Join("join"), Load("load"), Ready("ready"), State("state"), Cmd("cmd"), Buffering("buffering"), Ping("ping"), Pong("pong"), Bye("bye") }
@@ -77,6 +77,9 @@ sealed interface Body {
 }
 
 data class Envelope(val from: String, val link: String, val seq: Long, val body: Body)
+
+/** The kind, with the reason of a `bye`: what the logs keep of a message. */
+val Body.label: String get() = if (this is Body.Bye) "bye ${reason.wire}" else kind.wire
 
 /** Why an envelope was dropped; the only thing ever logged about it (ADR 0124 § Sécurité). */
 enum class Reject(val code: String) { Json("json"), Size("size"), Version("version"), Field("field"), Kind("kind") }

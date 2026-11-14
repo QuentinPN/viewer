@@ -285,7 +285,7 @@ impl Glue {
                         return;
                     }
                 };
-                log::debug!("sync: received {} #{}", env.body.kind(), env.seq);
+                log::debug!("sync: received {} #{}", env.body.label(), env.seq);
                 // A link opens on a listed TV only; its name comes from the server,
                 // read off this task so timers and player events never wait on it.
                 if !self.leader.is_active() && matches!(env.body, Body::Join) {
@@ -351,7 +351,7 @@ impl Glue {
                         seq: self.seq,
                         body,
                     };
-                    log::debug!("sync: send {} #{}", env.body.kind(), env.seq);
+                    log::debug!("sync: send {} #{}", env.body.label(), env.seq);
                     self.seq = (self.seq + 1).min(MAX_SEQ);
                     let _ = self.out.send(Out::Send {
                         to,

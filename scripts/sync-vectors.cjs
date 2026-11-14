@@ -20,7 +20,7 @@ const valid = [
     name: "load full",
     raw: env("load", {
       itemId: "68397",
-      mediaSourceId: "mediasource-68397",
+      mediaSourceId: "mediasource_68397",
       positionMs: 754000,
       audioStreamIndex: 1,
       subtitleStreamIndex: 3,
@@ -28,7 +28,7 @@ const valid = [
     kind: "load",
     fields: {
       itemId: "68397",
-      mediaSourceId: "mediasource-68397",
+      mediaSourceId: "mediasource_68397",
       positionMs: 754000,
       audioStreamIndex: 1,
       subtitleStreamIndex: 3,

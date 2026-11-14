@@ -85,7 +85,9 @@ class SyncHub(private val app: Context) {
     /** Keeps the socket open while the caller's coroutine runs (an activity started). */
     suspend fun hold(client: EmbyClient, userId: String) {
         holders++
-        if (held?.first !== client || held?.second != userId || socket == null) start(client, userId)
+        // Each screen builds its own client: only another session restarts the socket
+        val same = held?.let { (c, u) -> c.sameSession(client) && u == userId } == true
+        if (!same || socket == null) start(client, userId)
         try {
             awaitCancellation()
         } finally {
@@ -104,10 +106,11 @@ class SyncHub(private val app: Context) {
         socket = scope.launch {
             launch {
                 for (send in sends) {
+                    Log.d(TAG, "send ${send.envelope.body.label} #${send.envelope.seq}")
                     try {
                         client.sendString(send.to, encodeEnvelope(send.envelope))
                     } catch (_: EmbyException) {
-                        Log.w(TAG, "send failed: ${send.envelope.body.kind.wire} #${send.envelope.seq}")
+                        Log.w(TAG, "send failed: ${send.envelope.body.label} #${send.envelope.seq}")
                     }
                 }
             }
@@ -137,10 +140,11 @@ class SyncHub(private val app: Context) {
         if (client != null && byes.isNotEmpty()) {
             scope.launch {
                 for (bye in byes) {
+                    Log.d(TAG, "send ${bye.envelope.body.label} #${bye.envelope.seq} (closing)")
                     try {
                         client.sendString(bye.to, encodeEnvelope(bye.envelope))
                     } catch (_: EmbyException) {
-                        Log.w(TAG, "send failed: ${bye.envelope.body.kind.wire} #${bye.envelope.seq}")
+                        Log.w(TAG, "send failed: ${bye.envelope.body.label} #${bye.envelope.seq}")
                     }
                 }
             }
@@ -184,6 +188,7 @@ class SyncHub(private val app: Context) {
             is Parsed.Rejected -> Log.w(TAG, "rejected: ${parsed.reason.code}")
             is Parsed.Ok -> {
                 val body = parsed.envelope.body
+                Log.d(TAG, "received ${body.label} #${parsed.envelope.seq}")
                 run(follower.receive(parsed.envelope, now()))
                 if (body is Body.State && follower.linked) player?.evaluate()
             }

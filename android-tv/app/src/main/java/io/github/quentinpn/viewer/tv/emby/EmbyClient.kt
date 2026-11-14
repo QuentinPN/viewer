@@ -42,6 +42,10 @@ class EmbyClient(
 
     fun withToken(token: String) = EmbyClient(server, device, http, token)
 
+    /** Same server, device and token: another instance of the same signed-in session. */
+    fun sameSession(other: EmbyClient): Boolean =
+        server.url == other.server.url && device.id == other.device.id && token == other.token
+
     /** Quotes and commas are stripped from values so they cannot break the header syntax. */
     fun authorizationHeader(): String {
         fun clean(v: String) = v.replace("\"", "").replace(",", "")

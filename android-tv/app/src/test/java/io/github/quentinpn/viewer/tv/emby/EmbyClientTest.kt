@@ -808,4 +808,15 @@ class EmbyClientTest {
         respond(200, """{"Name":"Soirée"}""")
         expectError(EmbyError.InvalidResponse::class.java) { client.withToken("t").createPlaylist("u1", "Soirée", "m1") }
     }
+
+    @Test
+    fun `another instance of the same signed-in session is the same session`() {
+        val http = EmbyClient.defaultHttp()
+        val url = ServerUrl.parse("http://127.0.0.1:${server.port}")
+        val a = EmbyClient(url, device, http).withToken("t1")
+        assertTrue(a.sameSession(EmbyClient(ServerUrl.parse("http://127.0.0.1:${server.port}"), device, http).withToken("t1")))
+        assertFalse(a.sameSession(EmbyClient(url, device, http).withToken("t2")))
+        assertFalse(a.sameSession(EmbyClient(url, DeviceIdentity("Shield", "dev-2", "0.1.0"), http).withToken("t1")))
+        assertFalse(a.sameSession(EmbyClient(ServerUrl.parse("http://127.0.0.2:1"), device, http).withToken("t1")))
+    }
 }

@@ -13,11 +13,11 @@
     },
     {
       "name": "load full",
-      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"load\",\"itemId\":\"68397\",\"mediaSourceId\":\"mediasource-68397\",\"positionMs\":754000,\"audioStreamIndex\":1,\"subtitleStreamIndex\":3}",
+      "raw": "{\"tv\":\"sync\",\"v\":1,\"from\":\"sess-a1\",\"link\":\"link-0001\",\"seq\":7,\"kind\":\"load\",\"itemId\":\"68397\",\"mediaSourceId\":\"mediasource_68397\",\"positionMs\":754000,\"audioStreamIndex\":1,\"subtitleStreamIndex\":3}",
       "kind": "load",
       "fields": {
         "itemId": "68397",
-        "mediaSourceId": "mediasource-68397",
+        "mediaSourceId": "mediasource_68397",
         "positionMs": 754000,
         "audioStreamIndex": 1,
         "subtitleStreamIndex": 3
@@ -506,23 +506,47 @@
       "rttMs": 0
     },
     {
-      "samples": [40],
+      "samples": [
+        40
+      ],
       "rttMs": 40
     },
     {
-      "samples": [10, 50, 30],
+      "samples": [
+        10,
+        50,
+        30
+      ],
       "rttMs": 30
     },
     {
-      "samples": [10, 20, 30, 40],
+      "samples": [
+        10,
+        20,
+        30,
+        40
+      ],
       "rttMs": 30
     },
     {
-      "samples": [100, 10, 20, 30, 40, 50],
+      "samples": [
+        100,
+        10,
+        20,
+        30,
+        40,
+        50
+      ],
       "rttMs": 30
     },
     {
-      "samples": [5, 5, 300, 5, 5],
+      "samples": [
+        5,
+        5,
+        300,
+        5,
+        5
+      ],
       "rttMs": 5
     }
   ],
