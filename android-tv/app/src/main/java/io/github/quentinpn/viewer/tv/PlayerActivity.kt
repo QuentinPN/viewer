@@ -22,8 +22,11 @@ import io.github.quentinpn.viewer.tv.sync.Body
 import io.github.quentinpn.viewer.tv.sync.CmdAction
 import io.github.quentinpn.viewer.tv.sync.DECIDE_EVERY_MS
 import io.github.quentinpn.viewer.tv.sync.LinkedPlayer
+import io.github.quentinpn.viewer.tv.sync.LINKED_REST_SPEED
+import io.github.quentinpn.viewer.tv.sync.SEEK_SETTLE_MS
 import io.github.quentinpn.viewer.tv.sync.SPEED_NORMAL
 import io.github.quentinpn.viewer.tv.sync.linkPill
+import io.github.quentinpn.viewer.tv.sync.nextSeekLead
 import io.github.quentinpn.viewer.tv.sync.decide as linkDecide
 import io.github.quentinpn.viewer.tv.emby.ActivePlayback
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
@@ -227,8 +230,15 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     private var linkLoad: Body.Load? = null
     private var readyJob: Job? = null
 
-    /** The speed the link set; away from 1 while it corrects. */
+    /** The speed a correction set, [SPEED_NORMAL] at rest. */
     private var linkSpeed = SPEED_NORMAL
+
+    /** Added to a linked seek while the leader plays; learnt from the last landing. */
+    private var seekLead = 0L
+    private var seekLanding = false
+
+    /** A correction changed mpv's speed in this link: set back to 1 when it ends. */
+    private var linkSpeedSet = false
 
     // Written on mpv's event thread
     @Volatile private var lastSeekAt = 0L
@@ -362,15 +372,27 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         val target = hub.target(settings.syncOffsetMs.toLong()) ?: return
         val leader = hub.leader() ?: return
         val e = (position * 1000).roundToLong() - target
-        hub.measured(e)
         val now = SystemClock.elapsedRealtime()
+        if (now - lastSeekAt >= SEEK_SETTLE_MS) {
+            hub.measured(e)
+            if (seekLanding) seekLead = nextSeekLead(seekLead, e)
+            seekLanding = false
+        }
         val c = linkDecide(e, target, leader.paused || leader.buffering, ui.paused, linkSpeed != SPEED_NORMAL, now - lastSeekAt)
+        if (c.seekTo != null || (c.speed != null && c.speed != linkSpeed)) Log.d(TAG, "link correct e=$e seek=${c.seekTo} speed=${c.speed}")
         if (c.pause) player.setPaused(true)
         if (c.resume) player.setPaused(false)
-        c.speed?.let { linkSpeed = player.setSpeed(it) ?: it }
+        c.speed?.takeIf { it != linkSpeed }?.let {
+            linkSpeed = it
+            linkSpeedSet = true
+            player.setSpeed(if (it == SPEED_NORMAL) LINKED_REST_SPEED else it)
+            lastSeekAt = now
+        }
         c.seekTo?.let {
             lastSeekAt = now
-            player.seekTo(it / 1000.0)
+            val playing = !leader.paused && !leader.buffering
+            seekLanding = playing
+            player.seekTo((it + if (playing) seekLead else 0) / 1000.0)
         }
     }
 
@@ -392,8 +414,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         readyJob?.cancel()
         readyJob = null
         evaluating?.cancel()
-        if (linkSpeed != SPEED_NORMAL) engine?.setSpeed(SPEED_NORMAL)
+        if (linkSpeedSet) engine?.setSpeed(SPEED_NORMAL)
         linkSpeed = SPEED_NORMAL
+        linkSpeedSet = false
     }
 
     /** Once the linked title has read enough ahead, paused at its position: `ready`. */

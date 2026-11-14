@@ -230,6 +230,39 @@ class FollowerTest {
     }
 
     @Test
+    fun aLateStateDoesNotPullTheTargetBack() {
+        val link = linked()
+        follower.receive(from(PC, link, state(60_000)), now)
+        // One second later, but 300 ms late on the relay
+        now += 1_300
+        follower.receive(from(PC, link, state(61_000)), now)
+        assertEquals(61_300L, follower.target(now, 0))
+        // The leader went back 10 s: followed at once
+        now += 1_000
+        follower.receive(from(PC, link, state(52_000)), now)
+        assertEquals(52_000L, follower.target(now, 0))
+        // A pause forgets the anchors: the paused position is the target
+        follower.receive(from(PC, link, state(52_100, paused = true)), now)
+        assertEquals(52_100L, follower.target(now, 0))
+    }
+
+    @Test
+    fun theSeekLeadLearnsFromTheLanding() {
+        assertEquals(1_200L, nextSeekLead(0, -1_200))
+        assertEquals(1_000L, nextSeekLead(1_200, 200))
+        assertEquals(0L, nextSeekLead(100, 400))
+        assertEquals(3_000L, nextSeekLead(2_500, -900))
+    }
+
+    @Test
+    fun keepAnchorKeepsTheLastFewUnlessTheLeaderWentBack() {
+        assertEquals(listOf(5L), keepAnchor(emptyList(), 5))
+        assertEquals(listOf(2L, 3L, 4L, 5L, 6L), keepAnchor(listOf(1, 2, 3, 4, 5), 6))
+        assertEquals(listOf(100L, 0L), keepAnchor(listOf(100), 0))
+        assertEquals(listOf(-901L), keepAnchor(listOf(100), -901))
+    }
+
+    @Test
     fun everyEndOfALinkSaysUnlinked() {
         // Join timeout, load timeout, « Délier », stop: Unlinked comes last each time
         follower.join(PC, now)

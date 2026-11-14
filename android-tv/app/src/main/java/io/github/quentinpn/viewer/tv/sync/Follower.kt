@@ -46,7 +46,7 @@ sealed interface Phase {
     data class Linked(override val peer: String) : Phase
 }
 
-/** The leader's last `state` and when it arrived. */
+/** The leader's last `state`, its position taken from the least delayed recent one, and when it arrived. */
 data class LeaderState(val state: Body.State, val recvAt: Long)
 
 sealed interface Effect {
@@ -87,6 +87,7 @@ class Follower(private val newLink: () -> String, private val nameOf: (String) -
     private var lastHeard = 0L
     private var lastPing: Long? = null
     private val rtts = ArrayDeque<Long>()
+    private var anchors = emptyList<Long>()
 
     val rttMs: Long get() = rttMs(rtts.toList())
 
@@ -121,12 +122,17 @@ class Follower(private val newLink: () -> String, private val nameOf: (String) -
             is Body.Load -> {
                 phase = Phase.Loading(peer, now, body)
                 leader = null
+                anchors = emptyList()
                 lastHeard = now
                 listOf(Effect.Load(body))
             }
             is Body.State -> {
                 if (phase is Phase.Joining) return emptyList()
-                leader = LeaderState(body, now)
+                // Paused or buffering, the position does not move: nothing to project from
+                val kept = if (leader?.state?.itemId == body.itemId) anchors else emptyList()
+                anchors = if (body.paused || body.buffering) emptyList() else keepAnchor(kept, body.positionMs - now)
+                val position = anchors.maxOrNull()?.let { it + now } ?: body.positionMs
+                leader = LeaderState(body.copy(positionMs = position), now)
                 lastHeard = now
                 emptyList()
             }
@@ -224,12 +230,14 @@ class Follower(private val newLink: () -> String, private val nameOf: (String) -
         rtts.clear()
         driftMs = null
         leader = null
+        anchors = emptyList()
     }
 
     private fun close(): Effect {
         phase = Phase.Idle
         cursor = null
         leader = null
+        anchors = emptyList()
         driftMs = null
         return Effect.Unlinked
     }

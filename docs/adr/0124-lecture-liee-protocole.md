@@ -32,14 +32,14 @@ Un objet JSON sur une ligne, au plus 1024 octets en UTF-8 :
 ```
 
 - `viewer` vaut `"sync"`, `v` vaut `1`.
-- `from` : Id de session de l'émetteur, 1 à 64 caractères `[A-Za-z0-9-]`.
-- `link` : identifiant de la liaison, 8 à 64 caractères `[A-Za-z0-9-]`, tiré au hasard par celui qui lance la liaison (`join` ou `load` hors liaison).
+- `from` : Id de session de l'émetteur, 1 à 64 caractères `[A-Za-z0-9_-]`.
+- `link` : identifiant de la liaison, 8 à 64 caractères `[A-Za-z0-9_-]`, tiré au hasard par celui qui lance la liaison (`join` ou `load` hors liaison).
 - `seq` : entier de 0 à 2^31−1, croissant pour chaque émetteur.
 - `kind` : une des valeurs ci-dessous.
 - Un champ inconnu est ignoré, ce qui permet d'ajouter des champs plus tard.
 - **Rejet sans erreur** (aucune réponse, rien dans les journaux hormis le motif) : JSON invalide ou trop long, `viewer`/`v` différents, champ obligatoire absent ou hors bornes, `kind` inconnu.
 - **Hors sujet** : en liaison, un message dont `from` n'est pas le pair ou dont `link` n'est pas la liaison courante. Il en va de même d'un `seq` inférieur ou égal au dernier reçu de ce pair dans la liaison. Exception : un `join` ou un `load` d'une autre session reçoit `bye busy`, envoyé à cette session et sous son `link`. Hors liaison, seuls `join` (côté ordi) et `load` (côté TV) sont lus ; ils ouvrent la liaison.
-- Les positions sont en millisecondes (`positionMs`, entier, 0 à 86 400 000). Les `itemId` et `mediaSourceId` font 1 à 64 caractères `[A-Za-z0-9-]`. Les index de piste sont des entiers de −1 à 999, −1 voulant dire « aucune ».
+- Les positions sont en millisecondes (`positionMs`, entier, 0 à 86 400 000). Les `itemId` et `mediaSourceId` font 1 à 64 caractères `[A-Za-z0-9_-]` (Emby donne par exemple `mediasource_104067`). Les index de piste sont des entiers de −1 à 999, −1 voulant dire « aucune ».
 
 ## Messages
 
@@ -95,6 +95,7 @@ Un objet JSON sur une ligne, au plus 1024 octets en UTF-8 :
 Tous les temps viennent d'une horloge monotone locale ; on ne compare jamais l'heure de deux appareils.
 
 - **Aller-retour** : `rttMs` est la médiane des 5 derniers `now − t` mesurés à chaque `pong` reçu. Pour un nombre pair, on prend la valeur triée d'index `n / 2`. Il vaut 0 tant qu'aucun `pong` n'est arrivé.
+- **Ancre du leader** : le délai du relais Emby varie d'un `state` à l'autre, de quelques dizaines à quelques centaines de ms. Pour chaque `state` en lecture, la TV calcule l'ancre `positionMs − recvAt`. Elle garde les 5 dernières et retient la plus grande, celle du `state` le moins retardé ; la position utilisée est `ancre + recvAt`. Les ancres repartent de zéro sur une pause, une mise en mémoire tampon ou un autre titre. Elles repartent aussi quand une ancre tombe plus d'1 s sous la meilleure : le leader est revenu en arrière.
 - **Position projetée du leader**, à l'instant `now`, pour le dernier `state` reçu à `recvAt` : `projected = positionMs + (paused || buffering ? 0 : (now − recvAt) + rttMs / 2)`. La division est entière, arrondie vers le bas.
 - **Cible** : `target = max(0, projected − offsetMs)`. `offsetMs` est le réglage « Décalage TV », de 0 à 1500 ms par pas de 100, à 0 par défaut. Il retarde la TV pour coller à l'image que voient les amis sur Discord.
 - **Écart** : `e = positionTv − target` ; positif quand la TV est en avance.
@@ -107,7 +108,12 @@ Tous les temps viennent d'une horloge monotone locale ; on ne compare jamais l'h
   6. Sinon, si une correction est en cours ou si `|e| ≥ 60`, vitesse 0,96 quand `e > 0` et 1,04 quand `e < 0`.
   7. Sinon, rien.
 - La décision est évaluée toutes les 250 ms et à chaque `state` reçu. La vitesse passe par la propriété `speed` de mpv ; la correction de hauteur du son de mpv (`audio-pitch-correction`, active par défaut) évite tout effet audible.
-- `driftMs` du `ping` est le dernier `e` arrondi. L'ordi l'affiche dans sa pastille.
+- **Comportement de mpv mesuré sur la Shield** (14/11/2026) :
+  - mpv retire scaletempo2 de la chaîne audio à la vitesse 1 exacte, ce qui fait sauter `time-pos` d'environ 300 ms. Pendant un lien, la « vitesse 1 » de la TV est donc 1,0001 : le filtre reste en place, et le 0,1 ms/s gagné se corrige comme n'importe quel écart. La vraie vitesse 1 revient à la fin du lien.
+  - Chaque changement de vitesse fausse aussi `time-pos` pendant un moment. L'attente de 1500 ms qui suit un saut s'applique donc aussi après un changement de vitesse : ni décision ni mesure pendant ce temps.
+  - Un essai par impulsions de durée calculée (`|e| × 25 ms` à ±4 %) a été abandonné. L'effet de vitesse se prolonge environ 2 s après le retour au repos, d'où une sur-correction.
+- **Avance au saut** : un saut prend environ 1 à 1,5 s pendant lequel le leader avance, et la TV atterrit en retard ; sans compensation, elle ressaute en boucle. Quand le leader joue, la TV saute donc à `target + avance`. L'avance part de 0 et s'ajuste après chaque saut : à la première mesure stabilisée, `avance = clamp(avance − e, 0, 3000)`. En pause, la TV saute à `target` exactement.
+- `driftMs` du `ping` est le dernier `e` arrondi, mesuré hors des temps d'attente. L'ordi l'affiche dans sa pastille.
 
 ## Interface
 
