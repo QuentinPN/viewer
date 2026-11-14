@@ -4,7 +4,7 @@
 
 > « Je stream mon écran à mes amis sur discord pour regarder des épisodes d'animés, j'aimerais pouvoir leur stream mon écran, et moi regarder sur ma télé en même temps (synchronisé) l'épisode qu'eux voient sur mon partage d'écran, et si je fait une action sur la TV ça la fait sur l'ordi aussi (ex, pause, skip >>>, ou <<<, skip intro etc.) »
 
-Il a demandé un plan avant de coder ; le plan ci-dessous a été présenté, **aucun code n'est écrit**. Prochaine étape validable : l'étape 0.
+Il a demandé un plan avant de coder ; le plan ci-dessous a été présenté. **Étape 0 faite le 2026-11-14** : le relais Emby convient (ADR 0123, preuve `docs/evidence/synchro-tv-relais-emby-2026-11-14.md`). Prochaine étape : l'étape 1.
 
 ## Constat dans le dépôt
 
