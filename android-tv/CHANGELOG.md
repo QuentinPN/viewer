@@ -2,6 +2,13 @@
 
 Chaque version livrée sur la Shield augmente `versionName` et `versionCode` dans `app/build.gradle.kts` et ajoute sa section ici.
 
+## 1.3.0 — 2026-11-14
+
+- Lecture liée avec l'ordi : quand l'ordi envoie un épisode à la TV, elle l'ouvre et suit sa lecture, en rattrapant l'écart par de petites variations de vitesse, inaudibles. Elle saute quand l'écart est grand (ADR 0123, 0124).
+- « Regarder avec l'ordi » dans le menu du lecteur rejoint ce que l'ordi lit ; « Délier » laisse chacun continuer seul. La pastille « Lié à … · ±40 ms » montre l'écart.
+- Pause, lecture, ±10 s et « Passer l'intro » sur la télécommande s'appliquent aussi à l'ordi ; Retour arrête les deux.
+- Réglages › « Décalage TV » (0 à 1,5 s) : retarde la TV pour coller à l'image que voient tes amis sur Discord.
+
 ## 1.2.0 — 2026-11-13
 
 - Réglages › Mises à jour : version installée, « Rechercher une mise à jour » et, quand elle est prête, « Installer la version X » (ADR 0112).
