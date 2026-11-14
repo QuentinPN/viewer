@@ -71,7 +71,8 @@ Un objet JSON sur une ligne, au plus 1024 octets en UTF-8 :
 **Chargement.** La TV fait sa propre négociation `PlaybackInfo` (ADR 0039) pour `itemId` / `mediaSourceId`. Elle applique les pistes reçues si elles existent, va à `positionMs`, reste en pause et répond `ready` une fois la mémoire tampon pleine.
 
 - Pendant ce temps, l'ordi affiche « En attente de la TV… » avec « Continuer sans la TV ».
-- À `ready`, l'ordi reprend la lecture et envoie `state` avec `paused: false`.
+- À `ready`, l'ordi reprend la lecture et envoie `state` avec `paused: false`. Seule une pause faite par la liaison est levée : si l'ordi était déjà en pause avant, il y reste.
+- **Pistes** : `audioStreamIndex` et `subtitleStreamIndex` sont l'index des pistes intégrées au fichier, qui est le même chez Emby (`MediaStream.Index`) et chez FFmpeg (`ff-index` de mpv). L'ordi ne les envoie qu'en Direct Play, et n'envoie pas un sous-titre externe. Sans index, la TV garde ses choix par défaut.
 - Sans `ready` après 30 s, l'ordi envoie `bye timeout` et reprend seul.
 
 **En liaison.**
@@ -87,7 +88,7 @@ Un objet JSON sur une ligne, au plus 1024 octets en UTF-8 :
 
 - Arrêter la lecture d'un côté (Retour, Stop, fermeture du lecteur) envoie `bye stopped`, et l'autre côté arrête aussi.
 - « Délier » envoie `bye left`, et l'autre continue seul.
-- **Perte du lien** : plus aucun message du pair pendant 5 s (`ping` pour l'ordi ; `state` ou `pong` pour la TV), ou la socket se ferme. Chaque côté affiche « Lien perdu avec <appareil>. La lecture continue ici. » et continue seul. Il n'y a pas de reprise automatique : on relance la liaison à la main.
+- **Perte du lien** : plus aucun message du pair pendant 5 s (`ping` pour l'ordi ; `state` ou `pong` pour la TV). Une coupure de socket seule ne suffit pas : la socket se reconnecte (ADR 0110), et le lien ne tombe qu'après ces 5 s de silence. Chaque côté affiche « Lien perdu avec <appareil>. La lecture continue ici. » et continue seul. Il n'y a pas de reprise automatique : on relance la liaison à la main.
 
 ## Recalage de la TV
 

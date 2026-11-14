@@ -30,3 +30,6 @@ Après l'ADR 0109 (relecture toutes les 5 min), le propriétaire précise : « l
 
 ## Vérification
 Voir ROADMAP.md (entrée ADR 0110).
+
+## Amendement (2026-11-14, ADR 0124)
+La socket reste ouverte toute la session connectée (sur la TV : tant que l'app est au premier plan), plus seulement sur l'accueil, pour porter la lecture liée. À chaque connexion, l'app déclare `Sessions/Capabilities/Full`. `LibraryChanged` ne relit toujours l'accueil que lorsqu'il est affiché.

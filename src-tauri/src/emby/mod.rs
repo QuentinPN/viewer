@@ -69,6 +69,9 @@ pub enum EmbyError {
     /// A setting refused or not written (ADR 0037).
     #[error("réglage non enregistré : {0}")]
     Settings(String),
+    /// Linked playback with a TV refused or failed (ADR 0124).
+    #[error("lecture liée impossible : {0}")]
+    Sync(String),
 }
 
 impl EmbyError {
@@ -93,6 +96,7 @@ impl EmbyError {
             Self::NoCompatibleStream => "noCompatibleStream",
             Self::Player(_) => "player",
             Self::Settings(_) => "settings",
+            Self::Sync(_) => "sync",
         }
     }
 }

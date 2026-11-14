@@ -78,6 +78,15 @@ import {
   sleepTimer,
   sleepValue,
 } from "./sleep";
+import {
+  noticeText,
+  pillText,
+  SYNC_EMPTY,
+  type SyncAction,
+  type SyncDevice,
+  type SyncStatus,
+  syncApi,
+} from "./sync";
 import type {
   EndReason,
   PlayerCommand,
@@ -177,7 +186,7 @@ const EARLY_EOF_SECONDS = 30;
 const HIDE_AFTER_MS = 3000;
 const SKIP_SECONDS = 10;
 
-type Panel = "audio" | "subs" | "info" | "chapters" | "options";
+type Panel = "audio" | "subs" | "info" | "chapters" | "options" | "tv";
 
 let active = $state(false);
 /**
@@ -221,9 +230,21 @@ let audioButton = $state<HTMLButtonElement | null>(null);
 let subsButton = $state<HTMLButtonElement | null>(null);
 let infoButton = $state<HTMLButtonElement | null>(null);
 let chaptersButton = $state<HTMLButtonElement | null>(null);
+let tvButton = $state<HTMLButtonElement | null>(null);
 let panelElement = $state<HTMLElement | null>(null);
 /** Next episode of the series, looked up while this one plays. */
 let nextEpisode = $state<EpisodeLink | null>(null);
+/** Previous episode, for a « précédent » asked by a linked TV. */
+let previousEpisode = $state<EpisodeLink | null>(null);
+/** Linked playback with a TV (ADR 0124), as Rust reports it. */
+let sync = $state<SyncStatus>({ phase: "idle" });
+/** TVs listed when the « TV » panel opens; `null` while loading. */
+let tvDevices = $state<SyncDevice[] | null>(null);
+let tvError = $state<string | null>(null);
+/** Last linked playback notice, shown for a few seconds. */
+let syncToast = $state<string | null>(null);
+let syncToastTimer: ReturnType<typeof setTimeout> | undefined;
+let syncUnlisten: (() => void)[] = [];
 /** Seconds left on the "Épisode suivant" card, shown once the episode ended. */
 let upNextLeft = $state<number | null>(null);
 /** Next episode being opened, until the app shows its playback. */
@@ -308,12 +329,14 @@ $effect(() => {
   const { itemId, title } = playback;
   launching = null;
   nextEpisode = null;
+  previousEpisode = null;
   if (!isEpisode(title)) return;
   embyApi
     .itemDetail(itemId)
     .then((detail) => {
-      if (playback.itemId === itemId)
-        nextEpisode = detail.episode?.next ?? null;
+      if (playback.itemId !== itemId) return;
+      nextEpisode = detail.episode?.next ?? null;
+      previousEpisode = detail.episode?.previous ?? null;
     })
     .catch(() => {
       // No card then: the end closes the player as for a film.
@@ -460,6 +483,12 @@ function onEvent(ev: PlayerEvent) {
 
 onMount(async () => {
   unlisten = await playerApi.onEvent(onEvent);
+  syncUnlisten = await Promise.all([
+    syncApi.onStatus((s) => (sync = s)),
+    syncApi.onNotice((n) => showSyncToast(noticeText(n))),
+    syncApi.onAction(onSyncAction),
+  ]);
+  sync = await syncApi.status().catch(() => sync);
   diagTimer = setInterval(async () => {
     if (!active) return;
     checkSleep();
@@ -500,6 +529,8 @@ onDestroy(() => {
   clearTimeout(clockTimer);
   stopCountdown?.();
   unlisten?.();
+  for (const stop of syncUnlisten) stop();
+  clearTimeout(syncToastTimer);
   clearInterval(diagTimer);
   clearTimeout(hideTimer);
   clearTimeout(skipTimer);
@@ -627,7 +658,10 @@ function dismissNext() {
  * fullscreen and volume stay; the opening screen shows its title meanwhile.
  */
 async function playNext() {
-  const next = nextEpisode;
+  await playEpisode(nextEpisode);
+}
+
+async function playEpisode(next: EpisodeLink | null) {
   if (!next || launching) return;
   dismissNext();
   // « Fin de l'épisode » was about the one that ends.
@@ -645,6 +679,52 @@ async function playNext() {
   diag = null;
   const failure = await onPlayNext(next.id);
   if (failure) error = failure;
+}
+
+function showSyncToast(text: string) {
+  syncToast = text;
+  clearTimeout(syncToastTimer);
+  syncToastTimer = setTimeout(() => (syncToast = null), 5000);
+}
+
+/** Done here for the TV: the episode change then reaches it as a new `load`. */
+function onSyncAction(action: SyncAction) {
+  // A late request after this playback ended changes nothing.
+  if (!active) return;
+  if (action === "next") void playNext();
+  else if (action === "previous") void playEpisode(previousEpisode);
+  else void close();
+}
+
+async function openTvPanel() {
+  const opening = panel !== "tv";
+  tvDevices = null;
+  tvError = null;
+  await openPanel("tv");
+  if (!opening) return;
+  try {
+    tvDevices = await syncApi.devices();
+  } catch (e) {
+    tvDevices = [];
+    tvError = errorText(e);
+  }
+  await tick();
+  panelElement?.querySelector<HTMLElement>("button")?.focus();
+}
+
+async function sendToTv(device: SyncDevice) {
+  try {
+    await syncApi.invite(device.sessionId);
+    closePanel();
+  } catch (e) {
+    tvError = errorText(e);
+  }
+}
+
+function errorText(e: unknown): string {
+  return typeof e === "object" && e !== null && "message" in e
+    ? String(e.message)
+    : String(e);
 }
 
 function runSkip(action: SkipAction) {
@@ -675,7 +755,9 @@ function toggleButton(which: Panel) {
         ? chaptersButton
         : which === "options"
           ? optionsButton
-          : infoButton;
+          : which === "tv"
+            ? tvButton
+            : infoButton;
 }
 
 async function openPanel(which: Panel) {
@@ -809,6 +891,9 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     {:else if name === "pause"}
       <rect class="solid" x="6" y="5" width="4" height="14" rx="1" />
       <rect class="solid" x="14" y="5" width="4" height="14" rx="1" />
+    {:else if name === "tv"}
+      <rect x="3" y="5" width="18" height="12" rx="2" />
+      <path d="M8 20h8" />
     {:else if name === "back"}
       <path d="M15 5l-7 7 7 7" />
     {:else if name === "rewind" || name === "forward"}
@@ -899,6 +984,23 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
         <h1>{heading.name}</h1>
       </div>
       <span class="decision" title="Décision du serveur Emby">{decision}</span>
+      {#if sync.phase === "linked"}
+        <span class="sync-pill" role="status">{pillText(sync.device, sync.driftMs)}</span>
+        <button type="button" class="sync-unlink" onclick={() => void syncApi.unlink()}>Délier</button>
+      {:else if sync.phase === "idle"}
+        <button
+          type="button"
+          class="round"
+          class:on={panel === "tv"}
+          aria-label="Envoyer aussi sur la TV"
+          aria-expanded={panel === "tv"}
+          title="Envoyer aussi sur la TV"
+          bind:this={tvButton}
+          onclick={() => void openTvPanel()}
+        >
+          {@render icon("tv")}
+        </button>
+      {/if}
       <span class="clock" aria-label={`Il est ${clock}`}>{clock}</span>
     </header>
 
@@ -910,6 +1012,15 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     {/if}
     {#if error}<p class="error floating" role="alert">{error}</p>{/if}
     {#if sleepNotice && !error}<p class="floating" role="status">{SLEEP_NOTICE}</p>{/if}
+    {#if sync.phase === "waiting"}
+      <div class="floating sync-wait" role="status">
+        <p>En attente de la TV…</p>
+        <button type="button" class="text-button" onclick={() => void syncApi.unlink()}>
+          Continuer sans la TV
+        </button>
+      </div>
+    {/if}
+    {#if syncToast}<p class="sync-toast" role="status">{syncToast}</p>{/if}
 
     {#if skip && skipVisible}
       <div class="skip" role="group" aria-label={skip.label}>
@@ -965,7 +1076,9 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
                 ? "Chapitres"
                 : panel === "options"
                   ? "Options de lecture"
-                  : "Informations de lecture"}
+                  : panel === "tv"
+                    ? "Envoyer aussi sur la TV"
+                    : "Informations de lecture"}
           bind:this={panelElement}
         >
           {#if panel === "audio"}
@@ -1120,6 +1233,22 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
                 </span>
               </label>
             </fieldset>
+          {:else if panel === "tv"}
+            <h2 tabindex="-1">Envoyer aussi sur la TV</h2>
+            {#if tvDevices === null}
+              <p class="muted" role="status">Recherche des TV…</p>
+            {:else if tvDevices.length === 0 && !tvError}
+              <p class="muted">{SYNC_EMPTY}</p>
+            {:else}
+              <div class="tv-list">
+                {#each tvDevices as device (device.sessionId)}
+                  <button type="button" class="text-button" onclick={() => void sendToTv(device)}>
+                    {device.name}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+            {#if tvError}<p class="muted" role="alert">{tvError}</p>{/if}
           {:else if panel === "chapters"}
             <ChaptersPanel {chapters} current={chapterNow} onSelect={goToChapter} />
           {:else}
@@ -1817,6 +1946,56 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   .error {
     margin: 0;
     color: var(--color-danger);
+  }
+  .sync-pill {
+    flex: none;
+    padding: var(--space-1) var(--space-3);
+    border-radius: 999px;
+    background: var(--material);
+    backdrop-filter: var(--material-blur);
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .sync-unlink {
+    flex: none;
+    border: 1px solid var(--separator);
+    border-radius: 999px;
+    background: var(--material);
+    color: var(--color-text);
+    padding: var(--space-1) var(--space-3);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .sync-unlink:hover {
+    background: var(--material-thick);
+  }
+  .sync-wait {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-1);
+  }
+  .sync-wait p {
+    margin: 0;
+  }
+  .sync-toast {
+    position: absolute;
+    top: calc(var(--titlebar-height) + 88px);
+    left: 50%;
+    translate: -50% 0;
+    margin: 0;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-sm);
+    background: var(--material);
+    backdrop-filter: var(--material-blur);
+  }
+  .tv-list {
+    display: grid;
+    gap: var(--space-2);
+  }
+  .tv-list .text-button {
+    margin: 0;
+    text-align: left;
   }
   .floating {
     position: absolute;

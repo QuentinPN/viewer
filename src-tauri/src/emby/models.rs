@@ -1086,3 +1086,18 @@ pub struct PlaylistCreated {
     pub name: String,
     pub added: u32,
 }
+
+/// One entry of `GET /Sessions` (ADR 0124): the fields linked playback reads.
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "PascalCase")]
+pub struct SessionInfoDto {
+    pub id: String,
+    #[serde(default)]
+    pub device_id: Option<String>,
+    #[serde(default)]
+    pub device_name: Option<String>,
+    #[serde(default)]
+    pub client: Option<String>,
+    #[serde(default)]
+    pub supports_remote_control: bool,
+}

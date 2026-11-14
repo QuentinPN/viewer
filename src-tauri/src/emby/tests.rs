@@ -5427,3 +5427,61 @@ fn real_server_episode_detail() {
     }
     assert!(checked > 0, "no series with two regular seasons");
 }
+
+/// Linked playback calls (ADR 0124): capabilities, the session list and the
+/// `SendString` relay, with the token in the header only.
+#[test]
+fn linked_playback_calls_use_the_session_relay() {
+    let server = FakeEmby::start(Box::new(|r: &Recorded| {
+        if r.method == "GET" && r.path.starts_with("/emby/Sessions?") {
+            (
+                200,
+                r#"[{"Id":"tv1","DeviceId":"dev-tv","DeviceName":"Shield","Client":"Viewer TV","SupportsRemoteControl":true}]"#.into(),
+            )
+        } else {
+            (204, String::new())
+        }
+    }));
+    let client = super::client::EmbyClient::new(
+        super::server_url::ServerUrl::parse(&server.url).unwrap(),
+        super::client::DeviceIdentity {
+            name: "test".into(),
+            id: "dev-pc".into(),
+            version: "0.1.0".into(),
+        },
+    )
+    .unwrap()
+    .with_token(AccessToken::new(TOKEN.into()));
+    assert_eq!(client.device_id(), "dev-pc");
+
+    run(client.post_capabilities()).unwrap();
+    let sessions = run(client.sessions(USER_ID)).unwrap();
+    assert_eq!(sessions[0].id, "tv1");
+    assert!(sessions[0].supports_remote_control);
+    run(client.send_string("tv1", r#"{"tv":"sync"}"#)).unwrap();
+
+    let reqs = server.requests();
+    assert_eq!(reqs[0].method, "POST");
+    assert_eq!(reqs[0].path, "/emby/Sessions/Capabilities/Full");
+    let caps: serde_json::Value = serde_json::from_str(&reqs[0].body).unwrap();
+    assert_eq!(caps["SupportedCommands"], serde_json::json!(["SendString"]));
+    assert_eq!(caps["SupportsMediaControl"], true);
+    assert_eq!(
+        reqs[1].path,
+        format!("/emby/Sessions?ControllableByUserId={USER_ID}")
+    );
+    assert_eq!(reqs[2].path, "/emby/Sessions/tv1/Command");
+    let cmd: serde_json::Value = serde_json::from_str(&reqs[2].body).unwrap();
+    assert_eq!(cmd["Name"], "SendString");
+    assert_eq!(cmd["Arguments"]["String"], r#"{"tv":"sync"}"#);
+    for r in &reqs {
+        assert!(!r.path.contains(TOKEN), "token stays out of the URL");
+        assert!(!r.body.contains(TOKEN), "token stays out of the body");
+        assert!(r.auth.as_deref().is_some_and(|a| a.contains(TOKEN)));
+    }
+
+    // A session id that is not one never reaches the server.
+    let err = run(client.send_string("../x", "{}")).unwrap_err();
+    assert!(matches!(err, EmbyError::InvalidResponse(_)), "{err:?}");
+    assert_eq!(server.requests().len(), 3);
+}

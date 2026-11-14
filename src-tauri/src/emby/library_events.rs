@@ -1,18 +1,22 @@
-//! Library events (ADR 0110): while the home is shown, one WebSocket to the Emby
-//! server listens for `LibraryChanged`, and a title added on the server reaches
-//! « Ajoutés récemment » at once. The UI only receives an event without payload;
-//! the socket URL carries the token and is never logged.
+//! Session socket (ADR 0110, 0124): while signed in, one WebSocket to the Emby
+//! server. It declares the session's capabilities on each connect, carries the
+//! linked playback's `SendString` messages and, while the home is shown,
+//! `LibraryChanged`, so a title added on the server reaches « Ajoutés
+//! récemment » at once. The UI only receives an event without payload; the
+//! socket URL carries the token and is never logged.
 
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tokio::time::{Instant, sleep, sleep_until};
 use tokio_tungstenite::tungstenite::Message;
 
 use super::client::EmbyClient;
+use super::session::EmbyService;
+use crate::sync::{SyncHandle, own_session_id};
 
 /// Emitted (no payload) once a burst of library changes has settled.
 pub const LIBRARY_CHANGED_EVENT: &str = "emby://library-changed";
@@ -22,6 +26,8 @@ pub const LIBRARY_CHANGED_EVENT: &str = "emby://library-changed";
 pub const SETTLE: Duration = Duration::from_secs(2);
 /// Sent so idle sockets are not closed by the server or a proxy.
 pub const KEEP_ALIVE: Duration = Duration::from_secs(30);
+/// How often the socket checks the session it was opened for is still the one.
+const SESSION_CHECK: Duration = Duration::from_secs(1);
 
 /// Delay before reconnect attempt `attempt` (0-based): 2 s, 5 s, 15 s, then 30 s.
 pub fn backoff(attempt: u32) -> Duration {
@@ -67,46 +73,98 @@ pub fn is_library_change(text: &str) -> bool {
         && change.items_removed.is_empty())
 }
 
-/// The listener task, if any. Starting again replaces it (new session or server).
+/// `String` of a `SendString` general command, the relay of linked playback.
+pub fn send_string_of(text: &str) -> Option<String> {
+    let msg = serde_json::from_str::<SocketMessage>(text).ok()?;
+    if msg.message_type != "GeneralCommand" {
+        return None;
+    }
+    let data = msg.data?;
+    if data.get("Name")?.as_str()? != "SendString" {
+        return None;
+    }
+    Some(data.get("Arguments")?.get("String")?.as_str()?.to_owned())
+}
+
+/// Whether the home is shown: `LibraryChanged` only matters then.
 #[derive(Default)]
 pub struct LibraryEvents {
-    task: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
+    home_shown: AtomicBool,
 }
 
 impl LibraryEvents {
-    pub fn start(&self, app: tauri::AppHandle, client: EmbyClient) {
-        let mut task = self.task.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(old) = task.take() {
-            old.abort();
-        }
-        *task = Some(tauri::async_runtime::spawn(run(app, client)));
+    pub fn start(&self) {
+        self.home_shown.store(true, Ordering::Relaxed);
     }
 
     pub fn stop(&self) {
-        if let Some(old) = self.task.lock().unwrap_or_else(|p| p.into_inner()).take() {
-            old.abort();
+        self.home_shown.store(false, Ordering::Relaxed);
+    }
+}
+
+/// Runs for the app's lifetime: one socket per signed-in session.
+pub fn spawn(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(supervise(app));
+}
+
+/// Socket URL of the open session, `None` when signed out.
+fn session_url(app: &tauri::AppHandle) -> Option<(EmbyClient, String)> {
+    let client = app.state::<EmbyService>().client().ok()?;
+    let url = client.library_socket_url().ok()?;
+    Some((client, url))
+}
+
+async fn supervise(app: tauri::AppHandle) {
+    let mut attempt = 0;
+    let mut last: Option<String> = None;
+    loop {
+        let Some((client, url)) = session_url(&app) else {
+            last = None;
+            sleep(SESSION_CHECK).await;
+            continue;
+        };
+        if last.as_deref() != Some(url.as_str()) {
+            attempt = 0;
+            app.state::<SyncHandle>().own_session(None);
+            last = Some(url.clone());
+        }
+        match tokio_tungstenite::connect_async(url.as_str()).await {
+            Ok((socket, _)) => {
+                log::info!("session socket: connected");
+                attempt = 0;
+                tauri::async_runtime::spawn(on_connect(app.clone(), client));
+                listen(&app, socket, &url).await;
+                log::info!("session socket: disconnected");
+            }
+            // The error text never holds the URL; its kind is enough to diagnose.
+            Err(e) => log::warn!("session socket: connection failed ({})", error_kind(&e)),
+        }
+        // A new session reconnects at once; the same one backs off.
+        if session_url(&app).is_some_and(|(_, now)| now == url) {
+            sleep(backoff(attempt)).await;
+            attempt = attempt.saturating_add(1);
         }
     }
 }
 
-async fn run(app: tauri::AppHandle, client: EmbyClient) {
-    let Ok(url) = client.library_socket_url() else {
+/// Makes the session reachable by `SendString`, then learns its id.
+async fn on_connect(app: tauri::AppHandle, client: EmbyClient) {
+    if let Err(e) = client.post_capabilities().await {
+        log::warn!("session socket: capabilities refused ({})", e.kind());
+        return;
+    }
+    let Some(user) = app.state::<EmbyService>().current_user() else {
         return;
     };
-    let mut attempt = 0;
-    loop {
-        match tokio_tungstenite::connect_async(url.as_str()).await {
-            Ok((socket, _)) => {
-                log::info!("library events: connected");
-                attempt = 0;
-                listen(&app, socket).await;
-                log::info!("library events: disconnected");
+    match client.sessions(&user.user_id).await {
+        Ok(list) => {
+            let own = own_session_id(&list, client.device_id());
+            if own.is_none() {
+                log::warn!("session socket: own session not listed");
             }
-            // The error text never holds the URL; its kind is enough to diagnose.
-            Err(e) => log::warn!("library events: connection failed ({})", error_kind(&e)),
+            app.state::<SyncHandle>().own_session(own);
         }
-        sleep(backoff(attempt)).await;
-        attempt = attempt.saturating_add(1);
+        Err(e) => log::warn!("session socket: sessions unavailable ({})", e.kind()),
     }
 }
 
@@ -122,7 +180,7 @@ fn error_kind(e: &tokio_tungstenite::tungstenite::Error) -> &'static str {
     }
 }
 
-async fn listen<S>(app: &tauri::AppHandle, socket: S)
+async fn listen<S>(app: &tauri::AppHandle, socket: S, url: &str)
 where
     S: futures_util::Stream<Item = Result<Message, tokio_tungstenite::tungstenite::Error>>
         + futures_util::Sink<Message>
@@ -130,13 +188,19 @@ where
 {
     let (mut tx, mut rx) = socket.split();
     let mut keep_alive = tokio::time::interval(KEEP_ALIVE);
+    let mut session_check = tokio::time::interval(SESSION_CHECK);
+    let events = app.state::<LibraryEvents>();
     // Set by a library change: the event goes out once nothing more came.
     let mut due: Option<Instant> = None;
     loop {
         tokio::select! {
             frame = rx.next() => match frame {
                 Some(Ok(Message::Text(text))) => {
-                    if is_library_change(text.as_str()) {
+                    if let Some(sync) = send_string_of(text.as_str()) {
+                        app.state::<SyncHandle>().incoming(sync);
+                    } else if is_library_change(text.as_str())
+                        && events.home_shown.load(Ordering::Relaxed)
+                    {
                         due = Some(Instant::now() + SETTLE);
                     }
                 }
@@ -146,6 +210,13 @@ where
             _ = keep_alive.tick() => {
                 let alive = Message::text(r#"{"MessageType":"KeepAlive"}"#);
                 if tx.send(alive).await.is_err() {
+                    break;
+                }
+            }
+            _ = session_check.tick() => {
+                // Signed out or another session: this socket is no longer ours.
+                if session_url(app).is_none_or(|(_, now)| now != url) {
+                    let _ = tx.send(Message::Close(None)).await;
                     break;
                 }
             }
@@ -244,6 +315,21 @@ mod tests {
         )
         .unwrap();
         assert!(anonymous.library_socket_url().is_err());
+    }
+
+    #[test]
+    fn send_string_frames_carry_the_relayed_text() {
+        let frame = r#"{"MessageType":"GeneralCommand","Data":{"Name":"SendString","Arguments":{"String":"{\"tv\":\"sync\"}"}}}"#;
+        assert_eq!(send_string_of(frame).as_deref(), Some(r#"{"tv":"sync"}"#));
+        let other = r#"{"MessageType":"GeneralCommand","Data":{"Name":"DisplayMessage","Arguments":{"String":"x"}}}"#;
+        assert_eq!(send_string_of(other), None);
+        let bare = r#"{"MessageType":"GeneralCommand","Data":{"Name":"SendString"}}"#;
+        assert_eq!(send_string_of(bare), None);
+        assert_eq!(
+            send_string_of(r#"{"MessageType":"LibraryChanged","Data":{}}"#),
+            None
+        );
+        assert_eq!(send_string_of("not json"), None);
     }
 
     #[test]

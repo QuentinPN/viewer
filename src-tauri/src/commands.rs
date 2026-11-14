@@ -12,9 +12,9 @@ use crate::emby::artwork_cache::{ArtworkCacheCleared, ArtworkCacheStats};
 use crate::emby::chapters::Chapter;
 use crate::emby::library_events::LibraryEvents;
 use crate::emby::models::{
-    EpisodePage, HeroItem, ItemDetail, ItemPage, ItemsOptions, Library, MediaItem, PlaybackStart,
-    PlaybackStopped, Playlist, PlaylistCard, PlaylistCreated, SearchResults, Season, ServerSummary,
-    SessionStatus, ShelfServer, SignedInUser, SortNameEntry, WatchItem,
+    EpisodePage, HeroItem, ItemDetail, ItemPage, ItemsOptions, Library, MediaItem, PlayMethod,
+    PlaybackStart, PlaybackStopped, Playlist, PlaylistCard, PlaylistCreated, SearchResults, Season,
+    ServerSummary, SessionStatus, ShelfServer, SignedInUser, SortNameEntry, WatchItem,
 };
 use crate::emby::quality::{PlaybackQuality, QualityCaps};
 use crate::emby::reporting::{ActivePlayback, PLAYBACK_STOPPED_EVENT};
@@ -26,6 +26,8 @@ use crate::player::{
     PlayerEvent, SubtitleStyle, Track,
 };
 use crate::segments::{Segment, SegmentService};
+use crate::sync::SyncDevice;
+use crate::sync::leader::{Peer, Status};
 use crate::video_surface::SurfaceMode;
 
 #[tauri::command]
@@ -175,7 +177,11 @@ pub async fn emby_restore(emby: State<'_, EmbyService>) -> Result<SessionStatus,
 
 /// Sets the open session aside without revoking it (ADR 0012).
 #[tauri::command]
-pub async fn emby_change_server(emby: State<'_, EmbyService>) -> Result<(), EmbyError> {
+pub async fn emby_change_server(
+    state: State<'_, AppState>,
+    emby: State<'_, EmbyService>,
+) -> Result<(), EmbyError> {
+    state.sync.stop(SYNC_BYE_WAIT).await;
     emby.change_server()
 }
 
@@ -209,7 +215,11 @@ pub async fn emby_resume_saved(
 }
 
 #[tauri::command]
-pub async fn emby_sign_out(emby: State<'_, EmbyService>) -> Result<(), EmbyError> {
+pub async fn emby_sign_out(
+    state: State<'_, AppState>,
+    emby: State<'_, EmbyService>,
+) -> Result<(), EmbyError> {
+    state.sync.stop(SYNC_BYE_WAIT).await;
     emby.sign_out().await
 }
 
@@ -364,13 +374,8 @@ pub async fn emby_set_favorite(
 /// Listens for titles added on the server while the home is shown (ADR 0110);
 /// each settled burst emits `emby://library-changed`. Replaces a running listener.
 #[tauri::command]
-pub fn emby_library_events_start(
-    app: tauri::AppHandle,
-    emby: State<'_, EmbyService>,
-    events: State<'_, LibraryEvents>,
-) -> Result<(), EmbyError> {
-    events.start(app, emby.client()?);
-    Ok(())
+pub fn emby_library_events_start(events: State<'_, LibraryEvents>) {
+    events.start();
 }
 
 /// Closes the library socket: the home is no longer shown.
@@ -631,6 +636,11 @@ pub async fn emby_play(
     let limit = plan.bitrate_limit;
     let start_seconds = (plan.start_ticks > 0).then(|| plan.start_ticks as f64 / 10_000_000.0);
     state.reporter.begin(ActivePlayback::new(&item_id, &plan));
+    state.sync.playing(
+        &item_id,
+        &plan.media_source_id,
+        plan.method == PlayMethod::DirectPlay,
+    );
     let request = PlaybackRequest {
         source: plan.url,
         http_headers,
@@ -661,4 +671,47 @@ pub async fn emby_play(
         bitrate_cap: limit.and_then(|l| l.cap),
         local_address: limit.is_none_or(|l| l.local_address),
     })
+}
+
+/// A linked TV is told `bye stopped` before sign-out or a server change, waiting
+/// at most this long (ADR 0124).
+const SYNC_BYE_WAIT: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// Viewer TVs open on the account the playback can be sent to (ADR 0124).
+#[tauri::command]
+pub async fn sync_devices(emby: State<'_, EmbyService>) -> Result<Vec<SyncDevice>, EmbyError> {
+    crate::sync::devices(&emby).await
+}
+
+/// Sends the current playback to a TV of `sync_devices`; the outcome arrives as
+/// `sync://status` and `sync://notice` events.
+#[tauri::command]
+pub async fn sync_invite(
+    state: State<'_, AppState>,
+    emby: State<'_, EmbyService>,
+    session_id: String,
+) -> Result<(), EmbyError> {
+    let device = crate::sync::devices(&emby)
+        .await?
+        .into_iter()
+        .find(|d| d.session_id == session_id)
+        .ok_or_else(|| EmbyError::Sync("cette TV n'est plus ouverte".into()))?;
+    state
+        .sync
+        .invite(Peer {
+            session_id: device.session_id,
+            name: device.name,
+        })
+        .await
+}
+
+/// Ends the link; the playback goes on here.
+#[tauri::command]
+pub fn sync_unlink(state: State<'_, AppState>) {
+    state.sync.unlink();
+}
+
+#[tauri::command]
+pub async fn sync_status(state: State<'_, AppState>) -> Result<Status, ()> {
+    Ok(state.sync.status().await)
 }

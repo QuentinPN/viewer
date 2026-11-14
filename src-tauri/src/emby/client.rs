@@ -11,8 +11,8 @@ use super::images::{self, ImageRequest};
 use super::models::{
     AddToPlaylistResultDto, AuthenticateUserByName, AuthenticationResult, BaseItemDto,
     DeviceProfile, HomeSectionDto, ItemsOptions, PlaybackInfoRequest, PlaybackInfoResponse,
-    PlaybackReportBody, PlaylistCreationResultDto, PublicSystemInfo, QueryResult, UserDto,
-    UserItemData,
+    PlaybackReportBody, PlaylistCreationResultDto, PublicSystemInfo, QueryResult, SessionInfoDto,
+    UserDto, UserItemData,
 };
 use super::server_url::ServerUrl;
 
@@ -716,6 +716,53 @@ impl EmbyClient {
         self.require_token()?;
         path_segment(&body.item_id)?;
         let res = self.request(Method::POST, path).json(body).send().await?;
+        check(res, true).map(drop)
+    }
+
+    /// Id of this device, matched against `GET /Sessions` (ADR 0124).
+    pub fn device_id(&self) -> &str {
+        &self.device.id
+    }
+
+    /// Declares this session controllable and able to receive `SendString`
+    /// (`POST /Sessions/Capabilities/Full`, ADR 0124). Emby answers 204.
+    pub async fn post_capabilities(&self) -> Result<(), EmbyError> {
+        self.require_token()?;
+        let body = serde_json::json!({
+            "PlayableMediaTypes": ["Video"],
+            "SupportedCommands": ["SendString"],
+            "SupportsMediaControl": true,
+        });
+        let res = self
+            .request(Method::POST, "/Sessions/Capabilities/Full")
+            .json(&body)
+            .send()
+            .await?;
+        check(res, true).map(drop)
+    }
+
+    /// Sessions the user can control (`GET /Sessions?ControllableByUserId=`).
+    pub async fn sessions(&self, user_id: &str) -> Result<Vec<SessionInfoDto>, EmbyError> {
+        self.require_token()?;
+        let url = self.server.api("/Sessions");
+        let res = self
+            .request_url(
+                Method::GET,
+                &url,
+                &[("ControllableByUserId", path_segment(user_id)?)],
+            )
+            .send()
+            .await?;
+        json(check(res, true)?).await
+    }
+
+    /// Relays `text` to another session (`POST /Sessions/{Id}/Command`, general
+    /// command `SendString`). The `/Command/SendString` path drops the arguments.
+    pub async fn send_string(&self, session_id: &str, text: &str) -> Result<(), EmbyError> {
+        self.require_token()?;
+        let path = format!("/Sessions/{}/Command", path_segment(session_id)?);
+        let body = serde_json::json!({"Name": "SendString", "Arguments": {"String": text}});
+        let res = self.request(Method::POST, &path).json(&body).send().await?;
         check(res, true).map(drop)
     }
 

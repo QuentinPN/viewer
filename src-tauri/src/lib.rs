@@ -5,6 +5,7 @@ pub mod player;
 pub mod segments;
 #[cfg(debug_assertions)]
 mod spike;
+mod sync;
 mod system_info;
 mod updater;
 mod video_surface;
@@ -30,6 +31,8 @@ pub struct AppState {
     pub wid: Option<i64>,
     /// Emby playback reports (ADR 0008), fed with every player event.
     pub reporter: Reporter,
+    /// Linked playback with a TV (ADR 0124), fed with every player event.
+    pub sync: sync::SyncHandle,
     app: tauri::AppHandle,
     #[cfg(windows)]
     _surface: Option<video_surface::ChildSurface>,
@@ -55,11 +58,13 @@ impl AppState {
         };
         let emitter = app.clone();
         let reporter = self.reporter.clone();
+        let linked = self.sync.clone();
         let engine = Arc::new(MpvEngine::new(
             &self.library,
             &config,
             Box::new(move |ev| {
                 reporter.player_event(&ev);
+                linked.player_event(&ev);
                 let _ = emitter.emit(PLAYER_EVENT, &ev);
             }),
         )?);
@@ -76,6 +81,7 @@ impl AppState {
             // The event thread is gone, so notify the UI ourselves: whoever closed the
             // player (UI, scenario, window close), the overlay must return to idle.
             self.reporter.player_event(&player::PlayerEvent::Shutdown);
+            self.sync.player_event(&player::PlayerEvent::Shutdown);
             let _ = self.app.emit(PLAYER_EVENT, player::PlayerEvent::Shutdown);
         }
     }
@@ -280,6 +286,9 @@ pub fn run() {
 
             app.manage(emby_service(app)?);
             app.manage(emby::library_events::LibraryEvents::default());
+            let linked = sync::SyncHandle::spawn(app.handle().clone());
+            app.manage(linked.clone());
+            emby::library_events::spawn(app.handle().clone());
             app.manage(segments::SegmentService::new(env!("CARGO_PKG_VERSION")));
 
             app.manage(AppState {
@@ -288,6 +297,7 @@ pub fn run() {
                 library: resolve_libmpv(),
                 wid,
                 reporter: Reporter::spawn(app.handle().clone()),
+                sync: linked,
                 app: app.handle().clone(),
                 #[cfg(windows)]
                 _surface: surface,
@@ -325,6 +335,10 @@ pub fn run() {
                     std::thread::spawn(move || {
                         let state = window.state::<AppState>();
                         state.close_player();
+                        // A linked TV stops too (`bye stopped`, best effort).
+                        if !state.sync.stop_blocking(std::time::Duration::from_secs(2)) {
+                            log::warn!("linked TV not told before exit");
+                        }
                         // Let the stop report reach the server before the process ends.
                         if !state.reporter.flush(std::time::Duration::from_secs(3)) {
                             log::warn!("playback stop report not confirmed before exit");
@@ -352,6 +366,10 @@ pub fn run() {
             commands::emby_probe,
             commands::emby_library_events_start,
             commands::emby_library_events_stop,
+            commands::sync_devices,
+            commands::sync_invite,
+            commands::sync_unlink,
+            commands::sync_status,
             commands::emby_sign_in,
             commands::emby_restore,
             commands::emby_change_server,

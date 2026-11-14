@@ -321,6 +321,16 @@ impl MpvEngine {
         self.inner.get_property(name)
     }
 
+    /// Playback position in seconds (`time-pos`), `None` before a file plays.
+    pub fn position_seconds(&self) -> Option<f64> {
+        self.inner.get_property("time-pos")?.parse().ok()
+    }
+
+    /// FFmpeg indexes of the selected audio and subtitle streams (ADR 0124).
+    pub fn selected_streams(&self) -> (Option<i32>, Option<i32>) {
+        selected_streams(&self.inner.get_property("track-list").unwrap_or_default())
+    }
+
     /// Escape hatch for engine tests that need mpv-only sources (e.g. lavfi).
     #[cfg(test)]
     fn load_raw(&self, target: &str) -> Result<(), PlayerError> {
@@ -615,6 +625,32 @@ fn track_with_ff_index(json: &str, kind: &str, index: i64) -> Option<i64> {
             .then(|| t.get("id")?.as_i64())
             .flatten()
     })
+}
+
+/// FFmpeg indexes of the selected file tracks in a `track-list`: audio, then
+/// subtitle (`-1` when none is shown). An added external track has no index.
+fn selected_streams(json: &str) -> (Option<i32>, Option<i32>) {
+    let Ok(serde_json::Value::Array(tracks)) = serde_json::from_str(json) else {
+        return (None, None);
+    };
+    let selected = |kind: &str| {
+        tracks.iter().find(|t| {
+            t.get("type").and_then(serde_json::Value::as_str) == Some(kind)
+                && t.get("selected").and_then(serde_json::Value::as_bool) == Some(true)
+        })
+    };
+    let ff_index = |t: &serde_json::Value| {
+        if t.get("external").and_then(serde_json::Value::as_bool) == Some(true) {
+            return None;
+        }
+        i32::try_from(t.get("ff-index")?.as_i64()?).ok()
+    };
+    let audio = selected("audio").and_then(ff_index);
+    let subtitle = match selected("sub") {
+        None => Some(-1),
+        Some(t) => ff_index(t),
+    };
+    (audio, subtitle)
 }
 
 /// Selects the tracks asked by the last `load`. A stream the file does not have
@@ -1019,6 +1055,32 @@ mod tests {
         );
         assert_eq!(track_with_ff_index(json, "sub", 1), None, "an audio index");
         assert_eq!(track_with_ff_index("not json", "audio", 1), None);
+    }
+
+    #[test]
+    fn selected_streams_read_ff_indexes() {
+        let json = r#"[
+            {"id":1,"type":"video","ff-index":0,"selected":true},
+            {"id":1,"type":"audio","ff-index":1,"selected":false},
+            {"id":2,"type":"audio","ff-index":2,"selected":true},
+            {"id":1,"type":"sub","ff-index":4,"selected":true},
+            {"id":2,"type":"sub","external":true,"selected":false}
+        ]"#;
+        assert_eq!(selected_streams(json), (Some(2), Some(4)));
+        let none = r#"[{"id":1,"type":"audio","ff-index":1,"selected":true},
+            {"id":1,"type":"sub","ff-index":3,"selected":false}]"#;
+        assert_eq!(
+            selected_streams(none),
+            (Some(1), Some(-1)),
+            "no subtitle shown"
+        );
+        let external = r#"[{"id":2,"type":"sub","external":true,"selected":true}]"#;
+        assert_eq!(
+            selected_streams(external),
+            (None, None),
+            "external: no index"
+        );
+        assert_eq!(selected_streams("not json"), (None, None));
     }
 
     /// Preferences of ADR 0035 reach libmpv: style options, subtitles off, and the
