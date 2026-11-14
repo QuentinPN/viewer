@@ -2,15 +2,9 @@
 
 ## 1.4.0 — 2026-11-14
 
-- Gate 7: real PC + Shield linked playback test and its evidence
-- Android TV: steadier linked recalage on the Shield (ADR 0124)
-- Linked playback: accept underscores in ids, log kinds only, keep the TV socket across screens
-- Desktop: lead linked playback with the TV over the Emby relay (ADR 0124)
-- Android TV: follow the desktop playback over the Emby relay (ADR 0124)
-- ADR 0124: linked playback protocol and shared test vectors
-- ADR 0123: linked TV playback goes through the Emby session relay
-- Add the claude-boilerplate setup and the TV sync hand-off
-- ADR 0111: note the Gitea 28.3.0 upgrade, release API unchanged
+- Lecteur : « Envoyer aussi sur la TV » ouvre le même épisode sur la Shield, qui suit ta lecture. Tu peux ainsi partager ton écran sur Discord et regarder sur la télé en même temps. La pastille « Lié à SHIELD · ±40 ms » montre l'écart mesuré par la TV ; « Délier » laisse chacun continuer seul (ADR 0123, 0124).
+- Pause, lecture, ±10 s et « Passer l'intro » faits sur la TV s'appliquent aussi à l'ordi. Retour sur la TV arrête la lecture ici.
+- Écart mesuré sur une vraie Shield : médiane environ 50 ms, rarement plus d'un quart de seconde.
 
 ## 1.3.1 — 2026-11-13
 
