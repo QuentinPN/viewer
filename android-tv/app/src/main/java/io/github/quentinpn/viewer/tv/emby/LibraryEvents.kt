@@ -5,6 +5,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
@@ -69,21 +71,23 @@ internal fun Flow<Unit>.settled(quietMs: Long): Flow<Unit> {
 }
 
 /**
- * Library changes of the signed-in user, while collected: one Unit per qualifying frame.
- * The socket reconnects after [reconnectDelay] when it fails or closes, and is closed when
- * collection stops. Failures are never logged: the socket URL carries the token.
+ * Frames pushed to the signed-in session, while collected. [onOpen] runs at each
+ * (re)connection, on OkHttp's thread. The socket reconnects after [reconnectDelay] when it
+ * fails or closes, and is closed when collection stops. Failures are never logged: the
+ * socket URL carries the token.
  */
-fun EmbyClient.libraryChanges(): Flow<Unit> = channelFlow {
+fun EmbyClient.events(onOpen: () -> Unit = {}): Flow<String> = channelFlow {
     var attempt = 0
     while (true) {
         val ended = Channel<Unit>(Channel.CONFLATED)
         val socket = openEventSocket(object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 attempt = 0
+                onOpen()
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                if (isLibraryChange(text)) trySend(Unit)
+                trySend(text)
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
@@ -118,3 +122,6 @@ fun EmbyClient.libraryChanges(): Flow<Unit> = channelFlow {
         delay(reconnectDelay(attempt++))
     }
 }
+
+/** Library changes among [this] frames: one Unit per qualifying frame. */
+fun Flow<String>.libraryChanges(): Flow<Unit> = filter(::isLibraryChange).map { }

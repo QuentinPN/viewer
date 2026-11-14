@@ -2,6 +2,7 @@ package io.github.quentinpn.viewer.tv.settings
 
 import android.content.Context
 import androidx.core.content.edit
+import io.github.quentinpn.viewer.tv.sync.offeredOffset
 import io.github.quentinpn.viewer.tv.emby.MAX_STREAMING_BITRATE
 import io.github.quentinpn.viewer.tv.player.LANGUAGE_CHOICES
 import io.github.quentinpn.viewer.tv.player.LanguageOverrides
@@ -32,11 +33,14 @@ data class PlaybackSettings(
     val nightMode: Boolean = false,
     /** Audio and subtitle languages set on this device (ADR 0120); all null follows the Emby account. */
     val languages: LanguageOverrides = LanguageOverrides(),
+    /** « Décalage TV »: how far behind the desktop the TV plays, for its slower picture (ADR 0124). */
+    val syncOffsetMs: Int = 0,
 ) {
     /** Drops caps and languages outside the lists, e.g. from an older version. */
     fun sanitized() = copy(
         localCap = offeredCap(localCap),
         remoteCap = offeredCap(remoteCap),
+        syncOffsetMs = offeredOffset(syncOffsetMs),
         languages = LanguageOverrides(
             audioLanguage = languages.audioLanguage?.takeIf { it in LANGUAGE_CHOICES },
             subtitleMode = languages.subtitleMode,
@@ -149,6 +153,7 @@ class PlaybackSettingsStore(context: Context, private val userId: String) {
                 overrideAss = prefs.getBoolean(key(SUB_OVERRIDE_ASS), style.overrideAss),
             ),
             nightMode = prefs.getBoolean(key(NIGHT_MODE), defaults.nightMode),
+            syncOffsetMs = prefs.getInt(key(SYNC_OFFSET), defaults.syncOffsetMs),
             languages = LanguageOverrides(
                 audioLanguage = prefs.getString(key(AUDIO_LANGUAGE), null),
                 subtitleMode = prefs.getString(key(SUBTITLE_MODE), null)?.let { stored -> SubtitleMode.entries.find { it.name == stored } },
@@ -172,6 +177,7 @@ class PlaybackSettingsStore(context: Context, private val userId: String) {
             putString(key(SUB_POSITION), style.position.stored)
             putBoolean(key(SUB_OVERRIDE_ASS), style.overrideAss)
             putBoolean(key(NIGHT_MODE), clean.nightMode)
+            putInt(key(SYNC_OFFSET), clean.syncOffsetMs)
             val languages = clean.languages
             for ((name, value) in listOf(
                 AUDIO_LANGUAGE to languages.audioLanguage,
@@ -197,6 +203,7 @@ class PlaybackSettingsStore(context: Context, private val userId: String) {
         const val SUB_POSITION = "subtitle.position"
         const val SUB_OVERRIDE_ASS = "subtitle.overrideAss"
         const val NIGHT_MODE = "audio.nightMode"
+        const val SYNC_OFFSET = "sync.offsetMs"
         const val AUDIO_LANGUAGE = "audio.language"
         const val SUBTITLE_MODE = "subtitle.mode"
         const val SUBTITLE_LANGUAGE = "subtitle.language"

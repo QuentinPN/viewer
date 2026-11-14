@@ -1,5 +1,6 @@
 package io.github.quentinpn.viewer.tv.ui
 
+import io.github.quentinpn.viewer.tv.sync.SyncHub
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -185,6 +186,15 @@ class PlayerUi {
     /** Over the paused picture once the timer has run out; gone when playback resumes. */
     var notice by mutableStateOf<String?>(null)
 
+    /** « Lié à Bureau · ±40 ms » while linked to a desktop (ADR 0124); kept from one file to the next. */
+    var linkPill by mutableStateOf<String?>(null)
+
+    /** Out of a link, the menu offers to join one; linked, to leave it. */
+    var linkBusy by mutableStateOf(false)
+
+    /** The desktop list, open over the player. */
+    var linkPicker by mutableStateOf<SyncHub?>(null)
+
     /** Target of the last ◀ ▶ seek while its thumbnail may show (ADR 0069); null once the seek settles. */
     var seekTarget by mutableStateOf<Double?>(null)
         private set
@@ -200,12 +210,13 @@ class PlayerUi {
         seeks++
     }
 
-    val menuOpen get() = tracks != null || chapterMenu || info != null
+    val menuOpen get() = tracks != null || chapterMenu || info != null || linkPicker != null
 
     fun closeMenus() {
         tracks = null
         chapterMenu = false
         info = null
+        linkPicker = null
     }
 
     // Bumped on each key: restarts the hide delay
@@ -297,8 +308,10 @@ fun PlayerOverlay(
     onSleep: (SleepChange) -> Unit,
     onQualityStep: (QualityChange) -> Unit,
     onQualityApply: () -> Unit,
+    onLink: () -> Unit,
 ) {
     ui.AutoHide()
+    ui.linkPicker?.let { hub -> LinkPicker(hub) { ui.linkPicker = null } }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         ui.status?.let {
             Text(it, color = Palette.text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.align(Alignment.Center))
@@ -327,7 +340,7 @@ fun PlayerOverlay(
             SkipButton(skip, !ui.menuOpen && ui.skipArmed, !ui.menuOpen, onSkip,Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
         }
         ui.tracks?.let {
-            TrackMenu(it, MenuState(ui.delays, ui.speed, ui.fit, ui.night, ui.sleep.choice, ui.item, ui.quality), MenuActions(onSelect, onDelay, onSpeed, onFit, onNight, onSleep, onInfo, onQualityStep, onQualityApply), Modifier.align(Alignment.CenterEnd))
+            TrackMenu(it, MenuState(ui.delays, ui.speed, ui.fit, ui.night, ui.sleep.choice, ui.item, ui.quality, ui.linkBusy), MenuActions(onSelect, onDelay, onSpeed, onFit, onNight, onSleep, onInfo, onQualityStep, onQualityApply, onLink), Modifier.align(Alignment.CenterEnd))
         }
         ui.info?.let { InfoMenu(it, Modifier.align(Alignment.CenterEnd)) }
         if (ui.chapterMenu) ChapterMenu(ui.chapters, chapterIndex(ui.chapters, ui.position), onChapter, Modifier.align(Alignment.CenterEnd))
@@ -438,7 +451,7 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
             // Only away from 1x: a reminder that the speed was changed in the menu (ADR 0072)
             // Likewise away from « Original »: the picture format chosen in the menu (ADR 0078)
             // As the speed's: the timer set in the menu, and what is left of it (ADR 0073)
-            listOfNotNull(speedBadge(ui.speed), ui.fit.badge, sleepBadge(ui.sleep, ui.now, ui.item)).forEach {
+            listOfNotNull(ui.linkPill, speedBadge(ui.speed), ui.fit.badge, sleepBadge(ui.sleep, ui.now, ui.item)).forEach {
                 Text(
                     it,
                     color = Palette.text,
@@ -512,12 +525,15 @@ private sealed interface MenuRow {
     /** ◀ ▶ step through the timer's values, OK goes to the next one and wraps (ADR 0073). */
     data class Sleep(val choice: SleepChoice, val item: SleepItem?) : MenuRow
 
+    /** « Regarder avec l'ordi », or « Délier » in a link (ADR 0124). */
+    data class Link(val busy: Boolean) : MenuRow
+
     /** Last row: opens "Informations de lecture" in place of the menu (ADR 0061). */
     data object Info : MenuRow
 }
 
 /** What the rows of the track menu show beyond the tracks. */
-private class MenuState(val delays: Delays, val speed: Double, val fit: VideoFit, val night: Night, val sleep: SleepChoice, val item: SleepItem?, val quality: Quality)
+private class MenuState(val delays: Delays, val speed: Double, val fit: VideoFit, val night: Night, val sleep: SleepChoice, val item: SleepItem?, val quality: Quality, val linkBusy: Boolean)
 
 private class MenuActions(
     val select: (TrackType, Int?) -> Unit,
@@ -529,6 +545,7 @@ private class MenuActions(
     val info: () -> Unit,
     val qualityStep: (QualityChange) -> Unit,
     val qualityApply: () -> Unit,
+    val link: () -> Unit,
 )
 
 /** ◀ and ▶ on a row: [left] or [right], held down they repeat; other keys go on as usual. */
@@ -564,6 +581,7 @@ private fun menuRows(tracks: List<Track>, state: MenuState): List<MenuRow> = bui
     add(MenuRow.Fit(state.fit))
     add(MenuRow.NightMode(state.night))
     add(MenuRow.Sleep(state.sleep, state.item))
+    add(MenuRow.Link(state.linkBusy))
     add(MenuRow.Info)
 }
 
@@ -641,6 +659,12 @@ private fun TrackMenu(tracks: List<Track>, state: MenuState, actions: MenuAction
                     supportingContent = { Text("◀ ▶ ou OK change  ·  met ensuite la lecture en pause", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     trailingContent = { Text(sleepValue(row.choice, row.item)) },
                     modifier = Modifier.leftRight(SleepChange.Previous, SleepChange.Next, actions.sleep),
+                )
+                is MenuRow.Link -> ListItem(
+                    selected = false,
+                    onClick = actions.link,
+                    headlineContent = { Text(if (row.busy) "Délier" else WATCH_WITH_DESKTOP, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = { Text(if (row.busy) "L'ordi continue seul, la TV aussi" else "L'ordi mène, la TV suit", maxLines = 1) },
                 )
                 MenuRow.Info -> ListItem(
                     selected = false,

@@ -337,3 +337,23 @@ data class MediaStreamDto(
     @SerialName("IsForced") val isForced: Boolean = false,
     @SerialName("IsHearingImpaired") val isHearingImpaired: Boolean = false,
 )
+
+/** One entry of `GET /Sessions?ControllableByUserId=` (ADR 0123): only what the linked playback reads. */
+@Serializable
+data class SessionInfoDto(
+    @SerialName("Id") val id: String,
+    @SerialName("DeviceId") val deviceId: String? = null,
+    @SerialName("DeviceName") val deviceName: String? = null,
+    @SerialName("Client") val client: String? = null,
+    @SerialName("SupportsRemoteControl") val supportsRemoteControl: Boolean = false,
+)
+
+@Serializable
+internal data class SendStringArguments(@SerialName("String") val string: String)
+
+/** Body of `POST /Sessions/{Id}/Command` for the relay; the `/Command/SendString` path drops the arguments (ADR 0123). */
+@Serializable
+internal data class SendStringCommand(
+    @SerialName("Arguments") val arguments: SendStringArguments,
+    @SerialName("Name") val name: String = "SendString",
+)

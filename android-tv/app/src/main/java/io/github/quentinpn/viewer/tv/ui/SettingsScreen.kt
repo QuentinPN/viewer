@@ -32,6 +32,7 @@ import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.ImageLoader
+import io.github.quentinpn.viewer.tv.sync.nextOffset
 import io.github.quentinpn.viewer.tv.AppServices
 import io.github.quentinpn.viewer.tv.BuildConfig
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
@@ -211,6 +212,13 @@ fun SettingsScreen(
                     "du lecteur. Sans effet quand le son part tel quel vers l'ampli.",
                 onOff(settings.nightMode),
             ) { change(settings.copy(nightMode = !settings.nightMode)) }
+        }
+        item {
+            Choice(
+                "Décalage TV",
+                "Avec l'ordi, la TV joue un peu en retard pour rattraper le délai de son image. OK ajoute 100 ms, jusqu'à 1500 ms.",
+                "${settings.syncOffsetMs} ms",
+            ) { change(settings.copy(syncOffsetMs = nextOffset(settings.syncOffsetMs))) }
         }
 
         item { Section("Langues") }

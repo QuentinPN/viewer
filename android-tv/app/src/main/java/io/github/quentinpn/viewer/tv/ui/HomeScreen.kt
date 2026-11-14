@@ -57,6 +57,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.HeroTitle
+import io.github.quentinpn.viewer.tv.AppServices
 import io.github.quentinpn.viewer.tv.emby.LIBRARY_DEBOUNCE_MS
 import io.github.quentinpn.viewer.tv.emby.libraryChanges
 import io.github.quentinpn.viewer.tv.emby.settled
@@ -237,12 +238,14 @@ fun HomeScreen(
         }
     }
 
-    // Titles added, updated or removed on the server are pushed through Emby's event socket:
-    // the shelves are read again ~2 s after a burst settles. Open only while the home is shown
-    // and the app started; the poll above stays as a fallback.
+    // Titles added, updated or removed on the server are pushed through Emby's event socket,
+    // held by the sync hub for the whole session (ADR 0123): the shelves are read again ~2 s
+    // after a burst settles, only while the home is shown and the app started; the poll above
+    // stays as a fallback.
+    val hub = AppServices.sync(androidx.compose.ui.platform.LocalContext.current)
     LaunchedEffect(lifecycle, memory, client) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            client.libraryChanges().settled(LIBRARY_DEBOUNCE_MS).collect { memory.userDataChanged() }
+            hub.frames.libraryChanges().settled(LIBRARY_DEBOUNCE_MS).collect { memory.userDataChanged() }
         }
     }
 

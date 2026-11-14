@@ -147,6 +147,10 @@ class MainActivity : ComponentActivity() {
                     val home = remember(current) { HomeMemory() }
                     // Sign-in or restored session: stop reports lost to the network go out now (ADR 0066)
                     LaunchedEffect(client) { reporter.signedIn(client, current.userId) }
+                    // The session's socket (ADR 0123): open while signed in and started, closed at sign-out
+                    LaunchedEffect(client) {
+                        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { AppServices.sync(this@MainActivity).hold(client, current.userId) }
+                    }
                     // The tile of a session opened at start (or migrated) learns the server's name (ADR 0104)
                     LaunchedEffect(client) {
                         try {

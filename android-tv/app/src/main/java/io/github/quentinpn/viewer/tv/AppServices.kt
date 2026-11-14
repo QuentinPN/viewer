@@ -17,6 +17,7 @@ import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.session.SessionStore
 import io.github.quentinpn.viewer.tv.settings.IMAGE_CACHE_DIRECTORY
 import io.github.quentinpn.viewer.tv.settings.IMAGE_CACHE_MAX_BYTES
+import io.github.quentinpn.viewer.tv.sync.SyncHub
 import okhttp3.OkHttpClient
 import okio.Path.Companion.toOkioPath
 
@@ -56,6 +57,13 @@ object AppServices {
     }
 
     @Volatile private var accountCache: Pair<String, AccountTracks?>? = null
+
+    /** The session-wide socket and the linked playback (ADR 0123, 0124). */
+    fun sync(context: Context): SyncHub = syncHub ?: synchronized(this) {
+        syncHub ?: SyncHub(context.applicationContext).also { syncHub = it }
+    }
+
+    @Volatile private var syncHub: SyncHub? = null
 
     fun store(context: Context) = SessionStore(context)
 

@@ -352,6 +352,8 @@ private fun Details(
                 Text(if (resume) "Reprendre à ${clock(position)}" else "Lire")
             }
             if (resume) OutlinedButton(onClick = { onPlay(episode.id, 0, version) }) { Text("Lire depuis le début") }
+            // The desktop leads, the TV follows (ADR 0124)
+            WatchWithDesktopButton()
         }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             actions { actionMessage = it }

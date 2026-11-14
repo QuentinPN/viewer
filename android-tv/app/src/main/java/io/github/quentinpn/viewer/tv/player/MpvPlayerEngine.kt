@@ -61,6 +61,7 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         MPVLib.observeProperty("time-pos", MpvFormat.MPV_FORMAT_INT64)
         MPVLib.observeProperty("duration", MpvFormat.MPV_FORMAT_DOUBLE)
         MPVLib.observeProperty("eof-reached", MpvFormat.MPV_FORMAT_FLAG)
+        MPVLib.observeProperty("paused-for-cache", MpvFormat.MPV_FORMAT_FLAG)
     }
 
     override fun addListener(listener: PlayerListener) {
@@ -98,17 +99,17 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         surfaceAttached = false
     }
 
-    override fun load(source: MediaSource, startSeconds: Double) {
+    override fun load(source: MediaSource, startSeconds: Double, paused: Boolean) {
         if (released.get()) return
         // Per-file option: a later file does not inherit this start position
         val start = if (startSeconds > 0) startSeconds.toString() else "none"
-        val file = PendingFile(source, "start=$start")
+        val file = PendingFile(source, "start=$start", paused)
         if (surfaceAttached) loadNow(file) else pending = file
     }
 
     private fun loadNow(file: PendingFile) {
         // keep-open paused the previous file on its last frame
-        MPVLib.setPropertyString("pause", "no")
+        MPVLib.setPropertyString("pause", if (file.paused) "yes" else "no")
         // `aid` and `sid` are options too: a track selected in the last file would carry over (as on Windows)
         MPVLib.setPropertyString("aid", "auto")
         MPVLib.setPropertyString("sid", "auto")
@@ -130,6 +131,20 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
     }
 
     override fun togglePause() = command("cycle", "pause")
+
+    override fun setPaused(paused: Boolean) {
+        if (!released.get()) MPVLib.setPropertyBoolean("pause", paused)
+    }
+
+    override fun positionSeconds(): Double? = calls.read { if (released.get()) null else MPVLib.getPropertyDouble("time-pos") }
+
+    override fun cacheAhead(): Pair<Double, Boolean> = calls.read {
+        if (released.get()) {
+            0.0 to false
+        } else {
+            (MPVLib.getPropertyDouble("demuxer-cache-duration") ?: 0.0) to (MPVLib.getPropertyBoolean("demuxer-cache-idle") ?: false)
+        }
+    }
 
     override fun seekBy(seconds: Double) = command("seek", seconds.toString(), "relative")
 
@@ -234,6 +249,7 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         when (property) {
             "pause" -> listeners.forEach { it.onPauseChanged(value) }
             "eof-reached" -> if (value) listeners.forEach { it.onEndReached() }
+            "paused-for-cache" -> listeners.forEach { it.onBuffering(value) }
         }
     }
 
@@ -304,4 +320,4 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
 }
 
 /** A source waiting for the surface, with its loadfile options. */
-private class PendingFile(val source: MediaSource, val options: String)
+private class PendingFile(val source: MediaSource, val options: String, val paused: Boolean = false)

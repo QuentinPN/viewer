@@ -14,7 +14,17 @@ import androidx.activity.addCallback
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.ComposeView
+import android.os.SystemClock
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import io.github.quentinpn.viewer.tv.sync.Body
+import io.github.quentinpn.viewer.tv.sync.CmdAction
+import io.github.quentinpn.viewer.tv.sync.DECIDE_EVERY_MS
+import io.github.quentinpn.viewer.tv.sync.LinkedPlayer
+import io.github.quentinpn.viewer.tv.sync.SPEED_NORMAL
+import io.github.quentinpn.viewer.tv.sync.linkPill
+import io.github.quentinpn.viewer.tv.sync.decide as linkDecide
 import io.github.quentinpn.viewer.tv.emby.ActivePlayback
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
@@ -65,6 +75,7 @@ import io.github.quentinpn.viewer.tv.player.SleepTimer
 import io.github.quentinpn.viewer.tv.player.SpeedChange
 import io.github.quentinpn.viewer.tv.player.TrackPreference
 import io.github.quentinpn.viewer.tv.player.TrackPreferenceStore
+import io.github.quentinpn.viewer.tv.player.Track
 import io.github.quentinpn.viewer.tv.player.TrackType
 import io.github.quentinpn.viewer.tv.player.VideoFit
 import io.github.quentinpn.viewer.tv.player.accountPick
@@ -114,6 +125,13 @@ import kotlin.math.roundToLong
 
 private const val TAG = "ViewerTV"
 private const val TICKS_PER_SECOND = 10_000_000.0
+private const val TICKS_PER_MS = 10_000L
+
+/** Read ahead before a linked load answers `ready` (ADR 0124). */
+private const val READY_CACHE_SECONDS = 3.0
+
+/** A link message over the picture goes after this long. */
+private const val LINK_NOTICE_MS = 6_000L
 
 /** As the tracker (ADR 0012): an end further than this from the duration is a cut stream. */
 private const val NATURAL_END_MARGIN_SECONDS = 30.0
@@ -143,7 +161,7 @@ private const val INFO_REFRESH_MS = 1_000L
  * Its « Qualité » asks the server again at another cap and reloads at the same place, for this playback only (ADR 0081).
  * A local trailer ([EXTRA_TRAILER]) plays without any report, segment lookup or next episode (ADR 0083).
  */
-class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener {
+class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener, LinkedPlayer {
     private var engine: PlayerEngine? = null
     private val ui = PlayerUi()
     private var subtitles: List<ExternalSubtitle> = emptyList()
@@ -203,6 +221,23 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     /** A trailer (ADR 0083): nothing reported to the server, no segments, no next episode. */
     private var trailer = false
 
+    private val hub by lazy { AppServices.sync(this) }
+
+    /** The linked `load` being played: its tracks, and `ready` still to send until [readyJob] ends (ADR 0124). */
+    private var linkLoad: Body.Load? = null
+    private var readyJob: Job? = null
+
+    /** The speed the link set; away from 1 while it corrects. */
+    private var linkSpeed = SPEED_NORMAL
+
+    // Written on mpv's event thread
+    @Volatile private var lastSeekAt = 0L
+
+    private var evaluating: Job? = null
+
+    /** A held ◀ ▶ moved playback: its final position is sent when the key is released. */
+    private var heldMoved = false
+
     /** A player event for the tracker, unless a trailer plays: it never reaches the server. */
     private fun report(apply: PlaybackTracker.(now: Long) -> List<Report>) {
         if (!trailer) reporter.event(apply)
@@ -213,7 +248,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val surface = SurfaceView(this)
         val overlay = ComposeView(this).apply {
-            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip, ::openInfo, ::shiftDelay, ::shiftSpeed, ::shiftFit, ::toggleNight, ::changeTimer, ::pickQuality, ::applyQuality) } }
+            setContent { ViewerTheme { PlayerOverlay(ui, ::selectTrack, ::goToChapter, ::playNext, ::cancelNext, ::skip, ::openInfo, ::shiftDelay, ::shiftSpeed, ::shiftFit, ::toggleNight, ::changeTimer, ::pickQuality, ::applyQuality, ::linkAction) } }
         }
         setContentView(
             // With the menu focused, keys reach the root before the overlay: the player sees them first
@@ -248,6 +283,27 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         preferences = TrackPreferenceStore(this, session.userId)
         settingsStore = PlaybackSettingsStore(this, session.userId)
         surface.holder.addCallback(this)
+        if (!trailer) {
+            hub.attach(this)
+            // The session's socket stays open while the player shows (ADR 0123)
+            lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { hub.hold(client, userId) } }
+            lifecycleScope.launch {
+                hub.view.collect { view ->
+                    ui.linkBusy = view.busy
+                    ui.linkPill = view.device?.takeIf { view.linked }?.let { linkPill(it, view.driftMs) }
+                }
+            }
+            lifecycleScope.launch {
+                hub.notice.collectLatest { text ->
+                    if (text == null) return@collectLatest
+                    ui.notice = text
+                    ui.show()
+                    delay(LINK_NOTICE_MS)
+                    if (ui.notice == text) ui.notice = null
+                    hub.dismissNotice()
+                }
+            }
+        }
 
         // Read once per session, before the file loads in practice; languages and mode only in the log
         lifecycleScope.launch {
@@ -273,7 +329,97 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             }
         }
 
-        play(itemId, startTicks, intent.getStringExtra(EXTRA_MEDIA_SOURCE_ID))
+        // Opened by a desktop's `load` from another screen: the hub kept it
+        val linked = if (intent.getBooleanExtra(EXTRA_LINKED, false)) hub.takePendingLoad() else null
+        if (linked != null) linkedLoad(linked) else play(itemId, startTicks, intent.getStringExtra(EXTRA_MEDIA_SOURCE_ID))
+    }
+
+    /** A `load` from the leader: the usual negotiation, its tracks, its position, paused (ADR 0124). */
+    override fun linkedLoad(load: Body.Load) {
+        linkLoad = load
+        linkSpeed = SPEED_NORMAL
+        readyJob?.cancel()
+        readyJob = null
+        play(load.itemId, load.positionMs * TICKS_PER_MS, load.mediaSourceId)
+    }
+
+    override fun linkedClose() = finish()
+
+    override fun linkedEnded() = leaveLink()
+
+    /** Recalage toward the leader, every 250 ms and at each `state`. */
+    override fun evaluate() {
+        val player = engine ?: return
+        if (ui.status != null || readyJob != null || linkLoad?.itemId != current || evaluating?.isActive == true) return
+        // mpv is read off the main thread, as the cache in awaitReady
+        evaluating = lifecycleScope.launch {
+            val position = withContext(Dispatchers.Default) { player.positionSeconds() } ?: return@launch
+            if (engine === player && linkLoad?.itemId == current) correct(player, position)
+        }
+    }
+
+    private fun correct(player: PlayerEngine, position: Double) {
+        val target = hub.target(settings.syncOffsetMs.toLong()) ?: return
+        val leader = hub.leader() ?: return
+        val e = (position * 1000).roundToLong() - target
+        hub.measured(e)
+        val now = SystemClock.elapsedRealtime()
+        val c = linkDecide(e, target, leader.paused || leader.buffering, ui.paused, linkSpeed != SPEED_NORMAL, now - lastSeekAt)
+        if (c.pause) player.setPaused(true)
+        if (c.resume) player.setPaused(false)
+        c.speed?.let { linkSpeed = player.setSpeed(it) ?: it }
+        c.seekTo?.let {
+            lastSeekAt = now
+            player.seekTo(it / 1000.0)
+        }
+    }
+
+    /** The menu's link row: the desktop list out of a link, « Délier » in one. */
+    private fun linkAction() {
+        ui.closeMenus()
+        if (ui.linkBusy) {
+            hub.unlink()
+            leaveLink()
+        } else {
+            hub.dismissNotice()
+            ui.linkPicker = hub
+        }
+    }
+
+    /** The TV plays on alone, at normal speed. */
+    private fun leaveLink() {
+        linkLoad = null
+        readyJob?.cancel()
+        readyJob = null
+        evaluating?.cancel()
+        if (linkSpeed != SPEED_NORMAL) engine?.setSpeed(SPEED_NORMAL)
+        linkSpeed = SPEED_NORMAL
+    }
+
+    /** Once the linked title has read enough ahead, paused at its position: `ready`. */
+    private fun awaitReady(load: Body.Load) {
+        readyJob?.cancel()
+        readyJob = lifecycleScope.launch {
+            while (true) {
+                val player = engine ?: return@launch
+                // The link ended or moved on: nothing to answer
+                if (!hub.loading(load.itemId)) {
+                    readyJob = null
+                    return@launch
+                }
+                val (ahead, idle) = withContext(Dispatchers.Default) { player.cacheAhead() }
+                if (ahead >= READY_CACHE_SECONDS || idle) break
+                delay(DECIDE_EVERY_MS)
+            }
+            val at = engine?.positionSeconds()?.let { (it * 1000).roundToLong() } ?: load.positionMs
+            readyJob = null
+            hub.ready(load.itemId, at)
+        }
+    }
+
+    /** A user action on the TV, already applied here, sent to the leader in a link. */
+    private fun relay(action: CmdAction, seconds: Double? = null) {
+        if (!trailer) hub.command(action, seconds?.let { (it * 1000).roundToLong() })
     }
 
     /** [mediaSourceId]: the version chosen on the film page (ADR 0058); null lets the server pick. */
@@ -357,9 +503,15 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         try {
             // The cap of the server's kind of address, else the default limit (ADR 0037, 0051)
             val bitrate = settings.maxStreamingBitrate(client.server.isLocal)
-            val first = plan(client.server, client.playbackInfo(userId, itemId, deviceProfile(bitrate), mediaSourceId), mediaSourceId)
+            val linked = linkLoad?.takeIf { it.itemId == itemId }
+            val first = plan(
+                client.server,
+                client.playbackInfo(userId, itemId, deviceProfile(bitrate), mediaSourceId, audioStreamIndex = linked?.audioStreamIndex),
+                mediaSourceId,
+            )
             if (current != itemId) return
-            val chosen = withRememberedAudio(itemId, first, bitrate)
+            // In a link, the leader's audio comes first (ADR 0124)
+            val chosen = if (linked != null) first else withRememberedAudio(itemId, first, bitrate)
             if (current != itemId) return
             Log.i(TAG, "play method=${chosen.method} source=${chosen.mediaSourceId} subtitles=${chosen.subtitles.size} maxBitrate=$bitrate")
             Log.i(TAG, "subtitle style=${settings.subtitles}")
@@ -381,7 +533,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
                 replacedEnds++
                 styleSubtitles(running)
                 applyNightMode(running)
-                play(running, source, startTicks / TICKS_PER_SECOND)
+                play(running, source, startTicks / TICKS_PER_SECOND, paused = linked != null)
                 return
             }
             // Created once the headers are known: they can only be set before mpv init
@@ -394,7 +546,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             }
             styleSubtitles(player)
             applyNightMode(player)
-            play(player, source, startTicks / TICKS_PER_SECOND)
+            play(player, source, startTicks / TICKS_PER_SECOND, paused = linked != null)
         } catch (e: EmbyException) {
             ui.status = e.error.message
         }
@@ -500,9 +652,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     }
 
     /** Loads a file; subtitles still being added to the replaced one are dropped (ADR 0085). */
-    private fun play(player: PlayerEngine, source: MediaSource, at: Double) {
+    private fun play(player: PlayerEngine, source: MediaSource, at: Double, paused: Boolean = false) {
         subtitleJob?.cancel()
-        player.load(source, at)
+        player.load(source, at, paused)
     }
 
     /**
@@ -565,6 +717,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         applyTracks()
         engine?.let(::restoreAdjustments)
         addSubtitles(subtitles)
+        runOnUiThread { linkLoad?.takeIf { it.itemId == current }?.let(::awaitReady) }
     }
 
     /**
@@ -613,6 +766,21 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             "${type.mpv}=${describeTrack(decision, player.property(type.property))}"
         }
         Log.i(TAG, "tracks ${described.joinToString(" ")}")
+        linkLoad?.takeIf { it.itemId == current }?.let { linkedTracks(player, tracks, it) }
+    }
+
+    /** The leader's streams, by their Emby index: the file's own streams only; -1 turns subtitles off. */
+    private fun linkedTracks(player: PlayerEngine, tracks: List<Track>, load: Body.Load) {
+        if (!transcode) {
+            load.audioStreamIndex?.let { index ->
+                tracks.find { it.type == TrackType.Audio && !it.external && it.ffIndex == index }?.let { player.selectTrack(TrackType.Audio, it.id) }
+            }
+        }
+        when (val index = load.subtitleStreamIndex) {
+            null -> Unit
+            -1 -> player.selectTrack(TrackType.Subtitle, null)
+            else -> tracks.find { it.type == TrackType.Subtitle && !it.external && it.ffIndex == index }?.let { player.selectTrack(TrackType.Subtitle, it.id) }
+        }
     }
 
     override fun onPosition(seconds: Double) {
@@ -651,7 +819,14 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         }
     }
 
-    override fun onSeek() = report { seeked(); emptyList() }
+    override fun onSeek() {
+        lastSeekAt = SystemClock.elapsedRealtime()
+        report { seeked(); emptyList() }
+    }
+
+    override fun onBuffering(buffering: Boolean) {
+        runOnUiThread { if (readyJob == null && !trailer) hub.buffering(buffering) }
+    }
 
     override fun onEndReached() {
         report { ended(it) }
@@ -664,6 +839,8 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             val following = next
             // A cut stream also reaches its end: no next episode then
             val natural = ui.duration <= 0 || ui.duration - ui.position <= NATURAL_END_MARGIN_SECONDS
+            // Linked, the leader decides what comes next: the last frame stays (ADR 0124)
+            if (ui.linkBusy) return@runOnUiThread
             if (following != null && natural && ui.upNext == null) {
                 ui.closeMenus()
                 ui.upNext = UpNext(following.seriesName ?: ui.title, episodeLabel(following.parentIndexNumber, following.indexNumber, following.name))
@@ -721,7 +898,8 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     /** The skip button, or the up-next card from the start of the credits. */
     private fun updateSkip() {
         // « Fin de l'épisode » set: the credits get their button, never the next episode (ADR 0073)
-        val hasNext = next != null && !ui.sleep.holdsNext
+        // Nor while linked: the leader moves to the next episode (ADR 0124)
+        val hasNext = next != null && !ui.sleep.holdsNext && !ui.linkBusy
         // Until the new file loads, positions are still those of the replaced one
         val prompt = if (ui.status == null) skips?.at(ui.position, ui.duration, hasNext) else null
         if (prompt == SkipPrompt.UpNext && ui.upNext == null) {
@@ -755,6 +933,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         val player = engine ?: return false
         Log.i(TAG, "skip to $target")
         player.seekTo(target)
+        relay(CmdAction.Seek, target)
         ui.position = target
         ui.skip = null
         return true
@@ -806,15 +985,24 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         }
         val action = action(event) ?: return false
         if (event.action == KeyEvent.ACTION_DOWN) action(player)
+        if (event.action == KeyEvent.ACTION_UP && heldMoved) {
+            heldMoved = false
+            relay(CmdAction.Seek, ui.position)
+        }
         return true
     }
 
     private fun action(event: KeyEvent): ((PlayerEngine) -> Unit)? = when (event.keyCode) {
         KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
         KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_SPACE -> { p ->
+            // ui.paused is still the state before the toggle
+            relay(if (ui.paused) CmdAction.Play else CmdAction.Pause)
             p.togglePause()
             ui.show()
         }
+        // Only sent: the leader answers with the `load` of the episode (ADR 0124)
+        KeyEvent.KEYCODE_MEDIA_NEXT -> { _ -> relay(CmdAction.Next) }
+        KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { _ -> relay(CmdAction.Previous) }
         KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> { p -> heldSeek(p, -1.0, event.repeatCount) }
         KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { p -> heldSeek(p, 1.0, event.repeatCount) }
         KeyEvent.KEYCODE_DPAD_UP -> { _ ->
@@ -834,16 +1022,20 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     /** ◀ ▶ held (ADR 0090): the step grows with the repeats, and only some repeats seek. */
     private fun heldSeek(player: PlayerEngine, direction: Double, repeatCount: Int) {
-        if (seeksOnRepeat(repeatCount)) seek(player, direction * seekStep(repeatCount))
+        if (!seeksOnRepeat(repeatCount)) return
+        // One press is sent at once; a hold sends where it ends, on release
+        if (repeatCount > 0) heldMoved = true
+        seek(player, direction * seekStep(repeatCount), send = repeatCount == 0)
     }
 
-    private fun seek(player: PlayerEngine, seconds: Double) {
+    private fun seek(player: PlayerEngine, seconds: Double, send: Boolean = true) {
         player.seekBy(seconds)
         // The OK that follows a seek plays or pauses, never skips (ADR 0108)
         ui.skipArmed = false
         // Shown at once; mpv's next position replaces it
         val end = if (ui.duration > 0) ui.duration else Double.MAX_VALUE
         ui.position = (ui.position + seconds).coerceIn(0.0, end)
+        if (send) relay(CmdAction.Seek, ui.position)
         ui.seeking(ui.position)
         preview(ui.position)
         ui.show()
@@ -881,6 +1073,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         val player = engine ?: return
         Log.i(TAG, "chapter at $start")
         player.seekTo(start)
+        relay(CmdAction.Seek, start)
         ui.position = start
         ui.chapterMenu = false
         ui.show()
@@ -960,6 +1153,11 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     }
 
     override fun onDestroy() {
+        // Back, Home or the end: the desktop stops too (`bye stopped`, ADR 0124)
+        if (!trailer) {
+            if (ui.linkBusy) hub.stopped()
+            hub.detach(this)
+        }
         // Before release: the tracker keeps the last position mpv reported
         report { closed(it) }
         dropThumbnails()
@@ -978,5 +1176,8 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
         /** True for a local trailer (ADR 0083): played without any report. */
         const val EXTRA_TRAILER = "trailer"
+
+        /** Opened by a desktop's `load`: the hub holds it (ADR 0124). */
+        const val EXTRA_LINKED = "linked"
     }
 }

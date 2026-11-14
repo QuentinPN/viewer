@@ -73,6 +73,29 @@ class EmbyClient(
         return socketHttp.newWebSocket(Request.Builder().url(url).build(), listener)
     }
 
+    /** This installation's `DeviceId`: finds the TV's own entry among the sessions (ADR 0124). */
+    val deviceId: String get() = device.id
+
+    /** Declares the session controllable and able to receive `SendString`, at each socket opening (ADR 0123). */
+    suspend fun postCapabilities(body: String) {
+        execute(post(server.api("/Sessions/Capabilities/Full"), body.toRequestBody(JSON_TYPE)), authenticated = true).close()
+    }
+
+    /** Sessions the user can control, with their client, device and controllability. */
+    suspend fun sessions(userId: String): List<SessionInfoDto> {
+        val url = server.api("/Sessions").newBuilder().addQueryParameter("ControllableByUserId", userId).build()
+        return call(get(url), kotlinx.serialization.builtins.ListSerializer(SessionInfoDto.serializer()))
+    }
+
+    /**
+     * Relays [text] to the session [sessionId] through `SendString` (ADR 0123). The server
+     * answers 204 even for a session gone: losses are found by the missing replies.
+     */
+    suspend fun sendString(sessionId: String, text: String) {
+        val body = json.encodeToString(SendStringCommand.serializer(), SendStringCommand(SendStringArguments(text)))
+        execute(post(server.api("/Sessions/${segment(sessionId)}/Command"), body.toRequestBody(JSON_TYPE)), authenticated = true).close()
+    }
+
     suspend fun publicInfo(): PublicSystemInfo =
         call(get(server.api("/System/Info/Public")), PublicSystemInfo.serializer(), authenticated = false)
 

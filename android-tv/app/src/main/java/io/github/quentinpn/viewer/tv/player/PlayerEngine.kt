@@ -21,6 +21,9 @@ interface PlayerListener {
 
     /** The last frame is shown: the file stays open (keep-open), playback is over. */
     fun onEndReached() {}
+
+    /** mpv waits for its cache (`paused-for-cache`), or plays again. */
+    fun onBuffering(buffering: Boolean) {}
 }
 
 /**
@@ -39,10 +42,10 @@ interface PlayerEngine {
     fun detachSurface()
 
     /**
-     * Playback begins at [startSeconds], unpaused; a loaded file is replaced. HTTP headers (the token) are given when the
+     * Playback begins at [startSeconds], unpaused unless [paused] (a linked load, ADR 0124); a loaded file is replaced. HTTP headers (the token) are given when the
      * engine is created, never in the URL.
      */
-    fun load(source: MediaSource, startSeconds: Double = 0.0)
+    fun load(source: MediaSource, startSeconds: Double = 0.0, paused: Boolean = false)
 
     /**
      * Adds an external subtitle file to the loaded one; [select] makes it the shown track.
@@ -51,6 +54,14 @@ interface PlayerEngine {
     fun addSubtitle(source: MediaSource, select: Boolean = true, title: String? = null, lang: String? = null)
 
     fun togglePause()
+
+    fun setPaused(paused: Boolean)
+
+    /** The exact position, in seconds, unlike [PlayerListener.onPosition]; null before a file plays. */
+    fun positionSeconds(): Double?
+
+    /** Seconds of the file read ahead in the cache, and whether the cache has stopped reading (all of it is there). */
+    fun cacheAhead(): Pair<Double, Boolean>
 
     fun seekBy(seconds: Double)
 

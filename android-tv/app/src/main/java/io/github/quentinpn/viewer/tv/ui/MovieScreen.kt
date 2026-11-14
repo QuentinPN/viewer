@@ -210,6 +210,8 @@ private fun Details(
                 Text(if (resume) "Reprendre à ${clock(position)}" else "Lire")
             }
             if (resume) OutlinedButton(onClick = { onPlay(movie.id, 0, version) }) { Text("Lire depuis le début") }
+            // The desktop leads, the TV follows (ADR 0124)
+            WatchWithDesktopButton()
             trailer { trailerMessage = it }
         }
         trailerMessage?.let { Text(it, color = Palette.error) }
