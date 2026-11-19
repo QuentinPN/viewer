@@ -1,6 +1,5 @@
 package io.github.quentinpn.viewer.tv.request
 
-import io.github.quentinpn.viewer.tv.emby.ServerUrl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
@@ -55,7 +54,7 @@ fun normalizeAddress(input: String): HttpUrl {
     if ('?' in withScheme || '#' in withScheme) invalid("l'adresse ne doit contenir ni « ? » ni « # »")
     val url = withScheme.toHttpUrlOrNull() ?: invalid("adresse invalide")
     if (url.username.isNotEmpty() || url.password.isNotEmpty()) invalid("l'adresse ne doit pas contenir d'identifiants")
-    if (!url.isHttps && !ServerUrl.isLocalHost(url.host)) {
+    if (!url.isHttps && !isPrivateHost(url.host)) {
         invalid("HTTP non chiffré n'est accepté que sur le réseau local, utilise https://")
     }
     return url.newBuilder().encodedPath(url.encodedPath.trimEnd('/').ifEmpty { "/" }).build()
@@ -71,6 +70,22 @@ fun ensureCompatible(version: ApiVersion) {
     if (version.apiVersion.substringBefore('.') != SUPPORTED_MAJOR || missing.isNotEmpty()) {
         throw RequestException(RequestError.TooOld(version.apiVersion, missing))
     }
+}
+
+/**
+ * Hosts where plain `http://` is accepted (ADR 0125): loopback (`localhost`, `127/8`, `::1`),
+ * `10/8`, `172.16/12`, `192.168/16` and `*.local`. Nothing else: not link-local, not `.lan`.
+ * Never resolves a name.
+ */
+internal fun isPrivateHost(host: String): Boolean {
+    val h = host.lowercase().removePrefix("[").removeSuffix("]")
+    if (h == "localhost" || h == "::1" || h.endsWith(".local")) return true
+    val parts = h.split('.')
+    if (parts.size != 4) return false
+    val octets = parts.map { it.toIntOrNull() ?: return false }
+    if (octets.any { it !in 0..255 }) return false
+    val (a, b) = octets
+    return a == 127 || a == 10 || (a == 172 && b in 16..31) || (a == 192 && b == 168)
 }
 
 /** An id from the server, checked before it goes into a path. */

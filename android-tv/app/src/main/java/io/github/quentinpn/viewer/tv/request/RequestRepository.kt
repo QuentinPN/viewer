@@ -11,13 +11,13 @@ import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 
 /** The signed-in Emby account whose token is traded for a Request session. Never shows the token. */
-class EmbyIdentity(val serverId: String, val userId: String, val token: String) {
+class EmbyAccount(val serverId: String, val userId: String) {
     val account: String get() = accountKey(serverId, userId)
 
-    override fun toString() = "EmbyIdentity(serverId=$serverId, userId=$userId, token=<redacted>)"
+    override fun toString() = "EmbyAccount(serverId=$serverId, userId=$userId)"
 }
 
-enum class RequestState { NotConfigured, TooOld, Unreachable, Rejected, Ready }
+enum class RequestState { NotConfigured, SignedOut, TooOld, Unreachable, Rejected, Ready }
 
 /** What the Demander tab and the settings show; [message] is the French text of the failure, if any. */
 data class RequestLinkStatus(
@@ -33,24 +33,45 @@ data class RequestLinkStatus(
 
 /**
  * Everything the app does with Request (ADR 0125). Calls carry the session token of the
- * signed-in Emby account, got by trading the Emby token ([identity]) once: the trade is
+ * signed-in Emby account, got by trading the Emby token ([embyToken]) once: the trade is
  * single-flight, so a burst of parallel calls costs one exchange, not one each. A 401 drops the
  * token, trades again once and replays the call; a second 401 is [RequestError.Rejected].
  */
 class RequestRepository(
     private val store: RequestStore,
     private val http: OkHttpClient,
-    private val identity: () -> EmbyIdentity?,
+    private val account: () -> EmbyAccount?,
+    private val embyToken: () -> String?,
     private val deviceName: String,
     private val userAgent: String,
 ) {
     private val exchangeLock = Mutex()
 
+    private class Cached(val account: String, val address: String, val token: SessionToken)
+
+    /** The decrypted session token in memory (one slot), so a call does not open the Keystore. */
+    @Volatile private var cache: Cached? = null
+
+    private fun stored(account: String, address: String): SessionToken? {
+        cache?.takeIf { it.account == account && it.address == address }?.let { return it.token }
+        return store.token(account, address)?.also { cache = Cached(account, address, it) }
+    }
+
+    private fun keep(account: String, address: String, token: SessionToken) {
+        store.saveToken(account, address, token)
+        cache = Cached(account, address, token)
+    }
+
+    private fun drop(account: String) {
+        if (cache?.account == account) cache = null
+        store.clearToken(account)
+    }
+
     @Volatile private var checkedAddress: String? = null
 
     @Volatile private var apiVersion: String? = null
 
-    private class Context(val address: String, val client: RequestClient, val identity: EmbyIdentity) {
+    private class Context(val address: String, val client: RequestClient, val identity: EmbyAccount) {
         val account: String get() = identity.account
     }
 
@@ -66,6 +87,7 @@ class RequestRepository(
         } catch (e: RequestException) {
             when (val error = e.error) {
                 RequestError.NotConfigured -> base
+                RequestError.SignedOut -> base.copy(RequestState.SignedOut)
                 is RequestError.TooOld ->
                     base.copy(RequestState.TooOld, apiVersion = error.apiVersion, missing = error.missing, message = error.message)
                 RequestError.Unreachable -> base.copy(RequestState.Unreachable, message = error.message)
@@ -83,14 +105,15 @@ class RequestRepository(
             store.address = address
             checkedAddress = null
             apiVersion = null
+            cache = null
         }
-        identity()?.let { store.setSignedOut(it.account, false) }
+        account()?.let { store.setSignedOut(it.account, false) }
         return status()
     }
 
     /** Connects again after « Se déconnecter ». */
     suspend fun signIn(): RequestLinkStatus {
-        identity()?.let { store.setSignedOut(it.account, false) }
+        account()?.let { store.setSignedOut(it.account, false) }
         return status()
     }
 
@@ -99,11 +122,11 @@ class RequestRepository(
      * in any case, and nothing reconnects until [signIn] or [setAddress].
      */
     suspend fun signOut() {
-        val id = identity() ?: return
+        val id = account() ?: return
         val address = store.address
-        val token = address?.let { store.token(id.account, it) }
+        val token = address?.let { stored(id.account, it) }
         store.setSignedOut(id.account, true)
-        store.clearToken(id.account)
+        drop(id.account)
         if (address != null && token != null) {
             try {
                 client(address).sendEmpty("POST", "/api/auth/logout", token)
@@ -114,7 +137,11 @@ class RequestRepository(
     }
 
     /** Emby sign-out or « Oublier ce serveur »: forgets this account's token and flag. */
-    fun forgetAccount(embyServerId: String, embyUserId: String) = store.forget(accountKey(embyServerId, embyUserId))
+    fun forgetAccount(embyServerId: String, embyUserId: String) {
+        val key = accountKey(embyServerId, embyUserId)
+        drop(key)
+        store.forget(key)
+    }
 
     suspend fun discover(): DiscoverResponse =
         authorized { c, t -> c.get("/api/discover", t, DiscoverResponse.serializer()) }
@@ -142,7 +169,7 @@ class RequestRepository(
         authorized { c, t -> c.get("/api/requests", t, RequestPage.serializer(), myRequestsQuery(statuses, page)) }
 
     suspend fun requestDetail(id: Int): RequestDetail =
-        authorized { c, t -> c.get("/api/requests/$id", t, RequestView.serializer()) }
+        authorized { c, t -> c.get("/api/requests/$id", t, RequestDetail.serializer()) }
 
     suspend fun cancel(id: Int): RequestView =
         authorized { c, t -> c.send("POST", "/api/requests/$id/cancel", t, RequestView.serializer()) }
@@ -164,15 +191,15 @@ class RequestRepository(
     suspend fun accessToken(failed: SessionToken? = null): SessionToken {
         val ctx = context()
         ensureVersion(ctx)
-        return store.token(ctx.account, ctx.address).takeIf { it != null && it != failed } ?: exchange(ctx, failed)
+        return stored(ctx.account, ctx.address).takeIf { it != null && it != failed } ?: exchange(ctx, failed)
     }
 
     private fun client(address: String) = RequestClient(normalizeAddress(address), http, userAgent)
 
     private fun context(): Context {
         val address = store.address ?: throw RequestException(RequestError.NotConfigured)
-        val id = identity() ?: throw RequestException(RequestError.EmbySignedOut)
-        if (store.isSignedOut(id.account)) throw RequestException(RequestError.NotConfigured)
+        val id = account() ?: throw RequestException(RequestError.EmbySignedOut)
+        if (store.isSignedOut(id.account)) throw RequestException(RequestError.SignedOut)
         return Context(address, client(address), id)
     }
 
@@ -187,7 +214,7 @@ class RequestRepository(
     private suspend fun <T> authorized(block: suspend (RequestClient, SessionToken) -> T): T {
         val ctx = context()
         ensureVersion(ctx)
-        val first = store.token(ctx.account, ctx.address) ?: exchange(ctx, null)
+        val first = stored(ctx.account, ctx.address) ?: exchange(ctx, null)
         return try {
             block(ctx.client, first)
         } catch (e: RequestException) {
@@ -202,10 +229,10 @@ class RequestRepository(
      * is not the one that failed, another call already renewed it and we just use it.
      */
     private suspend fun exchange(ctx: Context, failed: SessionToken?): SessionToken = exchangeLock.withLock {
-        store.token(ctx.account, ctx.address)?.takeIf { it != failed }?.let { return it }
-        store.clearToken(ctx.account)
-        val session = ctx.client.exchange(ctx.identity.userId, ctx.identity.token, deviceName)
-        SessionToken(session.token).also { store.saveToken(ctx.account, ctx.address, it) }
+        stored(ctx.account, ctx.address)?.takeIf { it != failed }?.let { return it }
+        drop(ctx.account)
+        val session = ctx.client.exchange(ctx.identity.userId, embyToken() ?: throw RequestException(RequestError.EmbySignedOut), deviceName)
+        SessionToken(session.token).also { keep(ctx.account, ctx.address, it) }
     }
 }
 

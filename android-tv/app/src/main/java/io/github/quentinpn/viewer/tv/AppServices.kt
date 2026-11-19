@@ -18,7 +18,7 @@ import io.github.quentinpn.viewer.tv.session.SessionStore
 import io.github.quentinpn.viewer.tv.settings.IMAGE_CACHE_DIRECTORY
 import io.github.quentinpn.viewer.tv.settings.IMAGE_CACHE_MAX_BYTES
 import io.github.quentinpn.viewer.tv.sync.SyncHub
-import io.github.quentinpn.viewer.tv.request.EmbyIdentity
+import io.github.quentinpn.viewer.tv.request.EmbyAccount
 import io.github.quentinpn.viewer.tv.request.ImageAuth
 import io.github.quentinpn.viewer.tv.request.RequestRepository
 import io.github.quentinpn.viewer.tv.request.RequestStore
@@ -78,7 +78,8 @@ object AppServices {
         viewerRequests ?: RequestRepository(
             store = RequestStore(app),
             http = http,
-            identity = { embyIdentity(app) },
+            account = { embyAccount(app) },
+            embyToken = { store(app).load()?.token },
             deviceName = deviceLabel(Build.MODEL ?: "Android TV"),
             userAgent = "Viewer-TV/${device(app).version}",
         ).also { viewerRequests = it }
@@ -86,11 +87,11 @@ object AppServices {
 
     @Volatile private var viewerRequests: RequestRepository? = null
 
-    /** The open Emby session as the identity traded for a Request token; the server id falls back to its address. */
-    private fun embyIdentity(context: Context): EmbyIdentity? {
+    /** The open Emby account, read without opening its token; the server id falls back to its address. */
+    private fun embyAccount(context: Context): EmbyAccount? {
         val store = store(context)
-        val session = store.load() ?: return null
-        return EmbyIdentity(store.server(session.key)?.serverId ?: session.server, session.userId, session.token)
+        val saved = store.activeKey()?.let(store::server) ?: return null
+        return EmbyAccount(saved.serverId ?: saved.server, saved.userId)
     }
 
     /** Posters and backdrops of Request: the Bearer goes to its origin only, never in the URL. */

@@ -28,6 +28,9 @@ sealed class RequestError(val message: String) {
 
     data object InvalidResponse : RequestError("Réponse inattendue d'Request.")
 
+    /** « Se déconnecter » was used: the tab offers « Se connecter », nothing reconnects by itself. */
+    data object SignedOut : RequestError("Déconnecté d'Request.")
+
     data object EmbySignedOut : RequestError("Connecte-toi à Emby pour utiliser les demandes.")
 
     private companion object {

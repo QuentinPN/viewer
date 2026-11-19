@@ -63,6 +63,7 @@ private object FakeCipher : TokenCipher {
 class RequestRepositoryTest {
     private val server = MockWebServer()
     private val exchanges = AtomicInteger()
+    private val tokenReads = AtomicInteger()
     private val seen = CopyOnWriteArrayList<RecordedRequest>()
 
     /** Whether the server accepts this `Authorization` header on the API calls. */
@@ -70,7 +71,7 @@ class RequestRepositoryTest {
 
     @Volatile private var exchangeAnswer: () -> MockResponse = { exchangeOk(exchanges.get()) }
 
-    @Volatile private var identity: EmbyIdentity? = EmbyIdentity("srv1", "userA", "emby-secret-token")
+    @Volatile private var identity: EmbyAccount? = EmbyAccount("srv1", "userA")
     private val prefs = MapStore()
     private val store = RequestStore(prefs, FakeCipher)
     private lateinit var repo: RequestRepository
@@ -87,6 +88,7 @@ class RequestRepositoryTest {
         store,
         EmbyClient.defaultHttp(),
         { identity },
+        { tokenReads.incrementAndGet(); "emby-secret-token" },
         deviceLabel("Shield"),
         "Viewer-TV/test",
     )
@@ -286,7 +288,7 @@ class RequestRepositoryTest {
         assertFalse("secret" in SessionToken("secret-value").toString())
         val session = viewerJson.decodeFromString(EmbyTokenSession.serializer(), fixture("emby-token"))
         assertFalse(FIXTURE_TOKEN in session.toString())
-        assertFalse("emby-secret-token" in EmbyIdentity("s", "u", "emby-secret-token").toString())
+        assertFalse("emby-secret-token" in EmbyAccount("s", "u").toString())
     }
 
     @Test
@@ -298,10 +300,10 @@ class RequestRepositoryTest {
         assertEquals("Bearer tok-1", calls("/api/auth/logout").single().headers["Authorization"])
         assertNull(store.token("srv1/userA", address))
 
-        assertEquals(RequestError.NotConfigured, expectError { repo.discover() })
-        assertEquals(RequestState.NotConfigured, repo.status().state)
+        assertEquals(RequestError.SignedOut, expectError { repo.discover() })
+        assertEquals(RequestState.SignedOut, repo.status().state)
         // The flag outlives the repository: a restart of the app does not reconnect either
-        assertEquals(RequestError.NotConfigured, expectError { repository().discover() })
+        assertEquals(RequestError.SignedOut, expectError { repository().discover() })
         assertEquals(1, exchanges.get())
 
         assertEquals(RequestState.Ready, repo.signIn().state)
@@ -321,10 +323,10 @@ class RequestRepositoryTest {
         assertEquals("https://request.exemple.fr", normalizeAddress(" request.exemple.fr/ ").display())
         assertEquals("https://request.exemple.fr:8445", normalizeAddress("https://request.exemple.fr:8445/").display())
         assertEquals("http://192.168.1.14:3000", normalizeAddress("http://192.168.1.14:3000/").display())
-        for (local in listOf("http://127.0.0.1:8000", "http://10.0.0.2", "http://172.20.1.1", "http://box.local")) {
+        for (local in listOf("http://127.0.0.1:8000", "http://10.0.0.2", "http://172.20.1.1", "http://box.local", "http://localhost:3000", "http://172.31.255.1")) {
             assertEquals(local.removePrefix("http://"), normalizeAddress(local).display().removePrefix("http://"))
         }
-        for (bad in listOf("", "  ", "ftp://x", "http://request.exemple.fr", "http://8.8.8.8", "http://172.32.0.1", "https://u:p@host", "https://host/?a=1")) {
+        for (bad in listOf("", "  ", "ftp://x", "http://request.exemple.fr", "http://8.8.8.8", "http://169.254.1.1", "http://box.lan", "http://nas.home.arpa", "http://[fd00::1]", "http://172.15.0.1", "http://192.169.0.1", "http://172.32.0.1", "https://u:p@host", "https://host/?a=1")) {
             val error = (runCatching { normalizeAddress(bad) }.exceptionOrNull() as? RequestException)?.error
             assertTrue("$bad should be refused", error is RequestError.InvalidAddress)
         }
@@ -345,13 +347,13 @@ class RequestRepositoryTest {
     @Test
     fun tokenIsScopedToEmbyAccount() = runBlocking {
         repo.discover()
-        identity = EmbyIdentity("srv1", "userB", "emby-b")
+        identity = EmbyAccount("srv1", "userB")
         repo.discover()
         assertEquals(2, exchanges.get())
         assertEquals(SessionToken("tok-1"), store.token("srv1/userA", address))
         assertEquals(SessionToken("tok-2"), store.token("srv1/userB", address))
 
-        identity = EmbyIdentity("srv1", "userA", "emby-secret-token")
+        identity = EmbyAccount("srv1", "userA")
         repo.discover()
         assertEquals("A's own token again, no new exchange", 2, exchanges.get())
         assertEquals("Bearer tok-1", calls("/api/discover").last().headers["Authorization"])
@@ -373,6 +375,70 @@ class RequestRepositoryTest {
         repo.forgetAccount("srv1", "userA")
         assertNull(store.token("srv1/userA", address))
         assertFalse(store.isSignedOut("srv1/userA"))
+    }
+
+    @Test
+    fun requestDetailKeepsTheTimeline() {
+        val detail = viewerJson.decodeFromString(RequestDetail.serializer(), fixture("request-detail"))
+        assertEquals(102, detail.request.id)
+        assertEquals(RequestStatus.Approved, detail.request.status)
+        assertEquals(listOf("requested", "approved", "sent"), detail.events.map { it.type })
+        assertNull(detail.events[0].detail)
+        assertEquals("Camille", detail.events[0].actor?.name)
+        assertNull(detail.events[2].actor)
+        assertEquals("Envoyé à Sonarr", detail.events[2].detail)
+    }
+
+    @Test
+    fun requestDetailIsReadFromTheServer() = runBlocking {
+        accepts = { true }
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = when (request.url.encodedPath) {
+                "/api/version" -> json(200, fixture("version-ok"))
+                "/api/auth/emby-token" -> exchangeOk(1)
+                "/api/requests/102" -> json(200, fixture("request-detail"))
+                else -> json(404, fixture("error"))
+            }
+        }
+        assertEquals(3, repo.requestDetail(102).events.size)
+    }
+
+    @Test
+    fun statusTellsSignedOutFromNotConfigured() = runBlocking {
+        store.address = null
+        assertEquals(RequestState.NotConfigured, repo.status().state)
+        store.address = address
+        repo.discover()
+        repo.signOut()
+        val status = repo.status()
+        assertEquals(RequestState.SignedOut, status.state)
+        assertEquals(address, status.address)
+    }
+
+    @Test
+    fun aValidTokenNeverOpensTheEmbyToken() = runBlocking {
+        repo.discover()
+        assertEquals(1, tokenReads.get())
+        repeat(10) { repo.discover() }
+        assertEquals("the cached session token serves every call", 1, tokenReads.get())
+
+        // Even a stored token from an earlier run needs no Emby token
+        tokenReads.set(0)
+        store.saveToken("srv1/userA", address, SessionToken("tok-1"))
+        repository().apply { repeat(5) { discover() } }
+        assertEquals(0, tokenReads.get())
+    }
+
+    @Test
+    fun theCacheFollowsSignOutAndA401() = runBlocking {
+        repo.discover()
+        accepts = { it == "Bearer tok-2" }
+        repo.discover() // tok-1 is refused: renewed once, the new token cached
+        assertEquals(2, exchanges.get())
+        repeat(3) { repo.discover() }
+        assertEquals(2, exchanges.get())
+        repo.signOut()
+        assertEquals(RequestError.SignedOut, expectError { repo.discover() })
     }
 
     @Test

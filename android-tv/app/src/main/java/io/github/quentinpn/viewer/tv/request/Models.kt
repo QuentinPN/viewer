@@ -1,7 +1,16 @@
 package io.github.quentinpn.viewer.tv.request
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.jsonObject
 
 /*
  * The Request API as pinned in contracts/request/openapi.json (ADR 0125).
@@ -226,7 +235,7 @@ data class RequestEvent(
     val createdAt: String,
 )
 
-/** One request. [events] is only filled by the detail endpoint (see [RequestDetail]). */
+/** One request, as listed. */
 @Serializable
 data class RequestView(
     val id: Int,
@@ -240,10 +249,8 @@ data class RequestView(
     val createdAt: String,
     val updatedAt: String,
     val media: MediaSummary? = null,
-    val events: List<RequestEvent> = emptyList(),
 )
 
-typealias RequestDetail = RequestView
 
 @Serializable
 data class RequestTotals(
@@ -258,6 +265,23 @@ data class RequestTotals(
 
 @Serializable
 data class RequestPage(val page: Int, val totalPages: Int, val results: List<RequestView>, val totals: RequestTotals)
+
+/** `GET /api/requests/{id}`: a [RequestView] plus its timeline. */
+@Serializable(with = RequestDetailSerializer::class)
+data class RequestDetail(val request: RequestView, val events: List<RequestEvent>)
+
+/** Reads the request fields and `events` from the same JSON object, so the fields are declared once. */
+internal object RequestDetailSerializer : KSerializer<RequestDetail> {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("RequestDetail")
+
+    override fun deserialize(decoder: Decoder): RequestDetail {
+        val element = (decoder as JsonDecoder).decodeJsonElement()
+        val events = element.jsonObject["events"]?.let { viewerJson.decodeFromJsonElement(ListSerializer(RequestEvent.serializer()), it) }
+        return RequestDetail(viewerJson.decodeFromJsonElement(RequestView.serializer(), element), events.orEmpty())
+    }
+
+    override fun serialize(encoder: Encoder, value: RequestDetail) = throw SerializationException("RequestDetail is read-only")
+}
 
 /** Which seasons of a series to request. */
 sealed interface SeasonsChoice {
