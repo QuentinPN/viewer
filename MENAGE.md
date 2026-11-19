@@ -2,7 +2,7 @@
 
 ## 2026-11-19 — `/clean-worktrees`
 
-61 worktrees supprimés : leur branche était déjà fusionnée dans `main` et ils n'avaient aucun fichier non commité. Les branches sont conservées. Sur 50 d'entre eux, `git worktree remove` a désinscrit le worktree mais n'a pas pu effacer le dossier (« Filename too long ») : ces dossiers résiduels, sans lien `.git`, ont été effacés à part (robocopy /MIR).
+61 worktrees supprimés : leur branche était déjà fusionnée dans `main` et ils n'avaient aucun fichier non commité. Les 61 branches locales ont ensuite été supprimées (`git branch -d`, sauf `claude/tv-apps-webos-firestick-androidtv-4a4d94` en `-D` : fusionnée dans `main` mais en avance sur sa copie `github/`) ; les branches distantes n'ont pas été touchées. Sur 50 d'entre eux, `git worktree remove` a désinscrit le worktree mais n'a pas pu effacer le dossier (« Filename too long ») : ces dossiers résiduels, sans lien `.git`, ont été effacés à part (robocopy /MIR).
 
 | Worktree | Branche | Commit |
 |---|---|---|
