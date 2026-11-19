@@ -1,6 +1,7 @@
 // French labels and tones of Request statuses (spec « Décisions d'UX »).
 import type {
   AuthSession,
+  EventType,
   MediaStatus,
   QuotaUsage,
   RequestQuota,
@@ -49,6 +50,56 @@ export function statusLabel(status: MediaStatus): string {
 
 export function requestStatusLabel(status: RequestStatus): string {
   return REQUEST_LABELS[status];
+}
+
+const EVENT_LABELS: Record<EventType, string> = {
+  requested: "Demandée",
+  approved: "Approuvée",
+  declined: "Refusée",
+  cancelled: "Annulée",
+  sent: "Envoyée",
+  failed: "Échec",
+  retried: "Nouvel essai",
+  available: "Disponible",
+};
+
+/** Step of a request's timeline; a type this version does not know reads as is. */
+export function eventLabel(type: string): string {
+  return EVENT_LABELS[type as EventType] ?? type;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const longDate = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" });
+const dateTime = new Intl.DateTimeFormat("fr-FR", {
+  dateStyle: "long",
+  timeStyle: "short",
+});
+
+/** « aujourd'hui », « hier », « il y a 2 jours », then the date after 30 days. */
+export function relativeDay(iso: string, now: number): string {
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return iso;
+  const days = Math.floor((startOfDay(now) - startOfDay(then)) / DAY_MS);
+  if (days <= 0) return "aujourd'hui";
+  if (days === 1) return "hier";
+  if (days <= 30) return `il y a ${days} jours`;
+  return `le ${longDate.format(then)}`;
+}
+
+function startOfDay(t: number): number {
+  const d = new Date(t);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+/** « 19 novembre 2026 à 10:41 » for a step of the timeline. */
+export function eventDate(iso: string): string {
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? iso : dateTime.format(t);
+}
+
+export function typeLabel(type: "movie" | "tv"): string {
+  return type === "movie" ? "Film" : "Série";
 }
 
 export function statusTone(status: MediaStatus | RequestStatus): Tone {

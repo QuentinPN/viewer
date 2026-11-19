@@ -1,7 +1,13 @@
 // What a member may request (ADR 0125), copied from Request
 // (`src/shared/requests.ts:37-49`, `status.ts:97` at main@54cd791).
 import type { MediaItem } from "../emby/types";
-import type { Capabilities, MediaDetails, MediaStatus, Season } from "./types";
+import type {
+  Capabilities,
+  MediaDetails,
+  MediaStatus,
+  MediaSummary,
+  Season,
+} from "./types";
 
 /** Today in UTC as `AAAA-MM-JJ`, the server's comparison of air dates. */
 export function isoDay(now: Date = new Date()): string {
@@ -9,7 +15,7 @@ export function isoDay(now: Date = new Date()): string {
 }
 
 /** No status, partial or declined: may be requested (again). */
-function openStatus(status: MediaStatus | null | undefined): boolean {
+export function openStatus(status: MediaStatus | null | undefined): boolean {
   return !status || status === "partial" || status === "declined";
 }
 
@@ -74,14 +80,16 @@ export function seasonsLabel(n: number): string {
 }
 
 /** The Emby title behind « Lire », opened by its id in the existing detail page. */
-export function embyItem(details: MediaDetails): MediaItem | null {
+export function embyItem(
+  details: MediaSummary & { runtime?: number | null },
+): MediaItem | null {
   if (!details.embyItemId) return null;
   return {
     id: details.embyItemId,
     name: details.title,
     itemType: details.type === "movie" ? "Movie" : "Series",
     year: details.year,
-    runtimeMinutes: details.runtime,
+    runtimeMinutes: details.runtime ?? null,
     poster: null,
     aspectRatio: null,
     played: false,

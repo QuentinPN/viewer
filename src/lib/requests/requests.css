@@ -147,3 +147,47 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Status pill of a list row: glass pill, coloured text. */
+.ur-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--fill-glass);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Status and section segments of the Demander tab. */
+.ur-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--material);
+  border: 1px solid var(--separator);
+  width: fit-content;
+}
+.ur-segments button {
+  height: 32px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--motion-fast);
+}
+.ur-segments button:hover {
+  background: rgb(255 255 255 / 0.12);
+}
+.ur-segments button[aria-current="page"],
+.ur-segments button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: 600;
+}

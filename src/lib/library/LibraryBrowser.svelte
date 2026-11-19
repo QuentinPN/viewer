@@ -1163,9 +1163,10 @@ $effect(() => {
         onRetry={() => void runSearch(true)}
         onOpen={open}
         onOpenEpisode={openEpisode}
+        onOpenRequest={openRequestMedia}
       />
     {:else if requestsOpen}
-      <RequestsTab onOpenMedia={openRequestMedia} />
+      <RequestsTab onOpenMedia={openRequestMedia} onPlay={playRequestMedia} />
     {:else if settingsOpen}
       <Settings
         libraries={libraries ?? []}

@@ -1,16 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  eventDate,
+  eventLabel,
   isPlainHttp,
   mediaStatusText,
   percent,
   quotaLine,
   quotaUsageLine,
+  relativeDay,
   requestStatusLabel,
   roleLabel,
   sessionName,
   stateLine,
   statusLabel,
   statusTone,
+  typeLabel,
 } from "./labels";
 import type { AuthSession, RequestQuota, UrStatus, Viewer } from "./types";
 
@@ -138,5 +142,51 @@ describe("state line", () => {
     expect(stateLine({ ...base, state: "tooOld" }).text).toBe(
       "Serveur Request trop ancien",
     );
+  });
+});
+
+describe("timeline and dates", () => {
+  it("names every event, unknown types as is", () => {
+    expect(
+      [
+        "requested",
+        "approved",
+        "declined",
+        "cancelled",
+        "sent",
+        "failed",
+        "retried",
+        "available",
+      ].map(eventLabel),
+    ).toEqual([
+      "Demandée",
+      "Approuvée",
+      "Refusée",
+      "Annulée",
+      "Envoyée",
+      "Échec",
+      "Nouvel essai",
+      "Disponible",
+    ]);
+    expect(eventLabel("escalated")).toBe("escalated");
+  });
+
+  it("says how long ago, by calendar day", () => {
+    const now = new Date(2026, 10, 19, 10, 0).getTime();
+    const at = (d: number, h = 12) => new Date(2026, 10, d, h).toISOString();
+    expect(relativeDay(at(19, 8), now)).toBe("aujourd'hui");
+    expect(relativeDay(at(18, 23), now)).toBe("hier");
+    expect(relativeDay(at(17), now)).toBe("il y a 2 jours");
+    expect(relativeDay(new Date(2026, 5, 1).toISOString(), now)).toBe(
+      "le 1 juin 2026",
+    );
+    expect(relativeDay("pas une date", now)).toBe("pas une date");
+  });
+
+  it("dates a step in French", () => {
+    const iso = new Date(2026, 10, 19, 10, 41).toISOString();
+    expect(eventDate(iso)).toBe("19 novembre 2026 à 10:41");
+    expect(typeLabel("movie")).toBe("Film");
+    expect(typeLabel("tv")).toBe("Série");
   });
 });

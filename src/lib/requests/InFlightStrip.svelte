@@ -6,21 +6,27 @@ import "./requests.css";
 import { requestsApi } from "./api";
 import { inFlight } from "./browse";
 import { percent, requestStatusLabel, statusTone } from "./labels";
+import { totalCount } from "./myRequests";
+import Thumb from "./Thumb.svelte";
 import type { MediaSummary, RequestView } from "./types";
 
 interface Props {
   onOpen: (media: MediaSummary) => void;
+  /** « Toutes mes demandes (N) »: the « Mes demandes » segment. */
+  onShowAll: () => void;
 }
 
-let { onOpen }: Props = $props();
+let { onOpen, onShowAll }: Props = $props();
 
 let shown = $state<RequestView[]>([]);
-/** Posters that failed to load, by request id. */
-let failed = $state<Set<number>>(new Set());
+let total = $state(0);
 
 onMount(() => {
   requestsApi.myRequests(null, 1).then(
-    (page) => (shown = inFlight(page.results, Date.now())),
+    (page) => {
+      shown = inFlight(page.results, Date.now());
+      total = totalCount(page.totals);
+    },
     // Only a shortcut: the rows below stay usable without it.
     () => {},
   );
@@ -37,7 +43,12 @@ function line(r: RequestView): string {
 
 {#if shown.length > 0}
   <section class="strip" aria-labelledby="ur-inflight">
-    <h2 id="ur-inflight">Mes demandes en cours</h2>
+    <div class="head">
+      <h2 id="ur-inflight">Mes demandes en cours</h2>
+      <button type="button" class="ur-link" onclick={onShowAll}>
+        Toutes mes demandes ({total})
+      </button>
+    </div>
     <ul>
       {#each shown as r (r.id)}
         {@const m = r.media}
@@ -48,19 +59,7 @@ function line(r: RequestView): string {
             disabled={!m}
             onclick={() => m && onOpen(m)}
           >
-            <span class="thumb">
-              {#if m?.poster && !failed.has(r.id)}
-                <img
-                  src={m.poster.src}
-                  srcset={m.poster.srcset}
-                  sizes="48px"
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  onerror={() => (failed = new Set([...failed, r.id]))}
-                />
-              {/if}
-            </span>
+            <Thumb image={m?.poster} />
             <span class="text">
               <span class="title">{m?.title ?? `Demande n° ${r.id}`}</span>
               <span class="status ur-tone-{statusTone(r.status)}">{line(r)}</span>
@@ -81,8 +80,14 @@ function line(r: RequestView): string {
   .strip {
     margin-bottom: var(--space-3);
   }
+  .head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-4);
+    margin-bottom: var(--space-2);
+  }
   h2 {
-    margin: 0 0 var(--space-2);
+    margin: 0;
     font-size: 17px;
     font-weight: 600;
     color: var(--color-text-secondary);
@@ -119,20 +124,6 @@ function line(r: RequestView): string {
   .card:focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
-  }
-  .thumb {
-    flex: 0 0 auto;
-    width: 48px;
-    aspect-ratio: 2 / 3;
-    border-radius: 6px;
-    overflow: hidden;
-    background: var(--color-elevated);
-  }
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
   }
   .text {
     min-width: 0;

@@ -14,9 +14,11 @@ import type { DiscoverRow, MediaSummary, RequestsError, SeeAll } from "./types";
 interface Props {
   onOpen: (media: MediaSummary) => void;
   onSeeAll: (seeAll: SeeAll, title: string) => void;
+  /** « Toutes mes demandes »: the Mes demandes segment. */
+  onShowAll: () => void;
 }
 
-let { onOpen, onSeeAll }: Props = $props();
+let { onOpen, onSeeAll, onShowAll }: Props = $props();
 
 let rows = $state<DiscoverRow[] | null>(null);
 let error = $state<RequestsError | null>(null);
@@ -41,7 +43,7 @@ onMount(() => {
 });
 </script>
 
-<InFlightStrip {onOpen} />
+<InFlightStrip {onOpen} {onShowAll} />
 {#if quota}<p class="quota ur-muted">{quota}</p>{/if}
 
 {#if error}

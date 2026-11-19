@@ -1,17 +1,24 @@
 <script lang="ts">
-// The « Demander » tab (ADR 0125): its state first, then Découvrir, Films and
-// Séries once Request is ready; the setup in place otherwise.
+// The « Demander » tab (ADR 0125): its state first, then Découvrir, Films,
+// Séries and Mes demandes once Request is ready, with a search field; the
+// setup in place otherwise.
 import { onMount, tick } from "svelte";
+import type { MediaItem } from "../emby/types";
+import { cleanQuery } from "../search/query";
 import "./requests.css";
 import { requestsApi, toRequestsError } from "./api";
 import Browse from "./Browse.svelte";
 import { DEFAULT_FILTERS, filtersFromSeeAll } from "./browse";
 import Discover from "./Discover.svelte";
+import MyRequests from "./MyRequests.svelte";
+import { openCount } from "./myRequests";
 import RequestsSetup from "./RequestsSetup.svelte";
+import SearchList from "./SearchList.svelte";
 import type {
   MediaSummary,
   MediaType,
   RequestsError,
+  RequestTotals,
   SeeAll,
   SeeAllFilters,
   UrStatus,
@@ -21,9 +28,11 @@ import type {
 interface Props {
   /** A title opens its page over the tab. */
   onOpenMedia: (media: MediaSummary, viewer: Viewer | null) => void;
+  /** « Lire »: the Emby title in the existing detail page. */
+  onPlay: (item: MediaItem) => void;
 }
 
-let { onOpenMedia }: Props = $props();
+let { onOpenMedia, onPlay }: Props = $props();
 
 type View =
   | { kind: "discover" }
@@ -32,7 +41,8 @@ type View =
       type: MediaType;
       filters: SeeAllFilters;
       from: string | null;
-    };
+    }
+  | { kind: "mine" };
 
 let status = $state<UrStatus | null>(null);
 let error = $state<RequestsError | null>(null);
@@ -40,6 +50,10 @@ let view = $state<View>({ kind: "discover" });
 /** Remounts Parcourir when a « Tout voir » or a segment starts it over. */
 let browseKey = $state(0);
 let heading = $state<HTMLElement | null>(null);
+/** « Mes demandes · N »: waiting, approved or sent; unknown until read. */
+let open = $state<number | null>(null);
+let query = $state("");
+const cleaned = $derived(cleanQuery(query));
 
 const SEGMENTS: { label: string; view: () => View }[] = [
   { label: "Découvrir", view: () => ({ kind: "discover" }) },
@@ -61,15 +75,19 @@ const SEGMENTS: { label: string; view: () => View }[] = [
       from: null,
     }),
   },
+  { label: "Mes demandes", view: () => ({ kind: "mine" }) },
 ];
 
 function isCurrent(label: string): boolean {
+  if (cleaned !== "") return false;
   if (label === "Découvrir") return view.kind === "discover";
+  if (label === "Mes demandes") return view.kind === "mine";
   if (view.kind !== "browse") return false;
   return (view.type === "movie") === (label === "Films");
 }
 
 function show(next: View) {
+  query = "";
   view = next;
   browseKey += 1;
 }
@@ -91,10 +109,21 @@ async function load() {
     status = await requestsApi.status();
   } catch (e) {
     error = toRequestsError(e);
+    return;
   }
+  if (status.state !== "ready") return;
+  requestsApi.myRequests(null, 1).then(
+    (page) => setTotals(page.totals),
+    // The segment reads « Mes demandes » without its count.
+    () => {},
+  );
 }
 
-const open = (media: MediaSummary) =>
+function setTotals(totals: RequestTotals) {
+  open = openCount(totals);
+}
+
+const openMedia = (media: MediaSummary) =>
   onOpenMedia(media, status?.viewer ?? null);
 
 onMount(load);
@@ -103,17 +132,24 @@ onMount(load);
 <header class="heading" bind:this={heading}>
   <h1>Demander</h1>
   {#if status?.state === "ready"}
-    <div class="segments" role="group" aria-label="Sections de Demander">
+    <div class="ur-segments" role="group" aria-label="Sections de Demander">
       {#each SEGMENTS as s (s.label)}
         <button
           type="button"
           aria-current={isCurrent(s.label) ? "page" : undefined}
           onclick={() => show(s.view())}
         >
-          {s.label}
+          {s.label}{#if s.label === "Mes demandes" && open !== null}&nbsp;· {open}{/if}
         </button>
       {/each}
     </div>
+    <input
+      class="ur-input search"
+      type="search"
+      placeholder="Rechercher un film ou une série"
+      aria-label="Rechercher dans Request"
+      bind:value={query}
+    />
   {/if}
 </header>
 
@@ -126,12 +162,21 @@ onMount(load);
   <p class="ur-muted" aria-busy="true">Connexion à Request…</p>
 {:else if status.state !== "ready"}
   <RequestsSetup {status} onStatus={(s) => (status = s)} />
+{:else if cleaned !== ""}
+  <SearchList
+    query={cleaned}
+    viewer={status.viewer}
+    onOpen={openMedia}
+    {onPlay}
+  />
 {:else if view.kind === "discover"}
-  <Discover onOpen={open} onSeeAll={seeAll} />
+  <Discover onOpen={openMedia} onSeeAll={seeAll} onShowAll={() => show({ kind: "mine" })} />
+{:else if view.kind === "mine"}
+  <MyRequests {onPlay} onTotals={setTotals} />
 {:else}
   {#if view.from}<p class="from ur-muted">{view.from}</p>{/if}
   {#key browseKey}
-    <Browse type={view.type} initial={view.filters} onOpen={open} />
+    <Browse type={view.type} initial={view.filters} onOpen={openMedia} />
   {/key}
 {/if}
 
@@ -147,37 +192,9 @@ onMount(load);
     margin: 0;
     font-size: 34px;
   }
-  .segments {
-    display: flex;
-    gap: var(--space-1);
-    padding: var(--space-1);
-    border-radius: var(--radius-pill);
-    background: var(--material);
-    border: 1px solid var(--separator);
-  }
-  .segments button {
-    height: 32px;
-    padding: 0 var(--space-4);
-    border: 0;
-    border-radius: var(--radius-pill);
-    background: transparent;
-    color: var(--color-text);
-    font: inherit;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background var(--motion-fast);
-  }
-  .segments button:hover {
-    background: rgb(255 255 255 / 0.12);
-  }
-  .segments button[aria-current="page"] {
-    background: var(--color-primary);
-    color: var(--color-on-primary);
-    font-weight: 600;
-  }
-  .segments button:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
+  .search {
+    margin-left: auto;
+    width: min(320px, 100%);
   }
   .state {
     display: grid;
