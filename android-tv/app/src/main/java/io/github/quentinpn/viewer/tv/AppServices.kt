@@ -18,6 +18,11 @@ import io.github.quentinpn.viewer.tv.session.SessionStore
 import io.github.quentinpn.viewer.tv.settings.IMAGE_CACHE_DIRECTORY
 import io.github.quentinpn.viewer.tv.settings.IMAGE_CACHE_MAX_BYTES
 import io.github.quentinpn.viewer.tv.sync.SyncHub
+import io.github.quentinpn.viewer.tv.request.EmbyIdentity
+import io.github.quentinpn.viewer.tv.request.ImageAuth
+import io.github.quentinpn.viewer.tv.request.RequestRepository
+import io.github.quentinpn.viewer.tv.request.RequestStore
+import io.github.quentinpn.viewer.tv.request.deviceLabel
 import okhttp3.OkHttpClient
 import okio.Path.Companion.toOkioPath
 
@@ -66,6 +71,36 @@ object AppServices {
     @Volatile private var syncHub: SyncHub? = null
 
     fun store(context: Context) = SessionStore(context)
+
+    /** Request (ADR 0125): one repository per process, so its exchange lock covers every call. */
+    fun requests(context: Context): RequestRepository = viewerRequests ?: synchronized(this) {
+        val app = context.applicationContext
+        viewerRequests ?: RequestRepository(
+            store = RequestStore(app),
+            http = http,
+            identity = { embyIdentity(app) },
+            deviceName = deviceLabel(Build.MODEL ?: "Android TV"),
+            userAgent = "Viewer-TV/${device(app).version}",
+        ).also { viewerRequests = it }
+    }
+
+    @Volatile private var viewerRequests: RequestRepository? = null
+
+    /** The open Emby session as the identity traded for a Request token; the server id falls back to its address. */
+    private fun embyIdentity(context: Context): EmbyIdentity? {
+        val store = store(context)
+        val session = store.load() ?: return null
+        return EmbyIdentity(store.server(session.key)?.serverId ?: session.server, session.userId, session.token)
+    }
+
+    /** Posters and backdrops of Request: the Bearer goes to its origin only, never in the URL. */
+    fun requestImages(context: Context): ImageLoader {
+        val imagesHttp = http.newBuilder().addInterceptor(ImageAuth(requests(context))).build()
+        return ImageLoader.Builder(context)
+            .components { add(OkHttpNetworkFetcherFactory(callFactory = { imagesHttp })) }
+            .diskCache { imageDiskCache(context.applicationContext) }
+            .build()
+    }
 
     fun device(context: Context): DeviceIdentity {
         val version = runCatching {
