@@ -184,11 +184,18 @@ export interface EpisodeCount {
   expected: number;
 }
 
+export interface FourK {
+  status?: MediaStatus | null;
+  progress?: number | null;
+  episodes?: EpisodeCount | null;
+}
+
 export interface Season {
   seasonNumber: number;
   episodeCount: number;
   airDate: string | null;
   episodes?: EpisodeCount | null;
+  fourK?: FourK | null;
   status?: MediaStatus | null;
   progress?: number | null;
 }
@@ -209,13 +216,41 @@ export interface CrewMember {
   profile: ImageRef | null;
 }
 
+export interface Collection {
+  id: number;
+  name: string;
+  posterPath: string | null;
+  backdropPath: string | null;
+  poster: ImageRef | null;
+  backdrop: ImageRef | null;
+}
+
+export interface WatchProvider {
+  id: number;
+  name: string;
+  logoPath: string | null;
+}
+
 export interface MediaDetails extends MediaSummary {
   genres: Genre[];
   runtime: number | null;
   seasons: Season[];
   cast: CastMember[];
   crew?: CrewMember[] | null;
+  collection?: Collection | null;
+  trailerKey: string | null;
+  watchProviders: {
+    flatrate: WatchProvider[];
+    rent: WatchProvider[];
+    buy: WatchProvider[];
+  };
+  recommendations: MediaSummary[];
+  similar: MediaSummary[];
+  externalIds: { imdb: string | null; tvdb: number | null };
+  fourK?: FourK | null;
+  keywords?: Genre[] | null;
   originalLanguage?: string | null;
+  lastAired?: { seasonNumber: number; episodeNumber: number } | null;
 }
 
 export interface QuotaUsage {
@@ -248,7 +283,11 @@ export interface RequestView {
   quotaExempt: boolean;
   decidedBy: RequestPerson | null;
   declineReason: string | null;
+  qualityProfileId: number | null;
+  rootFolder: string | null;
+  seriesType: "standard" | "anime" | "daily" | null;
   is4k: boolean;
+  server: { id: number; name: string } | null;
   createdAt: string;
   updatedAt: string;
   media: MediaSummary | null;
