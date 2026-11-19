@@ -67,3 +67,5 @@
 | `.claude/worktrees/review-merge-open-prs-4d9baf` | `claude/tv-buffering-skip-intro-0f7889` | `144e293` |
 | `.claude/worktrees/synchro-tv-discord-666b83` | `claude/synchro-tv-discord-666b83` | `d766db9` |
 | `.claude/worktrees/viewer-fullscreen-default-022619` | `claude/auto-refresh-home-feed-1d0d40` | `1ba8866` |
+
+Ensuite, 5 autres branches locales déjà fusionnées dans `main` et sans worktree ont aussi été supprimées (`git branch -d`) : `claude/adoring-elbakyan-a9ac5f`, `claude/agitated-pascal-0c6467`, `claude/review-merge-open-prs-4d9baf`, `claude/skip-button-autohide`, `claude/wizardly-jennings-974fb2`. Il ne reste que `main`.
