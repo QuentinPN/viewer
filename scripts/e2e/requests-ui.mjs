@@ -6,7 +6,7 @@
 // Réglages › Demandes, « Lire » opening the Emby title of an available one
 // (Mes demandes, else the Films grid), and « trop ancien » against a local fake server whose
 // /api/version only lists `api.version`.
-// Never sends a request nor cancels one: the totals of `ur_my_requests` are
+// Without --real-request, never sends a request nor cancels one: the totals of `ur_my_requests` are
 // compared before and after. The debug app's request.json is moved aside at
 // the start (setup screen) and put back at the end; the Request session made
 // for the run is signed out (revoked) at the end, then Emby.
@@ -28,6 +28,8 @@ import {
 } from "./scenario.mjs";
 
 const UR_URL = debugEnv("VIEWER_UR_URL");
+const REAL = process.argv.includes("--real-request");
+const TMDB_MOVIE = 1153576;
 const account = testAccount();
 /** Host names never shown in the evidence. */
 const hidden = [UR_URL, account.url]
@@ -116,35 +118,9 @@ const fake = createServer((req, res) => {
   }
 });
 
-let app = null;
-let before = null;
-let urSignedIn = false;
-try {
-  if (existsSync(settingsFile)) renameSync(settingsFile, backup);
-  app = await launch({ env: { VIEWER_EMBY_URL: account.url ?? "" } });
-  const { page } = app;
-  await page.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
-
-  if ((await startScreen(page)) === "signedOut")
-    await signIn(page, account, account.password);
-  await libraryNav(page).waitFor({ timeout: 30000 });
-
-  // Configuration on the spot.
-  await nav(page, "Demander").click();
-  const setupTitle = page.getByRole("heading", {
-    name: "Demander des films et des séries",
-  });
-  await setupTitle.waitFor({ timeout: 20000 });
-  check("setup shown without an address", true);
-  await shot(page, "01-configuration");
-
-  await page.locator("#setup-ur-address").fill(UR_URL);
-  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
-  await segment(page, "Découvrir").waitFor({ timeout: 30000 });
-  urSignedIn = true;
-  check("Request ready after the address", true);
+/** The read-only tour of the Demander screens (01–10). */
+async function tour(page) {
   before = await totals(page);
-
   // Découvrir.
   await page
     .locator(".row button.card, li button.card")
@@ -351,6 +327,156 @@ try {
   check("« trop ancien » with a server lacking the features", true);
   await shot(page, "09-trop-ancien");
   await invoke(page, "ur_set_address", { address: UR_URL });
+}
+
+/** Opt-in (--real-request): one real request of the film TMDB_MOVIE through the
+ * UI, then its cancellation (11–15). Stops before sending when the account
+ * auto-approves films or the film is already requested or available. If the
+ * request was made, it is cancelled even when a step fails. */
+async function realRequest(page) {
+  const status = await invoke(page, "ur_status");
+  const caps = status.viewer.capabilities;
+  const media = await invoke(page, "ur_media", {
+    mediaType: "movie",
+    tmdbId: TMDB_MOVIE,
+  });
+  check(
+    "account and film read",
+    true,
+    JSON.stringify({
+      role: status.viewer.role,
+      autoApproveMovies: caps.autoApproveMovies,
+      canRequestMovies: caps.canRequestMovies,
+      quotaExempt: caps.quotaExempt,
+      status: media.status,
+    }),
+  );
+  if (caps.autoApproveMovies || !caps.canRequestMovies)
+    throw new Error("stopped: films auto-approved or not requestable");
+  if (media.status) throw new Error(`stopped: film status ${media.status}`);
+  const quotaBefore = JSON.stringify(await invoke(page, "ur_quota"));
+  const pendingBefore = await invoke(page, "ur_my_requests", {
+    status: null,
+    page: 1,
+  });
+  const known = new Set(pendingBefore.results.map((r) => r.id));
+  let created = null;
+  try {
+    await page.getByLabel("Rechercher dans Request").fill(media.title);
+    const year = String(media.year ?? "");
+    const hit = page
+      .locator("section[aria-labelledby=ur-search-title] li.row")
+      .filter({
+        has: page.locator(".title", {
+          hasText: new RegExp(`^${media.title}$`),
+        }),
+      })
+      .filter({ hasText: year })
+      .first();
+    await hit.waitFor({ timeout: 20000 });
+    await hit.getByRole("button").click();
+    await page.locator("#ur-media-title").waitFor({ timeout: 20000 });
+    await loaded(page);
+    const shownTitle = await page.locator("#ur-media-title").textContent();
+    if (shownTitle?.trim() !== media.title)
+      throw new Error(`wrong page: ${shownTitle}`);
+    await page.getByRole("button", { name: "Demander", exact: true }).click();
+    const dialog = page.locator("dialog[aria-labelledby=ur-dialog-title]");
+    await dialog.waitFor({ timeout: 10000 });
+    await page.waitForTimeout(1000);
+    await shot(page, "11-demande-street-fighter");
+    await dialog.getByRole("button", { name: "Demander", exact: true }).click();
+    await page
+      .getByRole("status")
+      .filter({ hasText: "Demande envoyée" })
+      .waitFor({ timeout: 20000 });
+    const after = await invoke(page, "ur_my_requests", {
+      status: null,
+      page: 1,
+    });
+    created = after.results.find(
+      (r) => !known.has(r.id) && r.media?.tmdbId === TMDB_MOVIE,
+    );
+    if (!created) throw new Error("request not found after sending");
+    check("request sent", true, `#${created.id} ${created.status}`);
+    await page.waitForTimeout(1000);
+    await shot(page, "12-demande-envoyee");
+
+    await page.keyboard.press("Escape");
+    await page
+      .locator("#ur-media-title")
+      .waitFor({ state: "detached", timeout: 10000 });
+    await page.getByLabel("Rechercher dans Request").fill("");
+    await segment(page, /^Mes demandes/).click();
+    await page.waitForFunction(
+      () => !document.querySelector(".list[aria-busy=true]"),
+      null,
+      { timeout: 20000 },
+    );
+    const row = page
+      .locator(".list button.row")
+      .filter({ hasText: media.title })
+      .first();
+    await row.waitFor({ timeout: 20000 });
+    await page.waitForTimeout(800);
+    await shot(page, "13-mes-demandes");
+    await row.click();
+    await page
+      .getByRole("list", { name: "Historique de la demande" })
+      .waitFor({ timeout: 20000 });
+    await page.waitForTimeout(800);
+    await shot(page, "14-historique");
+    await page.getByRole("button", { name: "Annuler la demande" }).click();
+    await page.getByRole("button", { name: "Oui, annuler" }).click();
+    await page
+      .getByRole("button", { name: "Annuler la demande" })
+      .waitFor({ state: "detached", timeout: 20000 });
+    await page.waitForTimeout(1500);
+    await shot(page, "15-annulee");
+  } finally {
+    if (created) {
+      let d = await invoke(page, "ur_request_detail", { id: created.id });
+      if (d.status !== "cancelled") {
+        check("cancelled through the UI", false, d.status);
+        d = await invoke(page, "ur_cancel", { id: created.id });
+      }
+      check("request cancelled", d.status === "cancelled", `#${created.id}`);
+      const quotaAfter = JSON.stringify(await invoke(page, "ur_quota"));
+      check("quota back", quotaAfter === quotaBefore, quotaAfter);
+    }
+  }
+}
+
+let app = null;
+let before = null;
+let urSignedIn = false;
+try {
+  if (existsSync(settingsFile)) renameSync(settingsFile, backup);
+  app = await launch({ env: { VIEWER_EMBY_URL: account.url ?? "" } });
+  const { page } = app;
+  await page.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
+
+  if ((await startScreen(page)) === "signedOut")
+    await signIn(page, account, account.password);
+  await libraryNav(page).waitFor({ timeout: 30000 });
+
+  // Configuration on the spot.
+  await nav(page, "Demander").click();
+  const setupTitle = page.getByRole("heading", {
+    name: "Demander des films et des séries",
+  });
+  await setupTitle.waitFor({ timeout: 20000 });
+  check("setup shown without an address", true);
+  await shot(page, "01-configuration");
+
+  await page.locator("#setup-ur-address").fill(UR_URL);
+  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+  await segment(page, "Découvrir").waitFor({ timeout: 30000 });
+  urSignedIn = true;
+  check("Request ready after the address", true);
+
+  if (REAL) await realRequest(page);
+  else await tour(page);
 } catch (e) {
   check("scenario ran to the end", false, e?.stack ?? e);
 } finally {
