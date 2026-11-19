@@ -8,7 +8,7 @@ Chaque version livrée sur la Shield augmente `versionName` et `versionCode` dan
 - « Mes demandes » suit l'état de tes demandes ; la recherche propose « À demander » sous les résultats Emby.
 - Réglages › Demandes : adresse d'Request, état de la connexion, déconnexion.
 - Connexion sans mot de passe via ta session Emby ; il faut un serveur Request en API 1.x.
-- Test sur la Shield : en cours.
+- Testé sur la Shield.
 
 ## 1.3.0 — 2026-11-14
 

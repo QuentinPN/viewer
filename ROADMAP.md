@@ -130,12 +130,13 @@ Separate native app in `android-tv/` (Kotlin, libmpv from mpv-android, ADR 0038)
 - DONE (2026-11-10, `docs/evidence/tv-client-2026-11-10.md`): track choice from the Emby account preferences (ADR 0065; the `(account)` origin not yet seen on the device); stop reports lost to a network cut kept on disk and resent (ADR 0066; the resend after a real cut is still to be checked by hand).
 - TODO: Transcode with external subtitles and resume start on the real server; sign-out checked on the device; the stop-report resend after a real network cut.
 
-## Request integration (ADR 0125) [desktop VERIFIED on the real server · Android TV real-device test IN PROGRESS]
+## Request integration (ADR 0125) [desktop and Android TV VERIFIED on the real server]
 
 « Demander » tab on desktop and Android TV: Découvrir, Films/Séries, title page, request of a film or seasons, Mes demandes, « À demander » in the search, Réglages › Demandes, sign-in through the Emby session (token in OS storage). Requires Request API 1.x. Desktop 1.5.0, Android TV 1.4.0.
 
 - VERIFIED (2026-11-19): desktop UI captured against the real Emby test account and the real Request server with `scripts/e2e/requests-ui.mjs` (nine captures in `docs/evidence/request/`); no request was sent or cancelled (totals compared before and after). Unit and contract tests on desktop and TV.
-- IN PROGRESS: real-device test on the Shield, captures in `docs/evidence/request/tv/`.
+- VERIFIED (2026-11-19): Shield, debug build against the real servers: setup, Découvrir, Films/Séries, film and series pages, series request dialog (not submitted), Mes demandes (empty), Emby search with « À demander », Réglages › Demandes; Back escapes every screen; no crash; no token in logcat. Six focus/layout bugs found and fixed, re-checked on the device (`docs/evidence/request/tv/`, `tv/fixed/`); debug app uninstalled.
+- NOT VERIFIED: sending or cancelling a real request, the detail and timeline of an existing request (test account has none), a title that is already available (« Lire »).
 - Not in scope (phase 2): other users' requests, 4K/advanced requests, reports, watch list, notifications, offline requests.
 
 ## Work log
