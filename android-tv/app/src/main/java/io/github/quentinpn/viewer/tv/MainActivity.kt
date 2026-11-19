@@ -59,6 +59,7 @@ import io.github.quentinpn.viewer.tv.ui.TrailerHandlers
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import io.github.quentinpn.viewer.tv.ui.VersionStore
 import io.github.quentinpn.viewer.tv.ui.requests.RequestsMemory
+import io.github.quentinpn.viewer.tv.ui.requests.RequestsPage
 import io.github.quentinpn.viewer.tv.ui.requests.RequestsScreen
 import io.github.quentinpn.viewer.tv.request.MediaType
 import io.github.quentinpn.viewer.tv.ui.ancestorIdsOrNull
@@ -422,8 +423,12 @@ class MainActivity : ComponentActivity() {
                             images,
                             openSearch,
                             searchHistory,
+                            AppServices.requests(this),
+                            requestImages,
                             onOpenSeries = openSeries,
                             onOpenMovie = openMovie,
+                            // Over the results: Back from the title returns to them
+                            onOpenRequest = { media -> requests = RequestsMemory(standalone = true).also { it.open(RequestsPage.Media(media.type, media.tmdbId)) } },
                             onSessionExpired = expired,
                         )
                         return@ViewerTheme

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
@@ -66,6 +67,14 @@ import io.github.quentinpn.viewer.tv.emby.cleanSearch
 import io.github.quentinpn.viewer.tv.emby.isSearchable
 import io.github.quentinpn.viewer.tv.emby.searchTitles
 import io.github.quentinpn.viewer.tv.session.SearchHistoryStore
+import io.github.quentinpn.viewer.tv.ui.requests.MediaCardTv
+import io.github.quentinpn.viewer.tv.ui.requests.RequestArt
+import io.github.quentinpn.viewer.tv.ui.requests.tried
+import io.github.quentinpn.viewer.tv.request.MediaSummary
+import io.github.quentinpn.viewer.tv.request.RequestRepository
+import io.github.quentinpn.viewer.tv.request.RequestState
+import io.github.quentinpn.viewer.tv.request.key
+import io.github.quentinpn.viewer.tv.request.toRequest
 import kotlinx.coroutines.delay
 
 /** Delay after the last key before searching; the keyboard's search key searches at once. */
@@ -107,6 +116,18 @@ internal sealed interface SearchState {
     data class Failed(val query: String, val message: String) : SearchState
 }
 
+/** The « À demander » row (ADR 0125): what Request finds that is not in Emby, hidden unless it is connected. */
+internal sealed interface ToRequest {
+    data object Hidden : ToRequest
+
+    data class Found(val items: List<MediaSummary>) : ToRequest
+
+    data object Unavailable : ToRequest
+}
+
+/** Group title of the row, also the key its opened card is remembered under. */
+private const val REQUEST_ROW = "À demander"
+
 /**
  * Search state that outlives the screen while a film or series page is shown, so
  * coming back keeps the term, the results, the scroll and the focused card.
@@ -124,6 +145,13 @@ class SearchMemory {
     /** Cleaned term and attempt the state answers: shown again, nothing is searched. */
     internal var searchedFor: Pair<String, Int>? = null
 
+    /** Whether Request is set up and connected, asked once when the search opens; null until known. */
+    internal var viewerReady by mutableStateOf<Boolean?>(null)
+    internal var toRequest by mutableStateOf<ToRequest>(ToRequest.Hidden)
+
+    /** The [searchedFor] the [toRequest] row answers. */
+    internal var viewerFor: Pair<String, Int>? = null
+
     /** Bumped by the keyboard's search key: the term is searched without waiting. */
     internal var flush by mutableIntStateOf(0)
     internal var immediate = false
@@ -140,8 +168,12 @@ fun SearchScreen(
     images: ImageLoader,
     memory: SearchMemory,
     history: SearchHistoryStore,
+    requests: RequestRepository,
+    requestImages: ImageLoader,
     onOpenSeries: (SeriesTarget) -> Unit,
     onOpenMovie: (movieId: String) -> Unit,
+    /** OK on a title of « À demander »: its page in the Demander tab. */
+    onOpenRequest: (MediaSummary) -> Unit,
     onSessionExpired: () -> Unit,
 ) {
     val query = cleanSearch(memory.text)
@@ -169,6 +201,7 @@ fun SearchScreen(
         if (!isSearchable(query)) {
             memory.state = SearchState.Idle
             memory.searchedFor = null
+            memory.toRequest = ToRequest.Hidden
             return@LaunchedEffect
         }
         val key = query to memory.attempt
@@ -176,6 +209,8 @@ fun SearchScreen(
         // A new key cancels this effect, and with it the request of an older term
         if (!now) delay(SEARCH_DEBOUNCE_MS)
         memory.state = SearchState.Loading
+        memory.toRequest = ToRequest.Hidden
+        memory.viewerFor = null
         val next = try {
             SearchState.Ready(searchTitles(client, userId, query))
         } catch (e: EmbyException) {
@@ -188,6 +223,19 @@ fun SearchScreen(
         memory.searchedFor = key
         memory.opened = null
     }
+
+    // Whether Request is connected, asked once per opening, never per key: a failed exchange counts toward its limit
+    LaunchedEffect(requests) {
+        if (memory.viewerReady == null) memory.viewerReady = requests.status().state == RequestState.Ready
+    }
+    // Then its titles that are not in Emby, once Emby has answered; a failure shows as a line, not as a failed search
+    LaunchedEffect(memory.searchedFor, memory.viewerReady) {
+        val asked = memory.searchedFor ?: return@LaunchedEffect
+        if (memory.viewerReady != true || memory.viewerFor == asked) return@LaunchedEffect
+        memory.toRequest = tried { requests.search(asked.first) }.fold({ ToRequest.Found(toRequest(it.results)) }, { ToRequest.Unavailable })
+        memory.viewerFor = asked
+    }
+    val art = remember(requestImages, memory.viewerReady) { RequestArt(requestImages, requests.origin()) }
 
     // Typing first, unless coming back from a page opened from the results
     LaunchedEffect(Unit) {
@@ -238,17 +286,18 @@ fun SearchScreen(
             SearchState.Idle -> Centered("Saisis au moins deux lettres d'un titre de film, de série ou d'épisode.")
             SearchState.Loading -> Centered("Recherche…")
             is SearchState.Failed -> Retry("Impossible de lancer la recherche : ${s.message}") { memory.attempt++ }
-            is SearchState.Ready -> if (s.results.isEmpty) {
+            is SearchState.Ready -> if (s.results.isEmpty && (memory.toRequest as? ToRequest.Found)?.items.isNullOrEmpty()) {
                 Box(Modifier.fillMaxSize().padding(48.dp), contentAlignment = Alignment.Center) {
                     Text(
                         "Aucun film, série ou épisode pour « ${s.results.query} ».\n" +
-                            "La recherche porte sur le début des mots du titre : « heure » trouve « 24 Heures chrono », « eures » ne le trouve pas.",
+                            "La recherche porte sur le début des mots du titre : « heure » trouve « 24 Heures chrono », « eures » ne le trouve pas." +
+                            (if (memory.toRequest == ToRequest.Unavailable) "\n$REQUEST_UNAVAILABLE" else ""),
                         color = Palette.textSecondary,
                         textAlign = TextAlign.Center,
                     )
                 }
             } else {
-                Results(searchGroups(s.results), memory, client, images) { group, item ->
+                Results(searchGroups(s.results), memory, client, images, art, onOpenRequest) { group, item ->
                     record(s.results.query)
                     memory.opened = group.title to item.id
                     when (item.type) {
@@ -351,11 +400,17 @@ private fun Results(
     memory: SearchMemory,
     client: EmbyClient,
     images: ImageLoader,
+    art: RequestArt,
+    onOpenRequest: (MediaSummary) -> Unit,
     onOpen: (SearchGroup, BaseItemDto) -> Unit,
 ) {
     val focus = remember { FocusRequester() }
+    val toRequest = memory.toRequest
+    val requestable = (toRequest as? ToRequest.Found)?.items.orEmpty()
     // Back from a page: the card that opened it, one frame first so it is placed
-    val target = memory.opened?.takeIf { (title, id) -> groups.any { it.title == title && it.items.any { i -> i.id == id } } }
+    val target = memory.opened?.takeIf { (title, id) ->
+        groups.any { it.title == title && it.items.any { i -> i.id == id } } || (title == REQUEST_ROW && requestable.any { it.key() == id })
+    }
     LaunchedEffect(target) {
         if (target == null) return@LaunchedEffect
         withFrameNanos {}
@@ -378,5 +433,33 @@ private fun Results(
                 group.note?.let { Text(it, color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp)) }
             }
         }
+        // Under the Emby results: what Request could add, or that it cannot be asked
+        if (requestable.isNotEmpty()) {
+            item(key = "to-request") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionHeader(REQUEST_ROW, requestable.size, Modifier.padding(horizontal = 48.dp))
+                    LazyRow(
+                        state = memory.rows.getOrPut(REQUEST_ROW) { LazyListState() },
+                        contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        items(requestable, key = { it.key() }) { media ->
+                            Box(Modifier.width(REQUEST_CARD_WIDTH)) {
+                                MediaCardTv(media, art, if (target == REQUEST_ROW to media.key()) Modifier.focusRequester(focus) else Modifier) {
+                                    memory.opened = REQUEST_ROW to media.key()
+                                    onOpenRequest(media)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (toRequest == ToRequest.Unavailable) {
+            item(key = "to-request-unavailable") { Text(REQUEST_UNAVAILABLE, color = Palette.textSecondary, modifier = Modifier.padding(horizontal = 48.dp)) }
+        }
     }
 }
+
+private const val REQUEST_UNAVAILABLE = "Recherche Request indisponible"
+
+private val REQUEST_CARD_WIDTH = 150.dp

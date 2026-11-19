@@ -100,7 +100,9 @@ internal fun DiscoverTv(
             val strip = async { tried { repository.myRequests(IN_FLIGHT) } }
             memory.discover = rows.await().fold({ Load.Ready(it.rows.filter { row -> row.items.isNotEmpty() }) }, { Load.Failed(it.requestMessage()) })
             // The strip is a bonus: without it the rows still show
-            memory.inFlight = strip.await().getOrNull()?.results.orEmpty()
+            val inFlight = strip.await().getOrNull()
+            memory.inFlight = inFlight?.results.orEmpty()
+            inFlight?.let { memory.mine.totals = it.totals }
         }
         memory.discoverStamp = stamp
     }
@@ -127,7 +129,11 @@ internal fun DiscoverTv(
                             SectionHeader("Mes demandes en cours", memory.inFlight.size, Modifier.padding(horizontal = 48.dp))
                             Row(Modifier.padding(horizontal = 48.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                                 for (request in strip) {
-                                    InFlightCard(request, art, Modifier.width(330.dp)) { onOpenRequest(request) }
+                                    InFlightCard(
+                                        request,
+                                        art,
+                                        Modifier.width(330.dp).then(if (requestKey(request) == memory.opened) Modifier.focusRequester(restore) else Modifier),
+                                    ) { onOpenRequest(request) }
                                 }
                             }
                         }

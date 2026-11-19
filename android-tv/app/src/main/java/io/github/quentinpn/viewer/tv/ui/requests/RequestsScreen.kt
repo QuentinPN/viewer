@@ -35,6 +35,7 @@ import io.github.quentinpn.viewer.tv.request.RequestView
 import io.github.quentinpn.viewer.tv.request.SeeAll
 import io.github.quentinpn.viewer.tv.request.RequestRepository
 import io.github.quentinpn.viewer.tv.request.RequestState
+import io.github.quentinpn.viewer.tv.request.inFlightCount
 import io.github.quentinpn.viewer.tv.request.key
 
 /** The tabs of the Demander screen, in the order of the segments. */
@@ -48,7 +49,10 @@ internal enum class RequestsSegment(val label: String) {
  * State of the Demander tab that outlives a film or series page opened from it (« Lire »), so
  * Back comes back to the same segment, scroll and card. Everything is read again when the tab is opened anew.
  */
-class RequestsMemory {
+class RequestsMemory(
+    /** Opened over another screen (the search): Back from the first level leaves the tab. */
+    internal val standalone: Boolean = false,
+) {
     internal var segment by mutableStateOf(RequestsSegment.Discover)
 
     /** Bumped after a request or a cancellation: what shows requests (badges, strip, count) is read again. */
@@ -62,6 +66,7 @@ class RequestsMemory {
     internal val discoverColumn = LazyListState()
     internal val discoverRows = mutableMapOf<String, LazyListState>()
     internal val browse = mutableMapOf<MediaType, BrowseState>()
+    internal val mine = MineState()
 
     /** True once a « Tout voir » opened a grid: Back goes to Découvrir before leaving the tab. */
     internal var fromSeeAll = false
@@ -80,7 +85,7 @@ class RequestsMemory {
 
     /** « Tout voir » of a row: the grid of its type, on its filters. */
     internal fun openBrowse(seeAll: SeeAll) {
-        browse[seeAll.type] = BrowseState(seeAll.type, seeAll.filters).also { it.stamp = -1 }
+        browse[seeAll.type] = BrowseState(seeAll.type, seeAll.filters)
         segment = if (seeAll.type == MediaType.Movie) RequestsSegment.Films else RequestsSegment.Series
         fromSeeAll = true
     }
@@ -120,6 +125,7 @@ fun RequestsScreen(
 ) {
     BackHandler {
         when {
+            memory.stack.size == 1 && memory.standalone -> onClose()
             memory.stack.isNotEmpty() -> memory.stack = memory.stack.dropLast(1)
             memory.fromSeeAll -> memory.select(RequestsSegment.Discover)
             else -> onClose()
@@ -129,10 +135,14 @@ fun RequestsScreen(
     val status = access.status
     val art = remember(images, status?.address) { RequestArt(images, repository.origin()) }
     val page = memory.stack.lastOrNull()
-    // A title takes the whole screen, its backdrop included
-    if (status?.state == RequestState.Ready && page is RequestsPage.Media) {
-        MediaTv(repository, memory, art, page, checkNotNull(status.viewer).capabilities) { title ->
-            title.embyItemId?.let { onOpenEmby(title.type, it) }
+    // A title, the list of requests or one request takes the whole screen
+    if (status?.state == RequestState.Ready && page != null) {
+        when (page) {
+            is RequestsPage.Media -> MediaTv(repository, memory, art, page, checkNotNull(status.viewer).capabilities) { title ->
+                title.embyItemId?.let { onOpenEmby(title.type, it) }
+            }
+            RequestsPage.Mine -> MyRequestsTv(repository, memory, art) { memory.open(RequestsPage.Detail(it.id), from = requestKey(it)) }
+            is RequestsPage.Detail -> RequestDetailTv(repository, memory, art, page, onOpenEmby)
         }
         return
     }
@@ -168,11 +178,18 @@ private fun RequestsSegments(repository: RequestRepository, memory: RequestsMemo
                 modifier = if (segment == memory.segment) Modifier.focusRequester(first) else Modifier,
             ) { Text(segment.label, fontSize = 14.sp, maxLines = 1) }
         }
+        // The requests in progress, counted: the list opens full screen
+        val inFlight = memory.mine.totals?.let(::inFlightCount) ?: 0
+        GlassButton(onClick = { memory.open(RequestsPage.Mine) }) {
+            Text(if (inFlight > 0) "Mes demandes · $inFlight" else "Mes demandes", fontSize = 14.sp, maxLines = 1)
+        }
     }
     // A title opens on its page; Back finds its card again
     val open: (MediaSummary) -> Unit = { memory.open(RequestsPage.Media(it.type, it.tmdbId), from = it.key()) }
     when (memory.segment) {
-        RequestsSegment.Discover -> DiscoverTv(repository, memory, art, open, memory::openBrowse, onOpenRequest = {})
+        RequestsSegment.Discover -> DiscoverTv(repository, memory, art, open, memory::openBrowse) {
+            memory.open(RequestsPage.Detail(it.id), from = requestKey(it))
+        }
         RequestsSegment.Films -> BrowseTv(repository, memory, MediaType.Movie, art, open)
         RequestsSegment.Series -> BrowseTv(repository, memory, MediaType.Tv, art, open)
     }

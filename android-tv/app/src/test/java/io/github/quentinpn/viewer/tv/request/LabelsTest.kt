@@ -4,8 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LabelsTest {
-    private fun media(id: Int, type: MediaType = MediaType.Movie) = MediaSummary(tmdbId = id, type = type, title = "T$id")
-
     @Test
     fun mediaStatusesUseTheSpecWording() {
         assertEquals("Disponible", mediaStatusLabel(MediaStatus.Available).text)
@@ -46,18 +44,5 @@ class LabelsTest {
         assertEquals(Tone.Warning, requestStatusLabel(RequestStatus.Pending).tone)
         assertEquals(Tone.Danger, requestStatusLabel(RequestStatus.Failed).tone)
         assertEquals(Tone.Muted, requestStatusLabel(RequestStatus.Cancelled).tone)
-    }
-
-    @Test
-    fun aMergedPageKeepsTheOrderAndDropsTitlesAlreadyHeld() {
-        val held = listOf(media(1), media(2))
-        val merged = mergeMedia(held, listOf(media(2), media(3), media(3)))
-        assertEquals(listOf(1, 2, 3), merged.map { it.tmdbId })
-    }
-
-    @Test
-    fun aFilmAndASeriesWithTheSameIdAreTwoTitles() {
-        val merged = mergeMedia(listOf(media(7, MediaType.Movie)), listOf(media(7, MediaType.Tv)))
-        assertEquals(listOf("movie:7", "tv:7"), merged.map { it.key() })
     }
 }

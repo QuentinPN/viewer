@@ -40,9 +40,3 @@ fun requestLine(request: RequestView): StatusLabel {
 
 /** Key of a title in lists and focus memory: movie and series ids may collide. */
 fun MediaSummary.key(): String = "${type.wire}:$tmdbId"
-
-/** [current] followed by the titles of [next] it does not hold yet, so a page read twice adds nothing. */
-fun mergeMedia(current: List<MediaSummary>, next: List<MediaSummary>): List<MediaSummary> {
-    val seen = current.mapTo(HashSet()) { it.key() }
-    return current + next.filter { seen.add(it.key()) }
-}

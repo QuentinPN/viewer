@@ -17,7 +17,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,7 +43,6 @@ import io.github.quentinpn.viewer.tv.request.RequestRepository
 import io.github.quentinpn.viewer.tv.request.genreChoices
 import io.github.quentinpn.viewer.tv.request.genreLabel
 import io.github.quentinpn.viewer.tv.request.key
-import io.github.quentinpn.viewer.tv.request.mergeMedia
 import io.github.quentinpn.viewer.tv.request.ratingChoices
 import io.github.quentinpn.viewer.tv.request.ratingLabel
 import io.github.quentinpn.viewer.tv.request.sameGenres
@@ -57,7 +55,6 @@ import io.github.quentinpn.viewer.tv.request.sortLabel
 import io.github.quentinpn.viewer.tv.request.yearChoices
 import io.github.quentinpn.viewer.tv.request.yearsLabel
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /** Cards left below the last one shown when the next page is asked for. */
@@ -65,71 +62,27 @@ private const val LOAD_AHEAD = 12
 
 private const val GRID_COLUMNS = 6
 
-/**
- * One grid of Films or Séries: the filters, the pages read so far and the scroll, kept in the
- * [RequestsMemory] so coming back from a title shows it as it was. An answer for filters no
- * longer in force is dropped, and a page read twice adds nothing.
- */
+/** One grid of Films or Séries: its filters, the pages read so far and the scroll, kept in the [RequestsMemory]. */
 internal class BrowseState(val type: MediaType, filters: BrowseFilters = BrowseFilters()) {
     var filters by mutableStateOf(filters)
         private set
-    val items = mutableStateListOf<MediaSummary>()
-    var loading by mutableStateOf(false)
-        private set
-    var error by mutableStateOf<String?>(null)
-        private set
+    val pager = Pager<MediaSummary>(MediaSummary::key)
     var genres by mutableStateOf<List<Genre>?>(null)
     val grid = LazyGridState()
 
-    /** The [RequestsMemory.revision] the items were read under. */
-    var stamp = -1
-    private var page = 0
-    private var totalPages = 1
-    private var job: Job? = null
+    private fun fetcher(repository: RequestRepository): suspend (Int) -> Fetched<MediaSummary> = { page ->
+        repository.browse(type, filters, page).let { Fetched(it.totalPages, it.results) }
+    }
 
     /** Starts over with [next]. */
     fun apply(next: BrowseFilters, repository: RequestRepository, scope: CoroutineScope) {
-        job?.cancel()
         filters = next
-        items.clear()
-        page = 0
-        totalPages = 1
-        error = null
-        loading = false
-        more(repository, scope)
+        pager.reset(scope, fetcher(repository))
     }
 
-    /** The next page, unless one is on its way, the last is read, or the last attempt failed (see [retry]). */
-    fun more(repository: RequestRepository, scope: CoroutineScope) {
-        if (loading || error != null || page >= totalPages) return
-        loading = true
-        val wanted = filters
-        job = scope.launch {
-            try {
-                val result = repository.browse(type, wanted, page + 1)
-                if (wanted == filters) {
-                    val merged = mergeMedia(items, result.results)
-                    items.addAll(merged.drop(items.size))
-                    page = result.page
-                    totalPages = result.totalPages
-                }
-            } catch (e: RequestException) {
-                if (wanted == filters) error = e.error.message
-            } finally {
-                if (wanted == filters) loading = false
-            }
-        }
-    }
+    fun more(repository: RequestRepository, scope: CoroutineScope) = pager.more(scope, fetcher(repository))
 
-    fun retry(repository: RequestRepository, scope: CoroutineScope) {
-        error = null
-        more(repository, scope)
-    }
-
-    /** Nothing read yet and nothing on its way: the first page was never asked for, or its read was cut short. */
-    val untouched: Boolean get() = page == 0 && !loading && error == null
-
-    val finished: Boolean get() = page > 0 && page >= totalPages
+    fun retry(repository: RequestRepository, scope: CoroutineScope) = pager.retry(scope, fetcher(repository))
 }
 
 private enum class Pill(val title: String) { Sort("Tri"), Genre("Genre"), Years("Années"), Rating("Note") }
@@ -153,10 +106,10 @@ internal fun BrowseTv(
 
     // First visit, or the statuses changed since (a request was made): read from the first page again
     LaunchedEffect(state, memory.revision) {
-        if (state.stamp != memory.revision) {
-            state.stamp = memory.revision
+        if (state.pager.stamp != memory.revision) {
+            state.pager.stamp = memory.revision
             state.apply(state.filters, repository, scope)
-        } else if (state.untouched) {
+        } else if (state.pager.untouched) {
             state.more(repository, scope)
         }
     }
@@ -171,10 +124,10 @@ internal fun BrowseTv(
     }
     LaunchedEffect(state) {
         snapshotFlow { state.grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }.collect { last ->
-            if (last >= state.items.size - LOAD_AHEAD) state.more(repository, scope)
+            if (last >= state.pager.items.size - LOAD_AHEAD) state.more(repository, scope)
         }
     }
-    FocusRestore(memory, state.items.isNotEmpty(), restore)
+    FocusRestore(memory, state.pager.items.isNotEmpty(), restore)
 
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val genres = state.genres.orEmpty()
@@ -194,11 +147,12 @@ internal fun BrowseTv(
                 }
             }
         }
-        val error = state.error
+        val pager = state.pager
+        val error = pager.error
         when {
-            state.items.isEmpty() && state.loading -> Centered("Chargement…")
-            state.items.isEmpty() && error != null -> Retry(error) { state.retry(repository, scope) }
-            state.items.isEmpty() && state.finished -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            pager.items.isEmpty() && pager.loading -> Centered("Chargement…")
+            pager.items.isEmpty() && error != null -> Retry(error) { state.retry(repository, scope) }
+            pager.items.isEmpty() && pager.finished -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Aucun titre ne correspond à ces filtres", color = Palette.textSecondary, textAlign = TextAlign.Center)
             }
             else -> LazyVerticalGrid(
@@ -209,7 +163,7 @@ internal fun BrowseTv(
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                items(state.items, key = { it.key() }) { media ->
+                items(pager.items, key = { it.key() }) { media ->
                     MediaCardTv(
                         media,
                         art,

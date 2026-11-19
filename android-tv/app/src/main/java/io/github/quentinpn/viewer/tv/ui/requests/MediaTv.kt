@@ -51,6 +51,11 @@ import kotlinx.coroutines.delay
 /** A level over the Demander segments; Back pops it. */
 internal sealed interface RequestsPage {
     data class Media(val type: MediaType, val tmdbId: Int) : RequestsPage
+
+    /** Mes demandes, full screen. */
+    data object Mine : RequestsPage
+
+    data class Detail(val id: Int) : RequestsPage
 }
 
 private const val CAST_SHOWN = 10

@@ -75,8 +75,8 @@ internal fun FocusOnOpen(target: FocusRequester, key: Any? = Unit) {
 }
 
 /**
- * A question with « Annuler » and a confirming button. [focusConfirm] false starts on « Annuler »,
- * the safe answer for something that cannot be undone. A server [error] shows verbatim.
+ * A question with a dismissing button (« Annuler » unless [dismissLabel] says better) and a confirming one. [focusConfirm] false starts on « Annuler »,
+ * the safe answer for something that cannot be undone; [dismissLabel] names it when « Annuler » would be ambiguous. A server [error] shows verbatim.
  */
 @Composable
 internal fun ConfirmDialog(
@@ -88,13 +88,14 @@ internal fun ConfirmDialog(
     busy: Boolean = false,
     error: String? = null,
     focusConfirm: Boolean = false,
+    dismissLabel: String = "Annuler",
 ) {
     val first = remember { FocusRequester() }
     DialogCard(title, onDismiss) {
         message?.let { Text(it, color = Palette.textSecondary) }
         error?.let { Text(it, color = Palette.danger) }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onDismiss, modifier = if (focusConfirm) Modifier else Modifier.focusRequester(first)) { Text("Annuler") }
+            OutlinedButton(onClick = onDismiss, modifier = if (focusConfirm) Modifier else Modifier.focusRequester(first)) { Text(dismissLabel) }
             Button(onClick = onConfirm, enabled = !busy, modifier = if (focusConfirm) Modifier.focusRequester(first) else Modifier) {
                 Text(if (busy) "En cours…" else confirmLabel)
             }
