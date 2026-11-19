@@ -1,15 +1,15 @@
 {
+  "exempt": false,
   "movies": {
-    "limit": 10,
     "days": 7,
-    "used": 2,
-    "remaining": 8
+    "limit": 10,
+    "remaining": 10,
+    "used": 0
   },
   "seasons": {
-    "limit": 5,
     "days": 7,
-    "used": 1,
-    "remaining": 4
-  },
-  "exempt": false
+    "limit": 10,
+    "remaining": 10,
+    "used": 0
+  }
 }

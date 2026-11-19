@@ -1,61 +1,217 @@
 {
-  "tmdbId": 94605,
-  "type": "tv",
-  "title": "Arcane",
-  "year": 2021,
-  "posterPath": "/abf8tHznhSvl9BAElD2cQeRr7do.jpg",
-  "backdropPath": "/q8eejQcg1bAqImEV8jh8RtBD4uH.jpg",
-  "overview": "Dans les cités jumelles de Piltover et Zaun, deux sœurs s'affrontent.",
-  "status": "partial",
-  "progress": 0.6,
-  "embyItemId": "51877",
-  "genres": [
+  "backdropPath": "/xhK9YCxNwnE0OB1SWvCY39heHQI.jpg",
+  "cast": [
     {
-      "id": 16,
-      "name": "Animation"
+      "character": "Olivia Benson",
+      "id": 6240,
+      "name": "Mariska Hargitay",
+      "profilePath": "/mF5BMaACeb1rlqp9Fz0f5z7N69H.jpg"
     },
     {
-      "id": 10765,
-      "name": "Science-Fiction & Fantastique"
+      "character": "Odafin 'Fin' Tutuola",
+      "id": 21411,
+      "name": "Ice-T",
+      "profilePath": "/96TdPckI16ggfHcPrSFf6bHYLLe.jpg"
+    },
+    {
+      "character": "Amanda Rollins",
+      "id": 206637,
+      "name": "Kelli Giddish",
+      "profilePath": "/3zcqEyAguRhYofePyJehWm19uUX.jpg"
     }
   ],
-  "runtime": 42,
+  "collection": null,
+  "crew": [
+    {
+      "id": 117443,
+      "jobs": ["creator"],
+      "name": "Dick Wolf",
+      "profilePath": "/tRMEuYNVFjXYJ7gh1sGJSxq9Vwq.jpg"
+    }
+  ],
+  "embyItemId": "50008",
+  "externalIds": {
+    "imdb": "tt0203259",
+    "tvdb": 75692
+  },
+  "genres": [
+    {
+      "id": 80,
+      "name": "Crime"
+    },
+    {
+      "id": 18,
+      "name": "Drame"
+    },
+    {
+      "id": 9648,
+      "name": "Mystère"
+    }
+  ],
+  "keywords": [
+    {
+      "id": 703,
+      "name": "detective"
+    },
+    {
+      "id": 739,
+      "name": "sexual abuse"
+    },
+    {
+      "id": 2943,
+      "name": "sex scandal"
+    },
+    {
+      "id": 10303,
+      "name": "domestic abuse"
+    },
+    {
+      "id": 11534,
+      "name": "sexual violence"
+    },
+    {
+      "id": 11925,
+      "name": "domestic violence"
+    },
+    {
+      "id": 15009,
+      "name": "criminal"
+    },
+    {
+      "id": 15049,
+      "name": "sex trafficking"
+    },
+    {
+      "id": 15271,
+      "name": "interrogation"
+    },
+    {
+      "id": 33518,
+      "name": "district attorney"
+    },
+    {
+      "id": 33519,
+      "name": "courtroom"
+    },
+    {
+      "id": 156902,
+      "name": "assistant district attorney"
+    },
+    {
+      "id": 189409,
+      "name": "sex crime"
+    },
+    {
+      "id": 190327,
+      "name": "sexual assault"
+    },
+    {
+      "id": 199723,
+      "name": "sex trade"
+    },
+    {
+      "id": 213132,
+      "name": "sex slavery"
+    },
+    {
+      "id": 214501,
+      "name": "sex offender"
+    },
+    {
+      "id": 241782,
+      "name": "criminal justice system"
+    },
+    {
+      "id": 249136,
+      "name": "suspicious"
+    },
+    {
+      "id": 259094,
+      "name": "dark"
+    },
+    {
+      "id": 268067,
+      "name": "police procedural"
+    },
+    {
+      "id": 286125,
+      "name": "gritty"
+    }
+  ],
+  "lastAired": {
+    "episodeNumber": 6,
+    "seasonNumber": 28
+  },
+  "originalLanguage": "en",
+  "overview": "Les inspecteurs qui font partie de la division des Crimes sexuels (SVU) du service de police de la ville de New York (NYPD) enquêtent sur des crimes de nature sexuelle. Alors que les autres émissions de la franchise de \"La loi et l'ordre\" se sont largement concentrées sur les cas de meurtres, les inspecteurs de la division des Crimes sexuels (SVU) ont souvent affaire à des crimes, tel le viol, auquel la victime survit et elle aide les autorités lors de l'enquête.",
+  "posterPath": "/95flTYCxEPNFSdZVrHy9nMIeLbw.jpg",
+  "recommendations": [
+    {
+      "backdropPath": "/AhFEqj8PFvvNDQ3Ouv39kNfTraI.jpg",
+      "overview": "Alors qu'une jeune femme est accusée d'avoir menti au sujet d'un viol, deux policières enquêtent sur une vague d'agressions similaires.",
+      "posterPath": "/jHOrNJNM03Lsjdw7nsw7TlqBOhd.jpg",
+      "title": "Unbelievable",
+      "tmdbId": 91275,
+      "type": "tv",
+      "year": 2019
+    },
+    {
+      "backdropPath": "/6LNiGx7KfdTPrIkkl6MjAXaDHmJ.jpg",
+      "overview": "Chaque saison, une nouvelle intrigue, des nouveaux personnages, une nouvelle enquête sur une personne disparue...",
+      "posterPath": "/yZnR6EccMv4Evcady5M8MSzAmuq.jpg",
+      "title": "The Missing",
+      "tmdbId": 61555,
+      "type": "tv",
+      "year": 2014
+    },
+    {
+      "backdropPath": "/Q9FMVA1UvX8cnNImaZc0dlpMdB.jpg",
+      "embyItemId": "50009",
+      "overview": "Au cœur de Londres, un appel anonyme précipite deux brillants policiers — une jeune femme au début de sa carrière et un homme bien placé déterminé à protéger son héritage — dans un combat pour rectifier une ancienne erreur judiciaire.",
+      "posterPath": "/1vTUmvdV0BEfxy4A8l8s0h0cSlp.jpg",
+      "status": "available",
+      "title": "Criminal Record",
+      "tmdbId": 204490,
+      "type": "tv",
+      "year": 2024
+    }
+  ],
+  "runtime": null,
   "seasons": [
     {
-      "seasonNumber": 0,
-      "episodeCount": 3,
-      "airDate": "2021-11-20"
+      "airDate": null,
+      "episodeCount": 6,
+      "seasonNumber": 0
     },
     {
+      "airDate": "2006-09-19",
+      "episodeCount": 22,
+      "episodes": {
+        "expected": 22,
+        "present": 22
+      },
       "seasonNumber": 1,
-      "episodeCount": 9,
-      "airDate": "2021-11-06",
-      "status": "available",
-      "episodes": {
-        "present": 9,
-        "expected": 9
-      }
+      "status": "available"
     },
     {
+      "airDate": "2024-10-03",
+      "episodeCount": 22,
+      "episodes": {
+        "expected": 22,
+        "present": 1
+      },
       "seasonNumber": 2,
-      "episodeCount": 9,
-      "airDate": "2024-11-09",
-      "status": "partial",
-      "progress": 0.6,
-      "episodes": {
-        "present": 5,
-        "expected": 9
-      }
+      "status": "partial"
     },
     {
-      "seasonNumber": 3,
-      "episodeCount": 8,
-      "airDate": "2025-03-01"
+      "airDate": "2024-01-18",
+      "episodeCount": 13,
+      "seasonNumber": 3
     },
     {
-      "seasonNumber": 4,
+      "airDate": "2027-10-08",
       "episodeCount": 8,
-      "airDate": "2027-06-01"
+      "seasonNumber": 4
     },
     {
       "seasonNumber": 5,
@@ -64,60 +220,103 @@
       "status": "pending"
     }
   ],
-  "cast": [
+  "similar": [
     {
-      "id": 1294,
-      "name": "Hailee Steinfeld",
-      "character": "Vi (voix)",
-      "profilePath": "/9eOJ6o6zZqBmZ2BjXnWNIZpl6vQ.jpg"
+      "backdropPath": "/bnEDaINpzWGBsE8IjA3TsU4FWeJ.jpg",
+      "overview": "Un journal de terrain d'intervention conjoint entre la police qui attrape les criminels et les pompiers qui attrapent les incendies. Le poste de police et la caserne des pompiers répondent conjointement à des scènes féroces entre crime, catastrophes et urgences.",
+      "posterPath": "/k5dxjAN4HB8Olm4IYIqarLgX58F.jpg",
+      "title": "Premiers secours",
+      "tmdbId": 211261,
+      "type": "tv",
+      "year": 2022
+    },
+    {
+      "backdropPath": "/fIXTetAsXkPO6UUUw85IU4oactf.jpg",
+      "overview": "Une jeune femme assassinée gît sur une aire de jeux de Copenhague. Au-​dessus d'elle est suspendu un bonhomme fabriqué avec des marrons.",
+      "posterPath": "/4d8dqel9Jtg6Po6fdCYKuvrvrMz.jpg",
+      "title": "Octobre",
+      "tmdbId": 127865,
+      "type": "tv",
+      "year": 2021
+    },
+    {
+      "backdropPath": "/uGGmIOPc2QLNF4t3Ro46wRcYr3t.jpg",
+      "embyItemId": "50010",
+      "overview": "Les policiers du 15e arrondissement de New York gèrent leur vie professionnelle et personnelle, et ils rencontrent certains des pires éléments que la ville a à offrir tout en travaillant sur de nombreux cas.",
+      "posterPath": "/x4rKHMNLxb6ZPODelJVaT9otOO9.jpg",
+      "status": "requested",
+      "title": "New York Police Blues",
+      "tmdbId": 194,
+      "type": "tv",
+      "year": 1993
     }
   ],
-  "crew": [
-    {
-      "id": 2001,
-      "name": "Christian Linke",
-      "jobs": ["creator"],
-      "profilePath": null
-    }
-  ],
-  "collection": null,
-  "trailerKey": null,
+  "status": "partial",
+  "title": "New York Unité Spéciale",
+  "tmdbId": 2734,
+  "trailerKey": "uygf0l_WzjA",
+  "type": "tv",
   "watchProviders": {
+    "buy": [
+      {
+        "id": 2,
+        "logoPath": "/qdEGArH3lKfFnAtYXMkSYk5wxuG.png",
+        "name": "Apple TV Store"
+      },
+      {
+        "id": 58,
+        "logoPath": "/51fX3l4yElitnfui0IkbMUmfmgF.png",
+        "name": "Canal VOD"
+      },
+      {
+        "id": 10,
+        "logoPath": "/jn6TLbtaTZntTRX9UYucHJvpQx1.png",
+        "name": "Amazon Video"
+      }
+    ],
     "flatrate": [
       {
         "id": 8,
-        "name": "Netflix",
-        "logoPath": "/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg"
+        "logoPath": "/rK1KljqmbvO9HQa1PBFLILWah72.png",
+        "name": "Netflix"
+      },
+      {
+        "id": 119,
+        "logoPath": "/gMZdpavHmxFNnLpMHwVxfqeux2g.png",
+        "name": "Amazon Prime Video"
+      },
+      {
+        "id": 337,
+        "logoPath": "/5eZ872CghnHFLB1j8grszbrx0dx.png",
+        "name": "Disney Plus"
+      },
+      {
+        "id": 1967,
+        "logoPath": "/g8P4BJ2Wrya0VkbGUxBoUqpXtSs.png",
+        "name": "Molotov TV"
+      },
+      {
+        "id": 1754,
+        "logoPath": "/j5w5U61YwOM6Adiaa5zuEVqrpP8.png",
+        "name": "TF1+"
+      },
+      {
+        "id": 1796,
+        "logoPath": "/eGUwOOIxcazwEBxqJpSN5sWEu6V.png",
+        "name": "Netflix Standard with Ads"
+      },
+      {
+        "id": 193,
+        "logoPath": "/9yt7CjnySiiOtRFknNWCz3gSyXz.png",
+        "name": "SFR Play"
+      },
+      {
+        "id": 2100,
+        "logoPath": "/tpwTT1FpWqLLhxUfAuDavIXDDfI.png",
+        "name": "Amazon Prime Video with Ads"
       }
     ],
-    "rent": [],
-    "buy": []
+    "rent": []
   },
-  "recommendations": [
-    {
-      "tmdbId": 96677,
-      "type": "tv",
-      "title": "Lupin",
-      "year": 2021,
-      "posterPath": "/sgxawbFB5Vi5OkPWQLNfl3dvkNJ.jpg",
-      "backdropPath": "/aJvnr3uKRZ34RRMXwPEUe0mvtL.jpg",
-      "overview": "Assane Diop venge son père en s'inspirant d'Arsène Lupin."
-    }
-  ],
-  "similar": [],
-  "externalIds": {
-    "imdb": "tt11126994",
-    "tvdb": 371028
-  },
-  "keywords": [
-    {
-      "id": 210024,
-      "name": "jeu vidéo"
-    }
-  ],
-  "originalLanguage": "en",
-  "lastAired": {
-    "seasonNumber": 2,
-    "episodeNumber": 9
-  }
+  "year": 1999
 }

@@ -1,51 +1,84 @@
 {
   "page": 1,
-  "totalPages": 2,
-  "results": [
-    {
-      "tmdbId": 693134,
-      "type": "movie",
-      "title": "Dune : Deuxième partie",
-      "year": 2024,
-      "posterPath": "/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg",
-      "backdropPath": "/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg",
-      "overview": "Paul Atréides s'unit aux Fremen pour venger sa famille.",
-      "status": "available",
-      "embyItemId": "48213"
-    },
-    {
-      "tmdbId": 438631,
-      "type": "movie",
-      "title": "Dune",
-      "year": 2021,
-      "posterPath": "/qmuFqMnPrRpLWFTQ2RUVMYlfC7Z.jpg",
-      "backdropPath": "/jYEW5xZkZk2WTrdbMGAPFuBqbDc.jpg",
-      "overview": "Paul Atréides rejoint la planète Arrakis.",
-      "status": "available",
-      "embyItemId": "47102"
-    },
-    {
-      "tmdbId": 872585,
-      "type": "movie",
-      "title": "Oppenheimer",
-      "year": 2023,
-      "posterPath": "/AoiQwtGg1DmCJrFKCzSgY4gk8Tu.jpg",
-      "backdropPath": "/fm6KqXpk3M2HVveHwCrBSSBaO0V.jpg",
-      "overview": "Le physicien J. Robert Oppenheimer dirige le projet Manhattan."
-    }
-  ],
   "people": [
     {
-      "id": 1002,
-      "name": "Denis Villeneuve",
-      "profilePath": "/zdDx9Xs93UIrJFWYApYR28J8M6b.jpg",
-      "knownFor": ["Dune", "Blade Runner 2049", "Premier Contact"]
+      "id": 6499244,
+      "knownFor": ["Cercles"],
+      "name": "Dune Favero",
+      "profilePath": null
     },
     {
-      "id": 5555,
-      "name": "Zendaya",
-      "profilePath": null,
-      "knownFor": ["Euphoria"]
+      "id": 5167259,
+      "knownFor": ["Chien 51", "Johnny", "Forty Love"],
+      "name": "Dune Allain",
+      "profilePath": null
+    },
+    {
+      "id": 1325979,
+      "knownFor": ["On dirait le sud"],
+      "name": "Dune Landenberg",
+      "profilePath": null
     }
-  ]
+  ],
+  "results": [
+    {
+      "backdropPath": "/qVgZu5BTx6pu4owCvVOm4zjTfOi.jpg",
+      "embyItemId": "50006",
+      "overview": "L'histoire de Paul Atreides, jeune homme aussi doué que brillant, voué à connaître un destin hors du commun qui le dépasse totalement. Car, s'il veut préserver l'avenir de sa famille et de son peuple, il devra se rendre sur Dune, la planète la plus dangereuse de l'Univers. Mais aussi la seule à même de fournir la ressource la plus précieuse capable de décupler la puissance de l'Humanité. Tandis que des forces maléfiques se disputent le contrôle de cette planète, seuls ceux qui parviennent à dominer leur peur pourront survivre…",
+      "posterPath": "/qpyaW4xUPeIiYA5ckg5zAZFHvsb.jpg",
+      "status": "available",
+      "title": "Dune",
+      "tmdbId": 438631,
+      "type": "movie",
+      "year": 2021
+    },
+    {
+      "backdropPath": "/lBoHzOgft2QfpjkVVvZCqeM4ttT.jpg",
+      "overview": "10 000 ans avant l'ascension de Paul Atreides, les Sœurs Harkonnen combattent des forces qui menacent l'avenir de l'humanité et établissent la secte légendaire connue sous le nom de Bene Gesserit.",
+      "posterPath": "/vVhx4SP0eyDOmYRJdUNIQ24fGL5.jpg",
+      "title": "Dune : Prophecy",
+      "tmdbId": 90228,
+      "type": "tv",
+      "year": 2024
+    },
+    {
+      "backdropPath": "/eZ239CUp1d6OryZEBPnO2n87gMG.jpg",
+      "embyItemId": "50007",
+      "overview": "Le voyage mythique de Paul Atreides qui s'allie à Chani et aux Fremen dans sa quête de vengeance envers les conspirateurs qui ont anéanti sa famille. Devant choisir entre l'amour de sa vie et le destin de l'univers, il fera tout pour éviter un terrible futur que lui seul peut prédire.",
+      "posterPath": "/iRNbRAIGQQr5diGnjpwJFm0dgt4.jpg",
+      "status": "available",
+      "title": "Dune : Deuxième partie",
+      "tmdbId": 693134,
+      "type": "movie",
+      "year": 2024
+    },
+    {
+      "backdropPath": "/i5E9H7Ik0u61ylDDTbmUpTL3Yw.jpg",
+      "overview": "L'empereur Paul Atraides fait face aux retombées de son ascensions au pouvoir alors que des complots politiques et une guerre sainte à l'échelle de la galaxie mettent en danger l'avenir que lui seul peut voir.",
+      "posterPath": "/zfI58QKzav88liXLsk0lvFSMCdr.jpg",
+      "title": "Dune : Troisième partie",
+      "tmdbId": 1170608,
+      "type": "movie",
+      "year": 2026
+    },
+    {
+      "backdropPath": "/5wJ2tckpvwcxGCAgZiccodwEJpf.jpg",
+      "overview": "Dans un futur lointain, la maison Atréides est chargée de gouverner Arrakis, planète désertique et unique source de l'Épice, la ressource la plus convoitée de l'univers. Mais cette nomination dissimule un piège tendu par leurs ennemis héréditaires, les Harkonnen. Contraint de fuir dans le désert, le jeune Paul Atréides voit son destin basculer au cœur d'un monde aussi hostile que fascinant.",
+      "posterPath": "/nCFApKqbqRDdGc3YylVf3VsTHcg.jpg",
+      "title": "Dune",
+      "tmdbId": 841,
+      "type": "movie",
+      "year": 1984
+    },
+    {
+      "backdropPath": "/rAJmWCqmEeRwlV5CxzbeQ3lSN5N.jpg",
+      "overview": "La politique, la trahison, la luxure, la cupidité et la venue d'un Messie. Basé sur le roman classique de science-fiction de Frank Herbert.",
+      "posterPath": "/c8R8HtNsdqhBhRYdt6X23ceDWco.jpg",
+      "title": "Dune",
+      "tmdbId": 19566,
+      "type": "tv",
+      "year": 2000
+    }
+  ],
+  "totalPages": 66
 }

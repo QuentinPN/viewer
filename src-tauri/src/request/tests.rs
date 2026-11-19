@@ -1143,3 +1143,125 @@ fn rate_limit_on_a_call_does_not_block_others() {
     discover(&ur, &id).unwrap();
     assert_eq!(hits.load(Ordering::SeqCst), 2);
 }
+
+/// Real Request probe (task 2b), on demand only, read-only:
+/// `scripts/with-test-account.ps1 cargo test … real_server_probe -- --ignored --nocapture`
+/// with `VIEWER_UR_URL` (default `https://request.example.com:8445`) and optional
+/// `VIEWER_UR_DUMP` (folder for the raw bodies). Creates no request.
+#[test]
+#[ignore = "needs the real Emby and Request servers and the test account"]
+fn real_server_probe() {
+    use crate::emby::session::{EmbyService, SessionFile};
+    let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} manquant"));
+    let ur_url =
+        std::env::var("VIEWER_UR_URL").unwrap_or_else(|_| "https://request.example.com:8445".into());
+    let dump = std::env::var_os("VIEWER_UR_DUMP").map(std::path::PathBuf::from);
+    let path = temp_settings().with_file_name("session.json");
+    SessionFile {
+        device_id: "viewer-request-probe".into(),
+        ..SessionFile::default()
+    }
+    .save(&path)
+    .unwrap();
+    let emby = EmbyService::new(
+        Box::new(Arc::new(MemoryCredentialStore::default())),
+        path,
+        "Viewer probe".into(),
+        "9.9.9".into(),
+    );
+    block_on(emby.sign_in(
+        &var("VIEWER_EMBY_URL"),
+        &var("VIEWER_EMBY_USER"),
+        &var("VIEWER_EMBY_PASSWORD"),
+    ))
+    .unwrap();
+    let (_, user_id, emby_token) = emby.exchange_identity().unwrap();
+    let client = RequestClient::new(&normalize_address(&ur_url).unwrap(), "9.9.9").unwrap();
+
+    let save = |name: &str, v: &serde_json::Value| {
+        if let Some(dir) = &dump {
+            std::fs::create_dir_all(dir).unwrap();
+            std::fs::write(
+                dir.join(format!("{name}.json")),
+                serde_json::to_vec_pretty(v).unwrap(),
+            )
+            .unwrap();
+        }
+    };
+    fn check<T: serde::de::DeserializeOwned>(name: &str, v: &serde_json::Value) {
+        if let Err(e) = serde_json::from_value::<T>(v.clone()) {
+            println!("MODEL MISMATCH {name}: {e}");
+        }
+    }
+    let version = block_on(client.version()).unwrap();
+    println!("version {} {:?}", version.api_version, version.features);
+    save("version-ok", &serde_json::to_value(&version).unwrap());
+    let session =
+        block_on(client.exchange(&user_id, &emby_token, "Viewer probe (Windows)")).unwrap();
+    save(
+        "emby-token",
+        &serde_json::json!({ "token": "<retiré>", "expiresAt": session.expires_at, "viewer": session.viewer }),
+    );
+    let t = session.token.clone();
+    let get = |name: &str, path: &str, query: &[(&str, String)]| -> serde_json::Value {
+        let v: serde_json::Value =
+            block_on(client.get(path, query, &t)).unwrap_or_else(|e| panic!("{path}: {e:?}"));
+        save(name, &v);
+        v
+    };
+    let discover = get("discover", "/api/discover", &[]);
+    check::<DiscoverResponse>("discover", &discover);
+    let search = get("search", "/api/search", &[("q", "dune".into())]);
+    check::<MediaSearchResults>("search", &search);
+    let paged = get(
+        "paged-media",
+        "/api/discover/movie",
+        &[("page", "1".into())],
+    );
+    check::<PagedMedia>("paged-media", &paged);
+    let all: Vec<&serde_json::Value> = discover["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|r| r["items"].as_array().unwrap())
+        .chain(search["results"].as_array().unwrap())
+        .collect();
+    let movie = all.iter().find(|i| i["type"] == "movie").unwrap()["tmdbId"].clone();
+    let media_movie = get("media-movie", &format!("/api/media/movie/{movie}"), &[]);
+    check::<MediaDetails>("media-movie", &media_movie);
+    // A series with several seasons, preferably partly available.
+    let mut best: Option<serde_json::Value> = None;
+    for item in all.iter().filter(|i| i["type"] == "tv").take(12) {
+        let v: serde_json::Value =
+            block_on(client.get(&format!("/api/media/tv/{}", item["tmdbId"]), &[], &t)).unwrap();
+        let seasons = v["seasons"].as_array().map_or(0, Vec::len);
+        let score = seasons + if v["status"] == "partial" { 100 } else { 0 };
+        let best_score = best.as_ref().map_or(0, |b| {
+            b["seasons"].as_array().map_or(0, Vec::len)
+                + if b["status"] == "partial" { 100 } else { 0 }
+        });
+        if score > best_score {
+            best = Some(v);
+        }
+    }
+    let media_tv = best.unwrap();
+    save("media-tv", &media_tv);
+    check::<MediaDetails>("media-tv", &media_tv);
+    check::<RequestQuota>("quota", &get("quota", "/api/requests/quota", &[]));
+    let page = get("request-page", "/api/requests", &[("mine", "true".into())]);
+    check::<RequestPage>("request-page", &page);
+    if let Some(id) = page["results"]
+        .as_array()
+        .and_then(|r| r.first())
+        .map(|r| r["id"].clone())
+    {
+        check::<RequestDetail>(
+            "request-detail",
+            &get("request-detail", &format!("/api/requests/{id}"), &[]),
+        );
+    }
+    check::<SessionList>("sessions", &get("sessions", "/api/auth/sessions", &[]));
+    block_on(client.send_empty(Method::POST, "/api/auth/logout", &t)).unwrap();
+    block_on(emby.sign_out()).unwrap();
+    println!("probe done");
+}

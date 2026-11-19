@@ -25,4 +25,4 @@ Contrat figé de l'API Request utilisée par l'onglet « Demander » (desktop et
 | `request-detail` | `RequestDetail` |
 | `error` | `ApiError` |
 
-Les fixtures sont **provisoires** : écrites à la main d'après le schéma, elles seront remplacées par des réponses réelles nettoyées (noms, ids et jetons retirés) à la tâche 2b du plan.
+Depuis la tâche 2b (2026-11-19, sonde `real_server_probe`), `version-ok`, `emby-token`, `sessions`, `discover`, `paged-media`, `search`, `media-movie`, `media-tv` et `quota` sont des réponses réelles nettoyées (nom et id du membre, appareil, ids Emby et jeton remplacés ; listes raccourcies). Ajouts faits à la main : les saisons de `media-tv` réduites à six cas (vraies formes, renumérotées, saison 4 future, saison 5 `pending`), deux `seeAll` dans `discover` (le serveur n'en renvoie aucun) et deux sessions fictives dans `sessions`. `request-view`, `request-page`, `request-detail`, `error` et `version-old` restent écrites à la main : le compte de test n'a aucune demande.
