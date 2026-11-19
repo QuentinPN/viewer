@@ -13,6 +13,7 @@ import io.github.quentinpn.viewer.tv.emby.ServerUrl
 import io.github.quentinpn.viewer.tv.player.AccountTracks
 import io.github.quentinpn.viewer.tv.player.accountTracks
 import io.github.quentinpn.viewer.tv.session.PendingStopStore
+import io.github.quentinpn.viewer.tv.session.SavedServer
 import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.session.SessionStore
 import io.github.quentinpn.viewer.tv.settings.IMAGE_CACHE_DIRECTORY
@@ -90,8 +91,15 @@ object AppServices {
     /** The open Emby account, read without opening its token; the server id falls back to its address. */
     private fun embyAccount(context: Context): EmbyAccount? {
         val store = store(context)
-        val saved = store.activeKey()?.let(store::server) ?: return null
-        return EmbyAccount(saved.serverId ?: saved.server, saved.userId)
+        return store.activeKey()?.let(store::server)?.let(::accountOf)
+    }
+
+    private fun accountOf(saved: SavedServer) = EmbyAccount(saved.serverId ?: saved.server, saved.userId)
+
+    /** Emby sign-out or « Oublier ce serveur »: the Request token and flag of that account go too. */
+    fun forgetRequests(context: Context, saved: SavedServer) {
+        val account = accountOf(saved)
+        requests(context).forgetAccount(account.serverId, account.userId)
     }
 
     /** Posters and backdrops of Request: the Bearer goes to its origin only, never in the URL. */

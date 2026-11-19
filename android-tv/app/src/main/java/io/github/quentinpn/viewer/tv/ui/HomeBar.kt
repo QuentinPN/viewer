@@ -56,7 +56,7 @@ import androidx.tv.material3.Text
  * Entries of the home bar (ADR 0064); the one opened last takes the focus back on return.
  * [Library] is one of the libraries, named by [HomeBar]'s `focusLibrary` (ADR 0092).
  */
-internal enum class BarItem { Home, Library, Search, Settings, Account }
+internal enum class BarItem { Home, Library, Search, Requests, Settings, Account }
 
 /**
  * The library « Films » or « Séries » opens: the one named so when there are several of
@@ -144,6 +144,7 @@ internal fun HomeBar(
                 val own = libraryRequesters.getValue(library.id)
                 BarEntry(Modifier.focusRequester(own).below(), onClick = { onOpenLibrary(library) }) { color -> Label(library.name.trim(), color) }
             }
+            BarEntry(Modifier.entry(BarItem.Requests), onClick = { onOpen(BarItem.Requests) }) { color -> Label("Demander", color) }
             BarEntry(Modifier.entry(BarItem.Search).semantics { contentDescription = "Rechercher" }, round = true, onClick = { onOpen(BarItem.Search) }) { color ->
                 Icon(SearchIcon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
             }

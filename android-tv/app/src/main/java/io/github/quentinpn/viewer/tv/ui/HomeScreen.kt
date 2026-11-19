@@ -167,6 +167,7 @@ fun HomeScreen(
     onOpenPlaylist: (playlist: BaseItemDto) -> Unit,
     onOpenLibrary: (Library) -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenRequests: () -> Unit,
     onOpenSettings: () -> Unit,
     onSessionExpired: () -> Unit,
     onSignOut: () -> Unit,
@@ -304,6 +305,7 @@ fun HomeScreen(
                     memory.focusHeader = item
                     when (item) {
                         BarItem.Search -> onOpenSearch()
+                        BarItem.Requests -> onOpenRequests()
                         BarItem.Settings -> onOpenSettings()
                         BarItem.Home, BarItem.Library, BarItem.Account -> Unit
                     }

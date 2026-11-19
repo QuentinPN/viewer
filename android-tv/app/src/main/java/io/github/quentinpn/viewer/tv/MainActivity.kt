@@ -58,6 +58,8 @@ import io.github.quentinpn.viewer.tv.ui.SettingsScreen
 import io.github.quentinpn.viewer.tv.ui.TrailerHandlers
 import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import io.github.quentinpn.viewer.tv.ui.VersionStore
+import io.github.quentinpn.viewer.tv.ui.requests.RequestsMemory
+import io.github.quentinpn.viewer.tv.ui.requests.RequestsScreen
 import io.github.quentinpn.viewer.tv.ui.ancestorIdsOrNull
 import io.github.quentinpn.viewer.tv.ui.backFromEpisode
 import io.github.quentinpn.viewer.tv.ui.genreOptions
@@ -118,6 +120,7 @@ class MainActivity : ComponentActivity() {
                             session = signedIn
                         },
                         onRevoke = { entry, token ->
+                            AppServices.forgetRequests(this@MainActivity, entry)
                             // Best effort, never waited for: the tile is already gone
                             scope.launch {
                                 try {
@@ -140,6 +143,8 @@ class MainActivity : ComponentActivity() {
                     var library by remember(current) { mutableStateOf<LibraryMemory?>(null) }
                     var search by remember(current) { mutableStateOf<SearchMemory?>(null) }
                     var settings by remember(current) { mutableStateOf(false) }
+                    // The Demander tab (ADR 0125): its state outlives a film or series page opened from it
+                    var requests by remember(current) { mutableStateOf<RequestsMemory?>(null) }
                     val libraryPrefs = remember(current) { LibraryPreferenceStore(this, current.userId) }
                     val settingsStore = remember(current) { PlaybackSettingsStore(this, current.userId) }
                     val homeRows = remember(current) { HomeRowStore(this, current.userId) }
@@ -393,6 +398,11 @@ class MainActivity : ComponentActivity() {
                         )
                         return@ViewerTheme
                     }
+                    val openRequests = requests
+                    if (openRequests != null) {
+                        RequestsScreen(AppServices.requests(this), openRequests, onClose = { requests = null })
+                        return@ViewerTheme
+                    }
                     // Also under the film and series pages: Back from them returns to the results
                     val openSearch = search
                     if (openSearch != null) {
@@ -438,12 +448,14 @@ class MainActivity : ComponentActivity() {
                         onOpenPlaylist = { pages = listOf(DetailPage.Playlist(it.id, it.name)) },
                         onOpenLibrary = { library = LibraryMemory(it, libraryPrefs.load(it)) },
                         onOpenSearch = { search = SearchMemory() },
+                        onOpenRequests = { requests = RequestsMemory() },
                         onOpenSettings = { settings = true },
                         onSessionExpired = expired,
                         rowStore = homeRows,
                         memory = home,
                         refresh = refresh,
                         onSignOut = {
+                            store.server(current.key)?.let { AppServices.forgetRequests(this@MainActivity, it) }
                             // Revoke the token on the server; signing out locally works offline too
                             scope.launch {
                                 try {

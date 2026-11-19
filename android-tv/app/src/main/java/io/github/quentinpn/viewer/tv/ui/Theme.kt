@@ -14,6 +14,10 @@ object Palette {
     val textSecondary = Color(0xB3EBEBF5)
     val accent = Color(0xFF8FD3F5)
     val error = Color(0xFFFF8A80)
+    // Status colours of the requests (DESIGN.md): done, in progress or waiting, refused
+    val success = Color(0xFF64C69A)
+    val warning = Color(0xFFF5C451)
+    val danger = Color(0xFFFF6961)
 }
 
 @Composable
