@@ -21,6 +21,21 @@ pub trait CredentialStore: Send + Sync {
     fn delete(&self, account: &str) -> Result<(), EmbyError>;
 }
 
+/// One store shared by the Emby and Request services (ADR 0125).
+impl<T: CredentialStore + ?Sized> CredentialStore for std::sync::Arc<T> {
+    fn save(&self, account: &str, token: &AccessToken) -> Result<(), EmbyError> {
+        (**self).save(account, token)
+    }
+
+    fn load(&self, account: &str) -> Result<Option<AccessToken>, EmbyError> {
+        (**self).load(account)
+    }
+
+    fn delete(&self, account: &str) -> Result<(), EmbyError> {
+        (**self).delete(account)
+    }
+}
+
 /// Credential account name for one user on one server.
 pub fn account(server_id: &str, user_id: &str) -> String {
     format!("{server_id}/{user_id}")

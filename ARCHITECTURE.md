@@ -61,6 +61,16 @@ Secure OS credential store, TLS validation, user-scoped permissions, sanitized l
 
 Logs (ADR 0033): `src-tauri/src/diagnostics.rs` is the `log` backend. It writes `viewer.log` in the app log directory, keeps 3 files of 2 MiB and redacts every line (`diagnostics::redact`) before writing. A panic hook writes the panic and its backtrace there. `diagnostics_open_log_dir` takes no argument and opens only that folder in the explorer.
 
+## Request (ADR 0125)
+
+A second remote service, separate from Emby: the household's request service. Spec `docs/superpowers/specs/2026-11-19-request-integration-design.md`.
+
+- Boundary: Rust `src-tauri/src/request/` (`client.rs` reqwest client, `service.rs` session and token rules, `commands.rs` typed `ur_*` Tauri commands, `images.rs` image protocol); frontend `src/lib/requests/` (`api.ts` wraps the commands) never builds a URL or sees the token. Android TV: `request/` (OkHttp `RequestClient`, `RequestRepository`, `RequestStore`) and `ui/requests/`.
+- Sign-in: `POST /api/auth/emby-token` exchanges the Emby identity for a session token; everything else is `Authorization: Bearer`. One exchange at a time (single-flight); a 401 drops the token and retries once. The server must report API major `1` and the features `auth.emby-token`, `auth.bearer`, `auth.sessions`, `media.item-id`, else the tab says « trop ancien ».
+- Token: OS secure storage (`CredentialStore` on desktop, Keystore on the TV), per Emby account (`request/{embyServerId}/{embyUserId}`), bound to the address that issued it; never in a URL, log or SQLite. The address and the signed-out flag live in `request.json`.
+- Images: the `requestimg` protocol (`http://requestimg.localhost/{size}/{file}`) is served by Rust with the Bearer and a disk cache; `size` in w185/w342/w500/w780/w1280, `file` `[A-Za-z0-9_-]{1,64}` + jpg/jpeg/png/webp, else 400. CSP `img-src` gains only that origin. TV: Coil on the authenticated client.
+- Shared contract: `contracts/request/openapi.json` (pinned) and `contracts/request/fixtures/`, read by the Vitest contract test, the Rust tests and the Kotlin tests.
+
 ## Error handling
 
 Typed error categories: authentication, authorization, unavailable server, timeout, invalid metadata, unsupported format, playback/transcode failure, local decoder failure. UI presents recoverable states. Bound retries and cancel stale requests.

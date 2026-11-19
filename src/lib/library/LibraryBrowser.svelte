@@ -33,6 +33,9 @@ import PlaylistPage from "../home/PlaylistPage.svelte";
 import { prefsKey, readPrefs } from "../home/rows";
 import CardMenu from "../menu/CardMenu.svelte";
 import { CardMenuState, provideCardMenu } from "../menu/menuState.svelte";
+import MediaPage from "../requests/MediaPage.svelte";
+import RequestsTab from "../requests/RequestsTab.svelte";
+import type { MediaSummary, Viewer } from "../requests/types";
 import {
   addSearch,
   historyKey,
@@ -174,6 +177,14 @@ let observer: IntersectionObserver | null = null;
 let opened = $state<MediaItem | null>(null);
 /** The settings screen replaces the content; a search still takes over. */
 let settingsOpen = $state(false);
+/** The « Demander » tab (Request, ADR 0125). */
+let requestsOpen = $state(false);
+/** Page of an Request title over the tab, and what opened it. */
+let requestMedia = $state<{
+  media: MediaSummary;
+  viewer: Viewer | null;
+} | null>(null);
+let requestOpener: Element | null = null;
 /** A playlist's page replaces the home (ADR 0122); a search still takes over. */
 let openedPlaylist = $state<PlaylistCard | null>(null);
 
@@ -501,6 +512,7 @@ function onWindowKeydown(e: KeyboardEvent) {
 }
 
 async function focusSearch() {
+  requestMedia = null;
   if (opened) {
     opened = null;
     openerId = null;
@@ -513,15 +525,49 @@ async function focusSearch() {
 function openSettings() {
   opened = null;
   openedPlaylist = null;
+  requestsOpen = false;
   if (searching) void leaveSearch(false);
   settingsOpen = true;
   scroller?.scrollTo({ top: 0 });
 }
 
-function showHome() {
+function openRequestMedia(media: MediaSummary, viewer: Viewer | null) {
+  requestOpener = document.activeElement;
+  requestMedia = { media, viewer };
+}
+
+/** Back to the tab, focus on the card that opened the page. */
+async function closeRequestMedia() {
+  const back = requestOpener;
+  requestMedia = null;
+  requestOpener = null;
+  await tick();
+  if (back instanceof HTMLElement && back.isConnected) {
+    back.focus({ preventScroll: true });
+  }
+}
+
+/** « Lire »: the Emby title over the Request page, which Échap comes back to. */
+function playRequestMedia(item: MediaItem) {
+  open(item);
+  focusAfterDetail = document.activeElement as HTMLElement | null;
+}
+
+function openRequests() {
   opened = null;
   openedPlaylist = null;
   settingsOpen = false;
+  if (searching) void leaveSearch(false);
+  requestsOpen = true;
+  scroller?.scrollTo({ top: 0 });
+}
+
+function showHome() {
+  opened = null;
+  requestMedia = null;
+  openedPlaylist = null;
+  settingsOpen = false;
+  requestsOpen = false;
   if (searching) void leaveSearch(false);
   if (selected === null) return;
   generation += 1;
@@ -566,8 +612,10 @@ function restartGrid() {
 
 function select(library: Library) {
   opened = null;
+  requestMedia = null;
   openedPlaylist = null;
   settingsOpen = false;
+  requestsOpen = false;
   if (searching) void leaveSearch(false);
   if (selected?.id === library.id && pager.total !== null) return;
   selected = library;
@@ -824,7 +872,8 @@ function loadMore(limit: number = PAGE_SIZE): Promise<void> {
 
 async function readPage(limit: number) {
   const library = selected;
-  if (!library || loading || pager.done) return;
+  // The « Demander » tab shares the scroller: its scrolling pages nothing here.
+  if (!library || requestsOpen || loading || pager.done) return;
   const gen = generation;
   loading = true;
   pageError = null;
@@ -918,7 +967,11 @@ $effect(() => {
 <svelte:window onkeydown={onWindowKeydown} />
 
 <div class="browser" bind:this={browser}>
-  <nav class="topnav" aria-label="Bibliothèques" hidden={opened !== null}>
+  <nav
+    class="topnav"
+    aria-label="Bibliothèques"
+    hidden={opened !== null || requestMedia !== null}
+  >
     <div class="pill">
       <form
         class="search-box"
@@ -979,7 +1032,10 @@ $effect(() => {
         <button
           type="button"
           class="home-link"
-          aria-current={selected === null && !searching && !settingsOpen
+          aria-current={selected === null &&
+          !searching &&
+          !settingsOpen &&
+          !requestsOpen
             ? "page"
             : undefined}
           aria-keyshortcuts="Control+1"
@@ -1002,7 +1058,8 @@ $effect(() => {
                 data-library-id={library.id}
                 aria-current={selected?.id === library.id &&
                 !searching &&
-                !settingsOpen
+                !settingsOpen &&
+                !requestsOpen
                   ? "page"
                   : undefined}
                 aria-keyshortcuts={i < 8 ? `Control+${i + 2}` : undefined}
@@ -1018,6 +1075,15 @@ $effect(() => {
             </li>
           {/each}
         </ul>
+        <button
+          type="button"
+          class="home-link"
+          aria-current={requestsOpen && !searching ? "page" : undefined}
+          title="Demander un film ou une série"
+          onclick={openRequests}
+        >
+          Demander
+        </button>
       {/if}
       <button
         type="button"
@@ -1073,8 +1139,8 @@ $effect(() => {
     bind:this={scroller}
     onscroll={onContentScroll}
     aria-busy={loading}
-    inert={opened !== null}
-    aria-hidden={opened !== null ? "true" : undefined}
+    inert={opened !== null || requestMedia !== null}
+    aria-hidden={opened !== null || requestMedia !== null ? "true" : undefined}
   >
     {#if librariesError}
       <div class="state" role="alert">
@@ -1097,7 +1163,10 @@ $effect(() => {
         onRetry={() => void runSearch(true)}
         onOpen={open}
         onOpenEpisode={openEpisode}
+        onOpenRequest={openRequestMedia}
       />
+    {:else if requestsOpen}
+      <RequestsTab onOpenMedia={openRequestMedia} onPlay={playRequestMedia} />
     {:else if settingsOpen}
       <Settings
         libraries={libraries ?? []}
@@ -1431,8 +1500,25 @@ $effect(() => {
     {/if}
     <div class="sentinel" bind:this={sentinel} aria-hidden="true"></div>
   </main>
-  {#if selected && counter && !searching && !settingsOpen && !opened}
+  {#if selected && counter && !searching && !settingsOpen && !requestsOpen && !opened}
     <p class="counter" aria-hidden="true">{counter}</p>
+  {/if}
+  {#if requestMedia}
+    <!-- Kept under « Lire »'s Emby page, which Échap comes back from. -->
+    {#key `${requestMedia.media.type}:${requestMedia.media.tmdbId}`}
+      <div
+        class="page-layer"
+        class:covered={opened !== null}
+        inert={opened !== null}
+      >
+        <MediaPage
+          media={requestMedia.media}
+          viewer={requestMedia.viewer}
+          onClose={() => void closeRequestMedia()}
+          onPlay={playRequestMedia}
+        />
+      </div>
+    {/key}
   {/if}
   {#if opened}
     <div class="page-layer" class:covered={pages.length > 0} inert={pages.length > 0}>

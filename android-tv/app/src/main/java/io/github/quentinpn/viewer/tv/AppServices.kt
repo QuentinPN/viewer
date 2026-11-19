@@ -13,11 +13,17 @@ import io.github.quentinpn.viewer.tv.emby.ServerUrl
 import io.github.quentinpn.viewer.tv.player.AccountTracks
 import io.github.quentinpn.viewer.tv.player.accountTracks
 import io.github.quentinpn.viewer.tv.session.PendingStopStore
+import io.github.quentinpn.viewer.tv.session.SavedServer
 import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.session.SessionStore
 import io.github.quentinpn.viewer.tv.settings.IMAGE_CACHE_DIRECTORY
 import io.github.quentinpn.viewer.tv.settings.IMAGE_CACHE_MAX_BYTES
 import io.github.quentinpn.viewer.tv.sync.SyncHub
+import io.github.quentinpn.viewer.tv.request.EmbyAccount
+import io.github.quentinpn.viewer.tv.request.ImageAuth
+import io.github.quentinpn.viewer.tv.request.RequestRepository
+import io.github.quentinpn.viewer.tv.request.RequestStore
+import io.github.quentinpn.viewer.tv.request.deviceLabel
 import okhttp3.OkHttpClient
 import okio.Path.Companion.toOkioPath
 
@@ -66,6 +72,44 @@ object AppServices {
     @Volatile private var syncHub: SyncHub? = null
 
     fun store(context: Context) = SessionStore(context)
+
+    /** Request (ADR 0125): one repository per process, so its exchange lock covers every call. */
+    fun requests(context: Context): RequestRepository = viewerRequests ?: synchronized(this) {
+        val app = context.applicationContext
+        viewerRequests ?: RequestRepository(
+            store = RequestStore(app),
+            http = http,
+            account = { embyAccount(app) },
+            embyToken = { store(app).load()?.token },
+            deviceName = deviceLabel(Build.MODEL ?: "Android TV"),
+            userAgent = "Viewer-TV/${device(app).version}",
+        ).also { viewerRequests = it }
+    }
+
+    @Volatile private var viewerRequests: RequestRepository? = null
+
+    /** The open Emby account, read without opening its token; the server id falls back to its address. */
+    private fun embyAccount(context: Context): EmbyAccount? {
+        val store = store(context)
+        return store.activeKey()?.let(store::server)?.let(::accountOf)
+    }
+
+    private fun accountOf(saved: SavedServer) = EmbyAccount(saved.serverId ?: saved.server, saved.userId)
+
+    /** Emby sign-out or « Oublier ce serveur »: the Request token and flag of that account go too. */
+    fun forgetRequests(context: Context, saved: SavedServer) {
+        val account = accountOf(saved)
+        requests(context).forgetAccount(account.serverId, account.userId)
+    }
+
+    /** Posters and backdrops of Request: the Bearer goes to its origin only, never in the URL. */
+    fun requestImages(context: Context): ImageLoader {
+        val imagesHttp = http.newBuilder().addInterceptor(ImageAuth(requests(context))).build()
+        return ImageLoader.Builder(context)
+            .components { add(OkHttpNetworkFetcherFactory(callFactory = { imagesHttp })) }
+            .diskCache { imageDiskCache(context.applicationContext) }
+            .build()
+    }
 
     fun device(context: Context): DeviceIdentity {
         val version = runCatching {
