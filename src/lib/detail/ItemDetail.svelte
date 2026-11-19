@@ -365,7 +365,7 @@ onMount(() => {
   <div class="hero" class:has-backdrop={detail?.backdrop && !backdropFailed}>
     {#if detail?.backdrop && !backdropFailed}
       <img
-        class="backdrop"
+        class="hero-backdrop"
         src={detail.backdrop.src}
         srcset={detail.backdrop.srcset}
         sizes="100vw"
@@ -374,12 +374,12 @@ onMount(() => {
         onerror={() => (backdropFailed = true)}
       />
     {/if}
-    <div class="scrim"></div>
+    <div class="hero-scrim"></div>
 
-    <div class="topbar">
+    <div class="hero-topbar">
       <button
         type="button"
-        class="back"
+        class="round-back"
         aria-label="Retour"
         title="Retour (Échap)"
         onclick={onClose}
@@ -919,56 +919,6 @@ onMount(() => {
     flex-direction: column;
     justify-content: space-between;
     overflow: hidden;
-  }
-  .backdrop {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center 25%;
-    animation: fade-in var(--motion-base) ease-out;
-  }
-  @keyframes fade-in {
-    from {
-      opacity: 0;
-    }
-  }
-  .scrim {
-    position: absolute;
-    inset: 0;
-    background:
-      linear-gradient(90deg, rgb(0 0 0 / 90%) 0%, rgb(0 0 0 / 40%) 50%, rgb(0 0 0 / 0%) 75%),
-      linear-gradient(0deg, var(--color-bg) 0%, rgb(0 0 0 / 0%) 45%);
-  }
-  .topbar {
-    position: relative;
-    padding: var(--space-4) clamp(var(--space-4), 3vw, 32px);
-  }
-  .back {
-    width: 44px;
-    height: 44px;
-    display: grid;
-    place-items: center;
-    padding: 0;
-    border: 1px solid var(--separator);
-    border-radius: 50%;
-    background: var(--material);
-    backdrop-filter: var(--material-blur);
-    color: var(--color-text);
-    cursor: pointer;
-  }
-  .back:hover {
-    background: var(--material-thick);
-  }
-  .back svg {
-    width: 18px;
-    height: 18px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
   .hero-content {
     position: relative;
@@ -1543,7 +1493,6 @@ onMount(() => {
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .backdrop,
     .sk-meta,
     .sk-text div {
       animation: none;

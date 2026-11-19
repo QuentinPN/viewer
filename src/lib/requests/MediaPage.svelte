@@ -10,6 +10,7 @@ import { requestsApi, toRequestsError } from "./api";
 import { mediaStatusText, statusTone } from "./labels";
 import RequestDialog from "./RequestDialog.svelte";
 import { canAsk, embyItem } from "./seasons";
+import { rememberStatus } from "./statusOverrides.svelte";
 import type {
   MediaDetails,
   MediaSummary,
@@ -64,6 +65,7 @@ async function load() {
   try {
     const d = await requestsApi.media(media.type, media.tmdbId);
     details = d;
+    rememberStatus(d);
   } catch (e) {
     error = toRequestsError(e);
   }
@@ -108,7 +110,7 @@ onMount(() => {
   <div class="hero">
     {#if backdrop}
       <img
-        class="backdrop"
+        class="hero-backdrop"
         src={backdrop.src}
         srcset={backdrop.srcset}
         sizes="100vw"
@@ -117,12 +119,12 @@ onMount(() => {
         onerror={() => (backdropFailed = true)}
       />
     {/if}
-    <div class="scrim"></div>
+    <div class="hero-scrim"></div>
 
-    <div class="topbar">
+    <div class="hero-topbar">
       <button
         type="button"
-        class="back"
+        class="round-back"
         aria-label="Retour"
         title="Retour (Échap)"
         onclick={onClose}
@@ -248,46 +250,6 @@ onMount(() => {
     justify-content: space-between;
     overflow: hidden;
   }
-  .backdrop {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center 25%;
-  }
-  .scrim {
-    position: absolute;
-    inset: 0;
-    background:
-      linear-gradient(90deg, rgb(0 0 0 / 90%) 0%, rgb(0 0 0 / 40%) 50%, rgb(0 0 0 / 0%) 75%),
-      linear-gradient(0deg, var(--color-bg) 0%, rgb(0 0 0 / 0%) 45%);
-  }
-  .topbar {
-    position: relative;
-    padding: var(--space-4) clamp(var(--space-4), 3vw, 32px);
-  }
-  .back {
-    width: 44px;
-    height: 44px;
-    display: grid;
-    place-items: center;
-    padding: 0;
-    border: 1px solid var(--separator);
-    border-radius: 50%;
-    background: var(--material);
-    backdrop-filter: var(--material-blur);
-    color: var(--color-text);
-    cursor: pointer;
-  }
-  .back:hover {
-    background: var(--material-thick);
-  }
-  .back:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
-  }
-  .back svg,
   .actions svg {
     width: 18px;
     height: 18px;

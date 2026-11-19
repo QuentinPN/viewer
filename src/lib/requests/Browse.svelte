@@ -125,10 +125,10 @@ onMount(() => {
 </script>
 
 <div class="toolbar" role="group" aria-label="Tri et filtres">
-  <label class="ur-field">
+  <label class="glass-field">
     <span>Trier par</span>
     <select
-      class="ur-select"
+      class="glass-select"
       bind:this={sortSelect}
       value={filters.sort ?? "popularity"}
       onchange={(e) =>
@@ -137,10 +137,10 @@ onMount(() => {
       {#each SORTS as s (s.key)}<option value={s.key}>{s.label}</option>{/each}
     </select>
   </label>
-  <label class="ur-field">
+  <label class="glass-field">
     <span>Genre</span>
     <select
-      class="ur-select"
+      class="glass-select"
       value={genre === null ? "" : String(genre)}
       aria-busy={genres === null && !genresFailed}
       onchange={(e) => {
@@ -155,10 +155,10 @@ onMount(() => {
       {#each genres ?? [] as g (g.id)}<option value={String(g.id)}>{g.name}</option>{/each}
     </select>
   </label>
-  <label class="ur-field">
+  <label class="glass-field">
     <span>Années</span>
     <select
-      class="ur-select"
+      class="glass-select"
       value={decade !== null ? String(decade) : years ? "custom" : ""}
       onchange={(e) => {
         const v = e.currentTarget.value;
@@ -170,10 +170,10 @@ onMount(() => {
       {#each decadeList as d (d)}<option value={String(d)}>Années {d}</option>{/each}
     </select>
   </label>
-  <label class="ur-field">
+  <label class="glass-field">
     <span>Note minimale</span>
     <select
-      class="ur-select"
+      class="glass-select"
       value={filters.rating ? String(filters.rating) : ""}
       onchange={(e) =>
         apply({

@@ -26,7 +26,7 @@ let value = $derived(address ?? "");
     if (value.trim() !== "") onSubmit(value.trim());
   }}
 >
-  <label class="ur-field" for={id}>
+  <label class="glass-field" for={id}>
     <span>Adresse d'Request</span>
   </label>
   <div class="line">
