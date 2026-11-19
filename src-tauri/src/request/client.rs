@@ -23,6 +23,8 @@ pub const MAX_IMAGE_BYTES: usize = crate::emby::images::MAX_BYTES;
 const IMAGE_TYPES: [&str; 3] = ["image/jpeg", "image/png", "image/webp"];
 /// Wait advised when a 429 has no usable `Retry-After`.
 const DEFAULT_RETRY_AFTER_S: u64 = 60;
+/// A server's `Retry-After` is bounded: it sets a deadline in memory.
+const MAX_RETRY_AFTER_S: u64 = 24 * 60 * 60;
 
 /// Request session token. Debug output is redacted so it cannot leak in logs.
 #[derive(Clone, PartialEq, Eq, Deserialize)]
@@ -227,7 +229,8 @@ async fn check(res: Response) -> Result<Response, RequestError> {
         .headers()
         .get(header::RETRY_AFTER)
         .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.trim().parse::<u64>().ok());
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .map(|s| s.min(MAX_RETRY_AFTER_S));
     let message = res
         .bytes()
         .await

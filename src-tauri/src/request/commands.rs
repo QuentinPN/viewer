@@ -9,8 +9,8 @@ use super::RequestError;
 use super::images::decorated;
 use super::models::{
     AuthSession, DiscoverResponse, Genre, GenreList, MediaDetails, MediaSearchResults, MediaType,
-    NewRequest, PagedMedia, RequestDetail, RequestPage, RequestQuota, RequestStatus, SessionList,
-    SortOrder,
+    NewRequest, PagedMedia, RequestDetail, RequestPage, RequestQuota, RequestStatus, SeeAllFilters,
+    SessionList,
 };
 use super::service::{Identity, UrStatus, RequestService};
 use crate::emby::session::EmbyService;
@@ -27,42 +27,43 @@ pub fn identity(emby: &EmbyService) -> Result<Identity, RequestError> {
     })
 }
 
-/// Filters of « Parcourir » (`GET /api/discover/{type}`).
+/// Filters of « Parcourir » (`GET /api/discover/{type}`): a page plus the same
+/// filters as a Découvrir row's `seeAll`, so « Tout voir » keeps every one.
 #[derive(Debug, Clone, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct BrowseFilters {
     #[serde(default)]
     pub page: Option<u32>,
-    #[serde(default)]
-    pub genres: Vec<i64>,
-    #[serde(default)]
-    pub year_from: Option<i32>,
-    #[serde(default)]
-    pub year_to: Option<i32>,
-    #[serde(default)]
-    pub rating: Option<i32>,
-    #[serde(default)]
-    pub sort: Option<SortOrder>,
+    #[serde(flatten)]
+    pub filters: SeeAllFilters,
 }
 
 impl BrowseFilters {
     pub fn query(&self) -> Vec<(&'static str, String)> {
+        let f = &self.filters;
         let mut q = vec![("page", self.page.unwrap_or(1).max(1).to_string())];
-        if !self.genres.is_empty() {
-            let ids: Vec<String> = self.genres.iter().map(i64::to_string).collect();
+        if let Some(genres) = f.genres.as_ref().filter(|g| !g.is_empty()) {
+            let ids: Vec<String> = genres.iter().map(i64::to_string).collect();
             q.push(("genres", ids.join(",")));
         }
         let numbers = [
-            ("yearFrom", self.year_from),
-            ("yearTo", self.year_to),
-            ("rating", self.rating),
+            ("yearFrom", f.year_from.map(i64::from)),
+            ("yearTo", f.year_to.map(i64::from)),
+            ("rating", f.rating.map(i64::from)),
+            ("runtimeMin", f.runtime_min.map(i64::from)),
+            ("runtimeMax", f.runtime_max.map(i64::from)),
+            ("provider", f.provider),
+            ("company", f.company),
+            ("network", f.network),
         ];
         q.extend(
             numbers
                 .into_iter()
                 .filter_map(|(k, v)| v.map(|v| (k, v.to_string()))),
         );
-        if let Some(sort) = self.sort {
+        if let Some(language) = &f.language {
+            q.push(("language", language.clone()));
+        }
+        if let Some(sort) = f.sort {
             q.push(("sort", sort.as_str().to_owned()));
         }
         q
@@ -86,13 +87,15 @@ pub fn requests_query(status: &[RequestStatus], page: u32) -> Vec<(&'static str,
     q
 }
 
-/// Opaque session id from `/api/auth/sessions`, safe as a path segment.
-fn is_session_id(id: &str) -> bool {
-    !id.is_empty()
-        && id.len() <= 128
-        && id
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+/// An opaque id as one path segment: every byte but the unreserved ones is
+/// percent-encoded, so `/`, `..` or `?` cannot reach another endpoint.
+pub fn path_segment(id: &str) -> String {
+    id.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'~' => (b as char).to_string(),
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
 }
 
 #[tauri::command]
@@ -273,10 +276,7 @@ pub async fn ur_revoke_session(
     ur: State<'_, RequestService>,
     id: String,
 ) -> Result<(), RequestError> {
-    if !is_session_id(&id) {
-        return Err(RequestError::NotFound("appareil introuvable".into()));
-    }
-    let path = format!("/api/auth/sessions/{id}");
+    let path = format!("/api/auth/sessions/{}", path_segment(&id));
     ur.send_empty(&identity(&emby)?, Method::DELETE, &path)
         .await
 }

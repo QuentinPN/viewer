@@ -227,7 +227,7 @@ pub struct PagedMedia {
     pub results: Vec<MediaSummary>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SeeAllFilters {
     #[serde(default)]

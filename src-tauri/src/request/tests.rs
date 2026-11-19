@@ -507,14 +507,15 @@ fn stored(store: &MemoryCredentialStore, user_id: &str) -> Option<String> {
     store
         .load(&super::account(EMBY_SERVER, user_id))
         .unwrap()
-        .map(|t| t.expose().to_owned())
+        .and_then(|t| t.expose().split_once(' ').map(|(_, v)| v.to_owned()))
 }
 
-fn seed(store: &MemoryCredentialStore, user_id: &str, value: &str) {
+/// A token stored for `issuer`, as the service keeps it.
+fn seed(store: &MemoryCredentialStore, user_id: &str, issuer: &Url, value: &str) {
     store
         .save(
             &super::account(EMBY_SERVER, user_id),
-            &AccessToken::new(value.into()),
+            &AccessToken::new(format!("{} {value}", super::address_text(issuer))),
         )
         .unwrap();
 }
@@ -615,7 +616,7 @@ fn concurrent_calls_exchange_once() {
 fn concurrent_401s_exchange_once() {
     let (server, exchanges) = request_like(|t| t != "stale");
     let store = Arc::new(MemoryCredentialStore::default());
-    seed(&store, EMBY_USER, "stale");
+    seed(&store, EMBY_USER, &server.url, "stale");
     let ur = service(&store, Some(&server.url));
     let id = identity(EMBY_USER);
     let results = block_on(futures_util::future::join_all(
@@ -637,7 +638,7 @@ fn concurrent_401s_exchange_once() {
 fn retries_once_after_401() {
     let (server, exchanges) = request_like(|t| t != "stale");
     let store = Arc::new(MemoryCredentialStore::default());
-    seed(&store, EMBY_USER, "stale");
+    seed(&store, EMBY_USER, &server.url, "stale");
     let ur = service(&store, Some(&server.url));
     discover(&ur, &identity(EMBY_USER)).unwrap();
     assert_eq!(exchanges.load(Ordering::SeqCst), 1);
@@ -794,7 +795,7 @@ fn sign_out_revokes_and_deletes() {
     let dead = Url::parse(&format!("http://{}", listener.local_addr().unwrap())).unwrap();
     drop(listener);
     let ur = service(&store, Some(&dead));
-    seed(&store, EMBY_USER, "kept-token");
+    seed(&store, EMBY_USER, &dead, "kept-token");
     block_on(ur.sign_out(&id)).unwrap();
     assert_eq!(stored(&store, EMBY_USER), None);
 }
@@ -843,8 +844,9 @@ fn emby_forget_drops_request_token() {
                 &AccessToken::new(EMBY_TOKEN.into()),
             )
             .unwrap();
-        seed(&store, EMBY_USER, "ur-token");
-        seed(&store, "otheruser", "other-ur-token");
+        let issuer = Url::parse("https://request.exemple.fr").unwrap();
+        seed(&store, EMBY_USER, &issuer, "ur-token");
+        seed(&store, "otheruser", &issuer, "other-ur-token");
         let emby = EmbyService::new(
             Box::new(Arc::clone(&store)),
             path,
@@ -939,7 +941,7 @@ fn image_path_validation() {
 fn image_is_fetched_with_bearer_and_cached() {
     let (server, _) = request_like(|t| t != "stale");
     let store = Arc::new(MemoryCredentialStore::default());
-    seed(&store, EMBY_USER, "stale");
+    seed(&store, EMBY_USER, &server.url, "stale");
     let root = std::env::temp_dir().join(format!("viewer-ur-artwork-{}", uuid::Uuid::new_v4()));
     let cache = Arc::new(crate::emby::artwork_cache::ArtworkCache::new(root, 1 << 20));
     let ur = service(&store, Some(&server.url)).with_artwork_cache(Some(cache));
@@ -1042,4 +1044,40 @@ fn builds_list_queries() {
             ("sort", "release".to_owned())
         ]
     );
+}
+
+#[test]
+fn token_follows_the_address() {
+    let (first, _) = request_like(|_| true);
+    let (second, exchanges) = request_like(|t| t == "tok-1");
+    let store = Arc::new(MemoryCredentialStore::default());
+    let ur = service(&store, Some(&first.url));
+    let id = identity(EMBY_USER);
+    discover(&ur, &id).unwrap();
+    ur.set_address(second.url.as_str()).unwrap();
+    // The first server's token is never sent to the second one.
+    assert!(ur.revocation_for(EMBY_SERVER, EMBY_USER).is_none());
+    discover(&ur, &id).unwrap();
+    assert_eq!(exchanges.load(Ordering::SeqCst), 1);
+    let paths: Vec<String> = second
+        .requests()
+        .iter()
+        .map(|r| format!("{} {}", r.path, bearer(r).is_some()))
+        .collect();
+    assert_eq!(
+        paths,
+        [
+            "/api/version false",
+            "/api/auth/emby-token false",
+            "/api/discover true"
+        ]
+    );
+}
+
+#[test]
+fn session_id_stays_one_path_segment() {
+    use super::commands::path_segment;
+    assert_eq!(path_segment("s_01HZX3K8-a~"), "s_01HZX3K8-a~");
+    assert_eq!(path_segment("../x?y=1"), "%2E%2E%2Fx%3Fy%3D1");
+    assert_eq!(path_segment("é"), "%C3%A9");
 }

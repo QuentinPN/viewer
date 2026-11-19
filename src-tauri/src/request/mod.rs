@@ -166,11 +166,6 @@ pub fn address_text(url: &Url) -> String {
     url.as_str().trim_end_matches('/').to_owned()
 }
 
-/// True for an `http://` address (shown with the « non chiffré » warning).
-pub fn is_unencrypted(url: &Url) -> bool {
-    url.scheme() == "http"
-}
-
 fn is_local(host: &Host<&str>) -> bool {
     match host {
         Host::Ipv4(ip) => ip.is_loopback() || ip.is_private(),

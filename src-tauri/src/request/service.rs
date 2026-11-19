@@ -213,11 +213,25 @@ impl RequestService {
         lock(&self.settings).signed_out.iter().any(|a| a == account)
     }
 
+    /// The stored token, only if it was issued by the current address: a token of
+    /// a previous address is never sent to another host.
     fn load(&self, account: &str) -> Result<Option<SessionToken>, RequestError> {
-        Ok(self
-            .store
-            .load(account)?
-            .map(|t| SessionToken::new(t.expose().to_owned())))
+        let Some(stored) = self.store.load(account)? else {
+            return Ok(None);
+        };
+        let address = self.address();
+        Ok(stored
+            .expose()
+            .split_once(' ')
+            .filter(|(issuer, _)| address.as_deref() == Some(*issuer))
+            .map(|(_, token)| SessionToken::new(token.to_owned())))
+    }
+
+    /// Kept as `{address} {token}` (a token has no space).
+    fn save(&self, account: &str, token: &SessionToken) -> Result<(), RequestError> {
+        let address = self.address().ok_or(RequestError::NotConfigured)?;
+        let value = format!("{address} {}", token.expose());
+        Ok(self.store.save(account, &AccessToken::new(value))?)
     }
 
     /// Fails fast while a 429 is running.
@@ -308,8 +322,7 @@ impl RequestService {
             }
             other => other?,
         };
-        self.store
-            .save(&key, &AccessToken::new(session.token.expose().to_owned()))?;
+        self.save(&key, &session.token)?;
         Ok(session.token)
     }
 
