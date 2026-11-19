@@ -22,7 +22,10 @@ $vcvars = $null
 foreach ($root in $installs) {
   $tools = Get-ChildItem "$root\VC\Tools\MSVC" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending
   foreach ($t in $tools) {
-    if (Test-Path "$($t.FullName)\lib\x64\msvcrt.lib") {
+    # Some installs have the libraries but no vcvars64.bat or no C++ headers.
+    if ((Test-Path "$($t.FullName)\lib\x64\msvcrt.lib") -and
+        (Test-Path "$($t.FullName)\include\vcruntime.h") -and
+        (Test-Path "$root\VC\Auxiliary\Build\vcvars64.bat")) {
       $vcvars = "$root\VC\Auxiliary\Build\vcvars64.bat"
       break
     }
