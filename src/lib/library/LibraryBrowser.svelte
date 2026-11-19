@@ -34,6 +34,7 @@ import { prefsKey, readPrefs } from "../home/rows";
 import CardMenu from "../menu/CardMenu.svelte";
 import { CardMenuState, provideCardMenu } from "../menu/menuState.svelte";
 import RequestsTab from "../requests/RequestsTab.svelte";
+import type { MediaSummary, Viewer } from "../requests/types";
 import {
   addSearch,
   historyKey,
@@ -521,6 +522,9 @@ function openSettings() {
   settingsOpen = true;
   scroller?.scrollTo({ top: 0 });
 }
+
+/** A title of Request: its page comes with « Fiche et demande ». */
+function openRequestMedia(_media: MediaSummary, _viewer: Viewer | null) {}
 
 function openRequests() {
   opened = null;
@@ -1127,7 +1131,7 @@ $effect(() => {
         onOpenEpisode={openEpisode}
       />
     {:else if requestsOpen}
-      <RequestsTab />
+      <RequestsTab onOpenMedia={openRequestMedia} />
     {:else if settingsOpen}
       <Settings
         libraries={libraries ?? []}
