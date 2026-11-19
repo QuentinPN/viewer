@@ -16,6 +16,14 @@ class RequestViewsTest {
         MediaSummary(tmdbId = id, type = type, title = "T$id", embyItemId = embyItemId, blocked = blocked)
 
     @Test
+    fun readIsOfferedOnlyWhenEmbyHasTheTitle() {
+        assertEquals(EmbyTitle(MediaType.Movie, "51877"), embyTitle(MediaType.Movie, "51877"))
+        assertEquals(EmbyTitle(MediaType.Tv, "9"), embyTitle(MediaType.Tv, "9"))
+        assertNull(embyTitle(MediaType.Movie, null))
+        assertNull(embyTitle(MediaType.Tv, ""))
+    }
+
+    @Test
     fun segmentsAskForTheStatusesOfTheSpecInOneCommaSeparatedParameter() {
         assertEquals(emptyList<RequestStatus>(), StatusFilter.All.statuses)
         assertEquals(listOf(RequestStatus.Pending), StatusFilter.Pending.statuses)

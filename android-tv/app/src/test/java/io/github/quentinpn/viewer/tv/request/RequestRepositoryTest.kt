@@ -422,6 +422,81 @@ class RequestRepositoryTest {
         assertEquals(3, repo.cancel(102).events.size)
     }
 
+    /** `POST /api/requests` refuses tmdbId 403 (403) and 409 (409) with the server's message, else answers a RequestDetail. */
+    private fun serveWrites() {
+        accepts = { true }
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                seen += request
+                val body = request.body?.utf8().orEmpty()
+                return when (request.url.encodedPath) {
+                    "/api/version" -> json(200, fixture("version-ok"))
+                    "/api/auth/emby-token" -> exchangeOk(1)
+                    "/api/requests" -> when {
+                        "\"tmdbId\":403" in body -> json(403, fixture("error"))
+                        "\"tmdbId\":409" in body -> json(409, """{"error":"Quota de séries atteint"}""")
+                        else -> json(201, fixture("request-detail"))
+                    }
+                    "/api/requests/102/cancel" -> json(200, fixture("request-detail"))
+                    else -> json(404, fixture("error"))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun requestBodiesOnTheWire() = runBlocking {
+        serveWrites()
+        repo.request(NewRequest(MediaType.Movie, 603))
+        repo.request(NewRequest(MediaType.Tv, 1399, SeasonsChoice.Some(listOf(1, 2))))
+        repo.request(NewRequest(MediaType.Tv, 1399, SeasonsChoice.All))
+        val posts = calls("/api/requests").onEach { assertEquals("POST", it.method) }
+        assertEquals(
+            listOf(
+                """{"type":"movie","tmdbId":603}""",
+                """{"type":"tv","tmdbId":1399,"seasons":[1,2]}""",
+                """{"type":"tv","tmdbId":1399,"seasons":"all"}""",
+            ),
+            posts.map { it.body!!.utf8() },
+        )
+    }
+
+    @Test
+    fun quotaRefusalsShowTheServerMessage() {
+        serveWrites()
+        val forbidden = expectError { repo.request(NewRequest(MediaType.Movie, 403)) }
+        assertEquals("Quota de films atteint", (forbidden as RequestError.Forbidden).message)
+        val conflict = expectError { repo.request(NewRequest(MediaType.Tv, 409)) } as RequestError.Server
+        assertEquals(409, conflict.status)
+        assertEquals("Quota de séries atteint", conflict.message)
+    }
+
+    @Test
+    fun cancelPostsToTheRequest() = runBlocking {
+        serveWrites()
+        repo.cancel(102)
+        val cancel = calls("/api/requests/102/cancel").single()
+        assertEquals("POST", cancel.method)
+        assertEquals("Bearer tok-1", cancel.headers["Authorization"])
+    }
+
+    /** The Request code never logs, and nothing it prints or throws carries a token. */
+    @Test
+    fun tokenNeverInLoggedText() = runBlocking {
+        val sources = File("src/main/java/io/github/quentinpn/viewer/tv/request").walk().filter { it.isFile }.toList()
+        assertTrue(sources.isNotEmpty())
+        sources.forEach { assertFalse("${it.name} logs", Regex("""\bLog\.|println\(|printStackTrace""").containsMatchIn(it.readText())) }
+
+        serveWrites()
+        val refused = expectError { repo.request(NewRequest(MediaType.Movie, 403)) }
+        accepts = { false }
+        val rejected = expectError { repo.quota() }
+        val texts = listOf(refused.toString(), refused.message, rejected.toString(), rejected.message, repo.status().toString())
+        for (text in texts) {
+            for (secret in listOf("tok-1", "emby-secret-token", FIXTURE_TOKEN)) assertFalse("$secret in $text", secret in text)
+        }
+    }
+
     @Test
     fun statusTellsSignedOutFromNotConfigured() = runBlocking {
         store.address = null

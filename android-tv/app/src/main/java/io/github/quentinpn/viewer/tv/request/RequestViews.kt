@@ -75,6 +75,11 @@ fun eventLabel(type: String): String = when (type) {
     else -> type
 }
 
+/** The Emby title behind « Lire »: offered only when Request names its Emby item. */
+data class EmbyTitle(val type: MediaType, val id: String)
+
+fun embyTitle(type: MediaType, embyItemId: String?): EmbyTitle? = embyItemId?.takeIf { it.isNotEmpty() }?.let { EmbyTitle(type, it) }
+
 /** What a search offers to ask for: titles that are not in Emby yet (no `embyItemId`) and are not blocked. */
 fun toRequest(results: List<MediaSummary>): List<MediaSummary> =
     results.filter { it.embyItemId == null && it.blocked == null }.distinctBy { it.key() }

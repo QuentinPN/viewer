@@ -139,9 +139,7 @@ fun RequestsScreen(
     // A title, the list of requests or one request takes the whole screen
     if (status?.state == RequestState.Ready && page != null) {
         when (page) {
-            is RequestsPage.Media -> MediaTv(repository, memory, art, page, checkNotNull(status.viewer).capabilities) { title ->
-                title.embyItemId?.let { onOpenEmby(title.type, it) }
-            }
+            is RequestsPage.Media -> MediaTv(repository, memory, art, page, checkNotNull(status.viewer).capabilities) { onOpenEmby(it.type, it.id) }
             RequestsPage.Mine -> MyRequestsTv(repository, memory, art) { memory.open(RequestsPage.Detail(it.id), from = requestKey(it)) }
             is RequestsPage.Detail -> RequestDetailTv(repository, memory, art, page, onOpenEmby)
         }

@@ -44,10 +44,12 @@ import io.github.quentinpn.viewer.tv.ui.Load
 import io.github.quentinpn.viewer.tv.ui.Palette
 import io.github.quentinpn.viewer.tv.ui.Retry
 import io.github.quentinpn.viewer.tv.request.Capabilities
+import io.github.quentinpn.viewer.tv.request.EmbyTitle
 import io.github.quentinpn.viewer.tv.request.MediaDetails
 import io.github.quentinpn.viewer.tv.request.MediaType
 import io.github.quentinpn.viewer.tv.request.StatusLabel
 import io.github.quentinpn.viewer.tv.request.RequestRepository
+import io.github.quentinpn.viewer.tv.request.embyTitle
 import io.github.quentinpn.viewer.tv.request.mediaStatusLabel
 import kotlinx.coroutines.delay
 
@@ -79,7 +81,7 @@ internal fun MediaTv(
     page: RequestsPage.Media,
     capabilities: Capabilities,
     /** OK on « Lire »: the title's Emby page, by its Emby id. */
-    onPlay: (MediaDetails) -> Unit,
+    onPlay: (EmbyTitle) -> Unit,
 ) {
     var details by remember(page) { mutableStateOf<Load<MediaDetails>>(Load.Loading) }
     var attempt by remember(page) { mutableIntStateOf(0) }
@@ -124,10 +126,10 @@ internal fun MediaTv(
                         title.blocked?.let { Text("Ce titre est bloqué : il ne peut pas être demandé.", color = Palette.warning) }
                     }
                     Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        val read = title.embyItemId != null
-                        if (read) GlassButton(onClick = { onPlay(title) }, modifier = Modifier.focusRequester(first), height = BUTTON_HEIGHT) { Text("Lire") }
+                        val read = embyTitle(title.type, title.embyItemId)
+                        if (read != null) GlassButton(onClick = { onPlay(read) }, modifier = Modifier.focusRequester(first), height = BUTTON_HEIGHT) { Text("Lire") }
                         if (canAsk) {
-                            GlassButton(onClick = { asking = true }, modifier = if (read) Modifier else Modifier.focusRequester(first), height = BUTTON_HEIGHT) { Text("Demander") }
+                            GlassButton(onClick = { asking = true }, modifier = if (read != null) Modifier else Modifier.focusRequester(first), height = BUTTON_HEIGHT) { Text("Demander") }
                         } else {
                             Text(
                                 if (something && !asked) "Les demandes ne sont pas autorisées pour ton compte" else "Rien à demander",

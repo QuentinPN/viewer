@@ -1265,3 +1265,163 @@ fn real_server_probe() {
     block_on(emby.sign_out()).unwrap();
     println!("probe done");
 }
+
+// ---------------------------------------------------------------------------
+// Writes on the wire: request bodies, quota refusals, cancel (owner's list).
+// ---------------------------------------------------------------------------
+
+/// Fake Request accepting `tok-*` tokens: `POST /api/requests` refuses tmdbId 403
+/// (403) and 409 (409) with the server's `{"error":…}`, else answers a RequestDetail.
+fn writes_server() -> FakeServer {
+    FakeServer::start(Box::new(|r| match (r.method.as_str(), r.path.as_str()) {
+        (_, "/api/version") => Reply::json(200, fixture!("version-ok")),
+        (_, "/api/auth/emby-token") => {
+            Reply::json(200, &fixture!("emby-token").replace(FIXTURE_TOKEN, "tok-1"))
+        }
+        _ if bearer(r) != Some("tok-1") => Reply::json(401, r#"{"error":"Session invalide"}"#),
+        ("POST", "/api/requests") if r.body.contains("\"tmdbId\":403") => {
+            Reply::json(403, fixture!("error"))
+        }
+        ("POST", "/api/requests") if r.body.contains("\"tmdbId\":409") => {
+            Reply::json(409, r#"{"error":"Quota de séries atteint"}"#)
+        }
+        ("POST", "/api/requests") => Reply::json(201, fixture!("request-detail")),
+        ("POST", "/api/requests/102/cancel") => Reply::json(200, fixture!("request-detail")),
+        _ => Reply::empty(404),
+    }))
+}
+
+fn post_request(
+    ur: &RequestService,
+    new: &NewRequest,
+) -> Result<RequestDetail, RequestError> {
+    block_on(ur.send(
+        &identity(EMBY_USER),
+        Method::POST,
+        "/api/requests",
+        Some(new),
+    ))
+}
+
+#[test]
+fn request_bodies_on_the_wire() {
+    let server = writes_server();
+    let store = Arc::new(MemoryCredentialStore::default());
+    let ur = service(&store, Some(&server.url));
+    let sent = [
+        (MediaType::Movie, 603, None),
+        (MediaType::Tv, 1399, Some(SeasonsChoice::List(vec![1, 2]))),
+        (MediaType::Tv, 1399, Some(SeasonsChoice::All)),
+    ];
+    for (media_type, tmdb_id, seasons) in sent {
+        let new = NewRequest {
+            media_type,
+            tmdb_id,
+            seasons,
+        };
+        // The contract answers a RequestDetail: the timeline comes back with it.
+        assert_eq!(post_request(&ur, &new).unwrap().events.len(), 3);
+    }
+    let bodies: Vec<_> = server
+        .requests()
+        .into_iter()
+        .filter(|r| r.method == "POST" && r.path == "/api/requests")
+        .map(|r| r.body)
+        .collect();
+    assert_eq!(
+        bodies,
+        [
+            r#"{"type":"movie","tmdbId":603}"#,
+            r#"{"type":"tv","tmdbId":1399,"seasons":[1,2]}"#,
+            r#"{"type":"tv","tmdbId":1399,"seasons":"all"}"#,
+        ]
+    );
+}
+
+#[test]
+fn quota_refusals_show_the_server_message() {
+    let server = writes_server();
+    let store = Arc::new(MemoryCredentialStore::default());
+    let ur = service(&store, Some(&server.url));
+    let new = |tmdb_id| NewRequest {
+        media_type: MediaType::Movie,
+        tmdb_id,
+        seasons: None,
+    };
+    let forbidden = post_request(&ur, &new(403)).unwrap_err();
+    assert_eq!(forbidden.to_string(), "Quota de films atteint");
+    let conflict = post_request(&ur, &new(409)).unwrap_err();
+    assert_eq!(
+        conflict,
+        RequestError::Server {
+            status: 409,
+            message: "Quota de séries atteint".into()
+        }
+    );
+    assert_eq!(conflict.to_string(), "Quota de séries atteint");
+}
+
+#[test]
+fn cancel_posts_to_the_request() {
+    let server = writes_server();
+    let store = Arc::new(MemoryCredentialStore::default());
+    let ur = service(&store, Some(&server.url));
+    let detail: RequestDetail = block_on(ur.send::<(), _>(
+        &identity(EMBY_USER),
+        Method::POST,
+        "/api/requests/102/cancel",
+        None,
+    ))
+    .unwrap();
+    assert_eq!(detail.events.len(), 3);
+    let reqs = server.requests();
+    let cancel = reqs
+        .iter()
+        .find(|r| r.path == "/api/requests/102/cancel")
+        .unwrap();
+    assert_eq!(cancel.method, "POST");
+    assert_eq!(bearer(cancel), Some("tok-1"));
+}
+
+/// Nothing the client prints or logs carries a token: errors, statuses, the
+/// recorded Authorization header and the exchange answer once redacted.
+#[test]
+fn token_never_in_logged_text() {
+    let server = writes_server();
+    let store = Arc::new(MemoryCredentialStore::default());
+    let ur = service(&store, Some(&server.url));
+    let id = identity(EMBY_USER);
+    let err = post_request(
+        &ur,
+        &NewRequest {
+            media_type: MediaType::Movie,
+            tmdb_id: 403,
+            seasons: None,
+        },
+    )
+    .unwrap_err();
+    let status = block_on(ur.status(&id));
+    let reqs = server.requests();
+    let exchange = reqs
+        .iter()
+        .find(|r| r.path == "/api/auth/emby-token")
+        .unwrap();
+    let authorization = format!(
+        "Authorization: {}",
+        reqs.last().unwrap().authorization.as_deref().unwrap()
+    );
+    let texts = [
+        format!("{err:?}"),
+        err.to_string(),
+        format!("{status:?}"),
+        format!("{:?}", identity(EMBY_USER).emby_token),
+        crate::diagnostics::redact(&authorization),
+        crate::diagnostics::redact(&exchange.body),
+        crate::diagnostics::redact(fixture!("emby-token")),
+    ];
+    for text in texts {
+        for secret in ["tok-1", EMBY_TOKEN, FIXTURE_TOKEN] {
+            assert!(!text.contains(secret), "{secret} in {text}");
+        }
+    }
+}

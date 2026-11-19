@@ -61,6 +61,7 @@ import io.github.quentinpn.viewer.tv.request.RequestView
 import io.github.quentinpn.viewer.tv.request.StatusFilter
 import io.github.quentinpn.viewer.tv.request.Tone
 import io.github.quentinpn.viewer.tv.request.RequestRepository
+import io.github.quentinpn.viewer.tv.request.embyTitle
 import io.github.quentinpn.viewer.tv.request.eventLabel
 import io.github.quentinpn.viewer.tv.request.formatWhen
 import io.github.quentinpn.viewer.tv.request.requestLine
@@ -263,16 +264,16 @@ internal fun RequestDetailTv(
                         request.failureReason?.let { Text("Motif de l'échec : $it", color = Palette.danger) }
                         // The actions come before the timeline, which can be long: they stay on screen
                         Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            val embyId = media?.embyItemId
+                            val emby = embyTitle(request.type, media?.embyItemId)
                             val cancellable = request.status == RequestStatus.Pending
-                            if (embyId != null) Button(onClick = { onPlay(request.type, embyId) }, modifier = Modifier.focusRequester(first)) { Text("Lire") }
+                            if (emby != null) Button(onClick = { onPlay(emby.type, emby.id) }, modifier = Modifier.focusRequester(first)) { Text("Lire") }
                             if (cancellable) {
                                 OutlinedButton(
                                     onClick = {
                                         error = null
                                         confirming = true
                                     },
-                                    modifier = if (embyId == null) Modifier.focusRequester(first) else Modifier,
+                                    modifier = if (emby == null) Modifier.focusRequester(first) else Modifier,
                                 ) { Text("Annuler la demande") }
                             }
                         }
