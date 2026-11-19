@@ -234,7 +234,8 @@ impl RequestService {
         Ok(self.store.save(account, &AccessToken::new(value))?)
     }
 
-    /// Fails fast while a 429 is running.
+    /// Fails fast while a 429 of the exchange is running: only the exchange counts
+    /// against the shared failure limit, a 429 elsewhere concerns that call only.
     fn check_blocked(&self) -> Result<(), RequestError> {
         let mut guard = lock(&self.blocked_until);
         match *guard {
@@ -259,7 +260,6 @@ impl RequestService {
     /// Client of the configured address, its API version checked on first use and
     /// kept until the address changes.
     async fn client(&self) -> Result<Checked, RequestError> {
-        self.check_blocked()?;
         let address = self.address().ok_or(RequestError::NotConfigured)?;
         if let Some(c) = lock(&self.checked)
             .as_ref()
@@ -269,7 +269,7 @@ impl RequestService {
         }
         let url = Url::parse(&address).map_err(|_| RequestError::InvalidAddress)?;
         let client = RequestClient::new(&url, &self.version)?;
-        let version = self.note(client.version().await)?;
+        let version = client.version().await?;
         ensure_compatible(&version)?;
         let checked = Checked {
             address,
@@ -292,6 +292,10 @@ impl RequestService {
         failed: Option<&SessionToken>,
     ) -> Result<SessionToken, RequestError> {
         let key = id.account();
+        // First: a token left behind by a failed vault delete is never used.
+        if self.is_signed_out(&key) {
+            return Err(RequestError::SignedOut);
+        }
         if failed.is_none()
             && let Some(t) = self.load(&key)?
         {
@@ -337,14 +341,17 @@ impl RequestService {
         F: Fn(RequestClient, SessionToken) -> Fut,
         Fut: Future<Output = Result<T, RequestError>>,
     {
+        if self.is_signed_out(&id.account()) {
+            return Err(RequestError::SignedOut);
+        }
         let client = self.client().await?.client;
         let first = self.token(&client, id, None).await?;
-        match self.note(f(client.clone(), first.clone()).await) {
+        match f(client.clone(), first.clone()).await {
             Err(RequestError::Rejected(_)) => {}
             other => return other,
         }
         let second = self.token(&client, id, Some(&first)).await?;
-        match self.note(f(client, second.clone()).await) {
+        match f(client, second.clone()).await {
             Err(RequestError::Rejected(message)) => {
                 let _flight = self.exchange.lock().await;
                 if self.load(&id.account())?.as_ref() == Some(&second) {

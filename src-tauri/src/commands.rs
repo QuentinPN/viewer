@@ -232,10 +232,12 @@ pub async fn emby_sign_out(
     let ur_revocation = emby
         .current_user()
         .and_then(|u| ur.revocation_for(&u.server.id, &u.user_id));
+    // Revoked only once the Emby sign-out succeeded: a failed one keeps the session.
+    emby.sign_out().await?;
     if let Some(revocation) = ur_revocation {
         tauri::async_runtime::spawn(revocation.send());
     }
-    emby.sign_out().await
+    Ok(())
 }
 
 #[tauri::command]

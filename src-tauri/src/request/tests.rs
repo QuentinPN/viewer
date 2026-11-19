@@ -1081,3 +1081,65 @@ fn session_id_stays_one_path_segment() {
     assert_eq!(path_segment("../x?y=1"), "%2E%2E%2Fx%3Fy%3D1");
     assert_eq!(path_segment("é"), "%C3%A9");
 }
+
+/// A vault whose delete always fails.
+struct StickyStore(MemoryCredentialStore);
+
+impl CredentialStore for StickyStore {
+    fn save(&self, account: &str, token: &AccessToken) -> Result<(), crate::emby::EmbyError> {
+        self.0.save(account, token)
+    }
+    fn load(&self, account: &str) -> Result<Option<AccessToken>, crate::emby::EmbyError> {
+        self.0.load(account)
+    }
+    fn delete(&self, _: &str) -> Result<(), crate::emby::EmbyError> {
+        Err(crate::emby::EmbyError::CredentialStore("refus".into()))
+    }
+}
+
+#[test]
+fn sign_out_holds_when_the_vault_keeps_the_token() {
+    let (server, _) = request_like(|_| true);
+    let store = Arc::new(StickyStore(MemoryCredentialStore::default()));
+    let ur = RequestService::new(
+        Box::new(Arc::clone(&store)),
+        temp_settings(),
+        "PC-TEST".into(),
+        "9.9.9".into(),
+    );
+    ur.set_address(server.url.as_str()).unwrap();
+    let id = identity(EMBY_USER);
+    discover(&ur, &id).unwrap();
+    assert!(block_on(ur.sign_out(&id)).is_err());
+    let sent = server.requests().len();
+    assert_eq!(discover(&ur, &id).unwrap_err(), RequestError::SignedOut);
+    let img = UrImage::parse("/w342/abc.jpg").unwrap();
+    assert_eq!(
+        block_on(ur.image(&id, &img)).unwrap_err(),
+        RequestError::SignedOut
+    );
+    assert_eq!(server.requests().len(), sent, "no HTTP call after sign-out");
+}
+
+#[test]
+fn rate_limit_on_a_call_does_not_block_others() {
+    let hits = Arc::new(AtomicUsize::new(0));
+    let count = Arc::clone(&hits);
+    let server = FakeServer::start(Box::new(move |r| match r.path.as_str() {
+        "/api/version" => Reply::json(200, fixture!("version-ok")),
+        "/api/auth/emby-token" => Reply::json(200, fixture!("emby-token")),
+        _ if count.fetch_add(1, Ordering::SeqCst) == 0 => {
+            Reply::json(429, r#"{"error":"Trop"}"#).header("Retry-After", "300")
+        }
+        _ => Reply::json(200, fixture!("discover")),
+    }));
+    let store = Arc::new(MemoryCredentialStore::default());
+    let ur = service(&store, Some(&server.url));
+    let id = identity(EMBY_USER);
+    assert_eq!(
+        discover(&ur, &id).unwrap_err(),
+        RequestError::RateLimited { retry_after_s: 300 }
+    );
+    discover(&ur, &id).unwrap();
+    assert_eq!(hits.load(Ordering::SeqCst), 2);
+}

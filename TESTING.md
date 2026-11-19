@@ -6,6 +6,7 @@
 - Frontend (`verify:web`): `biome check .`, `svelte-check --fail-on-warnings`, `vitest run`, `vite build`.
 - Rust (`verify:rust`): `cargo fmt --all -- --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (manifest `src-tauri/Cargo.toml`). The libmpv engine test runs against `vendor/mpv/libmpv-2.dll` (or `VIEWER_LIBMPV`); set `VIEWER_REQUIRE_LIBMPV=1` to fail instead of skipping when it is missing (CI does).
 - Local MSVC workaround if `LNK1104 msvcrt.lib`: prefix with `scripts/with-msvc.ps1` (ADR 0001).
+- If scripts/with-msvc.ps1 fails (its pick, VS 18, has no `vcvars64.bat`), import `C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat` (`cmd /c "call ...vcvars64.bat >nul && set"`, then set each variable) and run `npm run verify:rust` in that environment; `vendor/mpv/libmpv-2.dll` must exist.
 - Windows packaging (ADR 0028): `./scripts/with-msvc.ps1 npx tauri build` builds the release app and the per-user NSIS installer `src-tauri/target/release/bundle/nsis/Viewer_<version>_x64-setup.exe`, with `libmpv-2.dll` beside the executable. The first build downloads NSIS and its Tauri plugin from GitHub, hash-checked by the Tauri CLI. `@tauri-apps/api` must stay on the `tauri` crate's minor, or the build stops. Build it after `npm run release -- <patch|minor|major|X.Y.Z>` (ADR 0032), so the installer carries the tagged version; `src/release/version.test.ts` fails when `package.json`, `package-lock.json`, `Cargo.toml` and `Cargo.lock` disagree.
 
 ## UI scenarios without taking the desktop (ADR 0006)
