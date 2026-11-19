@@ -1144,17 +1144,38 @@ fn rate_limit_on_a_call_does_not_block_others() {
     assert_eq!(hits.load(Ordering::SeqCst), 2);
 }
 
+/// `key=` of the gitignored debug.env at the root of the main checkout (found
+/// as scripts/gitea.ts does), or a panic naming the key. Never printed.
+fn debug_env(key: &str) -> String {
+    let dir = env!("CARGO_MANIFEST_DIR");
+    let out = std::process::Command::new("git")
+        .args(["rev-parse", "--git-common-dir"])
+        .current_dir(dir)
+        .output()
+        .expect("git rev-parse");
+    let common = std::path::Path::new(dir).join(String::from_utf8_lossy(&out.stdout).trim());
+    let file = common.join("..").join("debug.env");
+    let prefix = format!("{key}=");
+    std::fs::read_to_string(&file)
+        .ok()
+        .and_then(|s| {
+            s.lines()
+                .find_map(|l| l.strip_prefix(&prefix).map(|v| v.trim().to_string()))
+        })
+        .unwrap_or_else(|| panic!("{key} absent (environnement ou debug.env)"))
+}
+
 /// Real Request probe (task 2b), on demand only, read-only:
 /// `scripts/with-test-account.ps1 cargo test … real_server_probe -- --ignored --nocapture`
-/// with `VIEWER_UR_URL` (default `https://request.example.com:8445`) and optional
+/// with `VIEWER_UR_URL` (environment, else the gitignored `debug.env` at the root
+/// of the main checkout) and optional
 /// `VIEWER_UR_DUMP` (folder for the raw bodies). Creates no request.
 #[test]
 #[ignore = "needs the real Emby and Request servers and the test account"]
 fn real_server_probe() {
     use crate::emby::session::{EmbyService, SessionFile};
     let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} manquant"));
-    let ur_url =
-        std::env::var("VIEWER_UR_URL").unwrap_or_else(|_| "https://request.example.com:8445".into());
+    let ur_url = std::env::var("VIEWER_UR_URL").unwrap_or_else(|_| debug_env("VIEWER_UR_URL"));
     let dump = std::env::var_os("VIEWER_UR_DUMP").map(std::path::PathBuf::from);
     let path = temp_settings().with_file_name("session.json");
     SessionFile {

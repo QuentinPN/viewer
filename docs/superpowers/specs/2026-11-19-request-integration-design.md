@@ -26,7 +26,7 @@ Ma liste (`/api/watchlist`), cloche (`/api/notifications`), signalements, action
 
 ## Contrat (source de vérité)
 
-`contracts/request/openapi.json` = copie de `docs/openapi.json` d'Request `main` @ `54cd791` (OpenAPI 3.1, API 1.0.0) et `docs/API.md` § « Clients natifs ». Serveur réel vérifié : `https://request.example.com:8445/api/version` → `{"apiVersion":"1.0.0","features":["api.version","media.item-id","auth.emby-token","auth.bearer","auth.sessions"]}`, TLS valide.
+`contracts/request/openapi.json` = copie de `docs/openapi.json` d'Request `main` @ `54cd791` (OpenAPI 3.1, API 1.0.0) et `docs/API.md` § « Clients natifs ». Serveur réel vérifié, le serveur Request réel (adresse dans debug.env) : `/api/version` → `{"apiVersion":"1.0.0","features":["api.version","media.item-id","auth.emby-token","auth.bearer","auth.sessions"]}`, TLS valide.
 
 Règles du contrat retenues :
 

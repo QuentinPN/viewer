@@ -10,13 +10,16 @@
 // compared before and after. The debug app's request.json is moved aside at
 // the start (setup screen) and put back at the end; the Request session made
 // for the run is signed out (revoked) at the end, then Emby.
-// VIEWER_UR_URL overrides the Request address.
+// The Request address is VIEWER_UR_URL (environment, else debug.env). Before
+// each screenshot, every input or text showing it or the Emby address is
+// masked on screen only (the stored settings are untouched).
 import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { launch, root } from "./app.mjs";
 import {
   createReport,
+  debugEnv,
   libraryNav,
   signIn,
   signOut,
@@ -24,8 +27,12 @@ import {
   testAccount,
 } from "./scenario.mjs";
 
-const UR_URL = process.env.VIEWER_UR_URL ?? "https://request.example.com:8445";
+const UR_URL = debugEnv("VIEWER_UR_URL");
 const account = testAccount();
+/** Host names never shown in the evidence. */
+const hidden = [UR_URL, account.url]
+  .filter(Boolean)
+  .map((u) => new URL(u).hostname);
 const { check, finish } = createReport("requests-ui");
 const evidence = join(root, "docs", "evidence", "request");
 mkdirSync(evidence, { recursive: true });
@@ -41,8 +48,41 @@ const invoke = (page, cmd, args = {}) =>
     ([c, a]) => window.__TAURI_INTERNALS__.invoke(c, a),
     [cmd, args],
   );
-const shot = (page, name) =>
-  page.screenshot({ path: join(evidence, `${name}.png`) });
+/** Screenshot with the server addresses masked, then put back. */
+const shot = async (page, name) => {
+  await page.evaluate((hosts) => {
+    const has = (t) => hosts.some((h) => t?.includes(h));
+    window.__masked = [];
+    for (const input of document.querySelectorAll("input")) {
+      if (!has(input.value)) continue;
+      window.__masked.push(() =>
+        input.style.removeProperty("-webkit-text-security"),
+      );
+      input.style.setProperty("-webkit-text-security", "disc");
+    }
+    const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      if (!has(n.nodeValue)) continue;
+      const node = n;
+      const text = node.nodeValue;
+      window.__masked.push(() => {
+        node.nodeValue = text;
+      });
+      node.nodeValue = hosts.reduce(
+        (t, h) => t.replaceAll(h, "serveur.exemple.fr"),
+        text,
+      );
+    }
+  }, hidden);
+  try {
+    await page.screenshot({ path: join(evidence, `${name}.png`) });
+  } finally {
+    await page.evaluate(() => {
+      for (const undo of window.__masked ?? []) undo();
+      window.__masked = [];
+    });
+  }
+};
 const nav = (page, name) =>
   libraryNav(page).getByRole("button", { name, exact: true });
 const segment = (page, name) =>

@@ -1,9 +1,27 @@
 // Shared pieces of the CDP scenarios: asserted checks, numbered screenshots,
 // report.json, and the sign-in screen of the app.
-import { spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { runDir } from "./app.mjs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { root, runDir } from "./app.mjs";
+
+/** `key` from the environment, else from the gitignored debug.env at the root
+ * of the main checkout (as scripts/gitea.ts), else an error. Never printed. */
+export function debugEnv(key) {
+  if (process.env[key]) return process.env[key];
+  const common = execFileSync("git", ["rev-parse", "--git-common-dir"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
+  const env = resolve(root, common, "..", "debug.env");
+  const line = existsSync(env)
+    ? readFileSync(env, "utf8")
+        .split(/\r?\n/)
+        .find((l) => l.startsWith(`${key}=`))
+    : undefined;
+  if (!line) throw new Error(`${key} absent (environnement ou debug.env)`);
+  return line.slice(key.length + 1).trim();
+}
 
 /** Test account from run.ps1 (Windows Credential Manager). */
 export function testAccount() {

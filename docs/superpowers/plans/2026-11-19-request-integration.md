@@ -160,5 +160,5 @@
 
 - [ ] `ARCHITECTURE.md`, `DESIGN.md` (onglet Demander), `ROADMAP.md`, `TESTING.md` (fixtures partagées).
 - [ ] Versions (une seule montée : la fonctionnalité est livrée en un bloc) : desktop 1.5.0 (`package.json`, CHANGELOG), TV 1.4.0 (`versionCode` 9, CHANGELOG).
-- [ ] Essai réel desktop contre `https://request.example.com:8445` avec le compte de test (`debug.env`) : statut `ready`, Découvrir, fiche, quota ; **ne pas créer de demande réelle sans accord**. Sur la Shield : même parcours, puis désinstaller `io.github.quentinpn.viewer.tv.debug`.
+- [ ] Essai réel desktop contre le serveur Request réel (adresse dans debug.env) avec le compte de test (`debug.env`) : statut `ready`, Découvrir, fiche, quota ; **ne pas créer de demande réelle sans accord**. Sur la Shield : même parcours, puis désinstaller `io.github.quentinpn.viewer.tv.debug`.
 - [ ] Commit `Document the Request integration and bump versions`.
