@@ -41,8 +41,8 @@ internal class RequestsAccess(val repository: RequestRepository, private val sco
 
     private fun act(clear: Boolean = false, block: suspend () -> RequestLinkStatus) {
         if (busy) return
+        busy = true
         scope.launch {
-            busy = true
             error = null
             if (clear) status = null
             try {

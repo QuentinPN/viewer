@@ -31,10 +31,11 @@ class SeasonsTest {
 
     @Test
     fun aSeasonAiringAfterTodayIsNotRequestable() {
-        // Season 3 airs on 2025-03-01
-        assertEquals(listOf(2), requestableSeasons(series, "2025-02-28"))
-        assertEquals(listOf(2, 3), requestableSeasons(series, "2025-03-01"))
-        assertEquals(listOf(2, 3, 4), requestableSeasons(series, "2027-06-01"))
+        // Season 3 airs on 2024-01-18, season 2 (partial) on 2024-10-03, season 4 on 2027-10-08
+        assertEquals(emptyList<Int>(), requestableSeasons(series, "2024-01-17"))
+        assertEquals(listOf(3), requestableSeasons(series, "2024-01-18"))
+        assertEquals(listOf(2, 3), requestableSeasons(series, "2024-10-03"))
+        assertEquals(listOf(2, 3, 4), requestableSeasons(series, "2027-10-08"))
     }
 
     @Test
