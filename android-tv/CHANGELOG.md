@@ -2,6 +2,14 @@
 
 Chaque version livrée sur la Shield augmente `versionName` et `versionCode` dans `app/build.gradle.kts` et ajoute sa section ici.
 
+## 1.4.0 — 2026-11-19
+
+- Nouvel onglet « Demander » : « Découvrir », « Parcourir » (films et séries, avec tous les filtres), fiche d'un titre et demande d'un film ou de saisons choisies, à la télécommande (ADR 0125).
+- « Mes demandes » suit l'état de tes demandes ; la recherche propose « À demander » sous les résultats Emby.
+- Réglages › Demandes : adresse d'Request, état de la connexion, déconnexion.
+- Connexion sans mot de passe via ta session Emby ; il faut un serveur Request en API 1.x.
+- Test sur la Shield : en cours.
+
 ## 1.3.0 — 2026-11-14
 
 - Lecture liée avec l'ordi : quand l'ordi envoie un épisode à la TV, elle l'ouvre et suit sa lecture, en rattrapant l'écart par de petites variations de vitesse, inaudibles. Elle saute quand l'écart est grand (ADR 0123, 0124).
