@@ -8,6 +8,7 @@ mod spike;
 mod sync;
 mod system_info;
 mod updater;
+pub mod request;
 mod video_surface;
 
 use std::path::PathBuf;
@@ -106,23 +107,93 @@ fn resolve_libmpv() -> PathBuf {
     beside_exe.unwrap_or_default()
 }
 
+/// How this PC names itself to Emby and Request.
+fn device_name() -> String {
+    std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC Windows".into())
+}
+
+/// Token store shared by the Emby and Request services (ADR 0004, 0125).
+fn credential_store() -> Arc<dyn emby::credentials::CredentialStore> {
+    #[cfg(windows)]
+    return Arc::new(emby::credentials::WindowsCredentialStore);
+    #[cfg(not(windows))]
+    return Arc::new(emby::credentials::MemoryCredentialStore::default());
+}
+
+/// Request service (ADR 0125): address in the app config directory, artwork in
+/// the Emby artwork cache.
+fn request_service(
+    app: &tauri::App,
+    store: Box<dyn emby::credentials::CredentialStore>,
+    artwork: Option<Arc<emby::artwork_cache::ArtworkCache>>,
+) -> Result<request::service::RequestService, Box<dyn std::error::Error>> {
+    let path = app.path().app_config_dir()?.join("request.json");
+    Ok(request::service::RequestService::new(
+        store,
+        path,
+        device_name(),
+        env!("CARGO_PKG_VERSION").to_owned(),
+    )
+    .with_artwork_cache(artwork))
+}
+
+/// Serves `requestimg` requests (ADR 0125): only validated `/{size}/{file}` paths,
+/// fetched with the Request Bearer so the token never reaches the WebView.
+async fn request_image(
+    app: &tauri::AppHandle,
+    request: &tauri::http::Request<Vec<u8>>,
+) -> tauri::http::Response<Vec<u8>> {
+    use tauri::http::{Response, StatusCode, header};
+    use request::RequestError as E;
+    let reply = |status: StatusCode| {
+        Response::builder()
+            .status(status)
+            .body(Vec::new())
+            .unwrap_or_default()
+    };
+    let Some(req) = request::images::UrImage::parse(request.uri().path()) else {
+        return reply(StatusCode::BAD_REQUEST);
+    };
+    let emby = app.state::<emby::session::EmbyService>();
+    let result = match request::commands::identity(&emby) {
+        Ok(id) => {
+            app.state::<request::service::RequestService>()
+                .image(&id, &req)
+                .await
+        }
+        Err(e) => Err(e),
+    };
+    match result {
+        Ok((content_type, bytes)) => Response::builder()
+            .header(header::CONTENT_TYPE, content_type)
+            // TMDB file names change with the picture.
+            .header(header::CACHE_CONTROL, "max-age=31536000, immutable")
+            .body(bytes)
+            .unwrap_or_default(),
+        Err(e) => {
+            log::debug!("Request artwork not served: {}", e.kind());
+            reply(match e {
+                E::EmbySignedOut | E::SignedOut | E::Rejected(_) => StatusCode::UNAUTHORIZED,
+                E::NotFound(_) => StatusCode::NOT_FOUND,
+                E::NotConfigured | E::Forbidden(_) => StatusCode::FORBIDDEN,
+                E::RateLimited { .. } => StatusCode::TOO_MANY_REQUESTS,
+                _ => StatusCode::BAD_GATEWAY,
+            })
+        }
+    }
+}
+
 /// Emby session service: token in the OS credential store, metadata in the app
 /// config directory (ADR 0004).
 fn emby_service(
     app: &tauri::App,
+    store: Box<dyn emby::credentials::CredentialStore>,
 ) -> Result<emby::session::EmbyService, Box<dyn std::error::Error>> {
     let path = app.path().app_config_dir()?.join("session.json");
-    #[cfg(windows)]
-    let store: Box<dyn emby::credentials::CredentialStore> =
-        Box::new(emby::credentials::WindowsCredentialStore);
-    #[cfg(not(windows))]
-    let store: Box<dyn emby::credentials::CredentialStore> =
-        Box::new(emby::credentials::MemoryCredentialStore::default());
-    let device_name = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC Windows".into());
     let service = emby::session::EmbyService::new(
         store,
         path,
-        device_name,
+        device_name(),
         env!("CARGO_PKG_VERSION").to_owned(),
     );
     // Debug builds only: scripted UI tests (scripts/e2e) force a transcode with a
@@ -249,6 +320,15 @@ pub fn run() {
                 });
             },
         )
+        .register_asynchronous_uri_scheme_protocol(
+            request::images::SCHEME,
+            |ctx, request, responder| {
+                let app = ctx.app_handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    responder.respond(request_image(&app, &request).await);
+                });
+            },
+        )
         .setup(|app| {
             // First, so everything after it is logged (ADR 0033).
             let log_dir = log_dir(app);
@@ -284,7 +364,11 @@ pub fn run() {
             #[cfg(not(windows))]
             let wid = None;
 
-            app.manage(emby_service(app)?);
+            let store = credential_store();
+            let emby = emby_service(app, Box::new(Arc::clone(&store)))?;
+            let artwork = emby.artwork_cache();
+            app.manage(emby);
+            app.manage(request_service(app, Box::new(store), artwork)?);
             app.manage(emby::library_events::LibraryEvents::default());
             let linked = sync::SyncHandle::spawn(app.handle().clone());
             app.manage(linked.clone());
@@ -412,6 +496,22 @@ pub fn run() {
             commands::emby_change_quality,
             commands::emby_segments,
             commands::emby_chapters,
+            request::commands::ur_status,
+            request::commands::ur_set_address,
+            request::commands::ur_sign_in,
+            request::commands::ur_sign_out,
+            request::commands::ur_discover,
+            request::commands::ur_browse,
+            request::commands::ur_genres,
+            request::commands::ur_search,
+            request::commands::ur_media,
+            request::commands::ur_quota,
+            request::commands::ur_request,
+            request::commands::ur_my_requests,
+            request::commands::ur_request_detail,
+            request::commands::ur_cancel,
+            request::commands::ur_sessions,
+            request::commands::ur_revoke_session,
             diagnostics::diagnostics_open_log_dir,
             updater::app_update_pending,
             updater::app_update_install,

@@ -58,9 +58,10 @@ onMount(load);
   {:else}
     {@const q = quality}
     <div class="fields" aria-busy={saving ? "true" : undefined}>
-      <label class="field">
+      <label class="glass-field">
         <span>Réseau local</span>
         <select
+          class="glass-select"
           value={capValue(q.local)}
           onchange={(e) => change("local", e.currentTarget.value)}
         >
@@ -69,9 +70,10 @@ onMount(load);
           {/each}
         </select>
       </label>
-      <label class="field">
+      <label class="glass-field">
         <span>Accès distant</span>
         <select
+          class="glass-select"
           value={capValue(q.remote)}
           onchange={(e) => change("remote", e.currentTarget.value)}
         >
@@ -117,44 +119,13 @@ onMount(load);
     font-size: 13px;
     max-width: 60ch;
   }
+  .fields .glass-select {
+    min-width: 220px;
+  }
   .fields {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-4);
-  }
-  .field {
-    display: grid;
-    gap: 6px;
-    font-size: 12px;
-    color: var(--color-text-muted);
-  }
-  /* Glass control, as in the grid toolbar; the native list keeps the keyboard. */
-  .field select {
-    appearance: none;
-    min-width: 220px;
-    height: 38px;
-    padding: 0 36px 0 14px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23f5f5f7' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")
-        no-repeat right 14px center,
-      var(--fill-glass);
-    color: var(--color-text);
-    font: inherit;
-    font-size: 14px;
-    cursor: pointer;
-  }
-  .field select:hover {
-    background-color: var(--fill-glass-hover);
-  }
-  .field select option {
-    background: var(--color-elevated);
-    color: var(--color-text);
-  }
-  .field select:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
   }
   button {
     font: inherit;

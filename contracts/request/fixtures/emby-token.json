@@ -1,0 +1,30 @@
+{
+  "expiresAt": "2026-12-19T18:04:54.269Z",
+  "token": "ur_sess_EXEMPLE_NON_SECRET_0000000000000000",
+  "viewer": {
+    "avatarUrl": null,
+    "capabilities": {
+      "autoApprove4k": false,
+      "autoApproveMovies": false,
+      "autoApproveTv": false,
+      "canAdvancedRequest": false,
+      "canAutoRequestWatchlist": false,
+      "canManageBlocklist": false,
+      "canManageIssues": false,
+      "canManageRequests": false,
+      "canManageUsers": false,
+      "canRequest": true,
+      "canRequest4k": true,
+      "canRequestMovies": true,
+      "canRequestOnBehalf": false,
+      "canRequestQuotaExempt": false,
+      "canRequestTv": true,
+      "canViewStats": false,
+      "isOwner": false,
+      "quotaExempt": false
+    },
+    "id": "u_4f2a9c1e",
+    "name": "Camille",
+    "role": "member"
+  }
+}

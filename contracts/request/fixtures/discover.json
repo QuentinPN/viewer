@@ -1,0 +1,262 @@
+{
+  "layout": [
+    "trending",
+    "recent-requests",
+    "popular-movies",
+    "popular-tv",
+    "upcoming",
+    "emby-recent",
+    "providers",
+    "studios",
+    "networks"
+  ],
+  "rows": [
+    {
+      "id": "trending",
+      "items": [
+        {
+          "backdropPath": "/c7btGYblBnfAaw713WvFM0Kimc7.jpg",
+          "overview": "Ulysse, roi d'Ithaque, entreprend un périple périlleux pour regagner son royaume après la guerre de Troie. Alors qu'ils traversent la Méditerranée avec ses soldats, ils se retrouvent bientôt à lutter non seulement contre les éléments, mais aussi contre une multitude d'obstacles mortels et de créatures mythiques.",
+          "posterPath": "/jKf0p3fhO893ROvRuvuSDsZSvK6.jpg",
+          "title": "L'Odyssée",
+          "tmdbId": 1368337,
+          "type": "movie",
+          "year": 2026
+        },
+        {
+          "backdropPath": "/aqFZcr2dxSZ2UwWSo1WC6C0rwDf.jpg",
+          "overview": "Alors que le jour se lève sur les 50e Hunger Games annuels, la peur s'empare des districts de Panem. Cette année, en l'honneur du Quarter Quell, deux fois plus de tributs seront tirés au sort. Dans le District 12, Haymitch Abernathy essaie de ne pas trop penser à ses chances. Tout ce qui lui importe est d'être avec la fille qu'il aime. Mais lorsque qu'il est appelé, tous ses rêves s'effondrent. Il est arraché à sa famille et à son amour, transporté au Capitole avec les trois autres tributs du District 12 : une jeune amie qui est presque une sœur pour lui, un parieur compulsif, et la fille la plus prétentieuse de la ville. Alors que les Jeux commencent, Haymitch comprend qu'il a été piégé pour échouer. Mais il est prêt à se battre... et faire en sorte que ce combat résonne bien au-delà de l'arène.",
+          "posterPath": "/6lwqxIhsKsiz6PM4tzzScn3ok1d.jpg",
+          "title": "Hunger Games : Lever de soleil sur la moisson",
+          "tmdbId": 1300968,
+          "type": "movie",
+          "year": 2026
+        },
+        {
+          "backdropPath": "/rObL4of4eFA8yWaN9pRFo9aOVNi.jpg",
+          "overview": "Les Avengers, les Wakandais, les Quatre Fantastiques, les New Avengers et les X-Men, tous héros issus de trois univers distincts se retrouvent sur une trajectoire de collision mortelle et font face à une menace existentielle sans précédent, comme ils n'en ont jamais rencontré auparavant, le Docteur Doom.",
+          "posterPath": "/cCUxE6EJ9zi1YfdsxU8rWLgqQnN.jpg",
+          "title": "Avengers : Doomsday",
+          "tmdbId": 1003596,
+          "type": "movie",
+          "year": 2026
+        },
+        {
+          "backdropPath": "/m8JTMj7jDMJFZAPP1ASmSi4gMWi.jpg",
+          "overview": "L'incroyable histoire de Sam Bankman-Fried et de sa petite amie Caroline Ellison, deux jeunes idéalistes ambitieux et futés, qui ont monté une colossale fraude financière. A travers leur start-up FTX, une plateforme d'échange de cryptomonnaies, et son entreprise sœur Alameda Research, le couple a utilisé l'argent de leurs clients pour des investissements risqués.",
+          "posterPath": "/quIxbzWKHOQTvWj3OpFjEe7Ejl4.jpg",
+          "title": "The Altruists",
+          "tmdbId": 308007,
+          "type": "tv",
+          "year": 2026
+        }
+      ],
+      "title": "Tendances"
+    },
+    {
+      "id": "recent-requests",
+      "items": [
+        {
+          "backdropPath": "/wnwzPfGPyA1Kv536EQk6pmswJjw.jpg",
+          "overview": "Hugo, un garde du corps professionnel, traverse un divorce douloureux. Toujours épris de son ex-femme, il tente de préserver un lien avec ses enfants. Mais tout bascule le jour où il se rend à l’anniversaire de son fils : son ex-femme et leurs deux enfants sont kidnappés sous ses yeux.\n\nRapidement, l’enquête de police s’oriente vers Hugo, considéré comme le principal suspect. Accablé par les indices et menacé d’être incarcéré, il décide de s’évader pour retrouver sa famille. Dans sa fuite, il mène sa propre enquête et découvre des vérités troublantes sur la femme qu’il croyait connaître. Ce thriller psychologique et familial place Hugo dans une course contre la montre où chaque seconde compte.",
+          "posterPath": "/iVn6hqxdyJ8qjT61CfUuUtbDwVO.jpg",
+          "title": "La Cible",
+          "tmdbId": 299247,
+          "type": "tv",
+          "year": 2026
+        }
+      ],
+      "title": "Demandes récentes"
+    },
+    {
+      "id": "popular-movies",
+      "items": [
+        {
+          "backdropPath": "/c7btGYblBnfAaw713WvFM0Kimc7.jpg",
+          "overview": "Ulysse, roi d'Ithaque, entreprend un périple périlleux pour regagner son royaume après la guerre de Troie. Alors qu'ils traversent la Méditerranée avec ses soldats, ils se retrouvent bientôt à lutter non seulement contre les éléments, mais aussi contre une multitude d'obstacles mortels et de créatures mythiques.",
+          "posterPath": "/jKf0p3fhO893ROvRuvuSDsZSvK6.jpg",
+          "title": "L'Odyssée",
+          "tmdbId": 1368337,
+          "type": "movie",
+          "year": 2026
+        },
+        {
+          "backdropPath": "/yE766yhgg98tKwTKd8CyNvAtmn6.jpg",
+          "overview": "Après un terrible crash d'avion, James Belmont, ancien des forces spéciales, se retrouve perdu au cœur de l'Alaska avec son chien Odin, depuis toujours à ses côtés. Livrés à eux-mêmes dans une nature aussi magnifique qu'impitoyable, ils devront puiser dans leurs dernières forces pour survivre ensemble.",
+          "posterPath": "/4t1ASmI2IQEAoO8hirEGQ6nMEib.jpg",
+          "title": "Heart of the Beast",
+          "tmdbId": 1263337,
+          "type": "movie",
+          "year": 2026
+        },
+        {
+          "backdropPath": "/smZ8BT4Vzw4iCEppTLCnN8jNYtn.jpg",
+          "overview": "Une jeune fille, Bela, développe dans son foyer une relation avec une entité troublante qui ressemble étrangement à sa mère. Son « autre maman » n'est pas que le fruit de son imagination. Cette entité sinistre et manipulatrice a l'intention d'anéantir la famille de Bela.",
+          "posterPath": "/a6AztQlJvKy2tEOc10M7WXIF5gX.jpg",
+          "title": "Malfaisante",
+          "tmdbId": 1400837,
+          "type": "movie",
+          "year": 2026
+        },
+        {
+          "backdropPath": "/3icyRAqgakNcQn6aDVz9libFmBA.jpg",
+          "overview": "Bryan, un coursier médical, est en train d'effectuer une livraison lorsqu'une épidémie soudaine se déclare, le forçant à lutter pour sa survie.",
+          "posterPath": "/pICoWjcKSet6sA3yzxOkP8ChwYI.jpg",
+          "title": "Resident Evil",
+          "tmdbId": 1423191,
+          "type": "movie",
+          "year": 2026
+        }
+      ],
+      "title": "Films populaires",
+      "seeAll": {
+        "type": "movie",
+        "filters": {
+          "sort": "popularity",
+          "yearFrom": 2020,
+          "rating": 7
+        }
+      }
+    },
+    {
+      "id": "popular-tv",
+      "items": [
+        {
+          "backdropPath": "/rJFqKcmMSttdNP58l0dVzY2NcTA.jpg",
+          "overview": "Un mentaliste utilise ses extraordinaires dons d'observation pour résoudre des crimes en tant que consultant du CBI. Une façon pour lui de contribuer à la justice et de démasquer le mystérieux tueur en série qui a assassiné son épouse et sa fille…",
+          "posterPath": "/dGRoQRWjGac97wqp6WuLnRsZDpc.jpg",
+          "title": "Mentalist",
+          "tmdbId": 5920,
+          "type": "tv",
+          "year": 2008
+        },
+        {
+          "backdropPath": "/5G4Bnc4Q0YUK1bwLEUYmIsmm2Ib.jpg",
+          "overview": "À chaque saison, son histoire. American Horror Story nous embarque dans des récits à la fois poignants et cauchemardesques, mêlant la peur, le gore et le politiquement correct. De quoi vous confronter à vos plus grandes frayeurs !",
+          "posterPath": "/o6n7edVeJJFLPwd2pQdbiZ0b8wW.jpg",
+          "title": "American Horror Story",
+          "tmdbId": 1413,
+          "type": "tv",
+          "year": 2011
+        },
+        {
+          "backdropPath": "/jbTqU6BJMufoMnPSlO4ThrcXs3Y.jpg",
+          "overview": "La famille Griffin habite à Quahog, charmante petite bourgade américaine. Peter, le père, a érigé la fainéantise en philosophie de vie. Lois, la mère, est à la fois la femme au foyer bonne à tout faire et le cerveau de la famille. Chris, le fils, a hérité de son père ses formes généreuses et ses préoccupations favorites sont manger, surfer sur le web et manger. Megan, la fille, est l'archétype de l'adolescente en crise : elle ne s'aime pas et, en même temps, attend désespérément son prince. Stewie, le petit dernier, a pour ambition de conquérir le monde. Même Brian, le chien, est complètement fou, ou plutôt très intelligent : il parle, philosophe, débat… Bienvenue chez les Griffin !",
+          "posterPath": "/7nHl3OHUSTHgslQxJUzNSy9vxqo.jpg",
+          "title": "Les Griffin",
+          "tmdbId": 1434,
+          "type": "tv",
+          "year": 1999
+        },
+        {
+          "backdropPath": "/lirPqYLTtd6XZqGn4cS1wiesTq0.jpg",
+          "overview": "Deux frères, Sam et Dean Winchester, chasseurs de créatures surnaturelles, sillonnent les États-Unis à bord d'une Chevrolet Impala noire de 1967 et enquêtent sur des phénomènes paranormaux (souvent issus du folklore, des superstitions, mythes et légendes urbaines américaines, mais aussi des monstres surnaturels tels que les fantômes, loups-garous, démons, vampires…).",
+          "posterPath": "/iBR4U3MZelj5avBqqs1SJpIqArP.jpg",
+          "title": "Supernatural",
+          "tmdbId": 1622,
+          "type": "tv",
+          "year": 2005
+        }
+      ],
+      "title": "Séries populaires",
+      "seeAll": {
+        "type": "tv",
+        "filters": {
+          "genres": [18, 80]
+        }
+      }
+    },
+    {
+      "id": "upcoming",
+      "items": [
+        {
+          "backdropPath": "/rObL4of4eFA8yWaN9pRFo9aOVNi.jpg",
+          "overview": "Les Avengers, les Wakandais, les Quatre Fantastiques, les New Avengers et les X-Men, tous héros issus de trois univers distincts se retrouvent sur une trajectoire de collision mortelle et font face à une menace existentielle sans précédent, comme ils n'en ont jamais rencontré auparavant, le Docteur Doom.",
+          "posterPath": "/cCUxE6EJ9zi1YfdsxU8rWLgqQnN.jpg",
+          "title": "Avengers : Doomsday",
+          "tmdbId": 1003596,
+          "type": "movie",
+          "year": 2026
+        },
+        {
+          "backdropPath": "/bDsmYvrzto7xrEwqDpLC3SPhn9A.jpg",
+          "overview": "Espagne 1932, 1937, 2017. Trois hommes. Trois époques. Un même fil invisible de désir, de douleur et d'héritage. LA BOLA NEGRA traverse le temps pour révéler ce qui les unit.",
+          "posterPath": "/ttsFxxHKwCHrtAGJt58rpNqHdFw.jpg",
+          "title": "La bola negra",
+          "tmdbId": 1422041,
+          "type": "movie",
+          "year": 2026
+        },
+        {
+          "backdropPath": "/sl5NJ1vtyhP9Vr88bB4blULsJYp.jpg",
+          "overview": "Prue, une jeune fille courageuse, part à la recherche de son petit frère, enlevé et retenu dans la forêt interdite peuplée de créatures enchantées, d’alliés inattendus et d’adversaires redoutables. Ce qui débute comme une quête intime se transforme rapidement en une aventure spectaculaire aux enjeux colossaux, et c’est le destin de tout un monde caché qui dépend désormais de ses choix.",
+          "posterPath": "/shb3OmIQACcqhRvIcXuba26cP0l.jpg",
+          "title": "Wildwood : La prophétie de la forêt",
+          "tmdbId": 791523,
+          "type": "movie",
+          "year": 2026
+        },
+        {
+          "backdropPath": "/rrbbzCyS45yooXpUGJatfptlHYI.jpg",
+          "overview": "Trente-quatre jours avant son incarcération, Elizabeth Holmes, fondatrice tristement célèbre de la Silicon Valley, invite une équipe de tournage — d’abord sceptique — à documenter chacun de ses faits et gestes. Ce qui commence comme le portrait intime d’une criminelle énigmatique se transforme en une odyssée vertigineuse de trois ans, une plongée dans les abysses.",
+          "posterPath": "/7nG1AFxnrh5KtgH3jA4uIsWmX95.jpg",
+          "title": "You Can See Everything",
+          "tmdbId": 1765072,
+          "type": "movie",
+          "year": 2026
+        }
+      ],
+      "title": "Prochainement"
+    },
+    {
+      "id": "emby-recent",
+      "items": [
+        {
+          "backdropPath": "/k0aoy0vcLxpI8d6USLMM2qzhwsb.jpg",
+          "embyItemId": "50001",
+          "overview": "Akira Oda et ses camarades de lycée sont convoqués dans un autre monde ! Alors que les autres élèves se voient attribuer des pouvoirs spéciaux grâce à cette convocation, Akira n'obtient que les capacités d'un « assassin » médiocre. Cependant, son statut dépasse rapidement celui de « héros », la profession la plus puissante. Après avoir commencé à soupçonner le roi d'être à l'origine de cette convocation, Akira est injustement accusé d'un crime et contraint de fuir.",
+          "posterPath": "/lJDjKRSEWzEQGOM2x8MNLeIdPEV.jpg",
+          "status": "available",
+          "title": "My Status as an Assassin Obviously Exceeds the Hero's",
+          "tmdbId": 284644,
+          "type": "tv",
+          "year": 2025
+        },
+        {
+          "backdropPath": "/vPw5Gpg0YEEk1VsE8QlmyTxIJuU.jpg",
+          "embyItemId": "50002",
+          "overview": "Nous sommes en 1986 et la Grande-Bretagne est en plein essor. \"Rivals\" nous plonge la tête la première dans le monde impitoyable de la télévision, où les apparences et les ambitions sont plus importantes que tout et où les accords se négocient dans les salles de réunion, mais aussi sur l’oreiller. Personne ne sait qui sera vainqueur. Tout le monde ne pense qu’à soi-même. Le véritable amour pourra-t-il s'épanouir dans cette adaptation du roman à succès de Jilly Cooper, “Rutshire Chronicles“ ?",
+          "posterPath": "/bwFoHcbBOk5tbc5oGq8qBy0lVaJ.jpg",
+          "status": "available",
+          "title": "Rivals",
+          "tmdbId": 208921,
+          "type": "tv",
+          "year": 2024
+        },
+        {
+          "backdropPath": "/pLWdn8zZcljxHaVGiACNFVrYPMv.jpg",
+          "embyItemId": "50003",
+          "overview": "Kurt Rockhans est un garçon au grand cœur qui travaille comme coursier au sein d'un groupe de héros, le Flaming Dragon Fang. Un jour, il est pourtant banni car il possède le rang au combat le plus bas du groupe. Pour gagner sa vie, Kurt accepte divers emplois et découvre qu'il a des capacités étonnantes, voire extraordinaires, tant qu'elles ne relèvent pas du combat. Il entame alors un nouveau voyage.",
+          "posterPath": "/6DXiVYwgJeV3P1tvXEoOA5RSaOo.jpg",
+          "status": "available",
+          "title": "The Unaware Atelier Meister",
+          "tmdbId": 277881,
+          "type": "tv",
+          "year": 2025
+        },
+        {
+          "backdropPath": "/6yC53NuAwy8KhbzsrZ7NDFsSg2p.jpg",
+          "embyItemId": "50004",
+          "overview": "Monica Everett est la Silent Witch, seule au monde capable de manier la magie sans prononcer d'incantation. Cette véritable héroïne a repoussé à elle seule le dragon noir de la légende. Pourtant, la jeune prodige est en réalité... maladivement timide ! Elle a appris cette magie uniquement pour éviter de parler en public. Ignorant cela, les Sept Sages l'ont chargée d'une mission de la plus haute importance. Parviendra-t-elle à dépasser ses peurs et à s’infiltrer dans une école pour nobles afin de protéger le deuxième fils du roi ?",
+          "posterPath": "/7rsvPwbs2TACS8OpBwP3ZrtJfO4.jpg",
+          "status": "available",
+          "title": "Secrets of the Silent Witch",
+          "tmdbId": 281058,
+          "type": "tv",
+          "year": 2025
+        }
+      ],
+      "title": "Ajoutés récemment dans Emby"
+    }
+  ]
+}

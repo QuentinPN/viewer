@@ -2,6 +2,7 @@
 // One film or series in a library grid, opening its detail page. Artwork comes
 // ready from Rust (ADR 0005). Right-click, the context-menu key or the "…"
 // button open its menu (ADR 0100).
+import type { Snippet } from "svelte";
 import type { MediaItem } from "../emby/types";
 import { isMenuKey, type MenuContext, posterTarget } from "../menu/actions";
 import MoreButton from "../menu/MoreButton.svelte";
@@ -13,9 +14,11 @@ interface Props {
   item: MediaItem;
   onOpen: (item: MediaItem) => void;
   menuContext?: MenuContext;
+  /** Over the bottom left of the artwork, e.g. a request status (ADR 0125). */
+  badge?: Snippet;
 }
 
-let { item, onOpen, menuContext = "poster" }: Props = $props();
+let { item, onOpen, menuContext = "poster", badge }: Props = $props();
 
 const menu = useCardMenu();
 let card = $state<HTMLButtonElement | null>(null);
@@ -91,6 +94,7 @@ const initials = $derived(
           {item.unplayedCount}<span class="sr-only"> épisodes non vus</span>
         </span>
       {/if}
+      {#if badge}<span class="corner">{@render badge()}</span>{/if}
     </div>
     <span class="title">{item.name}</span>
     {#if subtitle}<span class="meta">{subtitle}</span>{/if}
@@ -192,6 +196,12 @@ const initials = $derived(
     stroke-width: 2.2;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+  .corner {
+    position: absolute;
+    left: var(--space-2);
+    bottom: var(--space-2);
+    max-width: calc(100% - 2 * var(--space-2));
   }
   .title {
     margin: 10px 0 0;

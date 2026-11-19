@@ -10,6 +10,8 @@ import type {
 } from "../emby/types";
 import WatchCard from "../home/WatchCard.svelte";
 import PosterCard from "../library/PosterCard.svelte";
+import SearchSection from "../requests/SearchSection.svelte";
+import type { MediaSummary, Viewer } from "../requests/types";
 import { isSearchable, resultsLabel, SEARCH_SHOWN } from "./query";
 
 interface Props {
@@ -22,10 +24,20 @@ interface Props {
   onRetry: () => void;
   onOpen: (item: MediaItem) => void;
   onOpenEpisode: (item: WatchItem) => void;
+  /** A title of « À demander · Request » opens its page. */
+  onOpenRequest: (media: MediaSummary, viewer: Viewer | null) => void;
 }
 
-let { query, results, loading, error, onRetry, onOpen, onOpenEpisode }: Props =
-  $props();
+let {
+  query,
+  results,
+  loading,
+  error,
+  onRetry,
+  onOpen,
+  onOpenEpisode,
+  onOpenRequest,
+}: Props = $props();
 
 const tooShort = $derived(!isSearchable(query));
 const empty = $derived(
@@ -125,6 +137,7 @@ const status = $derived.by(() => {
       {/if}
     </div>
   {/if}
+  <SearchSection {query} onOpen={onOpenRequest} />
 </section>
 
 <style>

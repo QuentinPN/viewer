@@ -99,6 +99,11 @@ impl EmbyClient {
         }
     }
 
+    /// Only for `EmbyService::exchange_identity` (ADR 0125).
+    pub(crate) fn access_token(&self) -> Option<&AccessToken> {
+        self.token.as_ref()
+    }
+
     pub fn server(&self) -> &ServerUrl {
         &self.server
     }

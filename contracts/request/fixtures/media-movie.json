@@ -1,0 +1,229 @@
+{
+  "backdropPath": "/c7btGYblBnfAaw713WvFM0Kimc7.jpg",
+  "cast": [
+    {
+      "character": "Odysseus",
+      "id": 1892,
+      "name": "Matt Damon",
+      "profilePath": "/aCvBXTAR9B1qRjIRzMBYhhbm1fR.jpg"
+    },
+    {
+      "character": "Telemachus",
+      "id": 1136406,
+      "name": "Tom Holland",
+      "profilePath": "/xKBAaPIa1c7tzZD3Y0MhBLv4hPE.jpg"
+    },
+    {
+      "character": "Penelope",
+      "id": 1813,
+      "name": "Anne Hathaway",
+      "profilePath": "/s6tflSD20MGz04ZR2R1lZvhmC4Y.jpg"
+    }
+  ],
+  "collection": null,
+  "crew": [
+    {
+      "id": 525,
+      "jobs": ["director", "writer"],
+      "name": "Christopher Nolan",
+      "profilePath": "/xuAIuYSmsUzKlUMBFGVZaWsY3DZ.jpg"
+    }
+  ],
+  "embyItemId": null,
+  "externalIds": {
+    "imdb": "tt33764258",
+    "tvdb": null
+  },
+  "genres": [
+    {
+      "id": 12,
+      "name": "Aventure"
+    },
+    {
+      "id": 28,
+      "name": "Action"
+    },
+    {
+      "id": 14,
+      "name": "Fantastique"
+    }
+  ],
+  "keywords": [
+    {
+      "id": 3799,
+      "name": "ship"
+    },
+    {
+      "id": 3265,
+      "name": "trojan war"
+    },
+    {
+      "id": 2036,
+      "name": "greek mythology"
+    },
+    {
+      "id": 12995,
+      "name": "historical fiction"
+    },
+    {
+      "id": 14704,
+      "name": "ancient world"
+    },
+    {
+      "id": 15060,
+      "name": "period drama"
+    },
+    {
+      "id": 41011,
+      "name": "based on song, poem or rhyme"
+    },
+    {
+      "id": 174378,
+      "name": "greek history"
+    },
+    {
+      "id": 181240,
+      "name": "voyage"
+    },
+    {
+      "id": 187305,
+      "name": "peplum"
+    },
+    {
+      "id": 189119,
+      "name": "ancient"
+    },
+    {
+      "id": 189601,
+      "name": "trojan horse"
+    },
+    {
+      "id": 208980,
+      "name": "mediterranean sea"
+    },
+    {
+      "id": 235616,
+      "name": "bronze age"
+    },
+    {
+      "id": 249756,
+      "name": "mythical"
+    },
+    {
+      "id": 311653,
+      "name": "odyssey"
+    },
+    {
+      "id": 317728,
+      "name": "sword and sandal"
+    },
+    {
+      "id": 375250,
+      "name": "epic fantasy"
+    }
+  ],
+  "originalLanguage": "en",
+  "overview": "Ulysse, roi d'Ithaque, entreprend un périple périlleux pour regagner son royaume après la guerre de Troie. Alors qu'ils traversent la Méditerranée avec ses soldats, ils se retrouvent bientôt à lutter non seulement contre les éléments, mais aussi contre une multitude d'obstacles mortels et de créatures mythiques.",
+  "posterPath": "/jKf0p3fhO893ROvRuvuSDsZSvK6.jpg",
+  "recommendations": [
+    {
+      "backdropPath": "/ZPcC5hJh21QiW0jmhMQhZeSoGu.jpg",
+      "overview": "Dans la Grèce antique, l'enlèvement d'Hélène, reine de Sparte, par Pâris, prince de Troie, est une insulte que le roi Ménélas ne peut supporter. L'honneur familial étant en jeu, Agamemnon, frère de Ménélas et puissant roi de Mycènes, réunit toutes les armées grecques afin de faire sortir Hélène de Troie. Mais en réalité, la sauvegarde de l'honneur familial n'est qu'un prétexte pris par Agamemnon pour cacher sa terrible avidité. Celui-ci cherche en fait à contrôler Troie et à agrandir son vaste empire. Aucune armée n'a jamais réussi à pénétrer dans la cité fortifiée, sur laquelle veillent le roi Priam et le prince Hector. L'issue de la guerre de Troie dépendra notamment d'un homme, Achille, connu comme le plus grand guerrier de son époque. Arrogant, rebelle, et réputé invincible, celui-ci n'a d'attache pour rien ni personne si ce n'est sa propre gloire…",
+      "posterPath": "/pkKBYrihVm5kuBgOH04KagSids0.jpg",
+      "title": "Troie",
+      "tmdbId": 652,
+      "type": "movie",
+      "year": 2004
+    },
+    {
+      "backdropPath": "/fNp2ikvY8WZTyVbK1iXW84RLbO5.jpg",
+      "overview": "Encore enfant, Conan assiste impuissant au massacre de ses parents par le cruel Thulsa Doom, et est réduit en esclavage. Enchaîné à la roue de douleur, il y acquiert une musculature peu commune qui lui permet, adulte, de gagner sa liberté comme lutteur. Désireux d’assouvir sa soif de vengeance, il part accompagné de deux voleurs, Subotai et Valeria, à la recherche de Thulsa Doom…",
+      "posterPath": "/qwnXGJCAMYrJ4KZo5d5zgCeMEjc.jpg",
+      "title": "Conan le barbare",
+      "tmdbId": 9387,
+      "type": "movie",
+      "year": 1982
+    },
+    {
+      "backdropPath": "/vbcUqIQZl7q7O2op2NT0ZqTLXxH.jpg",
+      "overview": "Dans la Grèce antique, Thésée, un jeune guerrier, va mener ses hommes à la bataille avec les dieux de l'Olympe pour tenter de repousser les Titans, anciens dieux primaires qui ont juré de détruire l'humanité.",
+      "posterPath": "/7ekXt7XQXktfqiLYQz2i15kk2nU.jpg",
+      "title": "Les Immortels",
+      "tmdbId": 37958,
+      "type": "movie",
+      "year": 2011
+    }
+  ],
+  "runtime": 173,
+  "seasons": [],
+  "similar": [
+    {
+      "backdropPath": "/sAiTihJ8bjEqg8nYUIlTQUnVXuj.jpg",
+      "overview": "Chaque année, depuis des siècles, se déroule l'Océan de Feu, une course de survie de 5 000 km à travers le désert arabe. En 1890, pour la première fois de l'histoire, un cheikh richissime invite un Américain et son cheval, Hidalgo, à participer à la course. Frank T. Hopkins, cow-boy et messager de la cavalerie américaine, est considéré comme le plus grand cavalier que n'ait jamais connu l'Ouest américain. Le cheikh désire opposer le cow-boy et son mustang aux plus grands chevaux arabes et aux meilleurs cavaliers bédouins. Certains parmi eux sont bien décidés à empêcher l'étranger de finir la course...",
+      "posterPath": "/3HHzAfV09miyaKrPwSQK1g6edka.jpg",
+      "title": "Hidalgo",
+      "tmdbId": 2023,
+      "type": "movie",
+      "year": 2004
+    },
+    {
+      "backdropPath": "/lIruQxRCxw5ZI3CmBL6VxwpKtUe.jpg",
+      "overview": "En ces temps lointains, les sauvages contrées du Nord de l'Europe étaient peuplées de héros et de monstres, et des hommes audacieux, taillés pour la lutte et les conquêtes, pouvaient encore se forger des destins d'exception. Le plus glorieux d'entre ces aventuriers fut le Viking Beowulf, qui surgit un beau jour pour sauver le vieux roi Hrothgar et ses sujets des assauts d'une féroce créature. Son nom devint vite légendaire à travers le royaume et, partout, l'on chanta sa bravoure face au maléfique Grendel. Beowulf ne devint pas seulement célèbre, mais riche. Et avec la richesse vinrent bientôt de dangereuses tentations et une inextinguible soif de pouvoir. Car le héros était aussi humain, trop humain, sans doute, et le guerrier plus avide, plus ambitieux et bien plus faillible qu'on ne l'imaginait...",
+      "posterPath": "/cq3FPhKCeCGI2XIbAgaUkiMbLsY.jpg",
+      "title": "La Légende de Beowulf",
+      "tmdbId": 2310,
+      "type": "movie",
+      "year": 2007
+    },
+    {
+      "backdropPath": "/ugVdGHicz21A3JjSctP1SlpF3e4.jpg",
+      "overview": "Sur l'île de l'obélisque, un séisme fait s'écrouler une immense statue, ce qui révèle une grande caverne. Alors que les scientifiques l’explorent, ils découvrent un bébé reptile à l'intérieur. La créature est rapatriée au Japon où elle subit des tests divers. C’est alors que les parents du reptile capturé commencent à attaquer le Japon à la recherche de leur enfant.",
+      "posterPath": "/hUPWFMLxWuo7EglgMRJUiefxGAb.jpg",
+      "title": "Gappa, le descendant de Godzilla",
+      "tmdbId": 2097,
+      "type": "movie",
+      "year": 1967
+    }
+  ],
+  "title": "L'Odyssée",
+  "tmdbId": 1368337,
+  "trailerKey": "9YGuN8sQpL0",
+  "type": "movie",
+  "watchProviders": {
+    "buy": [
+      {
+        "id": 2,
+        "logoPath": "/qdEGArH3lKfFnAtYXMkSYk5wxuG.png",
+        "name": "Apple TV Store"
+      },
+      {
+        "id": 35,
+        "logoPath": "/872dfVu1biZISJ8rO143CZZutPR.png",
+        "name": "Rakuten TV"
+      },
+      {
+        "id": 58,
+        "logoPath": "/51fX3l4yElitnfui0IkbMUmfmgF.png",
+        "name": "Canal VOD"
+      },
+      {
+        "id": 389,
+        "logoPath": "/a9ZXOebUSXGUFxTi3N36sA8wSSh.png",
+        "name": "Sooner"
+      },
+      {
+        "id": 10,
+        "logoPath": "/jn6TLbtaTZntTRX9UYucHJvpQx1.png",
+        "name": "Amazon Video"
+      },
+      {
+        "id": 2601,
+        "logoPath": "/zbXVTncv6m6ojLjPQJeW7u0SYKp.png",
+        "name": "Pathé Home"
+      }
+    ],
+    "flatrate": [],
+    "rent": []
+  },
+  "year": 2026
+}

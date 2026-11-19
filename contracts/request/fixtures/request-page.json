@@ -1,0 +1,130 @@
+{
+  "page": 1,
+  "totalPages": 1,
+  "results": [
+    {
+      "id": 101,
+      "type": "movie",
+      "tmdbId": 915935,
+      "status": "pending",
+      "seasons": [],
+      "requester": {
+        "id": "u_4f2a9c1e",
+        "name": "Camille",
+        "avatarUrl": null
+      },
+      "createdBy": null,
+      "quotaExempt": false,
+      "decidedBy": null,
+      "declineReason": null,
+      "qualityProfileId": null,
+      "rootFolder": null,
+      "seriesType": null,
+      "is4k": false,
+      "server": null,
+      "createdAt": "2026-11-15T20:12:00.000Z",
+      "updatedAt": "2026-11-16T08:30:00.000Z",
+      "media": {
+        "tmdbId": 915935,
+        "type": "movie",
+        "title": "Anatomie d'une chute",
+        "year": 2023,
+        "posterPath": "/kQs6keheMwCxJxrzV83VUwFtHkB.jpg",
+        "backdropPath": null,
+        "overview": "Une romancière est soupçonnée du meurtre de son mari.",
+        "status": "requested"
+      },
+      "failureReason": null
+    },
+    {
+      "id": 102,
+      "type": "tv",
+      "tmdbId": 94605,
+      "status": "approved",
+      "seasons": [3],
+      "requester": {
+        "id": "u_4f2a9c1e",
+        "name": "Camille",
+        "avatarUrl": null
+      },
+      "createdBy": null,
+      "quotaExempt": false,
+      "decidedBy": {
+        "id": "u_owner01",
+        "name": "Quentin",
+        "avatarUrl": null
+      },
+      "declineReason": null,
+      "qualityProfileId": null,
+      "rootFolder": null,
+      "seriesType": "standard",
+      "is4k": false,
+      "server": {
+        "id": 1,
+        "name": "Sonarr"
+      },
+      "createdAt": "2026-11-15T20:12:00.000Z",
+      "updatedAt": "2026-11-16T08:30:00.000Z",
+      "media": {
+        "tmdbId": 94605,
+        "type": "tv",
+        "title": "Arcane",
+        "year": 2021,
+        "posterPath": "/abf8tHznhSvl9BAElD2cQeRr7do.jpg",
+        "backdropPath": "/q8eejQcg1bAqImEV8jh8RtBD4uH.jpg",
+        "overview": "Dans les cités jumelles de Piltover et Zaun, deux sœurs s'affrontent.",
+        "status": "partial",
+        "progress": 0.5,
+        "embyItemId": "51877"
+      },
+      "failureReason": null
+    },
+    {
+      "id": 103,
+      "type": "movie",
+      "tmdbId": 603,
+      "status": "declined",
+      "seasons": [],
+      "requester": {
+        "id": "u_4f2a9c1e",
+        "name": "Camille",
+        "avatarUrl": null
+      },
+      "createdBy": null,
+      "quotaExempt": false,
+      "decidedBy": {
+        "id": "u_owner01",
+        "name": "Quentin",
+        "avatarUrl": null
+      },
+      "declineReason": "Déjà prévu dans une autre qualité",
+      "qualityProfileId": null,
+      "rootFolder": null,
+      "seriesType": null,
+      "is4k": false,
+      "server": null,
+      "createdAt": "2026-11-15T20:12:00.000Z",
+      "updatedAt": "2026-11-16T08:30:00.000Z",
+      "media": {
+        "tmdbId": 603,
+        "type": "movie",
+        "title": "Matrix",
+        "year": 1999,
+        "posterPath": "/2SUCAoJZc9NFpVJyuXThpqMbsnC.jpg",
+        "backdropPath": "/fNG7i7RqMErkcqhohV2a6cV1Ehy.jpg",
+        "overview": "Un hacker découvre la vérité sur son monde.",
+        "status": "declined"
+      },
+      "failureReason": null
+    }
+  ],
+  "totals": {
+    "pending": 1,
+    "approved": 1,
+    "declined": 1,
+    "cancelled": 0,
+    "sent": 0,
+    "failed": 0,
+    "available": 4
+  }
+}

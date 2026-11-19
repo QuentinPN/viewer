@@ -239,6 +239,11 @@ impl EmbyService {
         self
     }
 
+    /// The disk cache, shared with Request artwork (one quota, ADR 0125).
+    pub fn artwork_cache(&self) -> Option<Arc<ArtworkCache>> {
+        self.artwork.clone()
+    }
+
     pub async fn artwork_stats(&self) -> Option<ArtworkCacheStats> {
         let cache = Arc::clone(self.artwork.as_ref()?);
         tauri::async_runtime::spawn_blocking(move || cache.stats())
@@ -396,6 +401,29 @@ impl EmbyService {
             .as_ref()
             .map(|c| c.client.clone())
             .ok_or(EmbyError::NotSignedIn)
+    }
+
+    /// Server id, user id and token of the open session, traded for a Request
+    /// session (ADR 0125). The only way the Emby token leaves this service.
+    pub fn exchange_identity(&self) -> Result<(String, String, AccessToken), EmbyError> {
+        let guard = self.lock_current();
+        let c = guard.as_ref().ok_or(EmbyError::NotSignedIn)?;
+        let token = c.client.access_token().ok_or(EmbyError::NotSignedIn)?;
+        Ok((
+            c.user.server.id.clone(),
+            c.user.user_id.clone(),
+            token.clone(),
+        ))
+    }
+
+    /// The Request session of an Emby account ends with it (ADR 0125).
+    fn forget_request(&self, server_id: &str, user_id: &str) {
+        if let Err(e) = self
+            .store
+            .delete(&crate::request::account(server_id, user_id))
+        {
+            log::warn!("Request token not deleted: {}", e.kind());
+        }
     }
 
     fn session(&self) -> Result<(EmbyClient, String), EmbyError> {
@@ -1746,6 +1774,7 @@ impl EmbyService {
         // The token first: a vault failure leaves everything as it was.
         let token = self.store.load(&record.account()).ok().flatten();
         self.store.delete(&record.account())?;
+        self.forget_request(server_id, user_id);
         self.update_file(|f| {
             if f.session.as_ref().is_some_and(|r| r.is(server_id, user_id)) {
                 f.session = None;
@@ -1837,6 +1866,7 @@ impl EmbyService {
         if let Some(r) = &record {
             self.store
                 .delete(&credentials::account(&r.server_id, &r.user_id))?;
+            self.forget_request(&r.server_id, &r.user_id);
         }
         let evicted = self.update_file(|f| {
             f.session = None;
