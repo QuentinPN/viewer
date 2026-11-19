@@ -8,6 +8,7 @@ mod spike;
 mod sync;
 mod system_info;
 mod updater;
+pub mod request;
 mod video_surface;
 
 use std::path::PathBuf;
