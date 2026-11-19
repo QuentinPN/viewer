@@ -1,0 +1,127 @@
+{
+  "rows": [
+    {
+      "id": "trending",
+      "title": "Tendances",
+      "items": [
+        {
+          "tmdbId": 693134,
+          "type": "movie",
+          "title": "Dune : Deuxième partie",
+          "year": 2024,
+          "posterPath": "/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg",
+          "backdropPath": "/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg",
+          "overview": "Paul Atréides s'unit aux Fremen pour venger sa famille.",
+          "status": "available",
+          "embyItemId": "48213"
+        },
+        {
+          "tmdbId": 94605,
+          "type": "tv",
+          "title": "Arcane",
+          "year": 2021,
+          "posterPath": "/abf8tHznhSvl9BAElD2cQeRr7do.jpg",
+          "backdropPath": "/q8eejQcg1bAqImEV8jh8RtBD4uH.jpg",
+          "overview": "Dans les cités jumelles de Piltover et Zaun, deux sœurs s'affrontent.",
+          "status": "partial",
+          "progress": 0.5,
+          "embyItemId": "51877"
+        },
+        {
+          "tmdbId": 872585,
+          "type": "movie",
+          "title": "Oppenheimer",
+          "year": 2023,
+          "posterPath": "/AoiQwtGg1DmCJrFKCzSgY4gk8Tu.jpg",
+          "backdropPath": "/fm6KqXpk3M2HVveHwCrBSSBaO0V.jpg",
+          "overview": "Le physicien J. Robert Oppenheimer dirige le projet Manhattan."
+        }
+      ]
+    },
+    {
+      "id": "popular-movies",
+      "title": "Films populaires",
+      "items": [
+        {
+          "tmdbId": 915935,
+          "type": "movie",
+          "title": "Anatomie d'une chute",
+          "year": 2023,
+          "posterPath": "/kQs6keheMwCxJxrzV83VUwFtHkB.jpg",
+          "backdropPath": null,
+          "overview": "Une romancière est soupçonnée du meurtre de son mari.",
+          "status": "requested"
+        },
+        {
+          "tmdbId": 299534,
+          "type": "movie",
+          "title": "Avengers : Endgame",
+          "year": 2019,
+          "posterPath": "/ulzhLuWrPK07P1YkdWQLZnQh1JL.jpg",
+          "backdropPath": "/7RyHsO4yDXtBv1zUU3mTpHeQ0d5.jpg",
+          "overview": "Les Avengers tentent de défaire les effets du claquement de Thanos.",
+          "status": "pending"
+        },
+        {
+          "tmdbId": 1241982,
+          "type": "movie",
+          "title": "Vaiana 2",
+          "year": 2024,
+          "posterPath": "/yh64qw9mgXBvlaWDi7Q9tpUBAvH.jpg",
+          "backdropPath": null,
+          "overview": "Vaiana part pour les mers lointaines d'Océanie.",
+          "status": "downloading",
+          "progress": 0.42
+        }
+      ],
+      "seeAll": {
+        "type": "movie",
+        "filters": {
+          "sort": "popularity",
+          "yearFrom": 2020,
+          "rating": 7
+        }
+      }
+    },
+    {
+      "id": "popular-tv",
+      "title": "Séries populaires",
+      "items": [
+        {
+          "tmdbId": 96677,
+          "type": "tv",
+          "title": "Lupin",
+          "year": 2021,
+          "posterPath": "/sgxawbFB5Vi5OkPWQLNfl3dvkNJ.jpg",
+          "backdropPath": "/aJvnr3uKRZ34RRMXwPEUe0mvtL.jpg",
+          "overview": "Assane Diop venge son père en s'inspirant d'Arsène Lupin."
+        },
+        {
+          "tmdbId": 1396,
+          "type": "tv",
+          "title": "Breaking Bad",
+          "year": 2008,
+          "posterPath": "/ineLOBPG8AZsluYwnkMpHRyu7L.jpg",
+          "backdropPath": "/tsRy63Mu5cu8etL1X7ZLyf7UP1M.jpg",
+          "overview": "Un professeur de chimie se lance dans la fabrication de méthamphétamine.",
+          "blocked": {
+            "by": "keyword",
+            "keyword": "drogue"
+          }
+        }
+      ],
+      "seeAll": {
+        "type": "tv",
+        "filters": {
+          "genres": [18, 80]
+        }
+      }
+    },
+    {
+      "id": "empty",
+      "title": "Pour vous",
+      "items": []
+    }
+  ],
+  "layout": ["trending", "popular-movies", "popular-tv"]
+}

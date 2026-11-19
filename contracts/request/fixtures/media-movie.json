@@ -1,0 +1,93 @@
+{
+  "tmdbId": 872585,
+  "type": "movie",
+  "title": "Oppenheimer",
+  "year": 2023,
+  "posterPath": "/AoiQwtGg1DmCJrFKCzSgY4gk8Tu.jpg",
+  "backdropPath": "/fm6KqXpk3M2HVveHwCrBSSBaO0V.jpg",
+  "overview": "Le physicien J. Robert Oppenheimer dirige le projet Manhattan.",
+  "embyItemId": null,
+  "genres": [
+    {
+      "id": 18,
+      "name": "Drame"
+    },
+    {
+      "id": 36,
+      "name": "Histoire"
+    }
+  ],
+  "runtime": 181,
+  "seasons": [],
+  "cast": [
+    {
+      "id": 2037,
+      "name": "Cillian Murphy",
+      "character": "J. Robert Oppenheimer",
+      "profilePath": "/dm6V24NjjvjMiCtbMkcimuODx7B.jpg"
+    },
+    {
+      "id": 3,
+      "name": "Emily Blunt",
+      "character": "Kitty Oppenheimer",
+      "profilePath": null
+    }
+  ],
+  "crew": [
+    {
+      "id": 525,
+      "name": "Christopher Nolan",
+      "jobs": ["director", "writer"],
+      "profilePath": "/xuAIuYSmsUzKlUMBFGVZaWsY3DZ.jpg"
+    }
+  ],
+  "collection": null,
+  "trailerKey": "uYPbbksJxIg",
+  "watchProviders": {
+    "flatrate": [],
+    "rent": [
+      {
+        "id": 2,
+        "name": "Apple TV",
+        "logoPath": "/q6tl6Ib6X5FT80RMlcDbexIo4St.jpg"
+      }
+    ],
+    "buy": []
+  },
+  "recommendations": [
+    {
+      "tmdbId": 693134,
+      "type": "movie",
+      "title": "Dune : Deuxième partie",
+      "year": 2024,
+      "posterPath": "/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg",
+      "backdropPath": "/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg",
+      "overview": "Paul Atréides s'unit aux Fremen pour venger sa famille.",
+      "status": "available",
+      "embyItemId": "48213"
+    }
+  ],
+  "similar": [
+    {
+      "tmdbId": 915935,
+      "type": "movie",
+      "title": "Anatomie d'une chute",
+      "year": 2023,
+      "posterPath": "/kQs6keheMwCxJxrzV83VUwFtHkB.jpg",
+      "backdropPath": null,
+      "overview": "Une romancière est soupçonnée du meurtre de son mari.",
+      "status": "requested"
+    }
+  ],
+  "externalIds": {
+    "imdb": "tt15398776",
+    "tvdb": null
+  },
+  "keywords": [
+    {
+      "id": 6075,
+      "name": "bombe atomique"
+    }
+  ],
+  "originalLanguage": "en"
+}

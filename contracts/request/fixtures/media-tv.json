@@ -1,0 +1,123 @@
+{
+  "tmdbId": 94605,
+  "type": "tv",
+  "title": "Arcane",
+  "year": 2021,
+  "posterPath": "/abf8tHznhSvl9BAElD2cQeRr7do.jpg",
+  "backdropPath": "/q8eejQcg1bAqImEV8jh8RtBD4uH.jpg",
+  "overview": "Dans les cités jumelles de Piltover et Zaun, deux sœurs s'affrontent.",
+  "status": "partial",
+  "progress": 0.6,
+  "embyItemId": "51877",
+  "genres": [
+    {
+      "id": 16,
+      "name": "Animation"
+    },
+    {
+      "id": 10765,
+      "name": "Science-Fiction & Fantastique"
+    }
+  ],
+  "runtime": 42,
+  "seasons": [
+    {
+      "seasonNumber": 0,
+      "episodeCount": 3,
+      "airDate": "2021-11-20"
+    },
+    {
+      "seasonNumber": 1,
+      "episodeCount": 9,
+      "airDate": "2021-11-06",
+      "status": "available",
+      "episodes": {
+        "present": 9,
+        "expected": 9
+      }
+    },
+    {
+      "seasonNumber": 2,
+      "episodeCount": 9,
+      "airDate": "2024-11-09",
+      "status": "partial",
+      "progress": 0.6,
+      "episodes": {
+        "present": 5,
+        "expected": 9
+      }
+    },
+    {
+      "seasonNumber": 3,
+      "episodeCount": 8,
+      "airDate": "2025-03-01"
+    },
+    {
+      "seasonNumber": 4,
+      "episodeCount": 8,
+      "airDate": "2027-06-01"
+    },
+    {
+      "seasonNumber": 5,
+      "episodeCount": 10,
+      "airDate": null,
+      "status": "pending"
+    }
+  ],
+  "cast": [
+    {
+      "id": 1294,
+      "name": "Hailee Steinfeld",
+      "character": "Vi (voix)",
+      "profilePath": "/9eOJ6o6zZqBmZ2BjXnWNIZpl6vQ.jpg"
+    }
+  ],
+  "crew": [
+    {
+      "id": 2001,
+      "name": "Christian Linke",
+      "jobs": ["creator"],
+      "profilePath": null
+    }
+  ],
+  "collection": null,
+  "trailerKey": null,
+  "watchProviders": {
+    "flatrate": [
+      {
+        "id": 8,
+        "name": "Netflix",
+        "logoPath": "/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg"
+      }
+    ],
+    "rent": [],
+    "buy": []
+  },
+  "recommendations": [
+    {
+      "tmdbId": 96677,
+      "type": "tv",
+      "title": "Lupin",
+      "year": 2021,
+      "posterPath": "/sgxawbFB5Vi5OkPWQLNfl3dvkNJ.jpg",
+      "backdropPath": "/aJvnr3uKRZ34RRMXwPEUe0mvtL.jpg",
+      "overview": "Assane Diop venge son père en s'inspirant d'Arsène Lupin."
+    }
+  ],
+  "similar": [],
+  "externalIds": {
+    "imdb": "tt11126994",
+    "tvdb": 371028
+  },
+  "keywords": [
+    {
+      "id": 210024,
+      "name": "jeu vidéo"
+    }
+  ],
+  "originalLanguage": "en",
+  "lastAired": {
+    "seasonNumber": 2,
+    "episodeNumber": 9
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "page": 1,
+  "totalPages": 2,
+  "results": [
+    {
+      "tmdbId": 693134,
+      "type": "movie",
+      "title": "Dune : Deuxième partie",
+      "year": 2024,
+      "posterPath": "/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg",
+      "backdropPath": "/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg",
+      "overview": "Paul Atréides s'unit aux Fremen pour venger sa famille.",
+      "status": "available",
+      "embyItemId": "48213"
+    },
+    {
+      "tmdbId": 438631,
+      "type": "movie",
+      "title": "Dune",
+      "year": 2021,
+      "posterPath": "/qmuFqMnPrRpLWFTQ2RUVMYlfC7Z.jpg",
+      "backdropPath": "/jYEW5xZkZk2WTrdbMGAPFuBqbDc.jpg",
+      "overview": "Paul Atréides rejoint la planète Arrakis.",
+      "status": "available",
+      "embyItemId": "47102"
+    },
+    {
+      "tmdbId": 872585,
+      "type": "movie",
+      "title": "Oppenheimer",
+      "year": 2023,
+      "posterPath": "/AoiQwtGg1DmCJrFKCzSgY4gk8Tu.jpg",
+      "backdropPath": "/fm6KqXpk3M2HVveHwCrBSSBaO0V.jpg",
+      "overview": "Le physicien J. Robert Oppenheimer dirige le projet Manhattan."
+    }
+  ],
+  "people": [
+    {
+      "id": 1002,
+      "name": "Denis Villeneuve",
+      "profilePath": "/zdDx9Xs93UIrJFWYApYR28J8M6b.jpg",
+      "knownFor": ["Dune", "Blade Runner 2049", "Premier Contact"]
+    },
+    {
+      "id": 5555,
+      "name": "Zendaya",
+      "profilePath": null,
+      "knownFor": ["Euphoria"]
+    }
+  ]
+}

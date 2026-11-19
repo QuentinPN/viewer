@@ -1,0 +1,74 @@
+{
+  "id": 102,
+  "type": "tv",
+  "tmdbId": 94605,
+  "status": "approved",
+  "seasons": [3],
+  "requester": {
+    "id": "u_4f2a9c1e",
+    "name": "Camille",
+    "avatarUrl": null
+  },
+  "createdBy": null,
+  "quotaExempt": false,
+  "decidedBy": {
+    "id": "u_owner01",
+    "name": "Quentin",
+    "avatarUrl": null
+  },
+  "declineReason": null,
+  "qualityProfileId": null,
+  "rootFolder": null,
+  "seriesType": "standard",
+  "is4k": false,
+  "server": {
+    "id": 1,
+    "name": "Sonarr"
+  },
+  "createdAt": "2026-11-15T20:12:00.000Z",
+  "updatedAt": "2026-11-16T08:30:00.000Z",
+  "media": {
+    "tmdbId": 94605,
+    "type": "tv",
+    "title": "Arcane",
+    "year": 2021,
+    "posterPath": "/abf8tHznhSvl9BAElD2cQeRr7do.jpg",
+    "backdropPath": "/q8eejQcg1bAqImEV8jh8RtBD4uH.jpg",
+    "overview": "Dans les cités jumelles de Piltover et Zaun, deux sœurs s'affrontent.",
+    "status": "partial",
+    "progress": 0.5,
+    "embyItemId": "51877"
+  },
+  "failureReason": null,
+  "events": [
+    {
+      "id": 1,
+      "type": "requested",
+      "actor": {
+        "id": "u_4f2a9c1e",
+        "name": "Camille",
+        "avatarUrl": null
+      },
+      "detail": null,
+      "createdAt": "2026-11-15T20:12:00.000Z"
+    },
+    {
+      "id": 2,
+      "type": "approved",
+      "actor": {
+        "id": "u_owner01",
+        "name": "Quentin",
+        "avatarUrl": null
+      },
+      "detail": null,
+      "createdAt": "2026-11-16T08:30:00.000Z"
+    },
+    {
+      "id": 3,
+      "type": "sent",
+      "actor": null,
+      "detail": "Envoyé à Sonarr",
+      "createdAt": "2026-11-16T08:30:05.000Z"
+    }
+  ]
+}

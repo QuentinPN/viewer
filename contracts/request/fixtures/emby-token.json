@@ -1,0 +1,30 @@
+{
+  "token": "ur_sess_EXEMPLE_NON_SECRET_0000000000000000",
+  "expiresAt": "2026-12-19T10:15:00.000Z",
+  "viewer": {
+    "id": "u_4f2a9c1e",
+    "name": "Camille",
+    "role": "member",
+    "capabilities": {
+      "canRequestMovies": true,
+      "canRequestTv": true,
+      "canRequest4k": false,
+      "autoApproveMovies": false,
+      "autoApproveTv": false,
+      "autoApprove4k": false,
+      "canRequestOnBehalf": false,
+      "canRequestQuotaExempt": false,
+      "canAdvancedRequest": false,
+      "canAutoRequestWatchlist": false,
+      "canManageRequests": false,
+      "canManageIssues": false,
+      "canManageBlocklist": false,
+      "canViewStats": false,
+      "canManageUsers": false,
+      "canRequest": true,
+      "isOwner": false,
+      "quotaExempt": false
+    },
+    "avatarUrl": null
+  }
+}
