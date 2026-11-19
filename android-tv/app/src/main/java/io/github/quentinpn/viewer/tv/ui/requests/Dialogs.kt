@@ -6,9 +6,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -43,6 +48,7 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
+import io.github.quentinpn.viewer.tv.ui.GlassButton
 import io.github.quentinpn.viewer.tv.ui.Palette
 
 /** A centred card over the screen, on the pattern of the link picker; Back closes it. */
@@ -142,4 +148,30 @@ internal fun AddressDialog(
         }
     }
     FocusOnOpen(field)
+}
+
+/** A list to pick one entry from, opened on [selected]; OK picks and closes through [onPick]. */
+@Composable
+internal fun ChoiceDialog(title: String, labels: List<String>, selected: Int, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
+    val current = remember { FocusRequester() }
+    // A long list (the genres) opens around the current choice, which is then composed to take the focus
+    val list = remember { LazyListState(firstVisibleItemIndex = (selected - 2).coerceAtLeast(0)) }
+    DialogCard(title, onDismiss) {
+        LazyColumn(
+            Modifier.heightIn(max = 340.dp),
+            state = list,
+            contentPadding = PaddingValues(vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            itemsIndexed(labels) { index, label ->
+                GlassButton(
+                    onClick = { onPick(index) },
+                    selected = index == selected,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = (if (index == selected) Modifier.focusRequester(current) else Modifier).fillMaxWidth(),
+                ) { Text(label, fontSize = 14.sp, maxLines = 1) }
+            }
+        }
+    }
+    FocusOnOpen(current)
 }

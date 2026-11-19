@@ -145,6 +145,7 @@ class MainActivity : ComponentActivity() {
                     var settings by remember(current) { mutableStateOf(false) }
                     // The Demander tab (ADR 0125): its state outlives a film or series page opened from it
                     var requests by remember(current) { mutableStateOf<RequestsMemory?>(null) }
+                    val requestImages = remember(current) { AppServices.requestImages(this) }
                     val libraryPrefs = remember(current) { LibraryPreferenceStore(this, current.userId) }
                     val settingsStore = remember(current) { PlaybackSettingsStore(this, current.userId) }
                     val homeRows = remember(current) { HomeRowStore(this, current.userId) }
@@ -400,7 +401,7 @@ class MainActivity : ComponentActivity() {
                     }
                     val openRequests = requests
                     if (openRequests != null) {
-                        RequestsScreen(AppServices.requests(this), openRequests, onClose = { requests = null })
+                        RequestsScreen(AppServices.requests(this), openRequests, requestImages, onClose = { requests = null })
                         return@ViewerTheme
                     }
                     // Also under the film and series pages: Back from them returns to the results

@@ -2,20 +2,37 @@ package io.github.quentinpn.viewer.tv.ui.requests
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import coil3.ImageLoader
 import io.github.quentinpn.viewer.tv.ui.Centered
+import io.github.quentinpn.viewer.tv.ui.GlassButton
+import io.github.quentinpn.viewer.tv.ui.Load
 import io.github.quentinpn.viewer.tv.ui.Palette
+import io.github.quentinpn.viewer.tv.request.DiscoverRow
+import io.github.quentinpn.viewer.tv.request.MediaSummary
+import io.github.quentinpn.viewer.tv.request.MediaType
+import io.github.quentinpn.viewer.tv.request.RequestView
+import io.github.quentinpn.viewer.tv.request.SeeAll
 import io.github.quentinpn.viewer.tv.request.RequestRepository
 import io.github.quentinpn.viewer.tv.request.RequestState
 
@@ -24,18 +41,58 @@ internal enum class RequestsSegment(val label: String) {
     Discover("Découvrir"),
     Films("Films"),
     Series("Séries"),
-    Mine("Mes demandes"),
 }
 
 /**
  * State of the Demander tab that outlives a film or series page opened from it (« Lire »), so
- * Back comes back to the same segment. Everything is read again when the tab is opened anew.
+ * Back comes back to the same segment, scroll and card. Everything is read again when the tab is opened anew.
  */
 class RequestsMemory {
     internal var segment by mutableStateOf(RequestsSegment.Discover)
 
     /** Bumped after a request or a cancellation: what shows requests (badges, strip, count) is read again. */
     internal var revision by mutableIntStateOf(0)
+
+    internal var discover by mutableStateOf<Load<List<DiscoverRow>>>(Load.Loading)
+    internal var inFlight by mutableStateOf<List<RequestView>>(emptyList())
+
+    /** Revision and retry the discover rows were read under: shown again as they are, nothing is read. */
+    internal var discoverStamp: Pair<Int, Int>? = null
+    internal val discoverColumn = LazyListState()
+    internal val discoverRows = mutableMapOf<String, LazyListState>()
+    internal val browse = mutableMapOf<MediaType, BrowseState>()
+
+    /** True once a « Tout voir » opened a grid: Back goes to Découvrir before leaving the tab. */
+    internal var fromSeeAll = false
+
+    /** Key of the card last opened: it takes the focus back on return. */
+    internal var opened: String? = null
+
+    /** « Tout voir » of a row: the grid of its type, on its filters. */
+    internal fun openBrowse(seeAll: SeeAll) {
+        browse[seeAll.type] = BrowseState(seeAll.type, seeAll.filters).also { it.stamp = -1 }
+        segment = if (seeAll.type == MediaType.Movie) RequestsSegment.Films else RequestsSegment.Series
+        fromSeeAll = true
+    }
+
+    internal fun select(next: RequestsSegment) {
+        segment = next
+        fromSeeAll = false
+    }
+}
+
+/** The card [RequestsMemory.opened] takes the focus once [ready], then the memory forgets it. */
+@Composable
+internal fun FocusRestore(memory: RequestsMemory, ready: Boolean, target: FocusRequester) {
+    LaunchedEffect(ready) {
+        if (!ready || memory.opened == null) return@LaunchedEffect
+        // One frame for the list to place the card, a second for its requester to be attached
+        repeat(2) {
+            withFrameNanos {}
+            runCatching { target.requestFocus() }
+        }
+        memory.opened = null
+    }
 }
 
 /**
@@ -43,8 +100,10 @@ class RequestsMemory {
  * closes the tab; the levels inside it (a title, a request) handle Back before it.
  */
 @Composable
-fun RequestsScreen(repository: RequestRepository, memory: RequestsMemory, onClose: () -> Unit) {
-    BackHandler(onBack = onClose)
+fun RequestsScreen(repository: RequestRepository, memory: RequestsMemory, images: ImageLoader, onClose: () -> Unit) {
+    BackHandler {
+        if (memory.fromSeeAll) memory.select(RequestsSegment.Discover) else onClose()
+    }
     val access = rememberRequestsAccess(repository)
     Column(Modifier.fillMaxSize().background(Palette.background)) {
         Text(
@@ -56,12 +115,38 @@ fun RequestsScreen(repository: RequestRepository, memory: RequestsMemory, onClos
         val status = access.status
         when {
             status == null -> Centered("Connexion à Request…")
-            status.state == RequestState.Ready -> Text(
-                stateLine(status),
-                color = Palette.textSecondary,
-                modifier = Modifier.padding(horizontal = 48.dp),
-            )
+            status.state == RequestState.Ready -> {
+                val art = remember(images, status.address) { RequestArt(images, repository.origin()) }
+                RequestsSegments(repository, memory, art)
+            }
             else -> RequestsSetupTv(status, access)
         }
+    }
+}
+
+@Composable
+private fun RequestsSegments(repository: RequestRepository, memory: RequestsMemory, art: RequestArt) {
+    val first = remember { FocusRequester() }
+    // The selected segment takes the focus when the tab opens, unless a card is to get it back
+    LaunchedEffect(Unit) {
+        if (memory.opened != null) return@LaunchedEffect
+        withFrameNanos {}
+        runCatching { first.requestFocus() }
+    }
+    Row(Modifier.padding(horizontal = 48.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        for (segment in RequestsSegment.entries) {
+            GlassButton(
+                onClick = { memory.select(segment) },
+                selected = segment == memory.segment,
+                modifier = if (segment == memory.segment) Modifier.focusRequester(first) else Modifier,
+            ) { Text(segment.label, fontSize = 14.sp, maxLines = 1) }
+        }
+    }
+    // A title opens on its page (see MediaTv); until then OK remembers the card, so Back finds it again
+    val open: (MediaSummary) -> Unit = { }
+    when (memory.segment) {
+        RequestsSegment.Discover -> DiscoverTv(repository, memory, art, open, memory::openBrowse, onOpenRequest = {})
+        RequestsSegment.Films -> BrowseTv(repository, memory, MediaType.Movie, art, open)
+        RequestsSegment.Series -> BrowseTv(repository, memory, MediaType.Tv, art, open)
     }
 }
