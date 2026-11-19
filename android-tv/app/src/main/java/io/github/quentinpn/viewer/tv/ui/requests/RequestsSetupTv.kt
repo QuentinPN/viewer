@@ -18,10 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
+import io.github.quentinpn.viewer.tv.ui.GlassButton
 import io.github.quentinpn.viewer.tv.ui.Palette
 import io.github.quentinpn.viewer.tv.request.RequestState
 import io.github.quentinpn.viewer.tv.request.RequestLinkStatus
@@ -54,12 +53,12 @@ internal fun RequestsSetupTv(status: RequestLinkStatus, access: RequestsAccess) 
                             "ton compte Emby sert de connexion, aucun mot de passe à saisir.",
                         color = Palette.textSecondary,
                     )
-                    Button(onClick = change, modifier = Modifier.focusRequester(first)) { Text("Se connecter") }
+                    GlassButton(onClick = change, modifier = Modifier.focusRequester(first), height = BUTTON_HEIGHT) { Text("Se connecter") }
                 }
                 RequestState.SignedOut -> {
                     Heading("Tu es déconnecté d'Request")
                     Text("Se reconnecter utilise ton compte Emby, sans mot de passe.", color = Palette.textSecondary)
-                    Button(onClick = access::signIn, enabled = !access.busy, modifier = Modifier.focusRequester(first)) {
+                    GlassButton(onClick = access::signIn, enabled = !access.busy, modifier = Modifier.focusRequester(first), height = BUTTON_HEIGHT) {
                         Text(if (access.busy) "Connexion…" else "Se connecter")
                     }
                 }
@@ -109,7 +108,7 @@ private fun Heading(text: String) {
 @Composable
 private fun Retry(access: RequestsAccess, first: FocusRequester, onChangeAddress: () -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Button(onClick = access::refresh, enabled = !access.busy, modifier = Modifier.focusRequester(first)) { Text("Réessayer") }
-        OutlinedButton(onClick = onChangeAddress) { Text("Changer d'adresse") }
+        GlassButton(onClick = access::refresh, enabled = !access.busy, modifier = Modifier.focusRequester(first), height = BUTTON_HEIGHT) { Text("Réessayer") }
+        GlassButton(onClick = onChangeAddress, height = BUTTON_HEIGHT) { Text("Changer d'adresse") }
     }
 }

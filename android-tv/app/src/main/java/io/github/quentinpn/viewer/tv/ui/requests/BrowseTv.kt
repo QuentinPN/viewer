@@ -97,6 +97,8 @@ internal fun BrowseTv(
     memory: RequestsMemory,
     type: MediaType,
     art: RequestArt,
+    /** The first filter pill: where Down from the segments lands. */
+    firstPill: FocusRequester,
     onOpen: (MediaSummary) -> Unit,
 ) {
     val state = memory.browse.getOrPut(type) { BrowseState(type) }
@@ -136,7 +138,7 @@ internal fun BrowseTv(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val f = state.filters
-            FilterPill("Tri : ${sortLabel(f)}") { choosing = Pill.Sort }
+            FilterPill("Tri : ${sortLabel(f)}", Modifier.focusRequester(firstPill)) { choosing = Pill.Sort }
             FilterPill("Genre : ${genreLabel(f, genres)}", enabled = state.genres != null) { choosing = Pill.Genre }
             FilterPill("Années : ${yearsLabel(f)}") { choosing = Pill.Years }
             FilterPill("Note : ${ratingLabel(f)}") { choosing = Pill.Rating }
@@ -200,6 +202,6 @@ internal fun BrowseTv(
 }
 
 @Composable
-private fun FilterPill(text: String, enabled: Boolean = true, onClick: () -> Unit) {
-    GlassButton(onClick = onClick, enabled = enabled) { Text(text, fontSize = 14.sp, maxLines = 1) }
+private fun FilterPill(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
+    GlassButton(onClick = onClick, modifier = modifier, enabled = enabled) { Text(text, fontSize = 14.sp, maxLines = 1) }
 }

@@ -1,6 +1,8 @@
 package io.github.quentinpn.viewer.tv.ui.requests
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,16 +29,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import io.github.quentinpn.viewer.tv.ui.Centered
+import io.github.quentinpn.viewer.tv.ui.GlassButton
 import io.github.quentinpn.viewer.tv.ui.Load
 import io.github.quentinpn.viewer.tv.ui.Palette
 import io.github.quentinpn.viewer.tv.ui.Retry
@@ -122,9 +125,9 @@ internal fun MediaTv(
                     }
                     Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         val read = title.embyItemId != null
-                        if (read) Button(onClick = { onPlay(title) }, modifier = Modifier.focusRequester(first)) { Text("Lire") }
+                        if (read) GlassButton(onClick = { onPlay(title) }, modifier = Modifier.focusRequester(first), height = BUTTON_HEIGHT) { Text("Lire") }
                         if (canAsk) {
-                            Button(onClick = { asking = true }, modifier = if (read) Modifier else Modifier.focusRequester(first)) { Text("Demander") }
+                            GlassButton(onClick = { asking = true }, modifier = if (read) Modifier else Modifier.focusRequester(first), height = BUTTON_HEIGHT) { Text("Demander") }
                         } else {
                             Text(
                                 if (something && !asked) "Les demandes ne sont pas autorisées pour ton compte" else "Rien à demander",
@@ -209,10 +212,16 @@ private const val SEASON_PILLS = 6
 @Composable
 private fun CastRowTv(title: MediaDetails, art: RequestArt) {
     if (title.cast.isEmpty()) return
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
         items(title.cast.distinctBy { it.id }.take(CAST_SHOWN), key = { it.id }) { person ->
             Column(Modifier.width(72.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Box(Modifier.size(56.dp).clip(CircleShape).background(Palette.surfaceRaised)) {
+                // Read-only, but on the focus path so the row can be reached: the accent ring says where it is
+                var focused by remember { mutableStateOf(false) }
+                Box(
+                    Modifier.size(56.dp).onFocusChanged { focused = it.isFocused }.focusable()
+                        .border(3.dp, if (focused) Palette.accent else Color.Transparent, CircleShape)
+                        .padding(3.dp).clip(CircleShape).background(Palette.surfaceRaised),
+                ) {
                     RequestImage(art, person.profilePath, "w185", Modifier.fillMaxSize())
                 }
                 Text(person.name, color = Palette.text, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)

@@ -65,6 +65,9 @@ internal fun DialogCard(title: String, onDismiss: () -> Unit, width: Dp = 460.dp
     }
 }
 
+/** Height of the action buttons of the Demander pages and dialogs (the filter pills keep GlassButton's 36 dp). */
+internal val BUTTON_HEIGHT = 44.dp
+
 /** Takes the focus once laid out, one frame later. */
 @Composable
 internal fun FocusOnOpen(target: FocusRequester, key: Any? = Unit) {

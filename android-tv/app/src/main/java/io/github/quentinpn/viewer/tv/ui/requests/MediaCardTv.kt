@@ -48,7 +48,8 @@ internal fun MediaCardTv(
 ) {
     val shape = RoundedCornerShape(10.dp)
     val still = reducedMotion()
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+    // 10 dp under the poster: the focused one's scale and ring then stay clear of its caption
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Card(
             onClick = onClick,
             modifier = modifier.fillMaxWidth().aspectRatio(2f / 3f).onFocusChanged { if (it.isFocused) onFocused() },

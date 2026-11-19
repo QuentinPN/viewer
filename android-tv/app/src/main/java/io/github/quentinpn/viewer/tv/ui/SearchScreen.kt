@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -26,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -76,6 +78,7 @@ import io.github.quentinpn.viewer.tv.request.RequestState
 import io.github.quentinpn.viewer.tv.request.key
 import io.github.quentinpn.viewer.tv.request.toRequest
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Delay after the last key before searching; the keyboard's search key searches at once. */
 internal const val SEARCH_DEBOUNCE_MS = 300L
@@ -419,9 +422,19 @@ private fun Results(
         withFrameNanos {}
         runCatching { focus.requestFocus() }
     }
+    // A row taking the focus goes to the top of the list: the row before it, captions included, leaves under the field whole
+    val scope = rememberCoroutineScope()
+    fun Modifier.rowToTop(index: Int) = onFocusChanged {
+        if (it.hasFocus) {
+            scope.launch {
+                withFrameNanos {}
+                memory.column.animateScrollToItem(index)
+            }
+        }
+    }
     LazyColumn(state = memory.column, contentPadding = PaddingValues(top = 16.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-        items(groups, key = { it.title }) { group ->
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        itemsIndexed(groups, key = { _, g -> g.title }) { index, group ->
+            Column(Modifier.rowToTop(index), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SectionHeader(group.title, group.items.size, Modifier.padding(horizontal = 48.dp))
                 LazyRow(
                     state = memory.rows.getOrPut(group.title) { LazyListState() },
@@ -439,7 +452,7 @@ private fun Results(
         // Under the Emby results: what Request could add, or that it cannot be asked
         if (requestable.isNotEmpty()) {
             item(key = "to-request") {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.rowToTop(groups.size), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionHeader(REQUEST_ROW, requestable.size, Modifier.padding(horizontal = 48.dp))
                     LazyRow(
                         state = memory.rows.getOrPut(REQUEST_ROW) { LazyListState() },
@@ -448,7 +461,7 @@ private fun Results(
                     ) {
                         items(requestable, key = { it.key() }) { media ->
                             Box(Modifier.width(REQUEST_CARD_WIDTH)) {
-                                MediaCardTv(media, art, if (target == REQUEST_ROW to media.key()) Modifier.focusRequester(focus) else Modifier) {
+                                MediaCardTv(media, art, if (target == REQUEST_ROW to media.key()) Modifier.focusRequester(focus) else Modifier, showTitle = true) {
                                     memory.opened = REQUEST_ROW to media.key()
                                     onOpenRequest(media)
                                 }

@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -170,17 +171,20 @@ private fun RequestsSegments(repository: RequestRepository, memory: RequestsMemo
         withFrameNanos {}
         runCatching { first.requestFocus() }
     }
+    // Down from the segments of a grid lands on its first filter pill, not on the nearest one (Genre)
+    val firstPill = remember { FocusRequester() }
+    val toPills = if (memory.segment == RequestsSegment.Discover) Modifier else Modifier.focusProperties { down = firstPill }
     Row(Modifier.padding(horizontal = 48.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         for (segment in RequestsSegment.entries) {
             GlassButton(
                 onClick = { memory.select(segment) },
                 selected = segment == memory.segment,
-                modifier = if (segment == memory.segment) Modifier.focusRequester(first) else Modifier,
+                modifier = (if (segment == memory.segment) Modifier.focusRequester(first) else Modifier).then(toPills),
             ) { Text(segment.label, fontSize = 14.sp, maxLines = 1) }
         }
         // The requests in progress, counted: the list opens full screen
         val inFlight = memory.mine.totals?.let(::inFlightCount) ?: 0
-        GlassButton(onClick = { memory.open(RequestsPage.Mine) }) {
+        GlassButton(onClick = { memory.open(RequestsPage.Mine) }, modifier = toPills) {
             Text(if (inFlight > 0) "Mes demandes · $inFlight" else "Mes demandes", fontSize = 14.sp, maxLines = 1)
         }
     }
@@ -190,7 +194,7 @@ private fun RequestsSegments(repository: RequestRepository, memory: RequestsMemo
         RequestsSegment.Discover -> DiscoverTv(repository, memory, art, open, memory::openBrowse) {
             memory.open(RequestsPage.Detail(it.id), from = requestKey(it))
         }
-        RequestsSegment.Films -> BrowseTv(repository, memory, MediaType.Movie, art, open)
-        RequestsSegment.Series -> BrowseTv(repository, memory, MediaType.Tv, art, open)
+        RequestsSegment.Films -> BrowseTv(repository, memory, MediaType.Movie, art, firstPill, open)
+        RequestsSegment.Series -> BrowseTv(repository, memory, MediaType.Tv, art, firstPill, open)
     }
 }

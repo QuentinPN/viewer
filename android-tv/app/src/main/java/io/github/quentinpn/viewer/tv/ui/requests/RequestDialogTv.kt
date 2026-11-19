@@ -31,11 +31,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Border
-import androidx.tv.material3.Button
 import androidx.tv.material3.ClickableSurfaceDefaults
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import io.github.quentinpn.viewer.tv.ui.GlassButton
 import io.github.quentinpn.viewer.tv.ui.Palette
 import io.github.quentinpn.viewer.tv.request.MediaDetails
 import io.github.quentinpn.viewer.tv.request.MediaType
@@ -121,13 +120,15 @@ internal fun RequestDialogTv(
         if (exceeds) Text("Cela dépasse ton quota.", color = Palette.warning)
         error?.let { Text(it, color = Palette.danger) }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onDismiss) { Text("Annuler") }
-            Button(
+            GlassButton(onClick = onDismiss, height = BUTTON_HEIGHT) { Text("Annuler") }
+            GlassButton(
                 onClick = submit,
-                enabled = !busy && count > 0 && !exceeds,
+                // Off but still focusable, with its ring: it says what is missing
+                dimmed = busy || count == 0 || exceeds,
+                height = BUTTON_HEIGHT,
                 modifier = if (firstRequestable == null || !chooses) Modifier.focusRequester(first) else Modifier,
             ) {
-                Text(if (busy) "Envoi…" else if (chooses) seasonsLabel(count) else "Demander")
+                Text(if (busy) "Envoi…" else if (chooses) (if (count == 0) "Choisissez des saisons" else seasonsLabel(count)) else "Demander")
             }
         }
     }
