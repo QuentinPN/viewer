@@ -45,7 +45,7 @@ export const SEGMENTS: Segment[] = [
   },
   {
     key: "declined",
-    label: "Refusées",
+    label: "Sans suite",
     statuses: ["declined", "failed", "cancelled"],
     empty: "Aucune demande refusée, annulée ou en échec.",
   },

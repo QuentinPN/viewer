@@ -13,7 +13,7 @@ enum class StatusFilter(val label: String, val statuses: List<RequestStatus>) {
     Pending("En attente", listOf(RequestStatus.Pending)),
     InProgress("En cours", listOf(RequestStatus.Approved, RequestStatus.Sent)),
     Available("Disponibles", listOf(RequestStatus.Available)),
-    Refused("Refusées", listOf(RequestStatus.Declined, RequestStatus.Failed, RequestStatus.Cancelled)),
+    Refused("Sans suite", listOf(RequestStatus.Declined, RequestStatus.Failed, RequestStatus.Cancelled)),
     ;
 
     /** How many requests of the member this segment holds, from `RequestPage.totals`. */

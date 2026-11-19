@@ -24,7 +24,7 @@
 ## Règles vérifiées dans le code d'Request (`main@54cd791`)
 
 - Saison demandable (`src/shared/requests.ts:37-49`, `status.ts:97`) : `seasonNumber > 0` ET diffusée (`episodeCount > 0` et `airDate` non nul et `airDate <= aujourd'hui UTC AAAA-MM-JJ`) ET statut absent, `partial` ou `declined`. Titre demandable : film → statut absent/`partial`/`declined` ; série → statut ≠ `available` et (statut demandable ou au moins une saison demandable).
-- `GET /api/requests?status=a,b` : plusieurs statuts séparés par des virgules, jamais répétés. « En cours » = `approved,sent` ; « En attente » = `pending` ; « Disponibles » = `available` ; « Refusées » = `declined,failed,cancelled`.
+- `GET /api/requests?status=a,b` : plusieurs statuts séparés par des virgules, jamais répétés. « En cours » = `approved,sent` ; « En attente » = `pending` ; « Disponibles » = `available` ; « Sans suite » (refusées, échouées, annulées) = `declined,failed,cancelled`.
 - `seeAll` = `{ type: "movie"|"tv", filters: { genres?: number[], yearFrom?, yearTo?, rating?, runtimeMin?, runtimeMax?, language?, provider? } }`.
 - Images : `posterPath`/`backdropPath`/`profilePath` TMDB commencent par `/` (ex. `/abc.jpg`) ; la route attend `file` = `^[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp|svg)$` → retirer le `/` initial. Côté client on n'accepte que `jpg|jpeg|png|webp` (pas de SVG). Tailles : `w185 w342 w500 w780 w1280 original`.
 - Recherche : les résultats passent par `withStatuses` ; `embyItemId` n'est présent que pour un titre `available` ou `partial`. « À demander » = résultats sans `embyItemId`.

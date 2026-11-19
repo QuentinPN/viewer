@@ -17,7 +17,7 @@ describe("segments", () => {
       ["En attente", ["pending"]],
       ["En cours", ["approved", "sent"]],
       ["Disponibles", ["available"]],
-      ["Refusées", ["declined", "failed", "cancelled"]],
+      ["Sans suite", ["declined", "failed", "cancelled"]],
     ]);
   });
 
