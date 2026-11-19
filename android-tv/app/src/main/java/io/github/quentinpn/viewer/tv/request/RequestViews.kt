@@ -76,4 +76,5 @@ fun eventLabel(type: String): String = when (type) {
 }
 
 /** What a search offers to ask for: titles that are not in Emby yet (no `embyItemId`) and are not blocked. */
-fun toRequest(results: List<MediaSummary>): List<MediaSummary> = results.filter { it.embyItemId == null && it.blocked == null }
+fun toRequest(results: List<MediaSummary>): List<MediaSummary> =
+    results.filter { it.embyItemId == null && it.blocked == null }.distinctBy { it.key() }

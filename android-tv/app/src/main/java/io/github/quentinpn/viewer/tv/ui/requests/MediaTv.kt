@@ -105,7 +105,7 @@ internal fun MediaTv(
                 val title = d.value
                 Backdrop(title, art)
                 val asked = capabilities.canRequestFor(title.type)
-                val something = title.blocked == null && isRequestable(title)
+                val something = title.blocked == null && canAskNow(title)
                 val canAsk = asked && something
                 Column(
                     Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 36.dp),
@@ -210,7 +210,7 @@ private const val SEASON_PILLS = 6
 private fun CastRowTv(title: MediaDetails, art: RequestArt) {
     if (title.cast.isEmpty()) return
     LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
-        items(title.cast.take(CAST_SHOWN), key = { it.id }) { person ->
+        items(title.cast.distinctBy { it.id }.take(CAST_SHOWN), key = { it.id }) { person ->
             Column(Modifier.width(72.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Box(Modifier.size(56.dp).clip(CircleShape).background(Palette.surfaceRaised)) {
                     RequestImage(art, person.profilePath, "w185", Modifier.fillMaxSize())

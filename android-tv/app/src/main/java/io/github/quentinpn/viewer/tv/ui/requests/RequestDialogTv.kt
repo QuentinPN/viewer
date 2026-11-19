@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -68,6 +69,8 @@ internal fun RequestDialogTv(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val first = remember { FocusRequester() }
+    // Opens on the first season that can be ticked, composed so it takes the focus whatever its place in the list
+    val list = remember { LazyListState(firstVisibleItemIndex = seasons.indexOfFirst { it.seasonNumber == firstRequestable }.coerceAtLeast(0)) }
     // Without the quota the dialog still works: the server has the last word
     LaunchedEffect(Unit) { quota = tried { repository.quota() }.getOrNull() }
 
@@ -98,6 +101,7 @@ internal fun RequestDialogTv(
             Text("Coche les saisons à demander.", color = Palette.textSecondary)
             LazyColumn(
                 Modifier.heightIn(max = 300.dp),
+                state = list,
                 contentPadding = PaddingValues(vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {

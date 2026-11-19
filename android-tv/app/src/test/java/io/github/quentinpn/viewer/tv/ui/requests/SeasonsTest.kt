@@ -65,6 +65,18 @@ class SeasonsTest {
     }
 
     @Test
+    fun askingNeedsASeasonToTickWhenTheSeasonsAreListed() {
+        // Partial overall, but every listed season is available, waiting or not aired: nothing to tick
+        val stuck = series.copy(seasons = series.seasons.filter { it.seasonNumber in setOf(1, 4, 5) })
+        assertTrue(isRequestable(stuck, TODAY))
+        assertFalse(canAskNow(stuck, TODAY))
+        assertTrue(canAskNow(series, TODAY))
+        // No season listed: asked for whole
+        assertTrue(canAskNow(series.copy(seasons = emptyList()), TODAY))
+        assertTrue(canAskNow(details("media-movie"), TODAY))
+    }
+
+    @Test
     fun aFilmIsRequestableWithNoStatusPartialOrDeclinedOnly() {
         val film = details("media-movie")
         assertNull(film.status)

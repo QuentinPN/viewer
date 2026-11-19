@@ -72,7 +72,7 @@ import kotlinx.coroutines.launch
 /** Cards left below the last row shown when the next page is asked for. */
 private const val LOAD_AHEAD = 5
 
-private const val EVENTS_SHOWN = 8
+private const val EVENTS_SHOWN = 5
 
 private const val MESSAGE_MS = 4_000L
 
@@ -141,7 +141,12 @@ internal fun MyRequestsTv(repository: RequestRepository, memory: RequestsMemory,
             for (filter in StatusFilter.entries) {
                 val count = state.totals?.let(filter::count)
                 GlassButton(
-                    onClick = { if (filter != state.filter) state.apply(filter, repository, scope) },
+                    onClick = {
+                        if (filter != state.filter) {
+                            state.apply(filter, repository, scope)
+                            scope.launch { state.list.scrollToItem(0) }
+                        }
+                    },
                     selected = filter == state.filter,
                     modifier = if (filter == state.filter) Modifier.focusRequester(first) else Modifier,
                 ) { Text(if (count == null) filter.label else "${filter.label} · $count", fontSize = 14.sp, maxLines = 1) }
@@ -256,7 +261,7 @@ internal fun RequestDetailTv(
                         }
                         request.declineReason?.let { Text("Motif du refus : $it", color = Palette.danger) }
                         request.failureReason?.let { Text("Motif de l'échec : $it", color = Palette.danger) }
-                        Timeline(d.value.events)
+                        // The actions come before the timeline, which can be long: they stay on screen
                         Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             val embyId = media?.embyItemId
                             val cancellable = request.status == RequestStatus.Pending
@@ -272,6 +277,7 @@ internal fun RequestDetailTv(
                             }
                         }
                         message?.let { Text(it, color = Palette.success) }
+                        Timeline(d.value.events)
                     }
                 }
                 FocusOnOpen(first)

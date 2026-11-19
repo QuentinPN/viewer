@@ -43,6 +43,14 @@ internal fun isRequestable(details: MediaDetails, today: String = isoDay()): Boo
     MediaType.Tv -> details.status != MediaStatus.Available && (details.status.allowsRequest() || requestableSeasons(details, today).isNotEmpty())
 }
 
+/**
+ * Whether « Demander » has anything to offer now: [isRequestable], and for a series whose seasons are
+ * listed, at least one of them to tick (its own status alone would open a dialog with nothing in it).
+ */
+internal fun canAskNow(details: MediaDetails, today: String = isoDay()): Boolean =
+    isRequestable(details, today) &&
+        (details.type == MediaType.Movie || details.seasons.none { it.seasonNumber > 0 } || requestableSeasons(details, today).isNotEmpty())
+
 /** « Demander 1 saison », « Demander 3 saisons ». */
 internal fun seasonsLabel(count: Int): String = if (count == 1) "Demander 1 saison" else "Demander $count saisons"
 

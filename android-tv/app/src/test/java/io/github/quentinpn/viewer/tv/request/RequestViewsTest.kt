@@ -56,6 +56,8 @@ class RequestViewsTest {
             media(2, embyItemId = "51877"),
             media(3, blocked = Blocked(by = "keyword", keyword = "x")),
             media(4, MediaType.Tv),
+            // The same title twice would crash a lazy row keyed by it
+            media(1),
         )
         assertEquals(listOf(1, 4), toRequest(results).map { it.tmdbId })
     }

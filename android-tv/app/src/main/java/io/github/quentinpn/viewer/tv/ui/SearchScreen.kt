@@ -232,7 +232,10 @@ fun SearchScreen(
     LaunchedEffect(memory.searchedFor, memory.viewerReady) {
         val asked = memory.searchedFor ?: return@LaunchedEffect
         if (memory.viewerReady != true || memory.viewerFor == asked) return@LaunchedEffect
-        memory.toRequest = tried { requests.search(asked.first) }.fold({ ToRequest.Found(toRequest(it.results)) }, { ToRequest.Unavailable })
+        val next = tried { requests.search(asked.first) }.fold({ ToRequest.Found(toRequest(it.results)) }, { ToRequest.Unavailable })
+        // An answer for a term no longer in the field is dropped
+        if (cleanSearch(memory.text) != asked.first) return@LaunchedEffect
+        memory.toRequest = next
         memory.viewerFor = asked
     }
     val art = remember(requestImages, memory.viewerReady) { RequestArt(requestImages, requests.origin()) }

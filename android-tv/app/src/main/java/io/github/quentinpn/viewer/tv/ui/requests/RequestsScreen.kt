@@ -165,7 +165,7 @@ fun RequestsScreen(
 private fun RequestsSegments(repository: RequestRepository, memory: RequestsMemory, art: RequestArt) {
     val first = remember { FocusRequester() }
     // The selected segment takes the focus when the tab opens, unless a card is to get it back
-    LaunchedEffect(Unit) {
+    LaunchedEffect(memory.segment) {
         if (memory.opened != null) return@LaunchedEffect
         withFrameNanos {}
         runCatching { first.requestFocus() }
