@@ -60,6 +60,7 @@ import io.github.quentinpn.viewer.tv.ui.ViewerTheme
 import io.github.quentinpn.viewer.tv.ui.VersionStore
 import io.github.quentinpn.viewer.tv.ui.requests.RequestsMemory
 import io.github.quentinpn.viewer.tv.ui.requests.RequestsScreen
+import io.github.quentinpn.viewer.tv.request.MediaType
 import io.github.quentinpn.viewer.tv.ui.ancestorIdsOrNull
 import io.github.quentinpn.viewer.tv.ui.backFromEpisode
 import io.github.quentinpn.viewer.tv.ui.genreOptions
@@ -401,7 +402,14 @@ class MainActivity : ComponentActivity() {
                     }
                     val openRequests = requests
                     if (openRequests != null) {
-                        RequestsScreen(AppServices.requests(this), openRequests, requestImages, onClose = { requests = null })
+                        RequestsScreen(
+                            AppServices.requests(this),
+                            openRequests,
+                            requestImages,
+                            // The title's own page, over the tab: Back returns to it
+                            onOpenEmby = { type, id -> if (type == MediaType.Movie) openMovie(id) else openSeries(SeriesTarget(id)) },
+                            onClose = { requests = null },
+                        )
                         return@ViewerTheme
                     }
                     // Also under the film and series pages: Back from them returns to the results

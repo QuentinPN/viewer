@@ -35,6 +35,7 @@ import io.github.quentinpn.viewer.tv.request.RequestView
 import io.github.quentinpn.viewer.tv.request.SeeAll
 import io.github.quentinpn.viewer.tv.request.RequestRepository
 import io.github.quentinpn.viewer.tv.request.RequestState
+import io.github.quentinpn.viewer.tv.request.key
 
 /** The tabs of the Demander screen, in the order of the segments. */
 internal enum class RequestsSegment(val label: String) {
@@ -68,6 +69,15 @@ class RequestsMemory {
     /** Key of the card last opened: it takes the focus back on return. */
     internal var opened: String? = null
 
+    /** The levels over the segments, the shown one last. */
+    internal var stack by mutableStateOf<List<RequestsPage>>(emptyList())
+
+    /** [from] is the card it was opened from, focused again on Back. */
+    internal fun open(page: RequestsPage, from: String? = null) {
+        opened = from
+        stack = stack + page
+    }
+
     /** « Tout voir » of a row: the grid of its type, on its filters. */
     internal fun openBrowse(seeAll: SeeAll) {
         browse[seeAll.type] = BrowseState(seeAll.type, seeAll.filters).also { it.stamp = -1 }
@@ -100,11 +110,32 @@ internal fun FocusRestore(memory: RequestsMemory, ready: Boolean, target: FocusR
  * closes the tab; the levels inside it (a title, a request) handle Back before it.
  */
 @Composable
-fun RequestsScreen(repository: RequestRepository, memory: RequestsMemory, images: ImageLoader, onClose: () -> Unit) {
+fun RequestsScreen(
+    repository: RequestRepository,
+    memory: RequestsMemory,
+    images: ImageLoader,
+    /** « Lire »: the title's page in Emby, by its type and Emby id. */
+    onOpenEmby: (MediaType, String) -> Unit,
+    onClose: () -> Unit,
+) {
     BackHandler {
-        if (memory.fromSeeAll) memory.select(RequestsSegment.Discover) else onClose()
+        when {
+            memory.stack.isNotEmpty() -> memory.stack = memory.stack.dropLast(1)
+            memory.fromSeeAll -> memory.select(RequestsSegment.Discover)
+            else -> onClose()
+        }
     }
     val access = rememberRequestsAccess(repository)
+    val status = access.status
+    val art = remember(images, status?.address) { RequestArt(images, repository.origin()) }
+    val page = memory.stack.lastOrNull()
+    // A title takes the whole screen, its backdrop included
+    if (status?.state == RequestState.Ready && page is RequestsPage.Media) {
+        MediaTv(repository, memory, art, page, checkNotNull(status.viewer).capabilities) { title ->
+            title.embyItemId?.let { onOpenEmby(title.type, it) }
+        }
+        return
+    }
     Column(Modifier.fillMaxSize().background(Palette.background)) {
         Text(
             "Demander",
@@ -112,13 +143,9 @@ fun RequestsScreen(repository: RequestRepository, memory: RequestsMemory, images
             color = Palette.text,
             modifier = Modifier.padding(start = 48.dp, end = 48.dp, top = 28.dp, bottom = 8.dp),
         )
-        val status = access.status
         when {
             status == null -> Centered("Connexion à Request…")
-            status.state == RequestState.Ready -> {
-                val art = remember(images, status.address) { RequestArt(images, repository.origin()) }
-                RequestsSegments(repository, memory, art)
-            }
+            status.state == RequestState.Ready -> RequestsSegments(repository, memory, art)
             else -> RequestsSetupTv(status, access)
         }
     }
@@ -142,8 +169,8 @@ private fun RequestsSegments(repository: RequestRepository, memory: RequestsMemo
             ) { Text(segment.label, fontSize = 14.sp, maxLines = 1) }
         }
     }
-    // A title opens on its page (see MediaTv); until then OK remembers the card, so Back finds it again
-    val open: (MediaSummary) -> Unit = { }
+    // A title opens on its page; Back finds its card again
+    val open: (MediaSummary) -> Unit = { memory.open(RequestsPage.Media(it.type, it.tmdbId), from = it.key()) }
     when (memory.segment) {
         RequestsSegment.Discover -> DiscoverTv(repository, memory, art, open, memory::openBrowse, onOpenRequest = {})
         RequestsSegment.Films -> BrowseTv(repository, memory, MediaType.Movie, art, open)
