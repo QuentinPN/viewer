@@ -63,7 +63,8 @@ internal fun RequestDialogTv(
     val today = remember { isoDay() }
     val seasons = remember(details) { details.seasons.filter { it.seasonNumber > 0 } }
     val firstRequestable = seasons.firstOrNull { isSeasonRequestable(it, today) }?.seasonNumber
-    var picked by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    // Every season that can be asked for starts ticked, as on the desktop
+    var picked by remember { mutableStateOf(requestableSeasons(details, today).toSet()) }
     var quota by remember { mutableStateOf<RequestQuota?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
