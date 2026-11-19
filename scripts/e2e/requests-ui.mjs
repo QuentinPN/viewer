@@ -3,7 +3,8 @@
 // Screenshots go to docs/evidence/request/:
 // configuration, Découvrir, Parcourir, film page, series page with the request
 // dialog open (never sent), Mes demandes, library search with « À demander »,
-// Réglages › Demandes, and « trop ancien » against a local fake server whose
+// Réglages › Demandes, « Lire » opening the Emby title of an available one
+// (Mes demandes, else the Films grid), and « trop ancien » against a local fake server whose
 // /api/version only lists `api.version`.
 // Never sends a request nor cancels one: the totals of `ur_my_requests` are
 // compared before and after. The debug app's request.json is moved aside at
@@ -230,6 +231,70 @@ try {
   await section.scrollIntoViewIfNeeded();
   await page.waitForTimeout(800);
   await shot(page, "08-reglages-demandes");
+
+  // « Lire »: a title Request knows on Emby opens the Emby detail page.
+  // First a request of the account whose title is on Emby, else a film of the grid.
+  await nav(page, "Demander").click();
+  await segment(page, /^Mes demandes/).click();
+  await page
+    .getByRole("group", { name: "Statut des demandes" })
+    .getByRole("button", { name: /^Toutes/ })
+    .click();
+  await page.waitForFunction(
+    () => !document.querySelector(".list[aria-busy=true]"),
+    null,
+    { timeout: 20000 },
+  );
+  const mine = await invoke(page, "ur_my_requests", { status: null, page: 1 });
+  const onEmby = mine.results.findIndex((r) => r.media?.embyItemId);
+  let lire = null;
+  if (onEmby >= 0) {
+    await page.locator(".list button.row").nth(onEmby).click();
+    lire = page.getByRole("button", { name: "Lire", exact: true });
+    await lire.waitFor({ timeout: 20000 });
+    check("« Lire » from Mes demandes", true, mine.results[onEmby].status);
+  } else {
+    await segment(page, "Films").click();
+    await gridCards(page).first().waitFor({ timeout: 30000 });
+    const films = Math.min(await gridCards(page).count(), 40);
+    for (let i = 0; i < films && !lire; i++) {
+      await gridCards(page).nth(i).click();
+      await page.locator("#ur-media-title").waitFor({ timeout: 20000 });
+      await loaded(page);
+      const button = page.getByRole("button", { name: "Lire", exact: true });
+      if (await button.count()) lire = button;
+      else {
+        await page.keyboard.press("Escape");
+        await page
+          .locator("#ur-media-title")
+          .waitFor({ state: "detached", timeout: 10000 });
+      }
+    }
+    check("« Lire » from the Films grid", lire !== null);
+  }
+  if (lire) {
+    await lire.click();
+    await page
+      .locator(".detail button.play")
+      .first()
+      .waitFor({ timeout: 20000 })
+      .catch(() => {});
+    await page.waitForTimeout(1500);
+    check(
+      "« Lire » opens the Emby detail page",
+      (await page.locator(".detail button.play").count()) > 0,
+      await page.locator(".detail h1").first().textContent(),
+    );
+    await shot(page, "10-lire-ouvre-emby");
+    // Back out of the Emby page and the title page to the tabs.
+    for (let i = 0; i < 4 && !(await libraryNav(page).isVisible()); i++) {
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(800);
+    }
+    await libraryNav(page).waitFor({ timeout: 20000 });
+  }
+  // Leave Demander, so the next visit reads the status again.
+  await libraryNav(page).getByRole("button", { name: "Réglages" }).click();
 
   if ((await totals(page)) !== before)
     throw new Error("the request totals changed during the run");
