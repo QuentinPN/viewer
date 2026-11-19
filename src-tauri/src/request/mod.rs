@@ -2,7 +2,10 @@
 //! here, in Rust; the UI never sees a token nor builds an API or image URL.
 
 pub mod client;
+pub mod commands;
+pub mod images;
 pub mod models;
+pub mod service;
 #[cfg(test)]
 mod tests;
 
@@ -20,6 +23,15 @@ pub const REQUIRED_FEATURES: [&str; 4] = [
     "auth.sessions",
     "media.item-id",
 ];
+/// Credential account of the Request session of one Emby account:
+/// `request/{embyServerId}/{embyUserId}`.
+pub fn account(server_id: &str, user_id: &str) -> String {
+    format!(
+        "request/{}",
+        crate::emby::credentials::account(server_id, user_id)
+    )
+}
+
 /// API major version this client speaks.
 const API_MAJOR: &str = "1";
 

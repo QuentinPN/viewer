@@ -28,6 +28,7 @@ use crate::player::{
 use crate::segments::{Segment, SegmentService};
 use crate::sync::SyncDevice;
 use crate::sync::leader::{Peer, Status};
+use crate::request::service::RequestService;
 use crate::video_surface::SurfaceMode;
 
 #[tauri::command]
@@ -196,10 +197,16 @@ pub async fn emby_shelf(emby: State<'_, EmbyService>) -> Result<Vec<ShelfServer>
 #[tauri::command]
 pub async fn emby_forget_server(
     emby: State<'_, EmbyService>,
+    ur: State<'_, RequestService>,
     server_id: String,
     user_id: String,
 ) -> Result<(), EmbyError> {
+    // Read before the Emby service deletes the token with the account (ADR 0125).
+    let ur_revocation = ur.revocation_for(&server_id, &user_id);
     if let Some(revocation) = emby.forget_server(&server_id, &user_id)? {
+        tauri::async_runtime::spawn(revocation.send());
+    }
+    if let Some(revocation) = ur_revocation {
         tauri::async_runtime::spawn(revocation.send());
     }
     Ok(())
@@ -218,8 +225,16 @@ pub async fn emby_resume_saved(
 pub async fn emby_sign_out(
     state: State<'_, AppState>,
     emby: State<'_, EmbyService>,
+    ur: State<'_, RequestService>,
 ) -> Result<(), EmbyError> {
     state.sync.stop(SYNC_BYE_WAIT).await;
+    // Read before the Emby service deletes the token with the account (ADR 0125).
+    let ur_revocation = emby
+        .current_user()
+        .and_then(|u| ur.revocation_for(&u.server.id, &u.user_id));
+    if let Some(revocation) = ur_revocation {
+        tauri::async_runtime::spawn(revocation.send());
+    }
     emby.sign_out().await
 }
 

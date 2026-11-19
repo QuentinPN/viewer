@@ -3,6 +3,8 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::emby::models::ImageRef;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MediaType {
@@ -209,6 +211,12 @@ pub struct MediaSummary {
     pub progress: Option<f64>,
     #[serde(default)]
     pub emby_item_id: Option<String>,
+    /// Built in Rust on the `requestimg` protocol; never read from the server.
+    #[serde(default, skip_deserializing)]
+    pub poster: Option<ImageRef>,
+    /// Built in Rust on the `requestimg` protocol; never read from the server.
+    #[serde(default, skip_deserializing)]
+    pub backdrop: Option<ImageRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -275,6 +283,9 @@ pub struct SearchPerson {
     pub id: i64,
     pub name: String,
     pub profile_path: Option<String>,
+    /// Built in Rust on the `requestimg` protocol; never read from the server.
+    #[serde(default, skip_deserializing)]
+    pub profile: Option<ImageRef>,
     pub known_for: Vec<String>,
 }
 
@@ -326,6 +337,9 @@ pub struct CastMember {
     pub name: String,
     pub character: String,
     pub profile_path: Option<String>,
+    /// Built in Rust on the `requestimg` protocol; never read from the server.
+    #[serde(default, skip_deserializing)]
+    pub profile: Option<ImageRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -335,6 +349,9 @@ pub struct CrewMember {
     pub name: String,
     pub jobs: Vec<CrewJob>,
     pub profile_path: Option<String>,
+    /// Built in Rust on the `requestimg` protocol; never read from the server.
+    #[serde(default, skip_deserializing)]
+    pub profile: Option<ImageRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -344,6 +361,12 @@ pub struct Collection {
     pub name: String,
     pub poster_path: Option<String>,
     pub backdrop_path: Option<String>,
+    /// Built in Rust on the `requestimg` protocol; never read from the server.
+    #[serde(default, skip_deserializing)]
+    pub poster: Option<ImageRef>,
+    /// Built in Rust on the `requestimg` protocol; never read from the server.
+    #[serde(default, skip_deserializing)]
+    pub backdrop: Option<ImageRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -413,6 +436,12 @@ pub struct MediaDetails {
     pub original_language: Option<String>,
     #[serde(default)]
     pub last_aired: Option<LastAired>,
+    /// Built in Rust on the `requestimg` protocol; never read from the server.
+    #[serde(default, skip_deserializing)]
+    pub poster: Option<ImageRef>,
+    /// Built in Rust on the `requestimg` protocol; never read from the server.
+    #[serde(default, skip_deserializing)]
+    pub backdrop: Option<ImageRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
