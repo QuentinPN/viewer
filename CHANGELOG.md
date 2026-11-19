@@ -1,5 +1,14 @@
 # Journal des versions
 
+## 1.5.0 — 2026-11-19
+
+- Nouvel onglet « Demander » : parcours « Découvrir », « Films » et « Séries », fiche d'un titre, puis « Demander » un film ou choisis les saisons d'une série. Rien ne part sans ta confirmation (ADR 0125).
+- « Mes demandes » suit l'état de tes demandes (en attente, approuvées, disponibles…), avec leur historique ; « Mes demandes en cours » reste en tête de Découvrir.
+- La recherche de la bibliothèque propose aussi « À demander · Request » sous les résultats Emby.
+- Réglages › Demandes : adresse d'Request, état de la connexion et déconnexion.
+- Pas de mot de passe de plus : la connexion se fait avec ta session Emby. Il faut un serveur Request en API 1.x ; sinon l'onglet l'explique (« trop ancien »).
+- Vérifié sur le vrai serveur (captures dans `docs/evidence/request/`) ; aucune demande réelle n'a été envoyée pendant les tests.
+
 ## 1.4.0 — 2026-11-14
 
 - Lecteur : « Envoyer aussi sur la TV » ouvre le même épisode sur la Shield, qui suit ta lecture. Tu peux ainsi partager ton écran sur Discord et regarder sur la télé en même temps. La pastille « Lié à SHIELD · ±40 ms » montre l'écart mesuré par la TV ; « Délier » laisse chacun continuer seul (ADR 0123, 0124).

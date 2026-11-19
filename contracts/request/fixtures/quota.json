@@ -1,0 +1,15 @@
+{
+  "exempt": false,
+  "movies": {
+    "days": 7,
+    "limit": 10,
+    "remaining": 10,
+    "used": 0
+  },
+  "seasons": {
+    "days": 7,
+    "limit": 10,
+    "remaining": 10,
+    "used": 0
+  }
+}

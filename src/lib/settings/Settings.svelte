@@ -4,6 +4,7 @@ import { embyApi, toEmbyError } from "../emby/api";
 import type { ArtworkCacheStats, EmbyError, Library } from "../emby/types";
 import { playerApi } from "../player/api";
 import { readSkip, type SkipSetting, saveSkip } from "../player/segments";
+import RequestsSettings from "../requests/RequestsSettings.svelte";
 import About from "./About.svelte";
 import Diagnostics from "./Diagnostics.svelte";
 import {
@@ -140,6 +141,8 @@ onMount(() => {
   <SubtitleSettings />
 
   <HomeRowsSettings {libraries} storageKey={rowPrefsKey} />
+
+  <RequestsSettings />
 </div>
 
 <header class="group">

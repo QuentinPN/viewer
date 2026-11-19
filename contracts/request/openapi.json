@@ -1,0 +1,5848 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "Request",
+    "version": "1.0.0",
+    "description": "API REST d’Request : demandes de films et de séries des membres d’un serveur Emby, Jellyfin ou Plex. Erreurs : JSON `{ \"error\": \"message\" }`. Un seul justificatif par requête (cookie, Bearer ou clé d’API) : plusieurs → 400. Justificatif en en-tête invalide → 401, puis 429 (en-tête `Retry-After`) après des essais répétés depuis la même adresse."
+  },
+  "tags": [
+    {
+      "name": "system",
+      "description": "Santé du serveur et version du contrat de l’API."
+    },
+    {
+      "name": "auth",
+      "description": "Connexion, déconnexion, membre connecté et ses sessions."
+    },
+    {
+      "name": "catalogue",
+      "description": "Catalogue TMDB : Découvrir, Films et Séries, recherche, fiches, avec le statut de chaque titre."
+    },
+    {
+      "name": "images",
+      "description": "Images relayées par le serveur : TMDB (avec cache disque) et photos des membres."
+    },
+    {
+      "name": "requests",
+      "description": "Demandes du membre connecté : création, suivi, modification, annulation, quota."
+    },
+    {
+      "name": "watchlist",
+      "description": "Ma liste : la liste de souhaits du membre connecté, et ses imports."
+    },
+    {
+      "name": "notifications",
+      "description": "Notifications du membre connecté et ses préférences."
+    }
+  ],
+  "security": [
+    {
+      "cookieAuth": []
+    },
+    {
+      "bearerAuth": []
+    },
+    {
+      "apiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": [
+          "system"
+        ],
+        "summary": "Santé du serveur et de sa base",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Base de données indisponible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/version": {
+      "get": {
+        "operationId": "getApiVersion",
+        "tags": [
+          "system"
+        ],
+        "summary": "Version du contrat de l’API et capacités du serveur",
+        "description": "Un client natif y détecte un serveur trop ancien : `features` liste les capacités disponibles.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiVersion"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "login",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Connexion par identifiant et mot de passe Emby ou Jellyfin",
+        "description": "Navigateur : la session est posée en cookie signé (`Set-Cookie`), rien dans le corps. Exige l’en-tête `x-request: 1` et une origine absente ou identique à l’hôte.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViewerResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma ; Le serveur multimédia configuré se connecte autrement (Plex)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Identifiant ou mot de passe refusé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Écriture par cookie sans l’en-tête CSRF, ou d’une autre origine",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de tentatives de connexion depuis cette adresse (en-tête `Retry-After`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Serveur multimédia injoignable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Serveur multimédia pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/emby-token": {
+      "post": {
+        "operationId": "loginWithEmbyToken",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Connexion d’un client natif par son jeton d’accès Emby ou Jellyfin",
+        "description": "Le serveur multimédia confirme que le jeton vaut pour `userId`. Le jeton de session renvoyé (montré une seule fois) s’envoie ensuite en `Authorization: Bearer`. Aucun cookie, pas de contrôle CSRF.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[\\w-]+$"
+                  },
+                  "accessToken": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512,
+                    "pattern": "^[\\w.~+/=-]+$"
+                  },
+                  "deviceName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^\\P{Cc}*$"
+                  }
+                },
+                "required": [
+                  "userId",
+                  "accessToken",
+                  "deviceName"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbyTokenSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma ; Le serveur multimédia configuré n’est ni Emby ni Jellyfin, ou aucun serveur configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton refusé, ou valable pour un autre compte",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de tentatives de connexion depuis cette adresse (en-tête `Retry-After`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Serveur multimédia injoignable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Déconnexion : révoque la session courante",
+        "description": "En Bearer, révoque la session du jeton ; sinon celle du cookie, qui est effacé.",
+        "security": [
+          {},
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Aucun contenu"
+          },
+          "403": {
+            "description": "Écriture par cookie sans l’en-tête CSRF, ou d’une autre origine",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "getViewer",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Membre connecté et ses droits",
+        "description": "Prolonge aussi le cookie de session (expiration glissante).",
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViewerResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sessions": {
+      "get": {
+        "operationId": "listSessions",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sessions en cours du membre connecté (navigateurs et appareils)",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sessions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AuthSession"
+                      }
+                    }
+                  },
+                  "required": [
+                    "sessions"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refusé avec une clé d’API",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sessions/{id}": {
+      "delete": {
+        "operationId": "revokeSession",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Révoque une session du membre connecté (la courante comprise)",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Aucun contenu"
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Écriture par cookie sans l’en-tête CSRF, ou d’une autre origine ; Refusé avec une clé d’API",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session inconnue, expirée ou d’un autre membre",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/discover": {
+      "get": {
+        "operationId": "getDiscover",
+        "tags": [
+          "catalogue"
+        ],
+        "summary": "Rangées de Découvrir, dans l’ordre choisi par le propriétaire",
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoverResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "TMDB injoignable ou réponse hors contrat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TMDB pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/discover/{type}/provider/{id}": {
+      "get": {
+        "operationId": "listProviderTitles",
+        "tags": [
+          "catalogue"
+        ],
+        "summary": "Titres d’une plateforme de streaming, paginés",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "movie",
+                "tv"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 500
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedMedia"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "TMDB injoignable ou réponse hors contrat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TMDB pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/discover/{type}": {
+      "get": {
+        "operationId": "browse",
+        "tags": [
+          "catalogue"
+        ],
+        "summary": "Films ou séries filtrés et triés, paginés",
+        "description": "`genres` : identifiants séparés par des virgules (`28,12`), tous exigés à la fois.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "movie",
+                "tv"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "genres",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+(,\\d+)*$"
+            }
+          },
+          {
+            "name": "yearFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1900,
+              "maximum": 2100
+            }
+          },
+          {
+            "name": "yearTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1900,
+              "maximum": 2100
+            }
+          },
+          {
+            "name": "rating",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          {
+            "name": "runtimeMin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "runtimeMax",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z]{2}$"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "popularity",
+                "rating",
+                "release",
+                "title"
+              ]
+            }
+          },
+          {
+            "name": "company",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "network",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedMedia"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "TMDB injoignable ou réponse hors contrat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TMDB pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/genres/{type}": {
+      "get": {
+        "operationId": "listGenres",
+        "tags": [
+          "catalogue"
+        ],
+        "summary": "Genres TMDB des films ou des séries",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "movie",
+                "tv"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "genres": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Genre"
+                      }
+                    }
+                  },
+                  "required": [
+                    "genres"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "TMDB injoignable ou réponse hors contrat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TMDB pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/providers/{type}": {
+      "get": {
+        "operationId": "listProviders",
+        "tags": [
+          "catalogue"
+        ],
+        "summary": "Plateformes de streaming (France, abonnement)",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "movie",
+                "tv"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/WatchProvider"
+                      }
+                    }
+                  },
+                  "required": [
+                    "providers"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "TMDB injoignable ou réponse hors contrat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TMDB pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "operationId": "search",
+        "tags": [
+          "catalogue"
+        ],
+        "summary": "Recherche de films, séries et personnes",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaSearchResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "TMDB injoignable ou réponse hors contrat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TMDB pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/person/{id}": {
+      "get": {
+        "operationId": "getPerson",
+        "tags": [
+          "catalogue"
+        ],
+        "summary": "Fiche d’une personne et sa filmographie",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Personne introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "TMDB injoignable ou réponse hors contrat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TMDB pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/collection/{id}": {
+      "get": {
+        "operationId": "getCollection",
+        "tags": [
+          "catalogue"
+        ],
+        "summary": "Saga (collection TMDB) et ses films",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Saga introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "TMDB injoignable ou réponse hors contrat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TMDB pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/{type}/{id}": {
+      "get": {
+        "operationId": "getMedia",
+        "tags": [
+          "catalogue"
+        ],
+        "summary": "Fiche d’un film ou d’une série, avec son statut et celui de chaque saison",
+        "description": "`id` : identifiant TMDB. `embyItemId` est toujours présent : l’id de l’élément sur le serveur multimédia, `null` si le titre n’y est pas.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "movie",
+                "tv"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Titre introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "TMDB injoignable ou réponse hors contrat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TMDB pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/images/{size}/{file}": {
+      "get": {
+        "operationId": "getImage",
+        "tags": [
+          "images"
+        ],
+        "summary": "Image TMDB (affiche, fond, portrait), mise en cache par le serveur",
+        "parameters": [
+          {
+            "name": "size",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "w185",
+                "w342",
+                "w500",
+                "w780",
+                "w1280",
+                "original"
+              ]
+            }
+          },
+          {
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+\\.(jpg|jpeg|png|webp|svg)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image (en cache 30 jours, immuable)",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "TMDB injoignable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{id}/avatar": {
+      "get": {
+        "operationId": "getUserAvatar",
+        "tags": [
+          "images"
+        ],
+        "summary": "Photo d’un membre, relayée depuis le serveur multimédia",
+        "description": "Adresse de `avatarUrl` (membre connecté, demandes, sélecteurs). `id` : id du membre.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Photo (en cache privé 24 heures)",
+            "content": {
+              "image/gif": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Membre sans photo, ou photo introuvable sur le serveur multimédia",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Serveur multimédia injoignable, ou type d’image inattendu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Serveur multimédia pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/requests": {
+      "post": {
+        "operationId": "createRequest",
+        "tags": [
+          "requests"
+        ],
+        "summary": "Demande un film ou des saisons d’une série",
+        "description": "Approuvée et envoyée d’office si le membre a le droit d’approbation automatique. `forUserId`, `quotaExempt` et les choix d’envoi demandent des droits supplémentaires.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "movie"
+                      },
+                      "tmdbId": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "is4k": {
+                        "default": false,
+                        "type": "boolean"
+                      },
+                      "forUserId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "quotaExempt": {
+                        "type": "boolean"
+                      },
+                      "serverId": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "qualityProfileId": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "rootFolderPath": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "tmdbId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "tv"
+                      },
+                      "tmdbId": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "seasons": {
+                        "default": "all",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "const": "all"
+                          },
+                          {
+                            "minItems": 1,
+                            "maxItems": 100,
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          }
+                        ]
+                      },
+                      "is4k": {
+                        "default": false,
+                        "type": "boolean"
+                      },
+                      "forUserId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "quotaExempt": {
+                        "type": "boolean"
+                      },
+                      "serverId": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "qualityProfileId": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "rootFolderPath": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "seriesType": {
+                        "type": "string",
+                        "enum": [
+                          "standard",
+                          "anime",
+                          "daily"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "tmdbId"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "La même demande était déjà en cours : elle est renvoyée, rien n’est créé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestDetail"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Demande créée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma ; Saison inconnue, spéciale ou pas encore diffusée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Écriture par cookie sans l’en-tête CSRF, ou d’une autre origine ; Droit manquant (type, 4K, pour un autre membre, hors quota, choix d’envoi) ou titre bloqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Titre ou membre introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Quota atteint, titre déjà disponible ou déjà demandé, aucun serveur Radarr ou Sonarr configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "TMDB injoignable ou réponse hors contrat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TMDB pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listRequests",
+        "tags": [
+          "requests"
+        ],
+        "summary": "Demandes, paginées, avec le total par statut",
+        "description": "`status` : statuts séparés par des virgules (`pending,failed`) ; `mine` : `true` ou `false`. Un membre sans droit de gérer les demandes ne voit que les siennes ; `tmdbId` exige `type`.",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "movie",
+                "tv"
+              ]
+            }
+          },
+          {
+            "name": "tmdbId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "mine",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sans le droit de faire des demandes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/requests/quota": {
+      "get": {
+        "operationId": "getRequestQuota",
+        "tags": [
+          "requests"
+        ],
+        "summary": "Quota restant du membre connecté (ou d’un autre membre avec `userId`)",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestQuota"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sans le droit de faire des demandes ; `userId` sans le droit « Demander pour un autre »",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Membre introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/requests/counts": {
+      "get": {
+        "operationId": "getRequestCounts",
+        "tags": [
+          "requests"
+        ],
+        "summary": "Compteurs : demandes en cours du membre, demandes à approuver",
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestCounts"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sans le droit de faire des demandes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/requests/{id}": {
+      "get": {
+        "operationId": "getRequest",
+        "tags": [
+          "requests"
+        ],
+        "summary": "Une demande et sa frise",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sans le droit de faire des demandes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Demande introuvable, ou d’un autre membre",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateRequest",
+        "tags": [
+          "requests"
+        ],
+        "summary": "Modifie une demande en attente (saisons, choix d’envoi)",
+        "description": "Par le membre qui l’a faite, ou par un gestionnaire.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "seasons": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "serverId": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "qualityProfileId": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "rootFolderPath": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "seriesType": {
+                    "type": "string",
+                    "enum": [
+                      "standard",
+                      "anime",
+                      "daily"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma ; Saisons ou type de série pour un film",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Écriture par cookie sans l’en-tête CSRF, ou d’une autre origine ; Demande d’un autre membre, ou choix d’envoi sans le droit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Demande introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Demande plus en attente, ou saisons déjà demandées",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/requests/{id}/cancel": {
+      "post": {
+        "operationId": "cancelRequest",
+        "tags": [
+          "requests"
+        ],
+        "summary": "Annule une demande du membre encore en attente",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Écriture par cookie sans l’en-tête CSRF, ou d’une autre origine ; Demande d’un autre membre",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Demande introuvable, ou d’un autre membre",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Demande plus en attente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watchlist": {
+      "get": {
+        "operationId": "listWatchlist",
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Ma liste, paginée, avec le statut de chaque titre",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 500
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "addToWatchlist",
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Ajoute un titre à Ma liste (idempotent)",
+        "description": "Si l’option du membre est active, le titre est aussi demandé : `autoRequest` dit le sort de la demande.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "movie",
+                      "tv"
+                    ]
+                  },
+                  "tmdbId": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "tmdbId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddedToWatchlist"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Écriture par cookie sans l’en-tête CSRF, ou d’une autre origine",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Titre introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "TMDB injoignable ou réponse hors contrat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TMDB pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watchlist/auto-request": {
+      "get": {
+        "operationId": "getWatchlistAutoRequest",
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Option « demander ce que j’ajoute à Ma liste »",
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoRequestSetting"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sans le droit de demande automatique depuis Ma liste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "setWatchlistAutoRequest",
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Active ou désactive la demande automatique depuis Ma liste",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoRequestSetting"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoRequestSetting"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Écriture par cookie sans l’en-tête CSRF, ou d’une autre origine ; Sans le droit de demande automatique depuis Ma liste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watchlist/{type}/{id}": {
+      "get": {
+        "operationId": "isInWatchlist",
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Le titre est-il dans Ma liste ?",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "movie",
+                "tv"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InWatchlist"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "removeFromWatchlist",
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Retire un titre de Ma liste (idempotent)",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "movie",
+                "tv"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InWatchlist"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Écriture par cookie sans l’en-tête CSRF, ou d’une autre origine",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watchlist/import/trakt": {
+      "post": {
+        "operationId": "importTraktWatchlist",
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Importe la liste de souhaits publique d’un compte Trakt",
+        "description": "`dryRun=true` : aperçu, rien n’est écrit.",
+        "parameters": [
+          {
+            "name": "dryRun",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "pattern": "^[\\w-]{1,50}$"
+                  }
+                },
+                "required": [
+                  "username"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Écriture par cookie sans l’en-tête CSRF, ou d’une autre origine",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Un import est déjà en cours pour ce membre",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Profil Trakt privé ou introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop d’imports (en-tête `Retry-After`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Trakt ou TMDB injoignable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Trakt ou TMDB pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watchlist/import/letterboxd": {
+      "post": {
+        "operationId": "importLetterboxdWatchlist",
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Importe le `watchlist.csv` d’un export Letterboxd",
+        "description": "`dryRun=true` : aperçu, rien n’est écrit.",
+        "parameters": [
+          {
+            "name": "dryRun",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "csv": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 524288
+                  }
+                },
+                "required": [
+                  "csv"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Écriture par cookie sans l’en-tête CSRF, ou d’une autre origine",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Un import est déjà en cours pour ce membre",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Fichier non reconnu, ou liste trop longue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop d’imports (en-tête `Retry-After`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "TMDB injoignable ou réponse hors contrat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TMDB pas encore configuré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "operationId": "listNotifications",
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Notifications du membre connecté, paginées, avec le nombre de non lues",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/read": {
+      "post": {
+        "operationId": "markNotificationsRead",
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Marque comme lues certaines notifications (`ids`) ou toutes (`all`)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "ids": {
+                        "minItems": 1,
+                        "maxItems": 100,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    "required": [
+                      "ids"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "all": {
+                        "type": "boolean",
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "all"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "unread": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "unread"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Écriture par cookie sans l’en-tête CSRF, ou d’une autre origine",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/account/notifications": {
+      "get": {
+        "operationId": "getNotificationPreferences",
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Préférences de notification du compte",
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferences"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "setNotificationPreferences",
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Enregistre les préférences de notification du compte",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "email",
+                        "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "emailNotifications": {
+                    "type": "boolean"
+                  },
+                  "pushNotifications": {
+                    "type": "boolean"
+                  },
+                  "types": {
+                    "type": "object",
+                    "properties": {
+                      "requested": {
+                        "type": "boolean"
+                      },
+                      "approved": {
+                        "type": "boolean"
+                      },
+                      "declined": {
+                        "type": "boolean"
+                      },
+                      "available": {
+                        "type": "boolean"
+                      },
+                      "failed": {
+                        "type": "boolean"
+                      },
+                      "auto_approved": {
+                        "type": "boolean"
+                      },
+                      "requested_on_behalf": {
+                        "type": "boolean"
+                      },
+                      "issue_created": {
+                        "type": "boolean"
+                      },
+                      "issue_commented": {
+                        "type": "boolean"
+                      },
+                      "issue_resolved": {
+                        "type": "boolean"
+                      },
+                      "issue_reopened": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "email",
+                  "emailNotifications",
+                  "pushNotifications"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferences"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide : paramètres, requête ou corps hors du schéma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Connexion requise, ou justificatif invalide, expiré ou révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Écriture par cookie sans l’en-tête CSRF, ou d’une autre origine ; Type de notification que le membre ne peut pas recevoir",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddedToWatchlist": {
+        "type": "object",
+        "properties": {
+          "inList": {
+            "type": "boolean"
+          },
+          "autoRequest": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "const": "requested"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "const": "skipped"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "status",
+                  "reason"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "inList"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "ApiVersion": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$"
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "apiVersion",
+          "features"
+        ]
+      },
+      "AuthSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "deviceName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "userAgent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "current": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "deviceName",
+          "userAgent",
+          "createdAt",
+          "lastSeenAt",
+          "expiresAt",
+          "current"
+        ]
+      },
+      "AutoRequestSetting": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "Capabilities": {
+        "type": "object",
+        "properties": {
+          "canRequestMovies": {
+            "type": "boolean"
+          },
+          "canRequestTv": {
+            "type": "boolean"
+          },
+          "canRequest4k": {
+            "type": "boolean"
+          },
+          "autoApproveMovies": {
+            "type": "boolean"
+          },
+          "autoApproveTv": {
+            "type": "boolean"
+          },
+          "autoApprove4k": {
+            "type": "boolean"
+          },
+          "canRequestOnBehalf": {
+            "type": "boolean"
+          },
+          "canRequestQuotaExempt": {
+            "type": "boolean"
+          },
+          "canAdvancedRequest": {
+            "type": "boolean"
+          },
+          "canAutoRequestWatchlist": {
+            "type": "boolean"
+          },
+          "canManageRequests": {
+            "type": "boolean"
+          },
+          "canManageIssues": {
+            "type": "boolean"
+          },
+          "canManageBlocklist": {
+            "type": "boolean"
+          },
+          "canViewStats": {
+            "type": "boolean"
+          },
+          "canManageUsers": {
+            "type": "boolean"
+          },
+          "canRequest": {
+            "type": "boolean"
+          },
+          "isOwner": {
+            "type": "boolean"
+          },
+          "quotaExempt": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "canRequestMovies",
+          "canRequestTv",
+          "canRequest4k",
+          "autoApproveMovies",
+          "autoApproveTv",
+          "autoApprove4k",
+          "canRequestOnBehalf",
+          "canRequestQuotaExempt",
+          "canAdvancedRequest",
+          "canAutoRequestWatchlist",
+          "canManageRequests",
+          "canManageIssues",
+          "canManageBlocklist",
+          "canViewStats",
+          "canManageUsers",
+          "canRequest",
+          "isOwner",
+          "quotaExempt"
+        ]
+      },
+      "CollectionDetails": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "name": {
+            "type": "string"
+          },
+          "overview": {
+            "type": "string"
+          },
+          "posterPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "backdropPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaSummary"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "overview",
+          "posterPath",
+          "backdropPath",
+          "parts"
+        ]
+      },
+      "DiscoverResponse": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MediaSummary"
+                  }
+                },
+                "seeAll": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "movie",
+                        "tv"
+                      ]
+                    },
+                    "filters": {
+                      "type": "object",
+                      "properties": {
+                        "genres": {
+                          "maxItems": 10,
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "yearFrom": {
+                          "type": "integer",
+                          "minimum": 1900,
+                          "maximum": 2100
+                        },
+                        "yearTo": {
+                          "type": "integer",
+                          "minimum": 1900,
+                          "maximum": 2100
+                        },
+                        "rating": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 10
+                        },
+                        "runtimeMin": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 1000
+                        },
+                        "runtimeMax": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 1000
+                        },
+                        "language": {
+                          "type": "string",
+                          "pattern": "^[a-z]{2}$"
+                        },
+                        "provider": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sort": {
+                          "type": "string",
+                          "enum": [
+                            "popularity",
+                            "rating",
+                            "release",
+                            "title"
+                          ]
+                        },
+                        "company": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "network": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "filters"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "items"
+              ]
+            }
+          },
+          "layout": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "rows",
+          "layout"
+        ]
+      },
+      "EmbyTokenSession": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "viewer": {
+            "$ref": "#/components/schemas/Viewer"
+          }
+        },
+        "required": [
+          "token",
+          "expiresAt",
+          "viewer"
+        ]
+      },
+      "Genre": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "version"
+        ]
+      },
+      "InWatchlist": {
+        "type": "object",
+        "properties": {
+          "inList": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "inList"
+        ]
+      },
+      "MediaDetails": {
+        "type": "object",
+        "properties": {
+          "tmdbId": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "movie",
+              "tv"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "posterPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "backdropPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "overview": {
+            "type": "string"
+          },
+          "blocked": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "by": {
+                    "type": "string",
+                    "const": "title"
+                  }
+                },
+                "required": [
+                  "by"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "by": {
+                    "type": "string",
+                    "const": "keyword"
+                  },
+                  "keyword": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "by",
+                  "keyword"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "partial",
+              "downloading",
+              "requested",
+              "pending",
+              "declined"
+            ]
+          },
+          "progress": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "embyItemId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Genre"
+            }
+          },
+          "runtime": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "seasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "seasonNumber": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "episodeCount": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "airDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "episodes": {
+                  "type": "object",
+                  "properties": {
+                    "present": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "expected": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "present",
+                    "expected"
+                  ]
+                },
+                "fourK": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "available",
+                        "partial",
+                        "downloading",
+                        "requested",
+                        "pending",
+                        "declined"
+                      ]
+                    },
+                    "progress": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "episodes": {
+                      "type": "object",
+                      "properties": {
+                        "present": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "expected": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "present",
+                        "expected"
+                      ]
+                    }
+                  }
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "available",
+                    "partial",
+                    "downloading",
+                    "requested",
+                    "pending",
+                    "declined"
+                  ]
+                },
+                "progress": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "seasonNumber",
+                "episodeCount",
+                "airDate"
+              ]
+            }
+          },
+          "cast": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "name": {
+                  "type": "string"
+                },
+                "character": {
+                  "type": "string"
+                },
+                "profilePath": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "character",
+                "profilePath"
+              ]
+            }
+          },
+          "crew": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "name": {
+                  "type": "string"
+                },
+                "jobs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "director",
+                      "writer",
+                      "creator"
+                    ]
+                  }
+                },
+                "profilePath": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "jobs",
+                "profilePath"
+              ]
+            }
+          },
+          "collection": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "posterPath": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "backdropPath": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "posterPath",
+                  "backdropPath"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trailerKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "watchProviders": {
+            "type": "object",
+            "properties": {
+              "flatrate": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WatchProvider"
+                }
+              },
+              "rent": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WatchProvider"
+                }
+              },
+              "buy": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WatchProvider"
+                }
+              }
+            },
+            "required": [
+              "flatrate",
+              "rent",
+              "buy"
+            ]
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaSummary"
+            }
+          },
+          "similar": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaSummary"
+            }
+          },
+          "externalIds": {
+            "type": "object",
+            "properties": {
+              "imdb": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tvdb": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "imdb",
+              "tvdb"
+            ]
+          },
+          "fourK": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "partial",
+                  "downloading",
+                  "requested",
+                  "pending",
+                  "declined"
+                ]
+              },
+              "progress": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "episodes": {
+                "type": "object",
+                "properties": {
+                  "present": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "expected": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "present",
+                  "expected"
+                ]
+              }
+            }
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Genre"
+            }
+          },
+          "originalLanguage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastAired": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "seasonNumber": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "episodeNumber": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "seasonNumber",
+                  "episodeNumber"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "tmdbId",
+          "type",
+          "title",
+          "year",
+          "posterPath",
+          "backdropPath",
+          "overview",
+          "embyItemId",
+          "genres",
+          "runtime",
+          "seasons",
+          "cast",
+          "trailerKey",
+          "watchProviders",
+          "recommendations",
+          "similar",
+          "externalIds"
+        ]
+      },
+      "MediaKey": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "movie",
+              "tv"
+            ]
+          },
+          "tmdbId": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "type",
+          "tmdbId"
+        ]
+      },
+      "MediaSearchResults": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaSummary"
+            }
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "name": {
+                  "type": "string"
+                },
+                "profilePath": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "knownFor": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "profilePath",
+                "knownFor"
+              ]
+            }
+          }
+        },
+        "required": [
+          "page",
+          "totalPages",
+          "results",
+          "people"
+        ]
+      },
+      "MediaSummary": {
+        "type": "object",
+        "properties": {
+          "tmdbId": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "movie",
+              "tv"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "posterPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "backdropPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "overview": {
+            "type": "string"
+          },
+          "blocked": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "by": {
+                    "type": "string",
+                    "const": "title"
+                  }
+                },
+                "required": [
+                  "by"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "by": {
+                    "type": "string",
+                    "const": "keyword"
+                  },
+                  "keyword": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "by",
+                  "keyword"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "partial",
+              "downloading",
+              "requested",
+              "pending",
+              "declined"
+            ]
+          },
+          "progress": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "embyItemId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "tmdbId",
+          "type",
+          "title",
+          "year",
+          "posterPath",
+          "backdropPath",
+          "overview"
+        ]
+      },
+      "NotificationPage": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationView"
+            }
+          },
+          "unread": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "page",
+          "totalPages",
+          "results",
+          "unread"
+        ]
+      },
+      "NotificationPreferences": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email",
+                "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "emailNotifications": {
+            "type": "boolean"
+          },
+          "pushNotifications": {
+            "type": "boolean"
+          },
+          "types": {
+            "type": "object",
+            "properties": {
+              "requested": {
+                "type": "boolean"
+              },
+              "approved": {
+                "type": "boolean"
+              },
+              "declined": {
+                "type": "boolean"
+              },
+              "available": {
+                "type": "boolean"
+              },
+              "failed": {
+                "type": "boolean"
+              },
+              "auto_approved": {
+                "type": "boolean"
+              },
+              "requested_on_behalf": {
+                "type": "boolean"
+              },
+              "issue_created": {
+                "type": "boolean"
+              },
+              "issue_commented": {
+                "type": "boolean"
+              },
+              "issue_resolved": {
+                "type": "boolean"
+              },
+              "issue_reopened": {
+                "type": "boolean"
+              }
+            }
+          },
+          "emailAvailable": {
+            "type": "boolean"
+          },
+          "pushDevices": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "email",
+          "emailNotifications",
+          "pushNotifications",
+          "types",
+          "emailAvailable",
+          "pushDevices"
+        ]
+      },
+      "NotificationView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "requested",
+              "approved",
+              "declined",
+              "available",
+              "failed",
+              "auto_approved",
+              "requested_on_behalf",
+              "issue_created",
+              "issue_commented",
+              "issue_resolved",
+              "issue_reopened"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "requestId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "issueId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "media": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MediaKey"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "body",
+          "read",
+          "createdAt",
+          "requestId",
+          "issueId",
+          "media"
+        ]
+      },
+      "PagedMedia": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaSummary"
+            }
+          }
+        },
+        "required": [
+          "page",
+          "totalPages",
+          "results"
+        ]
+      },
+      "PersonDetails": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "name": {
+            "type": "string"
+          },
+          "profilePath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "knownForDepartment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "birthday": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deathday": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "placeOfBirth": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "biography": {
+            "type": "string"
+          },
+          "movies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tmdbId": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "movie",
+                    "tv"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "year": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "posterPath": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "backdropPath": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "overview": {
+                  "type": "string"
+                },
+                "blocked": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "by": {
+                          "type": "string",
+                          "const": "title"
+                        }
+                      },
+                      "required": [
+                        "by"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "by": {
+                          "type": "string",
+                          "const": "keyword"
+                        },
+                        "keyword": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "by",
+                        "keyword"
+                      ]
+                    }
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "available",
+                    "partial",
+                    "downloading",
+                    "requested",
+                    "pending",
+                    "declined"
+                  ]
+                },
+                "progress": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "embyItemId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "actor",
+                      "crew"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "tmdbId",
+                "type",
+                "title",
+                "year",
+                "posterPath",
+                "backdropPath",
+                "overview",
+                "roles"
+              ]
+            }
+          },
+          "shows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tmdbId": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "movie",
+                    "tv"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "year": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "posterPath": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "backdropPath": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "overview": {
+                  "type": "string"
+                },
+                "blocked": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "by": {
+                          "type": "string",
+                          "const": "title"
+                        }
+                      },
+                      "required": [
+                        "by"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "by": {
+                          "type": "string",
+                          "const": "keyword"
+                        },
+                        "keyword": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "by",
+                        "keyword"
+                      ]
+                    }
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "available",
+                    "partial",
+                    "downloading",
+                    "requested",
+                    "pending",
+                    "declined"
+                  ]
+                },
+                "progress": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "embyItemId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "actor",
+                      "crew"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "tmdbId",
+                "type",
+                "title",
+                "year",
+                "posterPath",
+                "backdropPath",
+                "overview",
+                "roles"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "profilePath",
+          "knownForDepartment",
+          "birthday",
+          "deathday",
+          "placeOfBirth",
+          "biography",
+          "movies",
+          "shows"
+        ]
+      },
+      "QuotaUsage": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "days": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "used": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "remaining": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "limit",
+          "days",
+          "used",
+          "remaining"
+        ]
+      },
+      "RequestCounts": {
+        "type": "object",
+        "properties": {
+          "pendingApprovals": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mineActive": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "pendingApprovals",
+          "mineActive"
+        ]
+      },
+      "RequestDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "movie",
+              "tv"
+            ]
+          },
+          "tmdbId": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "declined",
+              "cancelled",
+              "sent",
+              "failed",
+              "available"
+            ]
+          },
+          "seasons": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "requester": {
+            "$ref": "#/components/schemas/RequestPerson"
+          },
+          "createdBy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequestPerson"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quotaExempt": {
+            "type": "boolean"
+          },
+          "decidedBy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequestPerson"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "declineReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "qualityProfileId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rootFolder": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seriesType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "standard",
+                  "anime",
+                  "daily"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "is4k": {
+            "type": "boolean"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "media": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MediaSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failureReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "requested",
+                    "approved",
+                    "declined",
+                    "cancelled",
+                    "sent",
+                    "failed",
+                    "retried",
+                    "available"
+                  ]
+                },
+                "actor": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RequestPerson"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "actor",
+                "detail",
+                "createdAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "tmdbId",
+          "status",
+          "seasons",
+          "requester",
+          "createdBy",
+          "quotaExempt",
+          "decidedBy",
+          "declineReason",
+          "qualityProfileId",
+          "rootFolder",
+          "seriesType",
+          "is4k",
+          "server",
+          "createdAt",
+          "updatedAt",
+          "media",
+          "failureReason",
+          "events"
+        ]
+      },
+      "RequestPage": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequestView"
+            }
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "pending": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "approved": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "declined": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "cancelled": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "sent": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "failed": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "available": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "pending",
+              "approved",
+              "declined",
+              "cancelled",
+              "sent",
+              "failed",
+              "available"
+            ]
+          }
+        },
+        "required": [
+          "page",
+          "totalPages",
+          "results",
+          "totals"
+        ]
+      },
+      "RequestPerson": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "avatarUrl"
+        ]
+      },
+      "RequestQuota": {
+        "type": "object",
+        "properties": {
+          "movies": {
+            "$ref": "#/components/schemas/QuotaUsage"
+          },
+          "seasons": {
+            "$ref": "#/components/schemas/QuotaUsage"
+          },
+          "exempt": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "movies",
+          "seasons",
+          "exempt"
+        ]
+      },
+      "RequestView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "movie",
+              "tv"
+            ]
+          },
+          "tmdbId": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "declined",
+              "cancelled",
+              "sent",
+              "failed",
+              "available"
+            ]
+          },
+          "seasons": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "requester": {
+            "$ref": "#/components/schemas/RequestPerson"
+          },
+          "createdBy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequestPerson"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quotaExempt": {
+            "type": "boolean"
+          },
+          "decidedBy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequestPerson"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "declineReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "qualityProfileId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rootFolder": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seriesType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "standard",
+                  "anime",
+                  "daily"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "is4k": {
+            "type": "boolean"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "media": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MediaSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failureReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "tmdbId",
+          "status",
+          "seasons",
+          "requester",
+          "createdBy",
+          "quotaExempt",
+          "decidedBy",
+          "declineReason",
+          "qualityProfileId",
+          "rootFolder",
+          "seriesType",
+          "is4k",
+          "server",
+          "createdAt",
+          "updatedAt",
+          "media",
+          "failureReason"
+        ]
+      },
+      "Viewer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "member",
+              "auto_approve",
+              "manager",
+              "owner"
+            ]
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/Capabilities"
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "role",
+          "capabilities",
+          "avatarUrl"
+        ]
+      },
+      "ViewerResponse": {
+        "type": "object",
+        "properties": {
+          "viewer": {
+            "$ref": "#/components/schemas/Viewer"
+          }
+        },
+        "required": [
+          "viewer"
+        ]
+      },
+      "WatchProvider": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "name": {
+            "type": "string"
+          },
+          "logoPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "logoPath"
+        ]
+      },
+      "WatchlistEntry": {
+        "type": "object",
+        "properties": {
+          "tmdbId": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "movie",
+              "tv"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "posterPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "backdropPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "overview": {
+            "type": "string"
+          },
+          "blocked": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "by": {
+                    "type": "string",
+                    "const": "title"
+                  }
+                },
+                "required": [
+                  "by"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "by": {
+                    "type": "string",
+                    "const": "keyword"
+                  },
+                  "keyword": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "by",
+                  "keyword"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "partial",
+              "downloading",
+              "requested",
+              "pending",
+              "declined"
+            ]
+          },
+          "progress": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "embyItemId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "trakt",
+              "letterboxd"
+            ]
+          },
+          "addedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tmdbId",
+          "type",
+          "title",
+          "year",
+          "posterPath",
+          "backdropPath",
+          "overview",
+          "source",
+          "addedAt"
+        ]
+      },
+      "WatchlistImportResult": {
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "trakt",
+              "letterboxd"
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "imported": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "alreadyInList": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "year": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "no_tmdb_id",
+                    "not_found",
+                    "ambiguous"
+                  ]
+                }
+              },
+              "required": [
+                "title",
+                "year",
+                "reason"
+              ]
+            }
+          }
+        },
+        "required": [
+          "dryRun",
+          "source",
+          "total",
+          "truncated",
+          "imported",
+          "alreadyInList",
+          "skipped"
+        ]
+      },
+      "WatchlistPage": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WatchlistEntry"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "page",
+          "totalPages",
+          "results",
+          "total"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "request_session",
+        "description": "Navigateur : cookie de session signé posé par `POST /api/auth/login`. Toute écriture (POST, PUT, PATCH, DELETE) exige aussi l’en-tête `x-request: 1` et une origine absente ou identique à l’hôte, sinon 403."
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Client natif : jeton de session renvoyé par `POST /api/auth/emby-token`, dans `Authorization: Bearer <jeton>`. Droits réels du membre ; pas de contrôle CSRF."
+      },
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "Script ou outil externe : clé d’API créée par le propriétaire (Réglages › API), qui agit avec les droits de son créateur. Pas de contrôle CSRF."
+      }
+    }
+  }
+}

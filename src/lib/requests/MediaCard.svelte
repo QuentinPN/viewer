@@ -1,0 +1,30 @@
+<script lang="ts">
+// A title of Request as a library poster card (lift, focus), its status at the
+// bottom left of the artwork.
+import PosterCard from "../library/PosterCard.svelte";
+import "./requests.css";
+import { cardItem } from "./browse";
+import { mediaStatusText, statusTone } from "./labels";
+import { currentStatus } from "./statusOverrides.svelte";
+import type { MediaSummary } from "./types";
+
+interface Props {
+  media: MediaSummary;
+  onOpen: (media: MediaSummary) => void;
+}
+
+let { media, onOpen }: Props = $props();
+
+const item = $derived(cardItem(media));
+const shown = $derived(currentStatus(media));
+</script>
+
+<PosterCard {item} onOpen={() => onOpen(media)}>
+  {#snippet badge()}
+    {#if shown.status}
+      <span class="ur-badge ur-tone-{statusTone(shown.status)}">
+        {mediaStatusText(shown.status, shown.progress)}
+      </span>
+    {/if}
+  {/snippet}
+</PosterCard>

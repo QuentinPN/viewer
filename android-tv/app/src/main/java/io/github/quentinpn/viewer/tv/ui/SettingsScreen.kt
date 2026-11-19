@@ -73,6 +73,9 @@ import io.github.quentinpn.viewer.tv.update.CheckResult
 import io.github.quentinpn.viewer.tv.update.UpdatePrompt
 import io.github.quentinpn.viewer.tv.update.Updater
 import io.github.quentinpn.viewer.tv.update.readyOf
+import io.github.quentinpn.viewer.tv.ui.requests.RequestsSettingsDialogs
+import io.github.quentinpn.viewer.tv.ui.requests.rememberRequestsSettings
+import io.github.quentinpn.viewer.tv.ui.requests.requestsSettingsSection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -136,6 +139,7 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     LaunchedEffect(images) { cache = withContext(Dispatchers.IO) { measure(images) } }
     val first = remember { FocusRequester() }
+    val requestsSettings = rememberRequestsSettings(AppServices.requests(context))
     fun change(next: PlaybackSettings) {
         settings = next
         store.save(next)
@@ -325,6 +329,8 @@ fun SettingsScreen(
             }
         }
 
+        requestsSettingsSection(requestsSettings)
+
         item { Section("Mises à jour") }
         item {
             Note(
@@ -399,6 +405,7 @@ fun SettingsScreen(
     // The home's card and install flow, « sources inconnues » step included; « Plus tard » here
     // only closes it, the home still offers the update
     if (updateCard) UpdatePrompt { updateCard = false }
+    RequestsSettingsDialogs(requestsSettings)
 }
 
 private fun onOff(on: Boolean) = if (on) "Activé" else "Désactivé"
@@ -433,7 +440,7 @@ private fun measure(images: ImageLoader): ImageCacheUsage {
 }
 
 @Composable
-private fun Section(title: String) {
+internal fun Section(title: String) {
     Text(
         title,
         style = MaterialTheme.typography.titleLarge,
@@ -443,13 +450,13 @@ private fun Section(title: String) {
 }
 
 @Composable
-private fun Subsection(title: String) {
+internal fun Subsection(title: String) {
     Text(title, style = MaterialTheme.typography.titleMedium, color = Palette.text, modifier = Modifier.padding(top = 12.dp))
 }
 
 /** A read-only row: focusable so ▲ ▼ scroll to it, OK does nothing. */
 @Composable
-private fun Info(row: InfoRow) {
+internal fun Info(row: InfoRow) {
     ListItem(
         selected = false,
         onClick = {},
@@ -461,13 +468,13 @@ private fun Info(row: InfoRow) {
 }
 
 @Composable
-private fun Note(text: String) {
+internal fun Note(text: String) {
     Text(text, color = Palette.textSecondary, modifier = Modifier.widthIn(max = 760.dp))
 }
 
 /** One focusable row: OK changes [value]. A ListItem stays the same node, so focus stays on it. */
 @Composable
-private fun Choice(
+internal fun Choice(
     title: String,
     detail: String?,
     value: String,

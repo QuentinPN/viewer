@@ -53,17 +53,19 @@ internal fun GlassButton(
     height: Dp = 36.dp,
     /** False leaves it dimmed and out of the focus path. */
     enabled: Boolean = true,
+    /** Dimmed like a disabled one and does nothing on OK, but stays on the focus path with its ring (a button that says why it is off). */
+    dimmed: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
     val still = reducedMotion()
     Surface(
-        onClick = onClick,
+        onClick = if (dimmed) ({}) else onClick,
         modifier = modifier.height(height),
         enabled = enabled,
         shape = ClickableSurfaceDefaults.shape(shape),
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (selected) Palette.text else Glass,
-            contentColor = if (selected) Color.Black else Palette.text,
+            containerColor = if (dimmed) Glass.copy(alpha = 0.12f) else if (selected) Palette.text else Glass,
+            contentColor = if (dimmed) Palette.textSecondary.copy(alpha = 0.7f) else if (selected) Color.Black else Palette.text,
             focusedContainerColor = Palette.text,
             focusedContentColor = Color.Black,
             pressedContainerColor = Palette.text,
