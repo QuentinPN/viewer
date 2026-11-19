@@ -161,8 +161,8 @@ class RequestRepository(
 
     suspend fun quota(): RequestQuota = authorized { c, t -> c.get("/api/requests/quota", t, RequestQuota.serializer()) }
 
-    suspend fun request(request: NewRequest): RequestView =
-        authorized { c, t -> c.send("POST", "/api/requests", t, RequestView.serializer(), request.toJson()) }
+    suspend fun request(request: NewRequest): RequestDetail =
+        authorized { c, t -> c.send("POST", "/api/requests", t, RequestDetail.serializer(), request.toJson()) }
 
     /** The member's own requests; [statuses] go in one comma-separated `status` parameter, none means all. */
     suspend fun myRequests(statuses: List<RequestStatus> = emptyList(), page: Int = 1): RequestPage =
@@ -171,8 +171,8 @@ class RequestRepository(
     suspend fun requestDetail(id: Int): RequestDetail =
         authorized { c, t -> c.get("/api/requests/$id", t, RequestDetail.serializer()) }
 
-    suspend fun cancel(id: Int): RequestView =
-        authorized { c, t -> c.send("POST", "/api/requests/$id/cancel", t, RequestView.serializer()) }
+    suspend fun cancel(id: Int): RequestDetail =
+        authorized { c, t -> c.send("POST", "/api/requests/$id/cancel", t, RequestDetail.serializer()) }
 
     suspend fun sessions(): List<AuthSession> =
         authorized { c, t -> c.get("/api/auth/sessions", t, AuthSessions.serializer()).sessions }

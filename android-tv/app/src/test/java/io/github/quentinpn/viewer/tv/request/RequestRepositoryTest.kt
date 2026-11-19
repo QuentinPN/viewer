@@ -403,6 +403,25 @@ class RequestRepositoryTest {
         assertEquals(3, repo.requestDetail(102).events.size)
     }
 
+    /** The contract answers both writes with a RequestDetail: the timeline must not be dropped. */
+    @Test
+    fun writesAnswerWithTheTimeline() = runBlocking {
+        accepts = { true }
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                seen += request
+                return when (request.url.encodedPath) {
+                    "/api/version" -> json(200, fixture("version-ok"))
+                    "/api/auth/emby-token" -> exchangeOk(1)
+                    "/api/requests", "/api/requests/102/cancel" -> json(201, fixture("request-detail"))
+                    else -> json(404, fixture("error"))
+                }
+            }
+        }
+        assertEquals(3, repo.request(NewRequest(MediaType.Movie, 603)).events.size)
+        assertEquals(3, repo.cancel(102).events.size)
+    }
+
     @Test
     fun statusTellsSignedOutFromNotConfigured() = runBlocking {
         store.address = null
