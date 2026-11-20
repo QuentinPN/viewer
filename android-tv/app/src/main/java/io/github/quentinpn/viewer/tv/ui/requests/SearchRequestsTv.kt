@@ -89,9 +89,10 @@ internal fun SearchRequestsTv(
             if (state.pager.untouched) state.more(repository, scope)
             return@LaunchedEffect
         }
-        // A new key cancels this effect, and with it the search of an older term
-        if (!now) delay(SEARCH_DEBOUNCE_MS)
         val sameTerm = state.query == query
+        // A new key cancels this effect, and with it the search of an older term; the same term read
+        // again (after a request) starts at once, as Parcourir does
+        if (!now && !sameTerm) delay(SEARCH_DEBOUNCE_MS)
         state.pager.stamp = memory.revision
         state.start(query, repository, scope)
         if (!sameTerm) state.grid.scrollToItem(0)

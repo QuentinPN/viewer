@@ -71,6 +71,9 @@ class RequestsMemory(
     internal val mine = MineState()
     internal val search = RequestSearchState()
 
+    /** True when Rechercher was just chosen: its field takes the focus once, not on every return to it. */
+    internal var typeNext = false
+
     /** True once a « Tout voir » opened a grid: Back goes to Découvrir before leaving the tab. */
     internal var fromSeeAll = false
 
@@ -96,6 +99,7 @@ class RequestsMemory(
     internal fun select(next: RequestsSegment) {
         segment = next
         fromSeeAll = false
+        typeNext = next == RequestsSegment.Search
     }
 }
 
@@ -173,7 +177,9 @@ private fun RequestsSegments(repository: RequestRepository, memory: RequestsMemo
     LaunchedEffect(memory.segment) {
         if (memory.opened != null) return@LaunchedEffect
         withFrameNanos {}
-        runCatching { (if (memory.segment == RequestsSegment.Search) firstPill else first).requestFocus() }
+        val type = memory.segment == RequestsSegment.Search && memory.typeNext
+        memory.typeNext = false
+        runCatching { (if (type) firstPill else first).requestFocus() }
     }
     val toPills = if (memory.segment == RequestsSegment.Discover) Modifier else Modifier.focusProperties { down = firstPill }
     Row(Modifier.padding(horizontal = 48.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
