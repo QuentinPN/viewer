@@ -2,7 +2,7 @@
 
 > Release GitHub remplacée par une release Gitea : voir ADR 0111.
 
-Statut : Accepté (2026-11-08), à la demande du propriétaire.
+Statut : Accepté (2026-11-08), à la demande du propriétaire. Publication remplacée par l'ADR 0126 (Gitea Actions) : `npm run release:publish` n'existe plus, `scripts/publish.ts` tourne en CI.
 
 ## Contexte
 `npm run release` (ADR 0032) monte le numéro, écrit le journal, commite et tague, sans rien pousser. L'installateur était ensuite construit à la main, et seuls les tags arrivaient sur GitHub : aucune release ne gardait les installateurs des versions 0.1.0 à 1.0.0. La 1.0.1 a été la première release GitHub, créée à la main. Le propriétaire veut que la release soit créée automatiquement. Les GitHub Actions sont désactivées à sa demande.

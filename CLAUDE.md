@@ -54,6 +54,8 @@ At the start of every task, read `PRODUCT.md`, `ARCHITECTURE.md`, `DESIGN.md`, `
 
 ## Testing and release
 
+Releases are automatic (ADR 0126): merge into `main` (merge commit, Conventional Commits: `feat`/`fix` release, `ci`/`docs`/`refactor`/`chore` do not) and `.gitea/workflows/release.yml` bumps, tags and publishes each changed track (desktop `vX.Y.Z`, Android TV `android-vX.Y.Z`). Before a risky release, run it by `workflow_dispatch` with `dry-run` on `dev`: both artifacts are built, nothing is published. Never edit versions or `CHANGELOG.md` / `android-tv/CHANGELOG.md` by hand, except a deliberate version bump.
+
 Follow `TESTING.md`. Never deploy or package a release if core playback gates are unverified. Audit redistribution and licensing obligations for mpv/FFmpeg and bundled binaries. Ship a Windows installer only after smoke tests on a clean Windows machine.
 
 ## Skills routing

@@ -1,6 +1,6 @@
 # ADR 0112 — Mises à jour automatiques (desktop et Android TV)
 
-Statut : Accepté (2026-11-13). Complète l'ADR 0111.
+Statut : Accepté (2026-11-13). Complète l'ADR 0111. Les manifestes sont désormais réécrits par Gitea Actions (ADR 0126) ; le reste ne change pas.
 
 ## Contexte
 Le propriétaire veut des mises à jour « à la Discord » : téléchargement en arrière-plan, puis l'app indique qu'une mise à jour est prête et demande s'il veut l'appliquer ; s'il accepte, l'app redémarre à jour. Objectifs : plus d'assistant NSIS en plusieurs étapes sur le PC, plus d'`adb install` pour la Shield. Design validé : pastille vitrée « Mise à jour prête » puis carte vitrée 440 px (desktop), carte focusable « Installer / Plus tard » (TV).

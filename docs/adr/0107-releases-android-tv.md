@@ -2,7 +2,7 @@
 
 > Release GitHub remplacée par une release Gitea : voir ADR 0111.
 
-Statut : Accepté (2026-11-11), à la demande du propriétaire.
+Statut : Accepté (2026-11-11), à la demande du propriétaire. Publication remplacée par l'ADR 0126 (Gitea Actions) : `npm run android:publish` n'existe plus, version et journal sont écrits par l'action, `scripts/publish-android.ts` tourne en CI.
 
 ## Contexte
 L'app Android TV (`android-tv/`) a son propre numéro de version (`versionName` et `versionCode` dans `app/build.gradle.kts`) et son propre journal (`android-tv/CHANGELOG.md`, ADR 0032). Les tags `vX.Y.Z` et les releases GitHub (ADR 0106) sont ceux de l'app desktop. Les APK n'étaient gardés nulle part : chaque version installée sur la Shield n'existait que sur le disque. Le propriétaire a demandé si l'app Android devait avoir son propre dépôt.

@@ -1,6 +1,6 @@
 # ADR 0032 — Numéros de version et montées de version
 
-Statut : Accepté (2026-11-07), à la demande du propriétaire.
+Statut : Accepté (2026-11-07), à la demande du propriétaire. Remplacé par l'ADR 0126 : versions et journal sont écrits par Gitea Actions, `scripts/release.ts` n'existe plus.
 
 ## Contexte
 L'application restait en 0.1.0 : chaque installateur portait le même numéro, et rien ne distinguait la version installée. Le numéro était écrit à trois endroits (`package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`), plus les deux fichiers de verrouillage.
