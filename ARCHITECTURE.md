@@ -59,7 +59,7 @@ Tauri WebView2 and libmpv rendering/overlay composition can conflict. Prototype 
 
 Secure OS credential store, TLS validation, user-scoped permissions, sanitized logs, narrow Tauri capabilities, no arbitrary shell commands, no credentials in cache. User must authorize real server access and any server-side change. The player follows no redirects and FFmpeg's own opens are limited to network protocols; a segment on another host named by an HLS playlist still receives the token, an accepted risk (ADR 0025). FFmpeg validates HTTPS against the Windows root certificates, exported to a PEM file before each HTTPS load (ADR 0026). The token stays out of the WebView, and `player_open`, which takes a URL from the WebView, is refused outside development builds.
 
-Logs (ADR 0033): `src-tauri/src/diagnostics.rs` is the `log` backend. It writes `viewer.log` in the app log directory, keeps 3 files of 2 MiB and redacts every line (`diagnostics::redact`) before writing. A panic hook writes the panic and its backtrace there. `diagnostics_open_log_dir` takes no argument and opens only that folder in the explorer.
+Logs (ADR 0033): `src-tauri/src/diagnostics.rs` is the `log` backend. It writes `viewer.log` in the app log directory, keeps 3 files of 2 MiB and redacts every line (`diagnostics::redact`) before writing. A panic hook writes the panic and its backtrace there. `diagnostics_open_log_dir` takes no argument and opens only that folder in the explorer. The only other caller of that explorer launch is `ur_open_trailer` (ADR 0127): it takes a YouTube video id, validates it and builds the `https://www.youtube.com/watch?v=` address itself, so the WebView never chooses what is opened.
 
 ## Request (ADR 0125)
 

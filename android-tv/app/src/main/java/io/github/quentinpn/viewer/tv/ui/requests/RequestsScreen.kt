@@ -44,6 +44,7 @@ internal enum class RequestsSegment(val label: String) {
     Discover("Découvrir"),
     Films("Films"),
     Series("Séries"),
+    Search("Rechercher"),
 }
 
 /**
@@ -68,6 +69,10 @@ class RequestsMemory(
     internal val discoverRows = mutableMapOf<String, LazyListState>()
     internal val browse = mutableMapOf<MediaType, BrowseState>()
     internal val mine = MineState()
+    internal val search = RequestSearchState()
+
+    /** True when Rechercher was just chosen: its field takes the focus once, not on every return to it. */
+    internal var typeNext = false
 
     /** True once a « Tout voir » opened a grid: Back goes to Découvrir before leaving the tab. */
     internal var fromSeeAll = false
@@ -94,6 +99,7 @@ class RequestsMemory(
     internal fun select(next: RequestsSegment) {
         segment = next
         fromSeeAll = false
+        typeNext = next == RequestsSegment.Search
     }
 }
 
@@ -122,13 +128,15 @@ fun RequestsScreen(
     images: ImageLoader,
     /** « Lire »: the title's page in Emby, by its type and Emby id. */
     onOpenEmby: (MediaType, String) -> Unit,
+    /** « Bande-annonce »: a checked address opened outside the app; false when no app can. */
+    onTrailer: (url: String) -> Boolean,
     onClose: () -> Unit,
 ) {
     BackHandler {
         when {
             memory.stack.size == 1 && memory.standalone -> onClose()
             memory.stack.isNotEmpty() -> memory.stack = memory.stack.dropLast(1)
-            memory.fromSeeAll -> memory.select(RequestsSegment.Discover)
+            memory.fromSeeAll || memory.segment == RequestsSegment.Search -> memory.select(RequestsSegment.Discover)
             else -> onClose()
         }
     }
@@ -139,7 +147,7 @@ fun RequestsScreen(
     // A title, the list of requests or one request takes the whole screen
     if (status?.state == RequestState.Ready && page != null) {
         when (page) {
-            is RequestsPage.Media -> MediaTv(repository, memory, art, page, checkNotNull(status.viewer).capabilities) { onOpenEmby(it.type, it.id) }
+            is RequestsPage.Media -> MediaTv(repository, memory, art, page, checkNotNull(status.viewer).capabilities, onTrailer) { onOpenEmby(it.type, it.id) }
             RequestsPage.Mine -> MyRequestsTv(repository, memory, art) { memory.open(RequestsPage.Detail(it.id), from = requestKey(it)) }
             is RequestsPage.Detail -> RequestDetailTv(repository, memory, art, page, onOpenEmby)
         }
@@ -163,14 +171,16 @@ fun RequestsScreen(
 @Composable
 private fun RequestsSegments(repository: RequestRepository, memory: RequestsMemory, art: RequestArt) {
     val first = remember { FocusRequester() }
-    // The selected segment takes the focus when the tab opens, unless a card is to get it back
+    // Down from the segments of a grid lands on its first filter pill (or the search field), not on the nearest one
+    val firstPill = remember { FocusRequester() }
+    // The selected segment takes the focus when the tab opens, the field when Rechercher is chosen, unless a card is to get it back
     LaunchedEffect(memory.segment) {
         if (memory.opened != null) return@LaunchedEffect
         withFrameNanos {}
-        runCatching { first.requestFocus() }
+        val type = memory.segment == RequestsSegment.Search && memory.typeNext
+        memory.typeNext = false
+        runCatching { (if (type) firstPill else first).requestFocus() }
     }
-    // Down from the segments of a grid lands on its first filter pill, not on the nearest one (Genre)
-    val firstPill = remember { FocusRequester() }
     val toPills = if (memory.segment == RequestsSegment.Discover) Modifier else Modifier.focusProperties { down = firstPill }
     Row(Modifier.padding(horizontal = 48.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         for (segment in RequestsSegment.entries) {
@@ -194,5 +204,6 @@ private fun RequestsSegments(repository: RequestRepository, memory: RequestsMemo
         }
         RequestsSegment.Films -> BrowseTv(repository, memory, MediaType.Movie, art, firstPill, open)
         RequestsSegment.Series -> BrowseTv(repository, memory, MediaType.Tv, art, firstPill, open)
+        RequestsSegment.Search -> SearchRequestsTv(repository, memory, art, firstPill, open)
     }
 }

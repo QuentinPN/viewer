@@ -43,6 +43,8 @@ export const requestsApi = {
   cancel: (id: number) => invoke<RequestDetail>("ur_cancel", { id }),
   sessions: () => invoke<AuthSession[]>("ur_sessions"),
   revokeSession: (id: string) => invoke<void>("ur_revoke_session", { id }),
+  /** « Bande-annonce »: the YouTube page of the key, in the default browser (ADR 0127). */
+  openTrailer: (key: string) => invoke<void>("ur_open_trailer", { key }),
 };
 
 /** The `{ kind, message }` of a failed command; the server's text is kept as is. */

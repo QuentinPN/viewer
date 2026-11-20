@@ -43,6 +43,7 @@ import io.github.quentinpn.viewer.tv.ui.GlassButton
 import io.github.quentinpn.viewer.tv.ui.Load
 import io.github.quentinpn.viewer.tv.ui.Palette
 import io.github.quentinpn.viewer.tv.ui.Retry
+import io.github.quentinpn.viewer.tv.ui.TRAILER_NO_APP
 import io.github.quentinpn.viewer.tv.request.Capabilities
 import io.github.quentinpn.viewer.tv.request.EmbyTitle
 import io.github.quentinpn.viewer.tv.request.MediaDetails
@@ -51,6 +52,7 @@ import io.github.quentinpn.viewer.tv.request.StatusLabel
 import io.github.quentinpn.viewer.tv.request.RequestRepository
 import io.github.quentinpn.viewer.tv.request.embyTitle
 import io.github.quentinpn.viewer.tv.request.mediaStatusLabel
+import io.github.quentinpn.viewer.tv.request.trailerPage
 import kotlinx.coroutines.delay
 
 /** A level over the Demander segments; Back pops it. */
@@ -70,7 +72,7 @@ private const val MESSAGE_MS = 4_000L
 /**
  * A title of Request: backdrop under a left and bottom scrim, title, meta, synopsis, then « Lire »
  * when it is in Emby and « Demander » when there is something to ask for (and the account may),
- * else « Rien à demander »; the cast below. A blocked title cannot be asked for. After a request the page
+ * else « Rien à demander », then « Bande-annonce » when the title has one (its YouTube page, outside the app); the cast below. A blocked title cannot be asked for. After a request the page
  * reads the title again and says so for a moment.
  */
 @Composable
@@ -80,6 +82,8 @@ internal fun MediaTv(
     art: RequestArt,
     page: RequestsPage.Media,
     capabilities: Capabilities,
+    /** Opens a checked trailer address outside the app; false when no app can (ADR 0083). */
+    onTrailer: (url: String) -> Boolean,
     /** OK on « Lire »: the title's Emby page, by its Emby id. */
     onPlay: (EmbyTitle) -> Unit,
 ) {
@@ -87,6 +91,7 @@ internal fun MediaTv(
     var attempt by remember(page) { mutableIntStateOf(0) }
     var asking by remember(page) { mutableStateOf(false) }
     var message by remember(page) { mutableStateOf<String?>(null) }
+    var trailerFailed by remember(page) { mutableStateOf(false) }
     val first = remember { FocusRequester() }
 
     LaunchedEffect(page, attempt) {
@@ -136,8 +141,17 @@ internal fun MediaTv(
                                 color = Palette.textSecondary,
                             )
                         }
+                        // Never the first button, unless it is the only one
+                        trailerPage(title.trailerKey)?.let { url ->
+                            GlassButton(
+                                onClick = { trailerFailed = !onTrailer(url) },
+                                modifier = if (read == null && !canAsk) Modifier.focusRequester(first) else Modifier,
+                                height = BUTTON_HEIGHT,
+                            ) { Text("Bande-annonce") }
+                        }
                     }
                     message?.let { Text(it, color = Palette.success) }
+                    if (trailerFailed) Text(TRAILER_NO_APP, color = Palette.warning)
                     CastRowTv(title, art)
                 }
                 // The first button takes the focus once the page is read

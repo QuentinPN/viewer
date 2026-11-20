@@ -512,6 +512,7 @@ pub fn run() {
             request::commands::ur_cancel,
             request::commands::ur_sessions,
             request::commands::ur_revoke_session,
+            request::trailer::ur_open_trailer,
             diagnostics::diagnostics_open_log_dir,
             updater::app_update_pending,
             updater::app_update_install,
