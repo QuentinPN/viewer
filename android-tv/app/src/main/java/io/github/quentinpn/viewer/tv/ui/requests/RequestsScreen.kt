@@ -44,6 +44,7 @@ internal enum class RequestsSegment(val label: String) {
     Discover("Découvrir"),
     Films("Films"),
     Series("Séries"),
+    Search("Rechercher"),
 }
 
 /**
@@ -68,6 +69,7 @@ class RequestsMemory(
     internal val discoverRows = mutableMapOf<String, LazyListState>()
     internal val browse = mutableMapOf<MediaType, BrowseState>()
     internal val mine = MineState()
+    internal val search = RequestSearchState()
 
     /** True once a « Tout voir » opened a grid: Back goes to Découvrir before leaving the tab. */
     internal var fromSeeAll = false
@@ -128,7 +130,7 @@ fun RequestsScreen(
         when {
             memory.stack.size == 1 && memory.standalone -> onClose()
             memory.stack.isNotEmpty() -> memory.stack = memory.stack.dropLast(1)
-            memory.fromSeeAll -> memory.select(RequestsSegment.Discover)
+            memory.fromSeeAll || memory.segment == RequestsSegment.Search -> memory.select(RequestsSegment.Discover)
             else -> onClose()
         }
     }
@@ -163,14 +165,14 @@ fun RequestsScreen(
 @Composable
 private fun RequestsSegments(repository: RequestRepository, memory: RequestsMemory, art: RequestArt) {
     val first = remember { FocusRequester() }
-    // The selected segment takes the focus when the tab opens, unless a card is to get it back
+    // Down from the segments of a grid lands on its first filter pill (or the search field), not on the nearest one
+    val firstPill = remember { FocusRequester() }
+    // The selected segment takes the focus when the tab opens, the field when Rechercher is chosen, unless a card is to get it back
     LaunchedEffect(memory.segment) {
         if (memory.opened != null) return@LaunchedEffect
         withFrameNanos {}
-        runCatching { first.requestFocus() }
+        runCatching { (if (memory.segment == RequestsSegment.Search) firstPill else first).requestFocus() }
     }
-    // Down from the segments of a grid lands on its first filter pill, not on the nearest one (Genre)
-    val firstPill = remember { FocusRequester() }
     val toPills = if (memory.segment == RequestsSegment.Discover) Modifier else Modifier.focusProperties { down = firstPill }
     Row(Modifier.padding(horizontal = 48.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         for (segment in RequestsSegment.entries) {
@@ -194,5 +196,6 @@ private fun RequestsSegments(repository: RequestRepository, memory: RequestsMemo
         }
         RequestsSegment.Films -> BrowseTv(repository, memory, MediaType.Movie, art, firstPill, open)
         RequestsSegment.Series -> BrowseTv(repository, memory, MediaType.Tv, art, firstPill, open)
+        RequestsSegment.Search -> SearchRequestsTv(repository, memory, art, firstPill, open)
     }
 }

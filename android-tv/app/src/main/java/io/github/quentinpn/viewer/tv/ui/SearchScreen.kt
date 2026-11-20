@@ -323,7 +323,13 @@ fun SearchScreen(
  * ringed in the accent while typing. The ring sits in reserved space, so nothing moves.
  */
 @Composable
-private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Modifier, onSearch: () -> Unit) {
+internal fun SearchField(
+    value: String,
+    onChange: (String) -> Unit,
+    modifier: Modifier,
+    placeholder: String = "Titre d'un film, d'une série ou d'un épisode",
+    onSearch: () -> Unit,
+) {
     // Read on the field itself: a text field's interaction source does not report its focus here
     var focused by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
@@ -343,7 +349,7 @@ private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Mod
         Box(Modifier.weight(1f)) {
             if (value.isEmpty()) {
                 Text(
-                    "Titre d'un film, d'une série ou d'un épisode",
+                    placeholder,
                     color = if (focused) Color(0x99000000) else Palette.textSecondary,
                     fontSize = 18.sp,
                     maxLines = 1,
@@ -358,13 +364,16 @@ private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Mod
                 cursorBrush = SolidColor(ink),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-                // A text field keeps the D-pad for its cursor: Down goes on to the results
+                // A text field keeps the D-pad for its cursor: Down goes on to the results, Up to what is above, if anything
                 modifier = modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }.onPreviewKeyEvent {
-                    if (it.key == Key.DirectionDown && it.type == KeyEventType.KeyDown) {
-                        focusManager.moveFocus(FocusDirection.Down)
-                        true
-                    } else {
-                        false
+                    when {
+                        it.type != KeyEventType.KeyDown -> false
+                        it.key == Key.DirectionDown -> {
+                            focusManager.moveFocus(FocusDirection.Down)
+                            true
+                        }
+                        it.key == Key.DirectionUp -> focusManager.moveFocus(FocusDirection.Up)
+                        else -> false
                     }
                 },
             )
