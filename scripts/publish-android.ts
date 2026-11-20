@@ -28,7 +28,7 @@ const section =
   fail(`android-tv/CHANGELOG.md n'a pas de section ${version.name}`);
 
 powershell("libmpv Android", "fetch-libmpv-android.ps1");
-const studioJdk = "C:Program FilesAndroidAndroid Studiojbr";
+const studioJdk = "C:\\Program Files\\Android\\Android Studio\\jbr";
 // Gradle needs JDK 17+: Android Studio's, even over an older JAVA_HOME
 if (existsSync(studioJdk)) process.env.JAVA_HOME = studioJdk;
 step(
