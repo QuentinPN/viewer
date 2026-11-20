@@ -55,19 +55,13 @@ export function gitea(root: string) {
   }
 
   return {
-    async exists(tag: string): Promise<boolean> {
-      const res = await fetch(`${api}/releases/tags/${tag}`, { headers: auth });
-      if (res.status === 404) return false;
-      if (!res.ok) throw new Error(`Gitea release ${tag} : ${res.status}`);
-      return true;
-    },
-
     /** Page of the public releases repository. */
     page,
 
-    /** Creates the release (and its tag on the releases repository's main),
-     *  uploads the file and downloads it back without the token, as the apps
-     *  will, to check its SHA-256. */
+    /** Creates the release (and its tag on the releases repository's main), or
+     *  reuses it to redo a failed publish (ADR 0126); uploads the file unless the
+     *  same bytes are already there (a different one is replaced), then downloads
+     *  it back without the token, as the apps will, to check its SHA-256. */
     async publish(
       tag: string,
       title: string,
@@ -75,39 +69,55 @@ export function gitea(root: string) {
       file: string,
       sha256: string,
     ): Promise<Release> {
-      const created = await call("/releases", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tag_name: tag,
-          target_commitish: "main",
-          name: title,
-          body: notes,
-        }),
+      const found = await fetch(`${api}/releases/tags/${tag}`, {
+        headers: auth,
       });
-      const { id } = (await created.json()) as { id: number };
+      if (!found.ok && found.status !== 404)
+        throw new Error(`Gitea release ${tag} : ${found.status}`);
+      type Asset = { id: number; name: string; browser_download_url: string };
+      const { id, assets = [] } = (await (found.ok
+        ? found
+        : await call("/releases", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              tag_name: tag,
+              target_commitish: "main",
+              name: title,
+              body: notes,
+            }),
+          })
+      ).json()) as { id: number; assets?: Asset[] };
       const name = basename(file);
-      const form = new FormData();
-      form.append("attachment", new Blob([readFileSync(file)]), name);
-      const up = await call(
-        `/releases/${id}/assets?name=${encodeURIComponent(name)}`,
-        { method: "POST", body: form },
-      );
-      const { browser_download_url } = (await up.json()) as {
-        browser_download_url: string;
+      const online = async (url: string) => {
+        const back = await fetch(url);
+        if (!back.ok)
+          throw new Error(`téléchargement de contrôle : ${back.status}`);
+        return createHash("sha256")
+          .update(Buffer.from(await back.arrayBuffer()))
+          .digest("hex");
       };
-      const back = await fetch(browser_download_url);
-      if (!back.ok)
-        throw new Error(`téléchargement de contrôle : ${back.status}`);
-      const online = createHash("sha256")
-        .update(Buffer.from(await back.arrayBuffer()))
-        .digest("hex");
-      if (online !== sha256)
-        throw new Error(`le fichier en ligne ne correspond pas : ${online}`);
+      let asset = assets.find((a) => a.name === name);
+      if (asset && (await online(asset.browser_download_url)) !== sha256) {
+        await call(`/releases/${id}/assets/${asset.id}`, { method: "DELETE" });
+        asset = undefined;
+      }
+      if (!asset) {
+        const form = new FormData();
+        form.append("attachment", new Blob([readFileSync(file)]), name);
+        const up = await call(
+          `/releases/${id}/assets?name=${encodeURIComponent(name)}`,
+          { method: "POST", body: form },
+        );
+        asset = (await up.json()) as Asset;
+      }
+      const hash = await online(asset.browser_download_url);
+      if (hash !== sha256)
+        throw new Error(`le fichier en ligne ne correspond pas : ${hash}`);
       return {
         id,
         url: `${page}/releases/tag/${tag}`,
-        fileUrl: browser_download_url,
+        fileUrl: asset.browser_download_url,
       };
     },
 
