@@ -29,8 +29,8 @@ const section =
 
 powershell("libmpv Android", "fetch-libmpv-android.ps1");
 const studioJdk = "C:Program FilesAndroidAndroid Studiojbr";
-if (!process.env.JAVA_HOME && existsSync(studioJdk))
-  process.env.JAVA_HOME = studioJdk;
+// Gradle needs JDK 17+: Android Studio's, even over an older JAVA_HOME
+if (existsSync(studioJdk)) process.env.JAVA_HOME = studioJdk;
 step(
   "tests, build release et lint",
   `"${join(app, "gradlew.bat")}"`,
