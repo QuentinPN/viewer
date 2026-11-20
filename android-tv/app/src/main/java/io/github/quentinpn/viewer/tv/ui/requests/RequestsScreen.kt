@@ -124,6 +124,8 @@ fun RequestsScreen(
     images: ImageLoader,
     /** « Lire »: the title's page in Emby, by its type and Emby id. */
     onOpenEmby: (MediaType, String) -> Unit,
+    /** « Bande-annonce »: a checked address opened outside the app; false when no app can. */
+    onTrailer: (url: String) -> Boolean,
     onClose: () -> Unit,
 ) {
     BackHandler {
@@ -141,7 +143,7 @@ fun RequestsScreen(
     // A title, the list of requests or one request takes the whole screen
     if (status?.state == RequestState.Ready && page != null) {
         when (page) {
-            is RequestsPage.Media -> MediaTv(repository, memory, art, page, checkNotNull(status.viewer).capabilities) { onOpenEmby(it.type, it.id) }
+            is RequestsPage.Media -> MediaTv(repository, memory, art, page, checkNotNull(status.viewer).capabilities, onTrailer) { onOpenEmby(it.type, it.id) }
             RequestsPage.Mine -> MyRequestsTv(repository, memory, art) { memory.open(RequestsPage.Detail(it.id), from = requestKey(it)) }
             is RequestsPage.Detail -> RequestDetailTv(repository, memory, art, page, onOpenEmby)
         }

@@ -8,6 +8,7 @@ pub mod models;
 pub mod service;
 #[cfg(test)]
 mod tests;
+pub mod trailer;
 
 use std::net::IpAddr;
 

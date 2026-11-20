@@ -409,6 +409,7 @@ class MainActivity : ComponentActivity() {
                             requestImages,
                             // The title's own page, over the tab: Back returns to it
                             onOpenEmby = { type, id -> if (type == MediaType.Movie) openMovie(id) else openSeries(SeriesTarget(id)) },
+                            onTrailer = trailers.open,
                             onClose = { requests = null },
                         )
                         return@ViewerTheme
