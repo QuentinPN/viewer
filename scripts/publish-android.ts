@@ -22,7 +22,6 @@ const version =
   fail("versionName ou versionCode introuvable dans build.gradle.kts");
 const tag = `android-v${version.name}`;
 const releases = dryRun ? undefined : gitea(root);
-if (await releases?.exists(tag)) fail(`la release ${tag} existe déjà`);
 const section =
   changelogSection(read("android-tv/CHANGELOG.md"), version.name) ??
   fail(`android-tv/CHANGELOG.md n'a pas de section ${version.name}`);

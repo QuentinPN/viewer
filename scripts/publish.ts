@@ -15,7 +15,6 @@ import { dryRun, fail, powershell, read, root, sha256, step } from "./step.ts";
 const version = JSON.parse(read("package.json")).version as string;
 const tag = `v${version}`;
 const releases = dryRun ? undefined : gitea(root);
-if (await releases?.exists(tag)) fail(`la release ${tag} existe déjà`);
 const section =
   changelogSection(read("CHANGELOG.md"), version) ??
   fail(`CHANGELOG.md n'a pas de section ${version}`);
