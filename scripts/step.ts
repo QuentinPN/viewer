@@ -30,8 +30,8 @@ export function step(
   if (r.status !== 0) fail(`échec : ${title} (code ${r.status})`);
 }
 
-/** Runs a script of `scripts/` with Windows PowerShell. Without PSModulePath, as
- *  a pwsh 7 parent (the CI shell) sets it to modules 5.1 cannot load. */
+/** Runs a script of `scripts/` with Windows PowerShell. Without PSModulePath (any
+ *  case), as a pwsh 7 parent (the CI shell) sets it to modules 5.1 cannot load. */
 export const powershell = (title: string, script: string, ...args: string[]) =>
   step(
     title,
@@ -45,5 +45,9 @@ export const powershell = (title: string, script: string, ...args: string[]) =>
       ...args,
     ],
     root,
-    { ...process.env, PSModulePath: undefined },
+    Object.fromEntries(
+      Object.entries(process.env).filter(
+        ([key]) => key.toLowerCase() !== "psmodulepath",
+      ),
+    ),
   );
