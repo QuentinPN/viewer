@@ -30,13 +30,20 @@ export function step(
   if (r.status !== 0) fail(`échec : ${title} (code ${r.status})`);
 }
 
-/** Runs a script of `scripts/` with Windows PowerShell. */
+/** Runs a script of `scripts/` with Windows PowerShell. Without PSModulePath, as
+ *  a pwsh 7 parent (the CI shell) sets it to modules 5.1 cannot load. */
 export const powershell = (title: string, script: string, ...args: string[]) =>
-  step(title, "powershell", [
-    "-NoProfile",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-File",
-    `scripts/${script}`,
-    ...args,
-  ]);
+  step(
+    title,
+    "powershell",
+    [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      `scripts/${script}`,
+      ...args,
+    ],
+    root,
+    { ...process.env, PSModulePath: undefined },
+  );
