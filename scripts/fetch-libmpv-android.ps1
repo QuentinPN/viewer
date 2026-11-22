@@ -6,7 +6,8 @@
   Source: mpv-android/mpv-android GitHub releases. The APK hash
   is pinned below; the script refuses any mismatch. Bump the tag, the hashes
   and android-tv/app/src/main/java/is/xyz/mpv/MPVLib.kt together, then re-run
-  Gate TV-1.
+  Gate TV-1. The verified APK is cached outside the repository
+  (scripts/cached-download.ps1).
 #>
 $ErrorActionPreference = 'Stop'
 
@@ -25,20 +26,10 @@ if ((Test-Path $libmpv) -and (Get-FileHash $libmpv -Algorithm SHA256).Hash -eq $
   exit 0
 }
 
-$dl = Join-Path $root 'vendor\_dl'
-New-Item -ItemType Directory -Force $dl, $dest | Out-Null
-$apk = Join-Path $dl "mpv-android-$Release-$Asset"
-$url = "https://github.com/mpv-android/mpv-android/releases/download/$Release/$Asset"
-Write-Output "Téléchargement $url"
-$ProgressPreference = 'SilentlyContinue'
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $apk
-
-$actual = (Get-FileHash $apk -Algorithm SHA256).Hash
-if ($actual -ne $ApkSha256) {
-  Remove-Item $apk -Force
-  throw "SHA-256 inattendu pour $Asset : $actual"
-}
+. "$PSScriptRoot\cached-download.ps1"
+New-Item -ItemType Directory -Force $dest | Out-Null
+$apk = Get-VerifiedDownload -Url "https://github.com/mpv-android/mpv-android/releases/download/$Release/$Asset" `
+  -FileName "mpv-android-$Release-$Asset" -Sha256 $ApkSha256
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = [IO.Compression.ZipFile]::OpenRead($apk)
