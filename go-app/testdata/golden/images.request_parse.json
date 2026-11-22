@@ -1,0 +1,105 @@
+[
+  {
+    "parsed": {
+      "apiPath": "/Items/74668/Images/Primary",
+      "imageType": "Primary",
+      "itemId": "74668",
+      "maxWidth": 360,
+      "serverId": "srv1",
+      "tag": "ab12_6384"
+    },
+    "path": "/srv1/74668/Primary",
+    "query": "tag=ab12_6384&maxWidth=360"
+  },
+  {
+    "parsed": {
+      "apiPath": "/Items/74668/Images/Backdrop",
+      "imageType": "Backdrop",
+      "itemId": "74668",
+      "maxWidth": 1920,
+      "serverId": "srv1",
+      "tag": "t-1"
+    },
+    "path": "/srv1/74668/Backdrop",
+    "query": "maxWidth=1920&tag=t-1"
+  },
+  {
+    "parsed": {
+      "apiPath": "/Items/74668/Images/Thumb",
+      "imageType": "Thumb",
+      "itemId": "74668",
+      "maxWidth": 32,
+      "serverId": "srv1",
+      "tag": "x"
+    },
+    "path": "/srv1/74668/Thumb",
+    "query": "tag=x&maxWidth=32"
+  },
+  {
+    "parsed": {
+      "apiPath": "/Items/74668/Images/Logo",
+      "imageType": "Logo",
+      "itemId": "74668",
+      "maxWidth": 640,
+      "serverId": "srv1",
+      "tag": "x"
+    },
+    "path": "/srv1/74668/Logo",
+    "query": "tag=x&maxWidth=640"
+  },
+  {
+    "parsed": null,
+    "path": "/srv1/74668/Primary",
+    "query": "tag=x"
+  },
+  {
+    "parsed": null,
+    "path": "/srv1/74668/Primary",
+    "query": "maxWidth=360"
+  },
+  {
+    "parsed": null,
+    "path": "/srv1/74668/Primary",
+    "query": "tag=x&maxWidth=8000"
+  },
+  {
+    "parsed": null,
+    "path": "/srv1/74668/Primary",
+    "query": "tag=x&maxWidth=31"
+  },
+  {
+    "parsed": null,
+    "path": "/srv1/74668/Primary",
+    "query": "tag=x&maxWidth=360&api_key=y"
+  },
+  {
+    "parsed": null,
+    "path": "/srv1/74668/Chapter",
+    "query": "tag=x&maxWidth=360"
+  },
+  {
+    "parsed": null,
+    "path": "/srv1/../Users/Primary",
+    "query": "tag=x&maxWidth=360"
+  },
+  {
+    "parsed": null,
+    "path": "/srv1/74668/Primary/0",
+    "query": "tag=x&maxWidth=360"
+  },
+  {
+    "parsed": null,
+    "path": "/srv1/74668/Primary",
+    "query": "tag=a%2Fb&maxWidth=360"
+  },
+  {
+    "parsed": null,
+    "path": "/srv1/74668/Primary",
+    "query": null
+  },
+  {
+    "parsed": null,
+    "path": "/74668/Primary",
+    "query": "tag=x&maxWidth=360"
+  }
+]

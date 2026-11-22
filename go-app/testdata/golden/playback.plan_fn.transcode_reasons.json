@@ -1,0 +1,40 @@
+{
+  "plan": {
+    "bitrateLimit": null,
+    "container": "ts",
+    "defaultAudioStreamIndex": null,
+    "defaultSubtitleStreamIndex": 4,
+    "headers": [],
+    "mediaSourceId": "mediasource_30207",
+    "method": "transcode",
+    "playSessionId": "p",
+    "runTimeTicks": null,
+    "startTicks": 0,
+    "streamCount": 4,
+    "subtitles": [
+      {
+        "lang": "fre",
+        "selected": false,
+        "source": "https://emby.test/emby/Videos/30207/mediasource_30207/Subtitles/3/0/Stream.subrip",
+        "title": "Forcés"
+      },
+      {
+        "lang": "eng",
+        "selected": true,
+        "source": "https://emby.test/emby/Videos/30207/mediasource_30207/Subtitles/4/0/Stream.subrip",
+        "title": null
+      }
+    ],
+    "title": null,
+    "tracks": {
+      "audio": {
+        "type": "auto"
+      },
+      "subtitle": {
+        "type": "auto"
+      }
+    },
+    "transcodeReasons": "codec vidéo non pris en charge, codec audio non pris en charge",
+    "url": "https://emby.test/emby/videos/30207/master.m3u8?PlaySessionId=p&TranscodeReasons=VideoCodecNotSupported%2CAudioCodecNotSupported"
+  }
+}

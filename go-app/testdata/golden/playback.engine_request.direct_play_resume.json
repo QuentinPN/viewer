@@ -1,0 +1,26 @@
+{
+  "source": "http://emby.test/emby/videos/30207/original.mkv?DeviceId=dev&MediaSourceId=mediasource_30207&PlaySessionId=ps1",
+  "httpHeaders": [
+    [
+      "X-Emby-Token",
+      "TOKEN_PLACEHOLDER"
+    ]
+  ],
+  "startSeconds": 1831.0167,
+  "subtitles": [],
+  "tracks": {
+    "audio": {
+      "type": "auto"
+    },
+    "subtitle": {
+      "type": "auto"
+    }
+  },
+  "subtitleStyle": {
+    "size": "normal",
+    "color": "white",
+    "background": "outline",
+    "position": "bottom",
+    "overrideAss": false
+  }
+}

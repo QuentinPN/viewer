@@ -1,0 +1,17 @@
+{
+  "itemId": "30207",
+  "mediaSourceId": "mediasource_30207",
+  "resume": false,
+  "method": "directPlay",
+  "container": "mkv",
+  "transcodeReasons": null,
+  "title": {
+    "name": "2 Coeurs",
+    "seriesName": null,
+    "seasonIndex": null,
+    "index": null,
+    "indexEnd": null
+  },
+  "bitrateCap": null,
+  "localAddress": true
+}

@@ -140,6 +140,15 @@ Separate native app in `android-tv/` (Kotlin, libmpv from mpv-android, ADR 0038)
 - DONE (2026-11-20, ADR 0127): « Rechercher » segment in Demander on the TV (every Request result, grid of Parcourir); « Bande-annonce » on the title pages of Demander, desktop (YouTube page in the default browser through `ur_open_trailer`, key validated in Rust) and TV (YouTube intent). Desktop 1.6.0, Android TV 1.5.0. Unit tests, lint and builds pass. NOT VERIFIED: the browser launch on the desktop, the YouTube app on the Shield, focus/keyboard/Back of the TV search on the device.
 - Not in scope (phase 2): other users' requests, 4K/advanced requests, reports, watch list, notifications, offline requests.
 
+## Go/Wails migration (ADR 0128) [IN PROGRESS · all 80 commands ported · cutover not decided]
+
+Native side ported from Rust/Tauri to Go + Wails v3 in `go-app/`, without cgo. `src-tauri/` stays the shipped app until cutover. Progress and owner checklist: `go-app/MAP.md`. Rules: `.claude/skills/go-wails-anything/`.
+
+- VERIFIED (2026-11-22): playback spike under Wails (`docs/evidence/gate1-go-2026-11-22.md`), 19/19 checks, local MKV and local HTTP, video visible under the HTML overlay. Cold build about 10 s, rebuild about 1 s.
+- VERIFIED (2026-11-22): every Rust test of the ported modules has its Go counterpart. The golden JSON produced by `src-tauri/src/golden.rs` matches. All 80 commands are registered (test against `generate_handler!`). The Wails app shows the first-run screen and closes cleanly.
+- NOT VERIFIED (owner): real keyboard and sound, a real Emby stream and the owner's MKV files, artwork in a real window, installing over the Tauri build and keeping the sign-in, 125–150 % scaling, a second screen, a linked TV.
+- TODO at cutover: release pipeline (`release.yml`, `publish.ts`, new ed25519 key), a transition release (UI settings export, installer), and amending ADR 0001, 0004, 0028, 0029 and 0112.
+
 ## Work log
 
 For each completed slice record date, changed behavior, tests executed, outcomes, blockers and next step. Do not fabricate progress.

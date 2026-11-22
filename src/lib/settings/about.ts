@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../native";
 
 // Réglages › À propos and Serveur (ADR 0116): what the app, this PC and the server
 // say about themselves. Typed wrapper over `system_report` and the labels shown.

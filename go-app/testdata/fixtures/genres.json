@@ -1,0 +1,6 @@
+{"Items":[
+        {"Name":"Action","Id":"901","Type":"Genre"},
+        {"Name":"Science-Fiction","Id":"902","Type":"Genre"},
+        {"Name":"Drame|Romance","Id":"903","Type":"Genre"},
+        {"Name":"Science-Fiction","Id":"904","Type":"Genre"}
+    ],"TotalRecordCount":4}

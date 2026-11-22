@@ -1,0 +1,40 @@
+{
+  "bitrateLimit": {
+    "bitrate": 400000000,
+    "cap": null,
+    "localAddress": true
+  },
+  "container": "mkv",
+  "defaultAudioStreamIndex": null,
+  "defaultSubtitleStreamIndex": null,
+  "headers": [
+    [
+      "X-Emby-Token",
+      "TOKEN_PLACEHOLDER"
+    ]
+  ],
+  "mediaSourceId": "30501",
+  "method": "directPlay",
+  "playSessionId": "ps5",
+  "runTimeTicks": null,
+  "startTicks": 0,
+  "streamCount": 0,
+  "subtitles": [],
+  "title": {
+    "index": null,
+    "indexEnd": null,
+    "name": "Deux Versions",
+    "seasonIndex": null,
+    "seriesName": null
+  },
+  "tracks": {
+    "audio": {
+      "type": "auto"
+    },
+    "subtitle": {
+      "type": "auto"
+    }
+  },
+  "transcodeReasons": null,
+  "url": "http://emby.test/emby/videos/30500/original.mkv?MediaSourceId=30501&PlaySessionId=ps5"
+}

@@ -1,0 +1,20 @@
+{"Items":[
+        {"Name":"2 Coeurs","Id":"30207","Type":"Movie","RunTimeTicks":61033890000,
+         "ImageTags":{"Primary":"7b213eb5_6379","Thumb":"bbcac8ec_6379"},
+         "BackdropImageTags":["2edd4b0e_6379"],
+         "UserData":{"PlaybackPositionTicks":18310000000,"PlayedPercentage":30.0,"Played":false}},
+        {"Name":" Le Professeur ","Id":"70227","Type":"Episode","IndexNumber":2,"ParentIndexNumber":5,
+         "SeriesName":"La casa de papel","SeriesId":"70185","RunTimeTicks":30000000000,
+         "ImageTags":{"Primary":"b31c7276_6384"},"BackdropImageTags":[],
+         "ParentThumbItemId":"70185","ParentThumbImageTag":"724ef532_6384",
+         "ParentBackdropItemId":"70185","ParentBackdropImageTags":["6da1a59e_6384"],
+         "ParentLogoItemId":"70185","ParentLogoImageTag":"9c1f0e2a_6384",
+         "SeriesPrimaryImageTag":"51d2b7e0_6384","Overview":" Le casse continue. ",
+         "UserData":{"PlaybackPositionTicks":6000000000,"Played":false}},
+        {"Name":"Sans image","Id":"70228","Type":"Episode","IndexNumber":3,"ParentIndexNumber":5,
+         "SeriesName":"La casa de papel","SeriesId":"70185","ImageTags":{},
+         "ParentThumbItemId":"70185","ParentThumbImageTag":"724ef532_6384",
+         "UserData":{"PlaybackPositionTicks":600000000,"Played":false}},
+        {"Name":"Chanson","Id":"5000","Type":"Audio","UserData":{"PlaybackPositionTicks":10}},
+        {"Name":"Id douteux","Id":"../x","Type":"Movie"}
+    ],"TotalRecordCount":5}

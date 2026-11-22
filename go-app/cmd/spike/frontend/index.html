@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Viewer spike Go</title>
+<style>
+  /* The page stays transparent so mpv's video (child of the main HWND) shows through. */
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
+    font: 18px "Segoe UI", system-ui, sans-serif; color: #fff; }
+  /* ADR 0003: opaque background outside playback, or the desktop shows through. */
+  body.idle { background: #101418; }
+  #badge { position: absolute; top: 16px; left: 16px; padding: 8px 14px; border-radius: 6px;
+    background: rgba(220, 40, 40, 0.45); }
+  #bar { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 20px;
+    background: rgba(0, 0, 0, 0.5); display: flex; gap: 24px; flex-wrap: wrap; }
+  #bar span b { color: #9fd3ff; font-weight: 600; }
+</style>
+</head>
+<body class="idle">
+<div id="badge">Overlay HTML semi-transparent</div>
+<div id="bar">
+  <span>Spike Go + Wails v3</span>
+  <span>État : <b id="state">—</b></span>
+  <span>Position : <b id="pos">—</b></span>
+  <span>Événements : <b id="count">0</b></span>
+  <span>Erreur : <b id="err">—</b></span>
+</div>
+<script type="module">
+  import { Call, Events } from "/wails/runtime.js";
+
+  const call = (method, ...args) => Call.ByName(`main.Player.${method}`, ...args);
+  const $ = (id) => document.getElementById(id);
+  let count = 0;
+  let lastReport = 0;
+
+  Events.On("player:event", (ev) => {
+    const d = ev.data ?? {};
+    count += 1;
+    document.body.classList.toggle("idle", d.state === "closed" || d.state === "idle");
+    $("state").textContent = d.paused ? `${d.state} (pause)` : d.state;
+    $("pos").textContent = typeof d.timePos === "number" ? `${d.timePos.toFixed(1)} s` : "—";
+    $("count").textContent = String(count);
+    // Acknowledge receipts so Go can prove the event reached the page.
+    const now = Date.now();
+    if (now - lastReport > 500 || d.state === "closed") {
+      lastReport = now;
+      call("ReportEvent", count, d).catch(() => {});
+    }
+  });
+
+  // Structured error roundtrip, triggered by Go: call Open with a bad path,
+  // display the error and send what JS actually received back to Go.
+  Events.On("spike:try-error", async () => {
+    try {
+      await call("Open", "C:\\introuvable\\absent.mkv");
+      $("err").textContent = "aucune erreur (inattendu)";
+      await call("ReportError", "none", "", null);
+    } catch (err) {
+      const cause = err?.cause ?? null;
+      $("err").textContent = `${err?.name} · ${cause?.kind ?? "?"} · ${cause?.message ?? err?.message}`;
+      await call("ReportError", String(err?.name), String(err?.message), cause);
+    }
+  });
+
+  // Keyboard stays in the WebView (mpv has input-vo-keyboard=no): Space → Go.
+  window.addEventListener("focus", () => call("ReportFocus", true).catch(() => {}));
+  window.addEventListener("blur", () => call("ReportFocus", false).catch(() => {}));
+  window.addEventListener("keydown", (e) => {
+    call("ReportKey", e.code).catch(() => {});
+    if (e.code === "Space") {
+      e.preventDefault();
+      call("TogglePause").catch(() => {});
+    }
+  });
+
+  call("Ready").catch((e) => { $("err").textContent = `Ready: ${e}`; });
+</script>
+</body>
+</html>

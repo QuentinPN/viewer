@@ -1,5 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { invoke, listen, type Unlisten } from "../native";
 import { preferenceStorage, readPreferences } from "../player/subtitles";
 import type {
   ArtworkCacheCleared,
@@ -213,8 +212,8 @@ export const embyApi = {
   },
   onPlaybackStopped: (
     handler: (state: PlaybackStopped) => void,
-  ): Promise<UnlistenFn> =>
-    listen<PlaybackStopped>(PLAYBACK_STOPPED_EVENT, (e) => handler(e.payload)),
+  ): Promise<Unlisten> =>
+    listen<PlaybackStopped>(PLAYBACK_STOPPED_EVENT, handler),
 };
 
 /** Normalizes a rejected command into an `EmbyError`, whatever was thrown. */

@@ -1,0 +1,28 @@
+{
+  "mpvVersion": "mpv 0.40.0",
+  "ffmpegVersion": "7.1",
+  "videoOutput": "gpu-next",
+  "gpuApi": "d3d11",
+  "hwdecCurrent": "d3d11va",
+  "videoCodec": "hevc",
+  "videoWidth": 3840,
+  "videoHeight": 2160,
+  "audioCodec": "ac3",
+  "audioOutput": "wasapi",
+  "container": "matroska,webm",
+  "osdWidth": 1920,
+  "osdHeight": 1080,
+  "timePos": 12.5,
+  "duration": 6000.0,
+  "paused": false,
+  "volume": 100.0,
+  "frameDropCount": 0,
+  "decoderFrameDropCount": 2,
+  "chapterCount": 3,
+  "subtitleOptions": [
+    [
+      "sub-scale",
+      "1.0"
+    ]
+  ]
+}

@@ -14,7 +14,7 @@ pub mod reporting;
 pub mod server_url;
 pub mod session;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 pub mod titles;
 pub mod tracks;
 

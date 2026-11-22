@@ -1,0 +1,68 @@
+[
+  {
+    "caps": {
+      "local": null,
+      "remote": null
+    },
+    "forLocalAddress": null,
+    "forRemoteAddress": null,
+    "valid": {
+      "local": null,
+      "remote": null
+    }
+  },
+  {
+    "caps": {
+      "local": null,
+      "remote": 4000000
+    },
+    "forLocalAddress": null,
+    "forRemoteAddress": 4000000,
+    "valid": {
+      "local": null,
+      "remote": 4000000
+    }
+  },
+  {
+    "caps": {
+      "local": 40000000,
+      "remote": 1500000
+    },
+    "forLocalAddress": 40000000,
+    "forRemoteAddress": 1500000,
+    "valid": {
+      "local": 40000000,
+      "remote": 1500000
+    }
+  },
+  {
+    "caps": {
+      "local": 0,
+      "remote": null
+    },
+    "error": {
+      "kind": "settings",
+      "message": "réglage non enregistré : débit de lecture non proposé"
+    }
+  },
+  {
+    "caps": {
+      "local": 3500000,
+      "remote": null
+    },
+    "error": {
+      "kind": "settings",
+      "message": "réglage non enregistré : débit de lecture non proposé"
+    }
+  },
+  {
+    "caps": {
+      "local": null,
+      "remote": 400000000
+    },
+    "error": {
+      "kind": "settings",
+      "message": "réglage non enregistré : débit de lecture non proposé"
+    }
+  }
+]

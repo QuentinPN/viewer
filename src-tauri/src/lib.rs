@@ -1,6 +1,8 @@
 mod commands;
 mod diagnostics;
 pub mod emby;
+#[cfg(test)]
+mod golden;
 pub mod player;
 pub mod segments;
 #[cfg(debug_assertions)]

@@ -1,0 +1,9 @@
+{"MediaSources":[{"Protocol":"File","Id":"mediasource_40000","Container":"avi",
+        "SupportsTranscoding":true,"SupportsDirectStream":false,"SupportsDirectPlay":false,
+        "RequiredHttpHeaders":{},
+        "TranscodingUrl":"/videos/40000/master.m3u8?DeviceId=dev&MediaSourceId=mediasource_40000&PlaySessionId=ps2&api_key=TOKEN_PLACEHOLDER&VideoCodec=h264&TranscodeReasons=ContainerNotSupported",
+        "TranscodingSubProtocol":"hls","TranscodingContainer":"ts","DefaultSubtitleStreamIndex":2,
+        "MediaStreams":[{"Type":"Video","Index":0},{"Type":"Subtitle","Index":2,"Codec":"subrip",
+        "Language":"fre","DeliveryMethod":"External",
+        "DeliveryUrl":"/Videos/40000/mediasource_40000/Subtitles/2/0/Stream.subrip?api_key=TOKEN_PLACEHOLDER"}]}],
+        "PlaySessionId":"ps2"}

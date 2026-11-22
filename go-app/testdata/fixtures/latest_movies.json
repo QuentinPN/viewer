@@ -1,0 +1,6 @@
+[
+        {"Name":"Runner","Id":"103617","Type":"Movie","ProductionYear":2026,"RunTimeTicks":58680640000,
+         "ImageTags":{"Primary":"aa11bb22_6390"},"PrimaryImageAspectRatio":0.6666666666666666,
+         "UserData":{"PlaybackPositionTicks":0,"Played":false}},
+        {"Name":"Coffret","Id":"103618","Type":"BoxSet","ImageTags":{}}
+    ]

@@ -1,0 +1,17 @@
+{
+  "itemId": "80475",
+  "mediaSourceId": "mediasource_30207",
+  "resume": false,
+  "method": "directPlay",
+  "container": "mkv",
+  "transcodeReasons": null,
+  "title": {
+    "name": "La Nouvelle Recrue",
+    "seriesName": "2.5 Dimensional Seduction",
+    "seasonIndex": 1,
+    "index": 1,
+    "indexEnd": null
+  },
+  "bitrateCap": null,
+  "localAddress": true
+}

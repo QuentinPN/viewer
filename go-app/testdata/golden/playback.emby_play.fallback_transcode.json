@@ -1,0 +1,17 @@
+{
+  "itemId": "30207",
+  "mediaSourceId": "mediasource_40000",
+  "resume": false,
+  "method": "transcode",
+  "container": "ts",
+  "transcodeReasons": "échec de la lecture directe",
+  "title": {
+    "name": "2 Coeurs",
+    "seriesName": null,
+    "seasonIndex": null,
+    "index": null,
+    "indexEnd": null
+  },
+  "bitrateCap": null,
+  "localAddress": true
+}

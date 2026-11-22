@@ -1,0 +1,11 @@
+{
+  "itemId": "40000",
+  "mediaSourceId": "mediasource_40000",
+  "resume": false,
+  "method": "transcode",
+  "container": "ts",
+  "transcodeReasons": "conteneur non pris en charge",
+  "title": null,
+  "bitrateCap": null,
+  "localAddress": true
+}

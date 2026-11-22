@@ -1,0 +1,59 @@
+[
+  {
+    "raw": "/videos/30207/original.mkv?DeviceId=dev&api_key=x",
+    "url": "https://emby.test/emby/videos/30207/original.mkv?DeviceId=dev"
+  },
+  {
+    "raw": "/Videos/1/stream.mkv?Static=true&ApiKey=x&X-Emby-Token=y&AccessToken=z#f",
+    "url": "https://emby.test/emby/Videos/1/stream.mkv?Static=true"
+  },
+  {
+    "error": {
+      "kind": "invalidResponse",
+      "message": "réponse inattendue du serveur : adresse de flux inattendue"
+    },
+    "raw": "http://evil.example/videos/1/original.mkv"
+  },
+  {
+    "error": {
+      "kind": "invalidResponse",
+      "message": "réponse inattendue du serveur : adresse de flux inattendue"
+    },
+    "raw": "//evil.example/videos/1/original.mkv"
+  },
+  {
+    "error": {
+      "kind": "invalidResponse",
+      "message": "réponse inattendue du serveur : adresse de flux inattendue"
+    },
+    "raw": "/Users/1/Items"
+  },
+  {
+    "error": {
+      "kind": "invalidResponse",
+      "message": "réponse inattendue du serveur : adresse de flux inattendue"
+    },
+    "raw": "/videos/../Users/1"
+  },
+  {
+    "error": {
+      "kind": "invalidResponse",
+      "message": "réponse inattendue du serveur : adresse de flux inattendue"
+    },
+    "raw": "/videos/%2e%2e/Users/1"
+  },
+  {
+    "error": {
+      "kind": "invalidResponse",
+      "message": "réponse inattendue du serveur : adresse de flux inattendue"
+    },
+    "raw": "videos/1/original.mkv"
+  },
+  {
+    "error": {
+      "kind": "invalidResponse",
+      "message": "réponse inattendue du serveur : adresse de flux inattendue"
+    },
+    "raw": "/videos\\..\\Users"
+  }
+]

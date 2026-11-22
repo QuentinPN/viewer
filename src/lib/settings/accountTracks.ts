@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../native";
 import { LANGUAGES, type TrackPreferences } from "../player/subtitles";
 
 // Audio and subtitle languages (ADR 0115): by default the Emby account's

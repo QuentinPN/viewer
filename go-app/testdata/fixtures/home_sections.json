@@ -1,0 +1,5 @@
+[
+        {"Name":"Mes Médias","Id":"smalllibrarytiles","SectionType":"userviews","IncludeNextUpInResume":true},
+        {"Name":"Reprendre la lecture","Id":"resume","SectionType":"resume","IncludeNextUpInResume":true},
+        {"Name":"Films : Derniers ajouts","Id":"latestmedia_5","SectionType":"latestmedia","ParentId":"5"}
+    ]

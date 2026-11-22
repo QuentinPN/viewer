@@ -1,0 +1,39 @@
+{
+  "source": "http://emby.test/emby/videos/40001/master.m3u8?MediaSourceId=mediasource_40001&PlaySessionId=ps2&AudioStreamIndex=2",
+  "httpHeaders": [
+    [
+      "X-Emby-Token",
+      "TOKEN_PLACEHOLDER"
+    ]
+  ],
+  "startSeconds": null,
+  "subtitles": [
+    {
+      "source": "http://emby.test/emby/Videos/40001/mediasource_40001/Subtitles/3/0/Stream.subrip",
+      "title": null,
+      "lang": "fre",
+      "selected": false
+    },
+    {
+      "source": "http://emby.test/emby/Videos/40001/mediasource_40001/Subtitles/4/0/Stream.subrip",
+      "title": null,
+      "lang": "eng",
+      "selected": true
+    }
+  ],
+  "tracks": {
+    "audio": {
+      "type": "auto"
+    },
+    "subtitle": {
+      "type": "auto"
+    }
+  },
+  "subtitleStyle": {
+    "size": "normal",
+    "color": "white",
+    "background": "outline",
+    "position": "bottom",
+    "overrideAss": false
+  }
+}
