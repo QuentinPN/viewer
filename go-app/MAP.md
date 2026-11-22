@@ -25,7 +25,7 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
 | 6 | request | request/* (mod, models, client, service, images, trailer, commands) | porté (`internal/request`, 1 commande branchée sur 17 : voir « Unité request »), wave6-request |
 | 7 | diagnostics | diagnostics.rs, system_info.rs (`redact` et ses 5 tests : déjà dans `internal/redact`, vague 3) | porté (`internal/diagnostics`, `internal/sysinfo`, 2 commandes non branchées : voir « Unité diagnostics et system-info »), wave7-diag |
 | 7 | updater | updater.rs | porté (`internal/updater`, 3 commandes non branchées : voir « Unité updater »), wave7-updater |
-| 7 | release-pipeline | installeur NSIS, release.yml, publish.ts (basculement) | à faire (chemin décrit dans « Unité updater », sous-partie release-pipeline) ; l'installeur NSIS est sorti dans l'unité `installer` |
+| 7 | release-pipeline | installeur NSIS, release.yml, publish.ts (basculement) | fait, essai à blanc local (ci/release-wails, voir « Unité updater », sous-partie release-pipeline) ; l'installeur NSIS est sorti dans l'unité `installer` |
 | 7 | installer | `tauri.conf.json` (bundle.nsis), installer.nsi généré par Tauri | porté (non exécuté : smoke propriétaire) (`go-app/build/windows/`, `scripts/build-wails-installer.ps1` : voir « Unité installer »), wave7-installer |
 
 ## Golden à surveiller
@@ -292,47 +292,21 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
   - Corrigés aussi : le repli de cible, la validation de toutes les entrées, les arguments de l'app après `/ARGS` et la nouvelle vérification avant le lancement.
 - **Dépendances** : aucune nouvelle (`crypto/ed25519` de la bibliothèque standard ; `golang.org/x/sys/windows.ShellExecute`).
 
-### Sous-partie release-pipeline : chemin du basculement (à faire, rien n'est implémenté)
-- **Nouvelle clé de signature.**
-  - Une paire ed25519, générée par le propriétaire sur viewer-pc, jamais dans le dépôt. La clé privée PKCS#8 PEM va dans `~/.viewer/updater-ed25519.pem`, à côté de `updater.key` (les clés de signature restent sur le PC).
-  - Elle est aussi exposée en secret Actions **`UPDATER_ED25519_KEY`**, que le job `desktop` passe en variable d'environnement. Comme pour `TAURI_SIGNING_PRIVATE_KEY`, publish.ts lit d'abord l'environnement, puis le fichier.
-  - La clé publique (base64 de 32 octets) n'est pas secrète. Elle peut être un fichier versionné (`go-app/updater.pub`) lu par le build pour `-ldflags -X`.
-- **`scripts/publish.ts`.**
-  - Construire le binaire Go (`CGO_ENABLED=0 go build -ldflags "-X …PublicKey=… -X main.version=…"`), puis l'installateur NSIS (`makensis` sur un `project.nsi` maison, voir plus bas), au lieu de `npx tauri build`.
-  - Signer avec `version` = celle de `package.json`. C'est la semver canonique, sans `v`, la même que le `version` du manifeste :
-    ```ts
-    const digest = createHash("sha512").update(readFileSync(installer)).digest();
-    const message = Buffer.concat([Buffer.from(`viewer-update-v1\0${version}\0`, "utf8"), digest]);
-    const ed25519 = sign(null, message, createPrivateKey(pem)).toString("base64");
-    ```
-    - C'est le `SignedMessage` de `internal/updater/signature.go` : préfixe, octet nul, version, octet nul, puis les 64 octets du SHA-512.
-    - Un test Vitest de `desktopManifest` devrait vérifier la signature avec `crypto.verify` et la clé publique.
-  - Écrire `platforms["windows-x86_64"].ed25519` dans `desktopManifest` (src/release/manifest.ts, test à ajouter).
-  - Pendant la transition, continuer à produire la `signature` minisign de l'installateur pour les apps Tauri : `npx tauri signer sign`, ou minisign en Node (`blake2b512` et ed25519 de `node:crypto`).
-  - `verify:rust` devient la porte Go : gofmt, vet, staticcheck, test.
-  - Au retrait de `src-tauri/`, `Test_shipped_config_is_quiet_and_signed` saute sa comparaison avec `tauri.conf.json` (fichier absent) ; `DefaultConfig` devient alors la seule source.
-  - Au basculement, mettre à jour `DECISIONS.md` : signature minisign avec la clé Tauri, et clés gardées sur le PC alors qu'il y a un nouveau secret Actions.
-    - L'ancienne affirmation « le numéro de version du manifeste n'est pas signé » est fausse : les signatures minisign publiées portent `version:`, et le plugin refuse un écart.
-    - L'app Go lie toujours la version (`SignedMessage`). La ligne est à réécrire au basculement.
-- **`.gitea/workflows/release.yml`**, job `desktop` :
-  - `env` : `UPDATER_ED25519_KEY: ${{ secrets.UPDATER_ED25519_KEY }}` à côté de `GITEA_TOKEN` ;
-  - Go et NSIS sur le runner `viewer-pc` ;
-  - la piste desktop versionne `go-app/` (la version vient toujours de `package.json`), et `src-tauri/Cargo.toml` sort de la liste au retrait de `src-tauri/`.
-- **Installateur NSIS** (NON VÉRIFIÉ, voir `research/updater.md`).
-  - Le modèle Wails est en `admin`, installe dans `$PROGRAMFILES64`, ne copie que l'exe et ne relance pas l'app.
-  - Il faut un `project.nsi` maison :
-    - `RequestExecutionLevel user`, `InstallDir $LOCALAPPDATA\Viewer` et clé de désinstallation dans HKCU, aux mêmes noms que l'installateur Tauri, pour qu'il s'installe par-dessus ;
-    - `libmpv-2.dll` à côté de l'exe ;
-    - relance de l'app quand `/R` est passé, et `/UPDATE` accepté sans effet de bord ;
-    - attente de la fin de l'app en cours (ou sa fermeture) avant de copier l'exe.
-  - À essayer à la main sur une installation Tauri existante avant toute release.
-- **Release de transition, recommandée.** C'est la dernière release Tauri, publiée avec l'installateur **Wails** :
-  - le `latest.json` porte `url` = installateur Wails, `signature` = sa signature minisign (clé Tauri actuelle) et `ed25519` = sa signature ed25519 ;
-  - les apps Tauri installées vérifient la minisign, lancent l'installateur Wails en `/S /UPDATE /R /ARGS` et sont remplacées sans geste du propriétaire ;
-  - ensuite, chaque release garde les deux signatures tant qu'une app Tauri peut rester installée, ou seulement `ed25519` une fois le PC passé à Go.
-  - Préalables : l'installateur maison accepte `/S /UPDATE /R` et reprend le dossier et la clé de l'installation Tauri.
-- **Alternative : réinstallation manuelle.** Le propriétaire désinstalle l'app Tauri et installe une fois l'app Wails. C'est plus simple, sans signature minisign à garder, mais c'est un geste manuel. Elle reste le repli si l'installateur maison ne peut pas reprendre l'installation Tauri.
-- Choix entre les deux : décision du propriétaire, à prendre au basculement (`whole-app.md`).
+### Sous-partie release-pipeline (fait, ci/release-wails ; essai à blanc local, pas encore sur le runner)
+- **Choix retenu : release de transition à double signature.** Le `latest.json` porte un seul installateur, l'installateur **Wails**, avec `signature` (minisign, clé Tauri actuelle) pour les apps Tauri installées et `ed25519` pour l'app Go. Chaque updater ignore le champ qu'il ne connaît pas (`ReleaseManifestPlatform` du plugin, `url` et `signature`, n'a pas de `deny_unknown_fields`). Les releases suivantes gardent les deux tant qu'une app Tauri peut rester installée.
+- **Clés.**
+  - ed25519 générée le 2026-11-22 sur viewer-pc (`node:crypto`), clé privée PKCS#8 PEM dans `~/.viewer/updater-ed25519.key` (ACL : l'utilisateur seul), à côté de `updater.key` (minisign). Jamais dans le dépôt, pas de secret Actions : le runner tourne sous le compte du propriétaire et lit le fichier, comme pour `updater.key`.
+  - Clé publique (base64 de 32 octets) versionnée dans `go-app/build/updater-ed25519.pub`. `publish.ts` échoue si la clé privée n'y correspond pas. `updater.PublicKey` reste vide dans le source (`Test_shipped_config_is_quiet_and_signed`).
+- **Build** : `scripts/build-wails-exe.ts` (derrière `npm run build:wails:exe`) est la seule source des drapeaux : `-H=windowsgui`, `app.buildMode=release`, `app.version`, `updater.PublicKey`, `CGO_ENABLED=0`. Il échoue si l'exe ne contient pas la clé.
+- **`scripts/publish.ts`** : libmpv, `verify:web`, portes Go (gofmt, vet, test ; staticcheck n'est pas installé), `build-wails-installer.ps1 -Build`, puis :
+  - minisign : `tauri signer sign -f ~/.viewer/updater.key -p "" --app-version <version>` (commentaire de confiance `version:X.Y.Z`, comme `tauri build`), relue par `scripts/minisign.ts` contre la `pubkey` de `tauri.conf.json` ;
+  - ed25519 : `signUpdate` de `src/release/signature.ts` (Web Crypto), même message que `SignedMessage`, revérifiée avec la clé versionnée ;
+  - `desktopManifest(version, notes, url, { minisign, ed25519 })` ; emplacement et envoi de `desktop/latest.json` inchangés. En `--dry-run`, le manifeste est écrit dans `go-app/bin/latest.json` avec une url `file://`.
+- **Vecteurs partagés** : `internal/updater/testdata/signature-vectors.json` (graine de test), lus par `Test_go_signature_vectors_shared_with_the_release_script` et `src/release/signature.test.ts`. `Test_go_release_manifest_verifies` vérifie un vrai build (`VIEWER_RELEASE_MANIFEST`, `VIEWER_RELEASE_INSTALLER`, voir TESTING.md).
+- **Mise à jour Tauri vers l'installateur Wails, lue dans tauri-plugin-updater 2.14.1 (`updater.rs` 1009-1170)** : le type vient des octets, pas de l'extension (`infer::app::is_exe`, en-tête `MZ`, sinon MSI, zip d'abord) ; un exe est écrit en `.exe` temporaire et lancé par `ShellExecuteW "open"` avec `/S /UPDATE /R /ARGS <args de l'app>` (mode `quiet` ; `/R /ARGS` parce que `restart_after_install` vaut `true` par défaut et que `src-tauri/src/updater.rs` garde `app.updater()` sans le changer), puis `exit(0)`. `installer.nsi` gère les quatre (`${Silent}`, `$UpdateMode`, `/R` puis `/ARGS` dans `.onInstSuccess`) et ferme une app encore ouverte avant la copie : aucune correction nécessaire. **Non observé** : le smoke propriétaire reste à faire.
+- **`.gitea/workflows/release.yml`** : étape `CARGO_TARGET_DIR` retirée, étape « Go toolchain » (`go version`, échec clair si Go manque). La piste desktop versionne toujours `src-tauri/Cargo.toml` jusqu'au retrait de `src-tauri/`.
+- **Conflit à trancher** : la décision « la release Tauri de transition exporte le localStorage » (unité app-shell) suppose une dernière release Tauri, que ce pipeline ne construit plus. Soit une release Tauri est publiée avant de fusionner ce changement, soit l'export est abandonné (réglages de l'UI remis à zéro).
+- **Reste à faire** : essai à blanc `workflow_dispatch` sur le runner ; smoke de l'installateur par-dessus Tauri ; au retrait de `src-tauri/`, `publish.ts` lit la `pubkey` minisign ailleurs (ou abandonne la minisign) et `Test_shipped_config_is_quiet_and_signed` saute sa comparaison avec `tauri.conf.json`.
 
 ## Unité installer (vague 7, wave7-installer)
 - **Fichiers** : `go-app/build/windows/installer.nsi`, `go-app/build/windows/utils.nsh` (macros reprises du modèle Tauri, sans le plugin `nsis_tauri_utils`), `scripts/build-wails-installer.ps1`. Aucun fichier de `internal/` ni de `cmd/` n'est touché.
@@ -370,7 +344,7 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
 - **À signaler à l'app-shell (hors de cette unité).**
   - Le binaire Go n'a pas d'icône ni de ressource de version (aucun `.syso`) : sans elle, `DisplayIcon` et les raccourcis auront l'icône générique après le remplacement de l'app Tauri.
   - Le dossier de données de WebView2 de Wails peut ne pas être dans `io.github.quentinpn.viewer` : la case « Supprimer les données » ne l'effacerait alors pas.
-  - La version de l'installateur vient de package.json, passée à `makensis`. L'exe packagé ne reçoit ni version ni `updater.PublicKey` (`build:wails:exe` ne passe que `-H=windowsgui`) : son updater échoue donc fermé. Pour la release, le build doit ajouter les `-ldflags -X` décrits dans « Unité updater ».
+  - La version de l'installateur vient de package.json, passée à `makensis`. L'exe packagé reçoit version, mode release et `updater.PublicKey` par `scripts/build-wails-exe.ts` (réglé par release-pipeline).
   - **Provenance de l'exe vérifié** : un `go build` direct (mêmes options que `build:wails:exe`) sur le `frontend/dist` déjà présent. Ni `npm run build:wails:exe` ni la branche `-Build` du script n'ont été exécutés : lancer vite dans `cmd/` pendant que d'autres agents y compilent était à éviter.
   - Le tableau a été confronté au modèle Tauri par un `grep` des `!define`, `WriteReg*`, `DeleteReg*`, `CreateShortcut` et `StrCpy $INSTDIR` des deux scripts (`SHCTX` lu comme `HKCU`). Il ne reste que les branches mortes pour la configuration actuelle : `perMachine` / `both`, `HOMEPAGE`, `STARTMENUFOLDER`.
 - **Smoke propriétaire** : voir la dernière section (installer par-dessus Tauri, lancer, désinstaller).
@@ -452,8 +426,7 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
 - **Build.**
   - Drapeaux `-ldflags -X` : `viewer/internal/app.buildMode=release` et `viewer/internal/app.version=X.Y.Z`.
   - Sans drapeau (`go build`, `go test`), c'est une build debug : identifiant `io.github.quentinpn.viewer.debug`, coffre `Viewer-debug`, titre « (debug) », `player_open` permis, pas d'updater.
-  - `npm run build:wails:exe` passe les deux drapeaux. La version vient de `%npm_package_version%` : le script npm tourne sous cmd.
-  - `updater.PublicKey` reste à injecter pour une release (sous-partie release-pipeline).
+  - `npm run build:wails:exe` passe les deux drapeaux, plus `updater.PublicKey`, par `scripts/build-wails-exe.ts` (version de package.json, clé de `go-app/build/updater-ed25519.pub`).
 - **Dossiers** (tauri 2.12.5, `path/desktop.rs` et `manager/webview.rs`).
   - Configuration : `%APPDATA%\{id}` (`session.json`, `playback-quality.json`, `request.json`).
   - Cache : `%LOCALAPPDATA%\{id}` (`artwork`, `tls-roots.pem`). Journaux : `%LOCALAPPDATA%\{id}\logs`.
@@ -496,7 +469,6 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
     - **Décision (2026-11-22), à faire au basculement.** La release Tauri de transition exporte les clés localStorage de l'app dans `%APPDATA%\io.github.quentinpn.viewer\ui-settings.json` : une commande dédiée, appelée au démarrage. Au premier lancement, l'app Wails lit ce fichier par une commande, remplit le localStorage s'il est vide, puis renomme le fichier. Clés concernées : `ItemDetail`, `LibraryBrowser`, `PlayerView` (volume), `subtitles`, `HomeRowsSettings`, `Settings`.
 - **Pour d'autres unités.**
   - installer : un `go build` sans drapeau donne un exe **debug** (identifiant `io.github.quentinpn.viewer.debug`, coffre `Viewer-debug`). Un build direct, hors de `npm run build:wails:exe`, doit passer `-X viewer/internal/app.buildMode=release`. L'icône et la ressource de version restent à faire. La note sur le dossier WebView2 est réglée : il est `%LOCALAPPDATA%\{id}\EBWebView`, comme sous Tauri.
-  - release-pipeline : la commande décrite dans « Unité updater » écrit `-X main.version=…`. La variable est maintenant `viewer/internal/app.version`, avec `viewer/internal/app.buildMode=release` en plus.
 - **Notes de recherche** : `research/websocket.md` et `research/wails-shell.md`.
 - **Dépendance.** `github.com/coder/websocket` v1.8.14 passe d'indirecte à directe. La bibliothèque standard n'a pas de client WebSocket, et Wails embarque déjà celui-ci : aucun téléchargement.
 - **Bugs Rust relevés** : aucun.

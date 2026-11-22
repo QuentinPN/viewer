@@ -45,7 +45,24 @@ go test ./...
 CGO_ENABLED=0 go build ./...   # PowerShell : $env:CGO_ENABLED='0'; go build ./...
 ```
 
-Le frontend Wails se construit avec `npm run build:wails`, l'exécutable avec `npm run build:wails:exe` (`go-app/bin/viewer.exe`).
+Le frontend Wails se construit avec `npm run build:wails`, l'exécutable avec `npm run build:wails:exe` (`go-app/bin/viewer.exe`) : `scripts/build-wails-exe.ts` porte les seuls drapeaux de release (`-H=windowsgui`, `buildMode=release`, version de package.json, `updater.PublicKey` lu dans `go-app/build/updater-ed25519.pub`) et vérifie que l'exe contient la clé.
+
+### Release desktop (`scripts/publish.ts`)
+
+`node scripts/publish.ts --dry-run` fait tout sauf publier : libmpv, `verify:web`, portes Go (`gofmt -l` vide, `go vet`, `go test`, en `CGO_ENABLED=0` ; staticcheck absent), `scripts/build-wails-installer.ps1 -Build` (frontend Wails, exe, NSIS), puis deux signatures de l'installateur :
+
+- minisign avec la clé Tauri (`~/.viewer/updater.key`, `tauri signer sign --app-version`), relue par `scripts/minisign.ts` contre la `pubkey` de `tauri.conf.json` et le `version:` du commentaire de confiance ;
+- ed25519 sur `SignedMessage` (`src/release/signature.ts`) avec `~/.viewer/updater-ed25519.key`, dont la clé publique doit être celle de `go-app/build/updater-ed25519.pub`.
+
+Il écrit `go-app/bin/latest.json` (url `file://`). Vérification par le code Go de l'app (`parseManifest` puis `Verify`) :
+
+```
+cd go-app
+$env:VIEWER_RELEASE_MANIFEST="$PWD\bin\latest.json"; $env:VIEWER_RELEASE_INSTALLER="$PWD\bin\Viewer_<version>_x64-setup.exe"
+go test ./internal/updater -run Test_go_release_manifest_verifies -v -count=1
+```
+
+Les vecteurs `go-app/internal/updater/testdata/signature-vectors.json` sont lus par le test Go et par `src/release/signature.test.ts` : les deux côtés doivent produire le même message et la même signature.
 
 ### Android TV, depuis `android-tv/`
 
@@ -127,6 +144,7 @@ Résultats réellement enregistrés. Tauri en build debug sauf mention. « Image
 | 2026-11-09 | idem | HEVC Main10 4K HDR10, AC3 5.1 | gamma pq, bt.2020, 0 image perdue sur 2 min, seek +60 s sans attente de cache, pause et changement de piste audio OK, fermeture 309 ms ; passage en SRT : attente de cache 4 à 8 s, 5 images perdues |
 | 2026-11-09 | idem | Surcouche du lecteur TV (pause, seek, menu pistes, ASS, retour) | OK ; aucun jeton Emby dans logcat |
 | 2026-11-14 | Bureau debug + Shield liée par le relais Emby `SendString` (Emby 4.10.2.0) | Synchronisation de lecture | Liaison en 5,3 s ; dérive en régime établi n=118, médiane 49 ms, p95 230 ms, max 250 ms (échec face à la cible p95 < 150 ms) ; retour sous 60 ms après +10 s en 1,7 s, après pause/reprise en 7,8 s ; commandes TV vers bureau 3–404 ms |
+| 2026-11-22 | viewer-pc, Node 26.13.1, Go 1.27.4, makensis du cache Tauri | `node scripts/publish.ts --dry-run` (version 1.5.0, branche `ci/release-wails`) | Sortie 0 : verify:web, gofmt, vet, test, installateur Wails 42,4 Mio. Minisign relue par `minisign-verify` 0.3.0 (crate du plugin, même chemin que `verify_signature`) contre la `pubkey` de tauri.conf.json, `version:1.5.0` signé, octet ajouté refusé. Ed25519 vérifiée par `Test_go_release_manifest_verifies`. Installateur non exécuté, rien publié |
 | 2026-11-22 | Win10 22H2, RTX 3080, WebView2 157, Go 1.27.4, Wails v3.1.0, `CGO_ENABLED=0` ; spike, pas l'app complète | H.264 720p30 + AAC synthétiques (fichier local et HTTP local), gpu-next/d3d11, d3d11va | Chargement et lecture 1,35 s (local) et 1,37 s (HTTP), 0 image perdue, vidéo visible sous la surcouche HTML (captures revues), piste audio 2 vers 1 OK, ASS OK, redimensionnement et plein écran OK, seek 30 s OK, arrêt 54–60 ms, sortie < 0,6 s code 0, fermeture par la croix 3/3 en 112–153 ms sans erreur 1412 ; touche Espace non vérifiée |
 
 La dérive de la ligne du 2026-11-14 est l'estimation de la TV elle-même (`time-pos` de mpv), sans horloge partagée ni caméra.
@@ -137,7 +155,7 @@ La dérive de la ligne du 2026-11-14 est l'estimation de la TV elle-même (`time
 - Shield : AudioTrack refuse l'AAC stéréo 44,1 kHz (repli OpenSL ES) ; attente de cache de 4 à 8 s au changement de sous-titre en 4K ; pas de Dolby Vision ; DTS, bitstream, PGS et AV1 non couverts ; transcodage, drapeau HDR et sortie multicanale non vérifiés sur la TV.
 - TV : les sous-titres mpv passent sous la couche Compose et chevauchent la barre quand les contrôles sont affichés ; la touche INFO n'existe pas sur la télécommande.
 - Le renvoi du rapport d'arrêt après coupure réseau n'a jamais été vérifié à la main sur la Shield (tests unitaires seulement).
-- Aucun résultat de lecture pour l'application Wails complète : la ligne Go est un spike. Clavier, focus, Espace et Échap non vérifiés ; la zone cliente fait 1 px de plus ; le rendu ASS « Forced » n'est pas vérifié. Installeur Wails et pipeline de release non exécutés.
+- Aucun résultat de lecture pour l'application Wails complète : la ligne Go est un spike. Clavier, focus, Espace et Échap non vérifiés ; la zone cliente fait 1 px de plus ; le rendu ASS « Forced » n'est pas vérifié. Installeur Wails jamais exécuté : la mise à jour d'une app Tauri installée vers l'installateur Wails (`/S /UPDATE /R /ARGS`) est lue dans le code du plugin et du `.nsi`, pas observée. Pipeline de release exécuté en essai à blanc local seulement, pas encore sur le runner.
 - Bureau : aucun rendu HEVC 10 bits, HDR ou Dolby Vision enregistré ; pas de machine Windows propre ; SmartScreen non testé ; mise à l'échelle 125 et 150 %, multi-écrans et DPI mixtes non testés.
 - Coupures réseau : seul le relais local a servi, jamais de vrai débranchement.
 - Le premier transcodage d'un film peut prendre environ 1 min (extraction des sous-titres). Un film sur un partage NAS périmé donnait un transcodage qui ne s'ouvrait jamais, corrigé depuis par un délai d'ouverture. Après une longue coupure HLS, la reprise revient à la position de la coupure.
