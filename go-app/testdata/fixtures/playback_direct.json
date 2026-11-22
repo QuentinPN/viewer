@@ -1,0 +1,11 @@
+{"MediaSources":[{"Chapters":[],"Protocol":"File","Id":"mediasource_30207",
+        "Path":"/share/Films/2 Coeurs (2020)/2 Coeurs.mkv","Type":"Default","Container":"mkv",
+        "Size":3760231036,"Name":"2 Coeurs","IsRemote":false,"HasMixedProtocols":false,
+        "RunTimeTicks":60000000000,"SupportsTranscoding":true,"SupportsDirectStream":true,
+        "SupportsDirectPlay":true,"IsInfiniteStream":false,"RequiresOpening":false,
+        "RequiresClosing":false,"RequiresLooping":false,"SupportsProbing":false,
+        "MediaStreams":[],"Formats":[],"Bitrate":5000000,"RequiredHttpHeaders":{},
+        "DirectStreamUrl":"/videos/30207/original.mkv?DeviceId=dev&MediaSourceId=mediasource_30207&PlaySessionId=ps1&api_key=TOKEN_PLACEHOLDER",
+        "AddApiKeyToDirectStreamUrl":false,"ReadAtNativeFramerate":false,
+        "DefaultAudioStreamIndex":1,"DefaultSubtitleStreamIndex":3,"ItemId":"30207",
+        "MimeType":"video/x-matroska"}],"PlaySessionId":"ps1"}

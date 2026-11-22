@@ -1,0 +1,8 @@
+{"Items":[
+        {"Name":"2 Coeurs","Id":"30207","Type":"Movie","ProductionYear":2020,
+         "ImageTags":{"Primary":"7b213eb5_6379"},"UserData":{"IsFavorite":true,"Played":false}},
+        {"Name":"Arcane","Id":"80473","Type":"Series","ProductionYear":2021,
+         "ImageTags":{},"UserData":{"IsFavorite":true,"UnplayedItemCount":18}},
+        {"Name":"Collection","Id":"555","Type":"BoxSet","UserData":{"IsFavorite":true}},
+        {"Name":"Id douteux","Id":"../x","Type":"Movie"}
+    ],"TotalRecordCount":4}

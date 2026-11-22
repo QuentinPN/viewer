@@ -214,24 +214,9 @@ func TestGolden_models_shapes(t *testing.T) {
 	}
 }
 
-// The PlaybackInfo bodies were read back by the fake server (alphabetical keys):
-// same value, order ignored.
-func TestGolden_playback_playbackinfo_request_shapes(t *testing.T) {
-	for _, name := range []string{
-		"playback.playbackinfo_request.direct_play.json",
-		"playback.playbackinfo_request.transcode_english.json",
-	} {
-		t.Run(name, func(t *testing.T) {
-			data := readGolden(t, name)
-			dec := json.NewDecoder(bytes.NewReader(data))
-			dec.DisallowUnknownFields()
-			var req PlaybackInfoRequest
-			if err := dec.Decode(&req); err != nil {
-				t.Fatal(err)
-			}
-			assertSameJSON(t, name, data, marshal(t, req))
-		})
-	}
+// The PlaybackInfo bodies of the goldens are sent by the Go client since wave 2
+// (TestGolden_playback_playbackinfo_request, client_test.go).
+func TestPlaybackInfoRequestSkipsUnsetFields(t *testing.T) {
 	// skip_serializing_if = "Option::is_none": absent, not null.
 	js := string(marshal(t, PlaybackInfoRequest{DeviceProfile: &DeviceProfile{}}))
 	if strings.Contains(js, "MediaSourceId") || strings.Contains(js, "AudioStreamIndex") {

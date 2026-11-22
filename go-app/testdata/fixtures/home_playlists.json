@@ -1,0 +1,9 @@
+{"Items":[
+        {"Name":"À revoir","Id":"60001","Type":"Playlist","MediaType":"Video","ChildCount":3,
+         "PrimaryImageAspectRatio":1.0,"ImageTags":{"Primary":"aa11"}},
+        {"Name":"Musique","Id":"60003","Type":"Playlist","MediaType":"Audio","ChildCount":12},
+        {"Name":"  ","Id":"60002","Type":"Playlist"},
+        {"Name":"À revoir","Id":"60001","Type":"Playlist","MediaType":"Video"},
+        {"Name":"Id douteux","Id":"../x","Type":"Playlist","MediaType":"Video"},
+        {"Name":"Pas une playlist","Id":"30207","Type":"Movie","MediaType":"Video"}
+    ],"TotalRecordCount":6}

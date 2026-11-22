@@ -1,0 +1,12 @@
+{"Items":[
+        {"Name":"La casa de papel","Id":"70185","Type":"Series","BackdropImageTags":["6da1a59e_6384"]},
+        {"Name":"2 Coeurs","Id":"30207","Type":"Movie","BackdropImageTags":["2edd4b0e_6379"]},
+        {"Name":"Dark","Id":"80473","Type":"Series","ProductionYear":2017,"Overview":"Winden.",
+         "ImageTags":{"Primary":"aa11_1","Logo":"bb22_1"},"BackdropImageTags":["cc33_1"],
+         "UserData":{"UnplayedItemCount":18,"Played":false}},
+        {"Name":"Sans fond","Id":"30300","Type":"Movie","BackdropImageTags":[]},
+        {"Name":"Tout vu","Id":"80500","Type":"Series","BackdropImageTags":["dd44_1"]},
+        {"Name":"Nouveau film","Id":"30301","Type":"Movie","RunTimeTicks":60000000000,
+         "BackdropImageTags":["ee55_1"],"UserData":{"PlaybackPositionTicks":0,"Played":false}},
+        {"Name":"En trop","Id":"30302","Type":"Movie","BackdropImageTags":["ff66_1"]}
+    ],"TotalRecordCount":7}

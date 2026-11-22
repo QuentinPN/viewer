@@ -41,9 +41,9 @@ func (l List[T]) MarshalJSON() ([]byte, error) {
 // PublicSystemInfo is `GET /System/Info/Public` (no authentication required in practice).
 // Every field is required.
 type PublicSystemInfo struct {
-	ServerName string `json:"ServerName"`
-	Version    string `json:"Version"`
-	ID         string `json:"Id"`
+	ServerName string `json:"ServerName" emby:"required"`
+	Version    string `json:"Version" emby:"required"`
+	ID         string `json:"Id" emby:"required"`
 }
 
 // AuthenticateUserByName is the `POST /Users/AuthenticateByName` request body.
@@ -55,9 +55,9 @@ type AuthenticateUserByName struct {
 // AuthenticationResult is the `POST /Users/AuthenticateByName` response. Every field
 // is required. Its String and GoString never print the token.
 type AuthenticationResult struct {
-	User        UserDto `json:"User"`
-	AccessToken string  `json:"AccessToken"`
-	ServerID    string  `json:"ServerId"`
+	User        UserDto `json:"User" emby:"required"`
+	AccessToken string  `json:"AccessToken" emby:"required"`
+	ServerID    string  `json:"ServerId" emby:"required"`
 }
 
 func (a AuthenticationResult) String() string {
@@ -69,8 +69,8 @@ func (a AuthenticationResult) GoString() string { return a.String() }
 
 // UserDto is an Emby user. Id and Name are required.
 type UserDto struct {
-	ID     string      `json:"Id"`
-	Name   string      `json:"Name"`
+	ID     string      `json:"Id" emby:"required"`
+	Name   string      `json:"Name" emby:"required"`
 	Policy *UserPolicy `json:"Policy"`
 	// Configuration is an object, or an array of one as the documentation types it
 	// (ADR 0065): read by the tracks unit, which keeps four fields only.
@@ -92,7 +92,7 @@ type QueryResult[T any] struct {
 // HomeSectionDto is one section of the user's home screen as the server composes it
 // (`/Users/{Id}/HomeSections`, a bare array on Emby 4.10.1.0). Id is required.
 type HomeSectionDto struct {
-	ID          string `json:"Id"`
+	ID          string `json:"Id" emby:"required"`
 	SectionType string `json:"SectionType"`
 	// IncludeNextUpInResume: the "resume" section also lists the next episode of each
 	// series in progress.
@@ -103,7 +103,7 @@ type HomeSectionDto struct {
 // opaque strings (numeric on Emby 4.10.1.0). Id is required. `Path` is never read: it
 // is the file path on the server.
 type BaseItemDto struct {
-	ID       string `json:"Id"`
+	ID       string `json:"Id" emby:"required"`
 	Name     string `json:"Name"`
 	ItemType string `json:"Type"`
 	// CollectionType of a library view.
@@ -243,7 +243,7 @@ type PlaybackInfoResponse struct {
 // `Path` is left out on purpose; the stream URLs carry the token in `api_key`
 // (removed before use).
 type MediaSourceInfo struct {
-	ID string `json:"Id"`
+	ID string `json:"Id" emby:"required"`
 	// Protocol: `File`, `Http`…
 	Protocol             *string `json:"Protocol"`
 	Container            *string `json:"Container"`
@@ -257,7 +257,7 @@ type MediaSourceInfo struct {
 	TranscodingSubProtocol *string `json:"TranscodingSubProtocol"`
 	TranscodingContainer   *string `json:"TranscodingContainer"`
 	// RequiredHTTPHeaders: headers the stream needs, in addition to authentication.
-	RequiredHTTPHeaders map[string]string `json:"RequiredHttpHeaders"`
+	RequiredHTTPHeaders map[string]string `json:"RequiredHttpHeaders" emby:"option"`
 	// DefaultAudioStreamIndex: audio the server picked from the user's preferences.
 	DefaultAudioStreamIndex *int32 `json:"DefaultAudioStreamIndex"`
 	// DefaultSubtitleStreamIndex: subtitle the server picked from the user's preferences.
@@ -272,7 +272,7 @@ type AddToPlaylistResultDto struct {
 
 // PlaylistCreationResultDto is `PlaylistCreationResult` of `POST /Playlists`. Id is required.
 type PlaylistCreationResultDto struct {
-	ID             string `json:"Id"`
+	ID             string `json:"Id" emby:"required"`
 	Name           string `json:"Name"`
 	ItemAddedCount uint32 `json:"ItemAddedCount"`
 }
@@ -280,7 +280,7 @@ type PlaylistCreationResultDto struct {
 // SessionInfoDto is one entry of `GET /Sessions` (ADR 0124): the fields linked
 // playback reads. Id is required.
 type SessionInfoDto struct {
-	ID                    string  `json:"Id"`
+	ID                    string  `json:"Id" emby:"required"`
 	DeviceID              *string `json:"DeviceId"`
 	DeviceName            *string `json:"DeviceName"`
 	Client                *string `json:"Client"`

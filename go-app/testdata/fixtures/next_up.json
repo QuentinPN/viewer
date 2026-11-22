@@ -1,0 +1,6 @@
+{"Items":[
+        {"Name":"Épisode 4","Id":"70229","Type":"Episode","IndexNumber":4,"ParentIndexNumber":5,
+         "SeriesName":"La casa de papel","SeriesId":"70185","RunTimeTicks":30000000000,
+         "ImageTags":{},"ParentBackdropItemId":"70185","ParentBackdropImageTags":["6da1a59e_6384"],
+         "UserData":{"PlaybackPositionTicks":0,"Played":false}}
+    ],"TotalRecordCount":1}
