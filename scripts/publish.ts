@@ -6,7 +6,6 @@
 // public releases repository, then rewrites desktop/latest.json there for the
 // app's updater. --dry-run stops after the signature, writes the manifest next to
 // the installer (file:// url) and prints the notes: nothing is published.
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -19,7 +18,16 @@ import {
 } from "../src/release/signature.ts";
 import { changelogSection, releaseNotes } from "../src/release/version.ts";
 import { gitea } from "./gitea.ts";
-import { dryRun, fail, powershell, read, root, sha256, step } from "./step.ts";
+import {
+  dryRun,
+  fail,
+  goGates,
+  powershell,
+  read,
+  root,
+  sha256,
+  step,
+} from "./step.ts";
 
 const version = JSON.parse(read("package.json")).version as string;
 const tag = `v${version}`;
@@ -41,18 +49,10 @@ if ((await publicKeyOf(ed25519Pem)) !== ed25519Pub)
 powershell("libmpv", "fetch-libmpv.ps1");
 step("verify:web", "npm", ["run", "verify:web"]);
 
-// Go gates, as in TESTING.md, without cgo like the release build
-const goApp = join(root, "go-app");
-process.env.CGO_ENABLED = "0";
-console.log("\n=== gofmt");
-const gofmt = spawnSync("gofmt", ["-l", "."], { cwd: goApp, encoding: "utf8" });
-if (gofmt.status !== 0 || gofmt.stdout.trim())
-  fail(`échec : gofmt\n${gofmt.stdout}${gofmt.stderr}`);
-step("go vet", "go", ["vet", "./..."], goApp);
-step("go test", "go", ["test", "./..."], goApp);
+goGates();
 
 // Frontend, exe (scripts/build-wails-exe.ts) and installer, rebuilt every time
-const outDir = join(goApp, "bin");
+const outDir = join(root, "go-app", "bin");
 const name = `Viewer_${version}_x64-setup.exe`;
 const installer = join(outDir, name);
 rmSync(installer, { force: true });

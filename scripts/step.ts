@@ -1,6 +1,7 @@
 // Shared steps of the CI publish scripts: publish.ts and
 // publish-android.ts run on the Windows runner after the release action has
-// bumped the version, written the changelog and tagged the commit.
+// bumped the version, written the changelog and tagged the commit. verify-go.ts
+// (`npm run verify:go`) runs the Go gates too.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -28,6 +29,22 @@ export function step(
   console.log(`\n=== ${title}`);
   const r = spawnSync(command, args, { cwd, stdio: "inherit", shell: true });
   if (r.status !== 0) fail(`échec : ${title} (code ${r.status})`);
+}
+
+/** The Go gates of go-app, without cgo like the release build: gofmt lists no
+ *  file, then go vet and go test. */
+export function goGates() {
+  const goApp = join(root, "go-app");
+  process.env.CGO_ENABLED = "0";
+  console.log("\n=== gofmt");
+  const gofmt = spawnSync("gofmt", ["-l", "."], {
+    cwd: goApp,
+    encoding: "utf8",
+  });
+  if (gofmt.status !== 0 || gofmt.stdout.trim())
+    fail(`échec : gofmt\n${gofmt.stdout}${gofmt.stderr}`);
+  step("go vet", "go", ["vet", "./..."], goApp);
+  step("go test", "go", ["test", "./..."], goApp);
 }
 
 /** Runs a script of `scripts/` with PowerShell 7 (the runner's shell: Windows
