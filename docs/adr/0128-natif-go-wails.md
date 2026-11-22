@@ -1,6 +1,6 @@
 # ADR 0128 — Natif en Go + Wails v3 à la place de Rust + Tauri
 
-Statut : Proposé (2026-11-22). Décision finale après le spike de lecture ci-dessous.
+Statut : Accepté pour la migration (2026-11-22, spike validé : `docs/evidence/gate1-go-2026-11-22.md`). Le basculement de l'app livrée reste à décider par le propriétaire (`go-app/MAP.md`).
 
 ## Contexte
 Le build release Rust prend 3 à 5 minutes à froid : 5 min 19 s dans la CI du 2026-11-21, 3 min 14 s en local. La CI desktop atteignait 9 min 30 s. La branche `chore/faster-desktop-build` traite déjà une partie du problème : dossier `target` persistant et LTO thin. Le propriétaire veut évaluer une migration du natif vers Go, dont la compilation est beaucoup plus rapide. Svelte, l'app Android TV et le serveur Emby ne changent pas.
