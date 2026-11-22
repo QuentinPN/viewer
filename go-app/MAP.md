@@ -2,7 +2,7 @@
 
 Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul agent à la fois.
 
-**Commandes non portées : 0 / 80** (vérifié par `TestRegisteredCommandsAreTheRustInvokeHandler`, qui lit `generate_handler!` dans lib.rs)
+**Commandes non portées : 0 / 82** (vérifié par `TestRegisteredCommandsAreTheRustInvokeHandler`, qui lit `generate_handler!` dans lib.rs)
 
 ## Vagues
 | Vague | Unité | Fichiers Rust | Statut |
@@ -17,7 +17,7 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
 | 2 | tls-roots | player/tls_roots.rs (sorti d'emby-client) | porté (`internal/tlsroots`, sans commande), wave2C |
 | 2 | library-events | emby/library_events.rs | porté (`internal/libraryevents`, hors `internal/emby` : voir « Unité app-shell »), app-shell |
 | 3 | player | player/mpv.rs, mod.rs, ffi.rs, video_surface.rs (mode parent seul) | porté (`internal/player`, binding `internal/mpv` étendu, sans commande : voir « Unité player »), wave3-player |
-| 3 | app-shell | lib.rs, commands.rs (commandes des vagues 1-3), fenêtre / barre de titre | porté (`internal/app`, `cmd/viewer`, 80 commandes ; illustrations servies sur `wails.localhost` : voir « Unité app-shell »), app-shell |
+| 3 | app-shell | lib.rs, commands.rs (commandes des vagues 1-3), fenêtre / barre de titre | porté (`internal/app`, `cmd/viewer`, 82 commandes ; illustrations servies sur `wails.localhost` : voir « Unité app-shell »), app-shell |
 | 4 | session | emby/session.rs, reporting.rs | porté (`internal/emby/session*.go`, `reporting.go`, sans commande : voir « Unité session et segments »), wave4 |
 | 4 | segments | segments/* | porté (`internal/segments`, sans commande), wave4 |
 | 5 | sync-core | sync/envelope.rs, leader.rs, mod.rs (parties pures : SyncDevice, tv_devices, own_session_id) | porté (`internal/devsync`, sans commande : voir « Unité sync-core »), wave5-sync-core |
@@ -435,7 +435,7 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
   - `internal/devsync/service.go` : service.rs. `Service` est le `SyncHandle`. Une goroutine possède l'automate, une seconde envoie les enveloppes dans l'ordre. Les files sont sans limite (`mailbox`), car le puits du lecteur ne doit jamais bloquer. Dépendances injectées : session, moteur (sans attente), émetteur, id de lien. `Devices` est `sync::devices`.
   - `cmd/viewer` : `main.go` (lib.rs `run`), `commands*.go` (commands.rs, un fichier par domaine), `args.go` (lecture des arguments à la manière de Tauri, sur `strictjson`, avec les mêmes textes d'erreur), `protocols.go` (`emby_image`, `request_image`).
   - `internal/bridge` : `Registry.Names()`, ajouté pour le test du jeu de commandes.
-- **Commandes : 80 / 80 enregistrées**, avec les mêmes noms, les mêmes clés camelCase (relevées dans les appels `invoke` de `src/`) et les mêmes résultats. `TestRegisteredCommandsAreTheRustInvokeHandler` lit `generate_handler!` dans lib.rs et compare les deux ensembles.
+- **Commandes : 82 / 82 enregistrées** (80 au départ, plus `ui_settings_export` / `ui_settings_import`, voir « Le localStorage ne suit pas la bascule »), avec les mêmes noms, les mêmes clés camelCase (relevées dans les appels `invoke` de `src/`) et les mêmes résultats. `TestRegisteredCommandsAreTheRustInvokeHandler` lit `generate_handler!` dans lib.rs et compare les deux ensembles.
 - **Devoirs de la couche commandes, reproduits.**
   - `emby_play` : `ResendStop` avant la négociation, `Begin` et `sync.Playing` après. Un échec après l'annonce envoie `Shutdown` au reporter seul, sans démantèlement (commands.rs:671).
   - `emby_change_quality` : `Switch` après l'analyse de la source et l'obtention du moteur, avant `Load`, sans `Shutdown`.
@@ -490,10 +490,13 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
     - Préfixes gardés : `/emby-img/` et `/requestimg/`. Ils ne croisent ni `dist` (`index.html`, `assets/`) ni un routeur (`src/` n'en a pas), et `src/` ne construit aucune URL d'image (seuls des commentaires les citent).
     - CSP Wails : `img-src 'self' data: blob:`, sans les deux hôtes Tauri. `'self'` couvre les illustrations. `csp_test.go` compare chaque directive à `tauri.conf.json`, aux deux écarts près. La CSP Tauri ne change pas.
     - Preuve, sans vrai serveur : `Test_go_library_artwork_is_served_on_the_app_origin` connecte l'app à un faux Emby local, prend le `src` et le `srcset` renvoyés par `emby_libraries`, et les envoie à `withCSP(withProtocols(…))`, comme `main.go`. Résultat : 200, `image/jpeg`, `Cache-Control` immuable, CSP et octets du faux. Le `src` répété vient du cache d'illustrations, et un autre id de serveur reçoit 403. Côté Request, `Test_go_set_image_origin_reaches_decorated_models` vérifie que le réglage atteint les modèles, et le routage est prouvé (401 hors session). Le 200 n'a pas tourné, faute de faux serveur Request dans `cmd/viewer`. L'appel `request.SetImageOrigin` de `useAppImageOrigins` n'est vérifié qu'à la relecture.
-  - **Le localStorage ne suit pas la bascule.**
+  - **Le localStorage ne suit pas la bascule** (réglé par la passation `ui-settings.json`, 2026-11-22).
     - Le dossier WebView2 est le même, mais le stockage est rangé par origine : `http://tauri.localhost` (vu dans `EBWebView\Default\Local Storage\leveldb` de l'app installée) contre `http://wails.localhost`.
-    - Les réglages de l'UI (préférences de lecture, etc.) repartent donc des valeurs par défaut. Aucune migration n'est faite ici.
-    - **Décision (2026-11-22), à faire au basculement.** La release Tauri de transition exporte les clés localStorage de l'app dans `%APPDATA%\io.github.quentinpn.viewer\ui-settings.json` : une commande dédiée, appelée au démarrage. Au premier lancement, l'app Wails lit ce fichier par une commande, remplit le localStorage s'il est vide, puis renomme le fichier. Clés concernées : `ItemDetail`, `LibraryBrowser`, `PlayerView` (volume), `subtitles`, `HomeRowsSettings`, `Settings`.
+    - Sans passation, les réglages de l'UI (préférences de lecture, etc.) repartiraient des valeurs par défaut.
+    - **Fait (2026-11-22) : passation par `ui-settings.json`** dans le dossier de config (`%APPDATA%\io.github.quentinpn.viewer`, `io.github.quentinpn.viewer.debug` pour la build debug).
+      - À chaque lancement, l'app Tauri exporte les clés de l'app (`ui_settings_export`, sans attendre ; écriture atomique). `src/lib/native/uiSettings.ts`, appelé par `src/main.ts` avant le montage.
+      - L'app Wails, si son localStorage n'a aucune clé de l'app, lit le fichier (`ui_settings_import`, `null` sans fichier) et attend 500 ms au plus avant le montage. Une réponse plus tardive remplit encore les clés absentes. Le fichier n'est pas renommé (lecture seule) : un renommage, avec ce délai, pouvait perdre les valeurs.
+      - Clés autorisées, une seule liste par langage (`uiSettings.ts`, `ui_settings.rs`, `internal/uisettings`) : `viewer.player.volume|skip|subtitles|nightMode`, et les préfixes `viewer.home-rows.v1:`, `viewer.library-options.v1:`, `viewer.search-history.v1:`, `viewer.version.v1:`. Limites : 200 entrées, 64 Kio par valeur, 512 Kio au total (octets UTF-8, clés comprises) ; au-delà, l'export est refusé en entier. Le frontend reste sous les limites : les choix de version par film (`viewer.version.v1:`) cèdent la place en premier.
 - **Pour d'autres unités.**
   - installer : un `go build` sans drapeau donne un exe **debug** (identifiant `io.github.quentinpn.viewer.debug`, coffre `Viewer-debug`). Un build direct, hors de `npm run build:wails:exe`, doit passer `-X viewer/internal/app.buildMode=release`. L'icône et la ressource de version restent à faire. La note sur le dossier WebView2 est réglée : il est `%LOCALAPPDATA%\{id}\EBWebView`, comme sous Tauri.
   - release-pipeline : la commande décrite dans « Unité updater » écrit `-X main.version=…`. La variable est maintenant `viewer/internal/app.version`, avec `viewer/internal/app.buildMode=release` en plus.
@@ -559,4 +562,4 @@ Smoke automatisé : `node scripts/e2e/wails-smoke.mjs` (build debug, vrai serveu
   - lecture liée avec une TV (invitation, `load`, pause, déliaison) ;
   - une deuxième instance s'ouvre comme sous Tauri (pas d'instance unique) ;
   - les illustrations s'affichent dans la build Wails : accueil, fiche détaillée, demandes Request (URL `http://wails.localhost/emby-img/…` et `/requestimg/…`) ; **[vérifié]** ;
-  - après la bascule, les réglages de l'UI repartent des valeurs par défaut (localStorage rangé par origine, voir `research/wails-shell.md`).
+  - après la bascule, les réglages de l'UI sont repris de `ui-settings.json` (exporté par la dernière release Tauri) ; non vérifié de bout en bout.
