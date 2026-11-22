@@ -250,9 +250,7 @@ try {
             "section[aria-labelledby=settings-updates] [role=status]",
           );
           return (
-            s &&
-            s.textContent.trim() &&
-            !/Recherche en cours/.test(s.textContent)
+            s?.textContent.trim() && !/Recherche en cours/.test(s.textContent)
           );
         },
         null,
