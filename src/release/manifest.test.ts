@@ -7,7 +7,7 @@ describe("desktopManifest", () => {
       "1.2.0",
       "- Mises à jour automatiques",
       "http://x/setup.exe",
-      "c2ln\n",
+      { minisign: "c2ln\n", ed25519: "ZWQ=\n" },
       new Date("2026-11-13T18:00:00Z"),
     );
     expect(m).toEqual({
@@ -15,7 +15,11 @@ describe("desktopManifest", () => {
       notes: "- Mises à jour automatiques",
       pub_date: "2026-11-13T18:00:00.000Z",
       platforms: {
-        "windows-x86_64": { signature: "c2ln", url: "http://x/setup.exe" },
+        "windows-x86_64": {
+          signature: "c2ln",
+          ed25519: "ZWQ=",
+          url: "http://x/setup.exe",
+        },
       },
     });
   });

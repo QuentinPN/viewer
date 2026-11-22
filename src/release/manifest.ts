@@ -1,12 +1,15 @@
 // Update manifests written to the public releases repository on each publish.
 // The apps read them to find a newer version.
 
-/** `desktop/latest.json`, in the format of Tauri's updater plugin. */
+/** `desktop/latest.json`, in the format of Tauri's updater plugin. One
+ *  installer, two signatures: `signature` (minisign, Tauri key) for the
+ *  installed Tauri app, `ed25519` (signature.ts) for the Go app. Each updater
+ *  ignores the field it does not know. */
 export function desktopManifest(
   version: string,
   notes: string,
   url: string,
-  signature: string,
+  signatures: { minisign: string; ed25519: string },
   now: Date,
 ) {
   return {
@@ -14,7 +17,11 @@ export function desktopManifest(
     notes,
     pub_date: now.toISOString(),
     platforms: {
-      "windows-x86_64": { signature: signature.trim(), url },
+      "windows-x86_64": {
+        signature: signatures.minisign.trim(),
+        ed25519: signatures.ed25519.trim(),
+        url,
+      },
     },
   };
 }

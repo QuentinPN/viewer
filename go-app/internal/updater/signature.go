@@ -13,10 +13,10 @@ import (
 //
 //	-ldflags "-X viewer/internal/updater.PublicKey=<base64>"
 //
-// TODO(release-pipeline): set at the cutover, from the public half of the new
-// signing key (MAP.md, "release-pipeline"). Empty, every update fails closed
-// with the category "signature": an unsigned or unverifiable installer is never
-// kept. No real key is committed.
+// The release build (scripts/build-wails-exe.ts) injects the key of
+// go-app/build/updater-ed25519.pub. Empty, every update fails closed with the
+// category "signature": an unsigned or unverifiable installer is never kept.
+// The source keeps it empty.
 var PublicKey = ""
 
 // SignaturePrefix separates the update signatures from any other use of the key.
