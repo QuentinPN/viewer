@@ -2,6 +2,17 @@
 
 Chaque section est écrite par Gitea Actions au merge dans `main`, avec `versionName` et `versionCode` (ADR 0126).
 
+## 1.5.0 — 2026-11-22
+
+### Nouveautés
+
+- bouton « Bande-annonce » sur les fiches, ordinateur et TV (demander)
+- segment « Rechercher » dans l'onglet Demander (tv)
+
+### Corrections
+
+- la recherche de Demander garde le focus au retour (tv)
+
 ## 1.4.0 — 2026-11-19
 
 - Nouvel onglet « Demander » : « Découvrir », « Parcourir » (films et séries, avec tous les filtres), fiche d'un titre et demande d'un film ou de saisons choisies, à la télécommande (ADR 0125).
