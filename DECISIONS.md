@@ -5,7 +5,6 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 
 - **Svelte + Vite sans SvelteKit** — pas de SSR ni de routage serveur à gérer dans une webview locale.
 - **Versions exactes et lockfile commité** — builds reproductibles, pas de mise à jour silencieuse d'une dépendance.
-- **Tauri 2 stable** — l'API des permissions et des protocoles personnalisés est celle sur laquelle le code s'appuie.
 - **Un seul dépôt pour desktop et Android** — contrats Emby, roadmap et choix d'API partagés ; deux dépôts obligeraient à les resynchroniser à la main.
 
 ## Lecture et libmpv (Windows)
@@ -26,11 +25,10 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 
 ## Emby
 
-- **Client Emby en Rust, jeton jamais exposé au JS** — la webview n'a aucune raison de voir le secret.
-- **native-tls, pas rustls** — rustls tire aws-lc, qui exige CMake et NASM au build.
+- **Client Emby en Go, jeton jamais exposé au JS** — la webview n'a aucune raison de voir le secret.
 - **Jeton dans le Credential Manager, une entrée par serveur et utilisateur ; métadonnées non secrètes et DeviceId stable dans `session.json`** — le secret est isolé, le reste se relit sans coffre.
 - **URL de serveur en http/https uniquement, sans identifiants, requête ni fragment** — évite qu'un secret ou un schéma inattendu passe dans les logs ou les en-têtes.
-- **PlaybackCoordinator en Rust, ordre Direct Play, Direct Stream, Transcode** — la décision vient du serveur (PlaybackInfo), jamais de l'extension du fichier.
+- **PlaybackCoordinator en Go, ordre Direct Play, Direct Stream, Transcode** — la décision vient du serveur (PlaybackInfo), jamais de l'extension du fichier.
 - **URL de flux fournie par le serveur acceptée seulement si relative sous `/videos/`, jeton déplacé dans l'en-tête `X-Emby-Token`** — empêche un serveur ou une réponse piégée d'envoyer le jeton ailleurs.
 - **Repli transcodage unique, décidé par le lecteur quand aucune position n'a été vue** — `FileLoaded` seul ne prouve pas que l'image sort.
 - **Machine à états du suivi de lecture** — un fichier non chargé n'est jamais annoncé, progression toutes les 10 s, le rapport d'arrêt est rejoué puis abandonné si la session a changé, attente de 3 s à la fermeture.
@@ -41,12 +39,12 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **Langues : choix local, sinon « Comme le compte Emby » (défaut), sinon règles client sur les préférences du compte, sinon mpv ; rien n'est écrit sur le serveur** — l'app ne modifie pas la configuration du serveur.
 - **Bouton « Passer » visible 10 s au début du segment, ensuite seulement avec les commandes** — ne masque pas l'image sans arrêt. Sur TV, `SkipArm` désarme le bouton pour qu'un OK après un seek ne saute pas le segment.
 - **Tri et filtres côté serveur avec options typées, choix par bibliothèque en localStorage** — les grandes bibliothèques ne se trient pas côté client.
-- **Recherche : requêtes films, séries et épisodes en parallèle, nettoyage en Rust, épisodes filtrés sur début de mot, drapeau « peut-être plus », anti-rebond 250 ms, réponses périmées ignorées** — Emby renvoie du bruit sur les épisodes et la saisie est rapide.
+- **Recherche : requêtes films, séries et épisodes en parallèle, nettoyage en Go, épisodes filtrés sur début de mot, drapeau « peut-être plus », anti-rebond 250 ms, réponses périmées ignorées** — Emby renvoie du bruit sur les épisodes et la saisie est rapide.
 - **Studios et genres filtrés par nom (`Studios=`, `Genres`), pas par ID** — la forme par ID n'est pas documentée ; le nom est validé (non vide, 100 caractères max, ni `|` ni caractère de contrôle).
 - **Playlists : ne pas combiner `MediaTypes=Video` et `IncludeItemTypes=Playlist`** — sur Emby 4.10.2.0 cela renvoie toutes les vidéos. Playlists audio filtrées côté client, entrées dédoublonnées à leur première place.
 - **Ouverture d'un genre ou studio dans la bibliothèque du titre via `GET /Items/{Id}/Ancestors?UserId=`, repli `sectionLibrary`** — évite de deviner la bibliothèque.
 - **Favoris triés par `SortName`** — Emby n'a pas de tri par date d'ajout aux favoris, et un tri stable garde le focus en place.
-- **Accueil : les cartes lancent la lecture directement ; « Reprendre » dédoublonné contre « À suivre » ; rangées relues après `playback-stopped` ; héros de 5 éléments max choisi en Rust** — l'accueil reflète toujours l'état réel sans écran intermédiaire.
+- **Accueil : les cartes lancent la lecture directement ; « Reprendre » dédoublonné contre « À suivre » ; rangées relues après `playback-stopped` ; héros de 5 éléments max choisi en Go** — l'accueil reflète toujours l'état réel sans écran intermédiaire.
 - **Barre d'accueil : une entrée par bibliothèque films ou séries, uniquement des IDs issus de `/Views`** — jamais d'identifiant déduit.
 - **Rangées d'accueil à clés stables (`resume`, `nextUp`, `favorites`, `latest.<libraryId>`, `playlists` sur TV seulement), ordre et visibilité par serveur et utilisateur, stockés localement jamais sur Emby** — clés inconnues ignorées mais conservées, nouvelle bibliothèque affichée après sa précédente.
 - **WebSocket Emby : `LibraryChanged` non vide relit l'accueil seulement s'il est affiché, rafales regroupées (relecture 2 s après le dernier message), KeepAlive 30 s, reconnexion 2, 5, 15 puis 30 s** — l'URL à jeton est construite côté natif, jamais loguée, erreurs loguées par catégorie. Le socket reste ouvert toute la session (nécessaire à la lecture liée).
@@ -63,12 +61,12 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **Battement chaque seconde, lien perdu après 5 s sans message, chaque lecteur continue seul** — une coupure ne doit jamais bloquer la lecture.
 - **Positions absolues, le suiveur corrige de la moitié de l'aller-retour ping/pong, aucune horloge murale comparée** — les horloges PC et Shield ne sont pas synchronisées.
 - **Volume jamais envoyé, pistes audio et sous-titres alignées seulement au `load`** — réglages propres à chaque appareil.
-- **Vecteurs de test partagés (`docs/sync/vectors.json`) lus par les tests Rust et Kotlin** — garantit que les deux implémentations parlent le même protocole.
+- **Vecteurs de test partagés (`docs/sync/vectors.json`) lus par les tests Go et Kotlin** — garantit que les deux implémentations parlent le même protocole.
 - **Limite connue : si Emby redémarre, le lien tombe** — pas de reprise automatique prévue.
 
 ## Demander (Request)
 
-- **Client natif par plateforme (reqwest derrière commandes Tauri, OkHttp sur TV), jamais d'appel depuis la webview** — pas de CORS, pas de jeton exposé au JS.
+- **Client natif par plateforme (net/http derrière les commandes Go, OkHttp sur TV), jamais d'appel depuis la webview** — pas de CORS, pas de jeton exposé au JS.
 - **Contrat figé dans `contracts/request/openapi.json` avec fixtures partagées validées contre lui** — toute dérive apparaît comme un test de contrat en échec.
 - **Échange de jeton depuis l'identité Emby, verrou à vol unique** — le serveur limite à 10 échecs par IP et 5 min, partagés avec la connexion par mot de passe.
 - **401 : une réémission puis « rejeté » ; 429 : délai `Retry-After` affiché, aucune nouvelle tentative automatique** — ne pas aggraver le blocage.
@@ -99,7 +97,7 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 
 ## Android TV
 
-- **Application Kotlin native dans `android-tv/`, aucun code partagé avec Tauri** — les contrats communs sont l'API Emby et les vecteurs de test, pas du code.
+- **Application Kotlin native dans `android-tv/`, aucun code partagé avec l'app desktop** — les contrats communs sont l'API Emby et les vecteurs de test, pas du code.
 - **Seul cible TV : la Shield** — pas de matrice d'appareils à supporter.
 - **`.so` libmpv de la release officielle mpv-android (arm64), SHA-256 vérifié par `scripts/fetch-libmpv-android.ps1`, dossier ignoré** — pont JNI exigeant la classe `is.xyz.mpv.MPVLib`, copiée sous licence MIT et protégée de R8.
 - **Compose pour TV ; le lecteur est une Activity séparée avec une SurfaceView hors de Compose** — la vidéo native ne se compose pas proprement dans Compose.
@@ -119,10 +117,10 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 
 ## Mises à jour
 
-- **Dépôt public `Viewer-releases` (lecture anonyme) avec manifestes `desktop/latest.json` (format updater Tauri) et `android/latest.json` (versionCode, versionName, notes, url, sha256, taille)** — l'app peut vérifier sans identifiants, alors que le code reste privé.
-- **Updater Tauri appelé uniquement depuis Rust, sans permission JS ; installation NSIS silencieuse** — la webview ne déclenche pas d'installation.
-- **Clé minisign hors du dépôt, l'app n'accepte que la clé publique embarquée** — seule la signature garantit l'intégrité.
-- **`dangerousInsecureTransportProtocol` activé** — le Gitea est en HTTP sur le LAN ; c'est la signature, pas le transport, qui protège. La version est signée (`version:` du commentaire de confiance minisign, message ed25519), donc un ancien installateur ne se rejoue pas sous un numéro plus récent.
+- **Dépôt public `Viewer-releases` (lecture anonyme) avec manifestes `desktop/latest.json` (format de l'updater Tauri, gardé pour l'updater Go) et `android/latest.json` (versionCode, versionName, notes, url, sha256, taille)** — l'app peut vérifier sans identifiants, alors que le code reste privé.
+- **Updater piloté depuis Go seulement (commandes `app_update_*`) ; installation NSIS silencieuse** — la webview ne déclenche pas d'installation.
+- **Clé privée ed25519 hors du dépôt, l'app n'accepte que la clé publique embarquée au build** — seule la signature garantit l'intégrité.
+- **Transport HTTP permis à l'updater (`AllowInsecureTransport`)** — le Gitea est en HTTP sur le LAN ; c'est la signature, pas le transport, qui protège. La version est signée (message ed25519 `SignedMessage`), donc un ancien installateur ne se rejoue pas sous un numéro plus récent.
 - **Pastille de mise à jour jamais affichée pendant la lecture ; builds debug vérifient mais ne téléchargent jamais** — pas d'interruption, pas d'écrasement d'un build de travail.
 - **TV : SHA-256 de l'APK et comparaison du certificat de signature avant de proposer l'installation (lecture par `GET_SIGNATURES` sous API 33), installation via PackageInstaller** — un APK altéré ou signé par un autre ne s'installe pas.
 - **Release Android signée avec le keystore debug de la machine (`~/.android/debug.keystore`)** — le perdre bloque les mises à jour (désinstallation requise), donc le sauvegarder.
@@ -136,18 +134,17 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **Build et publication sur le runner Windows `viewer-pc`** — les clés de l'updater et le keystore Android n'existent que sur ce PC.
 - **Deux pistes : desktop `vX.Y.Z` (tout sauf `android-tv/**`) et Android `android-vX.Y.Z` (seulement `android-tv/**`)** — tags distincts pour que le changelog desktop ignore ceux d'Android. Elles tournent à la suite dans le même job pour qu'Android voie le commit desktop.
 - **Publication idempotente, `workflow_dispatch` avec `publish` republie depuis le tag** — une publication interrompue se rattrape sans nouvelle version.
-- **Release desktop = installateur Go/Wails signé deux fois pendant la transition : minisign (clé Tauri) dans `signature`, ed25519 sur `SignedMessage` dans `ed25519` ; clé privée ed25519 dans `~/.viewer/updater-ed25519.key` sur le PC de release comme la clé minisign, clé publique versionnée dans `go-app/build/updater-ed25519.pub`** — l'app Tauri installée passe à l'app Go sans geste du propriétaire ; la minisign tombera quand plus aucune app Tauri ne sera installée.
+- **Release desktop = installateur Go/Wails signé en ed25519 sur `SignedMessage` (champ `ed25519` du manifeste) ; clé privée dans `~/.viewer/updater-ed25519.key` sur le PC de release, clé publique versionnée dans `go-app/build/updater-ed25519.pub`** — la signature minisign de l'updater Tauri est tombée avec l'app Tauri : plus aucune n'est installée.
 - **Versions et changelogs jamais édités à la main sauf bump délibéré** — les messages de commit doivent donc rester lisibles.
 - **Secret `RELEASE_TOKEN` passé en `GITEA_TOKEN`** — Gitea refuse les secrets nommés `GITEA_*`.
 - **Dépôt sur le Gitea du propriétaire (code privé), GitHub gardé comme remote de sauvegarde sans push automatique** — pas de dépendance à un service externe pour livrer.
 
-## Migration Go + Wails v3 (en cours)
+## Partie native Go + Wails v3
 
-- **Partie native portée de Rust/Tauri vers Go + Wails v3 (3.1.0) dans `go-app/` ; `src-tauri/` reste la référence livrée jusqu'à la bascule** — build Rust release de 3 à 5 min à froid (9 min 30 s en CI). La bascule attend le propriétaire, suivi dans `go-app/MAP.md`.
+- **App Tauri 2 + Rust (`src-tauri/`) retirée après la v1.7.0, première release Go ; la partie native est l'app Go + Wails v3 (3.1.0) de `go-app/`** — build Rust release de 3 à 5 min à froid (9 min 30 s en CI), et la v1.7.0 a remplacé l'app Tauri sur le seul poste : plus rien à mettre à jour depuis Tauri.
 - **Go en `CGO_ENABLED=0`, libmpv chargée par syscall, boucle d'événements en goroutine** — pas de chaîne C à installer.
-- **Même composition vidéo que Tauri (fenêtre sans cadre et transparente, HWND principal passé par `wid`, clavier dans la WebView)** — l'interface Svelte ne doit pas changer.
-- **Fidélité prouvée par les tests Rust portés et du JSON de référence des commandes et événements** — le port doit répondre exactement comme l'original.
-- **Commits `refactor` ou `chore` jusqu'à la bascule (aucune release)** — l'app livrée reste celle de Tauri.
-- **Bug Rust trouvé pendant le port : petit et visible par l'utilisateur, corrigé dans Rust tout de suite ; sinon noté dans `go-app/MAP.md`, porté tel quel, corrigé ensuite en Go** — évite de faire diverger les deux bases.
-- **Smoke E2E Wails : `VIEWER_E2E_BROWSER_ARGS` lu en debug seulement** — Wails efface `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`.
-- **Conséquence ouverte : peut-être une reconnexion unique si Go ne relit pas l'entrée du coffre** — à trancher à la bascule (l'updater est réglé par la double signature, voir « Installateur, release et CI »).
+- **Fenêtre sans cadre et transparente, HWND principal passé à mpv par `wid`, clavier dans la WebView** — la composition vidéo de l'app Tauri, que l'interface Svelte attend.
+- **Tests Rust portés et JSON de référence figé des commandes et événements (`go-app/testdata/golden/`, plus rien ne le régénère)** — l'app Go doit répondre exactement comme l'original.
+- **Bugs de l'app Rust portés tels quels, listés dans `go-app/MAP.md`, corrigés en Go** — le port est resté fidèle ; la correction vient après.
+- **E2E : `VIEWER_E2E_BROWSER_ARGS` lu en debug seulement** — Wails efface `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`.
+- **Conséquence ouverte : peut-être une reconnexion unique si Go ne relit pas l'entrée du coffre de l'app Tauri** — à constater sur la v1.7.0 installée.
