@@ -459,6 +459,7 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
   - Cache : `%LOCALAPPDATA%\{id}` (`artwork`, `tls-roots.pem`). Journaux : `%LOCALAPPDATA%\{id}\logs`.
   - Profil WebView2 : `WebviewUserDataPath` = `%LOCALAPPDATA%\{id}`. Tauri passe `app_local_data_dir` à WebView2, qui y ajoute `EBWebView` ; observé à l'exécution.
   - Les variables `VIEWER_E2E_*` et `VIEWER_LIBMPV` sont reprises, en debug seulement.
+  - Port DevTools des scénarios CDP : Wails vide `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` dans un `init()` de paquet, avant `main`. La build debug lit donc `VIEWER_E2E_BROWSER_ARGS` (`app.BrowserArgsFor`) et la passe à `Windows.AdditionalBrowserArgs`. Un `--disable-features` rejoint `Windows.DisabledFeatures`. `scripts/e2e/app.mjs` pose les deux variables (2026-11-22, `docs/evidence/wails-smoke-2026-11-22.md`).
 - **Tests.** Les 8 tests Rust de library_events.rs sont portés sous le même nom ; service.rs n'en a pas. Tests `Test_go_*` ajoutés :
   - socket, contre un vrai WebSocket local : KeepAlive, capacités, session propre, relais, annonce après le calme, fermeture en fin de session, accueil non affiché, catégories d'erreur ;
   - service sync : refus d'invitation, `load` puis `bye` dans l'ordre avec l'accusé de `Stop` (le service invite encore après, comme après une déconnexion), index de flux en lecture directe seulement, `join` nommé par le serveur, changement de session, service arrêté, ids de lien ;
@@ -473,7 +474,7 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
   - Capture PrintWindow de sa seule fenêtre (2560x1400) : écran de premier lancement « Bienvenue. Ajoute ton premier serveur Emby. », sans « commande non portée ».
   - `WM_CLOSE` : sortie en 31 ms, code 0, pas d'erreur 1412 dans le journal. L'exe a été supprimé ensuite.
   - Relancé sur le code final (gardes de panique, `state.Go` dans le crochet de fermeture) : fenêtre après 572 ms, même écran, sortie 15 ms après `WM_CLOSE`, code 0. Le journal tient en trois lignes (démarrage en release, WebView2 créé, sortie), sans erreur ni adresse 192.0.2.
-  - **Limite :** la fenêtre était au repos. La fermeture pendant une lecture (annulation, démantèlement, `bye`, envoi du rapport d'arrêt, puis `win.Close`) n'a pas été exécutée, seulement relue (voir la checklist smoke).
+  - **Limite :** la fenêtre était au repos. La fermeture pendant une lecture (annulation, démantèlement, `bye`, envoi du rapport d'arrêt, puis `win.Close`) n'a pas été exécutée, seulement relue (voir la checklist smoke). **Exécutée le 2026-11-22** par `scripts/e2e/wails-smoke.mjs`, sans TV liée : sortie en 303 ms. Emby a la position de la fermeture (380 s, à 3 s près), et le journal n'a pas l'avertissement « stop report not confirmed ».
 - **Écarts assumés.**
   - Pas d'instance unique : le squelette avait `SingleInstance`, retiré parce que l'app Tauri n'a pas ce plugin.
   - Les dossiers sont lus dans `%APPDATA%` / `%LOCALAPPDATA%` (`os.UserConfigDir`, `os.UserCacheDir`) au lieu des dossiers connus du shell. Ce sont les mêmes dans une session normale, et un processus lancé avec d'autres variables reste hors des données du propriétaire.
@@ -482,7 +483,7 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
   - libmpv en debug : `vendor/mpv/libmpv-2.dll` est cherché en remontant depuis l'exe (Go n'a pas `CARGO_MANIFEST_DIR`).
   - Socket : le `Close(None)` de Rust devient une trame de fermeture 1000. La taille maximale d'un message reste 64 Mio (défaut de tungstenite).
 - **Points ouverts (décision de l'orchestrateur ou du propriétaire).**
-  - **Réglé côté Go (2026-11-22), à confirmer à l'écran : les illustrations visent l'origine de l'app.** Aucune image n'a encore été vue dans un vrai WebView2 : la preuve s'arrête au gestionnaire Go.
+  - **Réglé côté Go (2026-11-22), confirmé à l'écran le même jour : les illustrations visent l'origine de l'app.** Le smoke Wails a vu dans un vrai WebView2, sans image cassée, les illustrations de l'accueil, de la grille et de la fiche (`/emby-img/`) ainsi que celles de Demander (`/requestimg/`) (`docs/evidence/wails-smoke-2026-11-22.md`).
     - Wails v3.1.0 ne route vers Go que l'hôte `wails.localhost` (`webview_window_windows.go`, `processRequest`). Les origines Tauri `http://emby-img.localhost` et `http://requestimg.localhost` n'y arrivaient donc jamais.
     - L'origine des URL est devenue un paramètre : `imageRefAt(origin, …)` dans `internal/emby/images.go` et `internal/request/images.go`. `ImageRefFor` et `imageRef` lisent l'origine du paquet, Tauri par défaut (`TauriImageOrigin`, `TauriOrigin`), donc les goldens ne changent pas.
     - Pas de point d'injection propre : les constructeurs sont des fonctions libres, appelées par les fonctions de conversion et par les `decorate()`, sans service. D'où un réglage de paquet, `SetImageOrigin` (un `atomic.Pointer`), appelé une seule fois par `main` avant `app.New` via `useAppImageOrigins` (`protocols.go`) : `http://wails.localhost/emby-img` et `http://wails.localhost/requestimg`. Les tests d'`internal/emby` et d'`internal/request` ne le changent jamais.
@@ -543,18 +544,19 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
   - Garder minisign est écarté : il faudrait BLAKE2b, donc `golang.org/x/crypto`. Détail dans `research/updater.md`.
 
 ## Checklist smoke pour le propriétaire (avant le basculement)
-- Clavier réel : Espace, flèches et Échap dans le lecteur, focus après le plein écran.
-- Son audible, lecture d'un vrai MKV et d'un vrai flux Emby (avec jeton).
-- Lecture par `MpvEngine` dans la fenêtre Wails (`wid` = HWND principal) : le spike a validé la composition, mais pas encore ce moteur, qui n'a tourné qu'en headless.
+Smoke automatisé : `node scripts/e2e/wails-smoke.mjs` (build debug, vrai serveur, CDP et PrintWindow, sans prise du bureau), plus un sous-ensemble `--offline` sans serveur. Résultats du 2026-11-22 dans `docs/evidence/wails-smoke-2026-11-22.md`. **[vérifié]** = exercé par ce scénario ; le reste demeure manuel. Point ouvert relevé : sous Wails, la fenêtre hors écran peut prendre le premier plan à son ouverture (pas d'option « sans activation »).
+- Clavier réel : Espace, flèches et Échap dans le lecteur, focus après le plein écran. **[vérifié par CDP seulement]** : Espace (pause et reprise), flèche droite (+10 s, `seeked`) et Échap (fermeture du panneau, puis sortie du lecteur) envoyés à la page. Le clavier physique et le focus après le plein écran restent NON VÉRIFIÉS ici ; le propriétaire les signale bons.
+- Son audible, lecture d'un vrai MKV et d'un vrai flux Emby (avec jeton). **[vérifié]** : flux Emby en lecture directe, MKV H.264 1920×800, pistes audio et sous-titres changées depuis les panneaux. Le son reste NON VÉRIFIÉ (sortie `null` en test) ; le propriétaire le signale bon.
+- Lecture par `MpvEngine` dans la fenêtre Wails (`wid` = HWND principal) : le spike a validé la composition, mais pas encore ce moteur, qui n'a tourné qu'en headless. **[vérifié]** : `d3d11va`, gpu-next / d3d11, vidéo visible sous les contrôles (PrintWindow du HWND de l'app), progression par `player://event`.
 - Échelle d'affichage à 125-150 %, deuxième écran.
 - Coffre : après une connexion faite avec l'app Tauri, la build Go doit rouvrir la session sans redemander le mot de passe (même entrée `{serverId}/{userId}.Viewer`).
 - Mise à jour : une build Go signée (clé injectée) trouve une version plus récente sur un `latest.json` de test, affiche la pastille, puis « Redémarrer maintenant » lance l'installateur en silence et l'app revient à jour. Un installateur à la signature altérée est refusé (Réglages › Mises à jour : erreur `signature`).
 - Installateur Wails (`pwsh scripts/build-wails-installer.ps1 -Build`, jamais exécuté jusqu'ici) : l'installer par-dessus une installation Tauri 1.5.0 (même dossier `%LOCALAPPDATA%\Viewer`, une seule entrée « Viewer » dans Paramètres › Applications, raccourcis conservés). Lancer l'app (elle charge `libmpv-2.dll` à côté de l'exe), vérifier l'icône des raccourcis, puis tester `Viewer_x.y.z_x64-setup.exe /S /UPDATE /R` app ouverte (elle se ferme, l'installateur écrase, l'app revient). Enfin désinstaller depuis Paramètres : exe, dll, raccourcis et clé disparaissent, les données restent sauf case cochée. Vérifier aussi que les accents français de l'installateur sont lisibles (l'encodage n'a pas été observé).
 - Coquille Wails (unité app-shell, rien de cela n'a tourné) :
-  - fermer avec ✕ pendant une lecture : le lecteur s'arrête, la TV liée reçoit `bye`, Emby enregistre la position, puis l'app quitte en moins de 6 s ;
+  - fermer avec ✕ pendant une lecture : le lecteur s'arrête, la TV liée reçoit `bye`, Emby enregistre la position, puis l'app quitte en moins de 6 s ; **[vérifié sans TV liée]** : `WM_CLOSE`, sortie en 303 ms (code 0). Reprise Emby à la position de la fermeture après relance, à 3 s près, et journal sans « stop report not confirmed ». Le `bye` reste à voir avec une TV ;
   - plein écran depuis une fenêtre maximisée, puis retour : la fenêtre redevient maximisée ;
-  - les événements arrivent à l'UI : progression du lecteur, nouveau titre sur l'accueil (`emby://library-changed`), pastille de mise à jour ;
+  - les événements arrivent à l'UI : progression du lecteur, nouveau titre sur l'accueil (`emby://library-changed`), pastille de mise à jour ; **[vérifié pour `player://event`]** (`timePos`, `tracks`, `paused`, `seeked`, `buffering`…). `emby://library-changed` et la pastille ne le sont pas ;
   - lecture liée avec une TV (invitation, `load`, pause, déliaison) ;
   - une deuxième instance s'ouvre comme sous Tauri (pas d'instance unique) ;
-  - les illustrations s'affichent dans la build Wails : accueil, fiche détaillée, demandes Request (URL `http://wails.localhost/emby-img/…` et `/requestimg/…`) ;
+  - les illustrations s'affichent dans la build Wails : accueil, fiche détaillée, demandes Request (URL `http://wails.localhost/emby-img/…` et `/requestimg/…`) ; **[vérifié]** ;
   - après la bascule, les réglages de l'UI repartent des valeurs par défaut (localStorage rangé par origine, voir `research/wails-shell.md`).
