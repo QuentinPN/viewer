@@ -66,7 +66,7 @@ Les vecteurs `go-app/internal/updater/testdata/signature-vectors.json` sont lus 
 
 Les vecteurs `contracts/seasons/vectors.json` (logo saisonnier) sont lus par `src/lib/brand/season.test.ts` et par `SeasonTest` côté Android (chemin relatif `../../contracts/seasons`, pas de copie à synchroniser).
 
-Le logo saisonnier du bureau : `src/lib/brand/logo.test.ts` (réglage, minuit, minuteur) et `go-app/internal/brand` (ids ; sous Windows, `WM_GETICON` d'une fenêtre cachée avant et après un changement de logo). À la main sur l'exe de débogage (fenêtre hors écran, `VIEWER_E2E_OFFSCREEN`) : `WM_GETICON` grande et petite icône non nulles au démarrage, différentes avec la date forcée au 25 décembre, identiques à celles du départ une fois le réglage coupé. Non vérifié : le bouton épinglé de la barre des tâches (il garde l'icône de l'exe), le rendu de la barre de titre à 125 et 150 %.
+Le logo saisonnier du bureau : `src/lib/brand/logo.test.ts` (réglage, minuit, minuteur, build de débogage toujours au casque de chantier) et `go-app/internal/brand` (ids ; sous Windows, `WM_GETICON` d'une fenêtre cachée avant et après un changement de logo). À la main sur l'exe de débogage (fenêtre hors écran, `VIEWER_E2E_OFFSCREEN`) : `WM_GETICON` grande et petite icône non nulles au démarrage, différentes avec la date forcée au 25 décembre, identiques à celles du départ une fois le réglage coupé. Non vérifié : le bouton épinglé de la barre des tâches (il garde l'icône de l'exe), le rendu de la barre de titre à 125 et 150 %.
 
 ### Android TV, depuis `android-tv/`
 

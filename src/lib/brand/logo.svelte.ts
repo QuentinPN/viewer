@@ -1,10 +1,12 @@
 // The logo in use: the raccoon in the outfit of the day (see season.ts), unless
-// « Icônes saisonnières » is off. Re-evaluated at startup, at each local
-// midnight and when the setting changes. Each change of logo also becomes the icon
+// « Icônes saisonnières » is off. The debug build always wears the hard hat
+// ("debug"): the setting and the date do not apply. Re-evaluated at startup, at
+// each local midnight and when the setting changes. Each change of logo also becomes the icon
 // of the window (title bar, taskbar button), on the Wails build only: the pinned
 // taskbar icon and the shortcuts stay the exe's resource, the default logo.
 import { backend, invoke } from "../native";
-import { type SeasonId, seasonForDate } from "./season";
+import type { LogoId } from "./logos";
+import { seasonForDate } from "./season";
 
 /** localStorage key of the setting: "0" is off, anything else (or nothing) on. */
 export const SEASONAL_KEY = "viewer.ui.seasonalLogo";
@@ -16,7 +18,9 @@ export interface LogoDeps {
   now: () => Date;
   storage: Storage | null;
   /** Sets the window icon. Rejections are logged, never thrown. */
-  applyIcon: (id: SeasonId) => Promise<unknown>;
+  applyIcon: (id: LogoId) => Promise<unknown>;
+  /** Whether this is the debug build. Rejections count as no. */
+  isDebug: () => Promise<boolean>;
 }
 
 export function readSeasonal(storage: Storage | null): boolean {
@@ -43,12 +47,14 @@ export function msUntilMidnight(now: Date): number {
 
 export class LogoState {
   /** The logo to show, a key of LOGO_URLS. */
-  id = $state<SeasonId>("default");
+  id = $state<LogoId>("default");
   /** « Icônes saisonnières ». */
   seasonal = $state(true);
+  /** The debug build (known once start() has asked): it keeps the hard hat. */
+  debug = $state(false);
 
   #deps: LogoDeps;
-  #applied: SeasonId | null = null;
+  #applied: LogoId | null = null;
   #icon: Promise<unknown> = Promise.resolve();
   #timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -58,7 +64,8 @@ export class LogoState {
     this.id = this.#compute();
   }
 
-  #compute(): SeasonId {
+  #compute(): LogoId {
+    if (this.debug) return "debug";
     return this.seasonal ? seasonForDate(this.#deps.now()) : "default";
   }
 
@@ -91,6 +98,14 @@ export class LogoState {
   start(): () => void {
     this.refresh();
     this.#arm();
+    // A local call: the debug build switches to the hard hat right after.
+    this.#deps
+      .isDebug()
+      .catch(() => false)
+      .then((debug) => {
+        this.debug = debug;
+        this.refresh();
+      });
     return () => {
       clearTimeout(this.#timer);
       this.#timer = undefined;
@@ -118,4 +133,9 @@ export const logo = new LogoState({
   storage: localStorageOrNull(),
   applyIcon: (id) =>
     backend === "wails" ? invoke("window_set_icon", { id }) : Promise.resolve(),
+  // Wails only (Go command app_is_debug): the Tauri build keeps the season.
+  isDebug: () =>
+    backend === "wails"
+      ? invoke<boolean>("app_is_debug")
+      : Promise.resolve(false),
 });

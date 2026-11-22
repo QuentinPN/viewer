@@ -18,7 +18,9 @@
 // The .syso needs Go on PATH and the network once (go-winres, pinned, cached by Go).
 //
 // <id> is a season: default, epiphany, winter, valentine, april-fools, easter,
-// music, summer, bastille, autumn, halloween, christmas, new-year.
+// music, summer, bastille, autumn, halloween, christmas, new-year. The hard hat
+// raccoon is a logo id of its own, "debug" (not a season): debug builds only,
+// src/lib/brand/debug.svg and go-app/internal/brand/icons/debug.png.
 
 import { spawnSync } from "node:child_process";
 import {
@@ -236,6 +238,11 @@ try {
     const debugIcon = rasterize(logoSvg(DEBUG), 432, 432);
     checkAlpha(debugIcon, "debug icon", true);
     put(`${debugRes}/icon.png`, debugIcon);
+    // Desktop debug build: the same hard hat, as UI logo and window icon.
+    put("src/lib/brand/debug.svg", logoSvg(DEBUG));
+    const debugWindowIcon = rasterize(logoSvg(DEBUG), 256, 256);
+    checkAlpha(debugWindowIcon, "debug 256px", true);
+    put("go-app/internal/brand/icons/debug.png", debugWindowIcon);
   }
   // Icon resource of the Windows exe. go-winres: pinned, icon only (no manifest: the
   // exe has none today, and one could change the DPI behaviour of the video window;

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LogoState, msUntilMidnight, SEASONAL_KEY } from "./logo.svelte";
-import { LOGO_URLS } from "./logos";
-import { SEASON_IDS, type SeasonId } from "./season";
+import { LOGO_URLS, type LogoId } from "./logos";
+import { SEASON_IDS } from "./season";
 
 class MemoryStorage {
   data = new Map<string, string>();
@@ -18,14 +18,18 @@ const asStorage = (s: MemoryStorage) => s as unknown as Storage;
 /** 25 December, 10:00 local: christmas. */
 const CHRISTMAS = new Date(2026, 11, 25, 10, 0, 0);
 
-function make(storage: MemoryStorage | null = new MemoryStorage()) {
-  const applied: SeasonId[] = [];
+function make(
+  storage: MemoryStorage | null = new MemoryStorage(),
+  isDebug: () => Promise<boolean> = async () => false,
+) {
+  const applied: LogoId[] = [];
   const state = new LogoState({
     now: () => new Date(),
     storage: storage ? asStorage(storage) : null,
     applyIcon: async (id) => {
       applied.push(id);
     },
+    isDebug,
   });
   return { state, applied, storage };
 }
@@ -41,9 +45,12 @@ afterEach(() => {
 });
 
 describe("LOGO_URLS", () => {
-  it("has a file for every season", () => {
-    expect(Object.keys(LOGO_URLS).sort()).toEqual([...SEASON_IDS].sort());
-    for (const id of SEASON_IDS) expect(LOGO_URLS[id], id).toBeTruthy();
+  it("has a file for every season, and the debug hard hat", () => {
+    expect(Object.keys(LOGO_URLS).sort()).toEqual(
+      [...SEASON_IDS, "debug"].sort(),
+    );
+    for (const id of [...SEASON_IDS, "debug"] as const)
+      expect(LOGO_URLS[id], id).toBeTruthy();
   });
 });
 
@@ -151,10 +158,45 @@ describe("LogoState", () => {
       applyIcon: async () => {
         throw new Error("refusé");
       },
+      isDebug: async () => false,
     });
     const stop = state.start();
     await vi.advanceTimersByTimeAsync(0);
     expect(warn).toHaveBeenCalled();
+    expect(state.id).toBe("christmas");
+    stop();
+  });
+});
+
+describe("LogoState in the debug build", () => {
+  it("wears the hard hat whatever the setting and the date", async () => {
+    for (const off of [false, true]) {
+      const storage = new MemoryStorage();
+      if (off) storage.setItem(SEASONAL_KEY, "0");
+      const { state, applied } = make(storage, async () => true);
+      const stop = state.start();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(state.debug).toBe(true);
+      expect(state.id).toBe("debug");
+      expect(applied.at(-1)).toBe("debug");
+
+      state.setSeasonal(!off);
+      expect(state.id).toBe("debug");
+      // Across midnights too: 25 Dec, then 3 days later.
+      await vi.advanceTimersByTimeAsync(3 * 24 * 3600 * 1000);
+      expect(state.id).toBe("debug");
+      expect(applied.at(-1)).toBe("debug");
+      stop();
+    }
+  });
+
+  it("is not debug when the build cannot tell", async () => {
+    const { state } = make(undefined, async () => {
+      throw new Error("indisponible");
+    });
+    const stop = state.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(state.debug).toBe(false);
     expect(state.id).toBe("christmas");
     stop();
   });

@@ -1,5 +1,5 @@
 <script lang="ts">
-// Réglages › Apparence: the seasonal logo. Global (not per server or user):
+// Réglages › Apparence: the seasonal logo (locked in the debug build, which keeps the hard hat). Global (not per server or user):
 // it is the app's own icon, kept on this PC like the player's volume.
 import { logo } from "../brand/logo.svelte";
 import { LOGO_URLS } from "../brand/logos";
@@ -11,13 +11,18 @@ import { LOGO_URLS } from "../brand/logos";
     <input
       type="checkbox"
       checked={logo.seasonal}
+      disabled={logo.debug}
       onchange={(e) => logo.setSeasonal(e.currentTarget.checked)}
     />
     <span>
       Icônes saisonnières
       <small class="muted">
-        Le raton change de tenue pour Noël, Halloween… L'icône épinglée dans la barre des
-        tâches reste la même.
+        {#if logo.debug}
+          Build de débogage : le raton garde son casque de chantier, quelle que soit la date.
+        {:else}
+          Le raton change de tenue pour Noël, Halloween… L'icône épinglée dans la barre des
+          tâches reste la même.
+        {/if}
       </small>
     </span>
     <img src={LOGO_URLS[logo.id]} width="40" height="40" alt="" aria-hidden="true" draggable="false" />

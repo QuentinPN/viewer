@@ -352,6 +352,23 @@ func TestUISettingsHandover(t *testing.T) {
 	}
 }
 
+// app_is_debug is the build flag, Go only, and costs nothing.
+func Test_go_app_is_debug(t *testing.T) {
+	if !slices.Contains(goOnlyCommands, "app_is_debug") {
+		t.Fatal("app_is_debug absent de goOnlyCommands")
+	}
+	for _, debug := range []bool{true, false} {
+		_, b, _, _ := testApp(t, debug)
+		want := "false"
+		if debug {
+			want = "true"
+		}
+		if out, err := invoke(t, b, "app_is_debug", `{}`); out != want || err != "" {
+			t.Errorf("debug=%v : %s %s", debug, out, err)
+		}
+	}
+}
+
 // window_set_icon refuses an id that is not an embedded logo, and a window that
 // does not exist yet; it never reaches WM_SETICON with either.
 func Test_go_window_set_icon_validates(t *testing.T) {
@@ -359,13 +376,16 @@ func Test_go_window_set_icon_validates(t *testing.T) {
 	if !slices.Contains(goOnlyCommands, "window_set_icon") {
 		t.Fatal("window_set_icon absent de goOnlyCommands")
 	}
-	for _, id := range []string{"", "debug", "../default", "default.png"} {
+	for _, id := range []string{"", "Debug", "../default", "default.png", "debug.png"} {
 		if _, err := invoke(t, b, "window_set_icon", `{"id":"`+id+`"}`); err != `"logo inconnu"` {
 			t.Errorf("%q : %s", id, err)
 		}
 	}
-	if _, err := invoke(t, b, "window_set_icon", `{"id":"christmas"}`); err != `"fenêtre indisponible"` {
-		t.Errorf("fenêtre sans HWND : %s", err)
+	// "debug" is an embedded logo (the hard hat), like a season.
+	for _, id := range []string{"christmas", "debug"} {
+		if _, err := invoke(t, b, "window_set_icon", `{"id":"`+id+`"}`); err != `"fenêtre indisponible"` {
+			t.Errorf("%s, fenêtre sans HWND : %s", id, err)
+		}
 	}
 	if _, err := invoke(t, b, "window_set_icon", `{}`); err == "" {
 		t.Error("sans id")

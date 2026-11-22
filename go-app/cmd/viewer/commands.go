@@ -20,7 +20,7 @@ func registerCommands(reg *bridge.Registry, a *app.App, win Window) {
 	registerPlayer(reg, a, win)
 	registerEmby(reg, a)
 	registerSync(reg, a)
-	registerBrand(reg, win)
+	registerBrand(reg, a.Debug(), win)
 
 	// Request: the 16 ur_* commands bound to the Emby session.
 	handlers := request.Handlers(a.Request, a.Identity)

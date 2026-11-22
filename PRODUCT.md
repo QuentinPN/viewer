@@ -29,7 +29,7 @@ Plusieurs comptes et plusieurs serveurs sont possibles, mais jamais au prix de l
 
 ## Logo saisonnier
 
-Le raton laveur change de tenue selon la date (Noël, Halloween, Pâques, 14 juillet…). Sur le bureau, le logo de l'interface et l'icône de la fenêtre (barre de titre, bouton de la barre des tâches, Alt+Tab) suivent le calendrier local, à l'ouverture puis à chaque minuit, sans redémarrer. Réglages › Apparence › « Icônes saisonnières », activé par défaut : désactivé, le logo reste le logo par défaut. L'icône épinglée dans la barre des tâches et celle des raccourcis sont celles de l'exe (logo par défaut) : elles ne changent jamais.
+Le raton laveur change de tenue selon la date (Noël, Halloween, Pâques, 14 juillet…). Sur le bureau, le logo de l'interface et l'icône de la fenêtre (barre de titre, bouton de la barre des tâches, Alt+Tab) suivent le calendrier local, à l'ouverture puis à chaque minuit, sans redémarrer. Réglages › Apparence › « Icônes saisonnières », activé par défaut : désactivé, le logo reste le logo par défaut. L'icône épinglée dans la barre des tâches et celle des raccourcis sont celles de l'exe (logo par défaut) : elles ne changent jamais. La build de débogage du bureau garde toujours le raton au casque de chantier (logo et icône de la fenêtre), comme celle d'Android ; son réglage est alors grisé.
 
 ## Hors périmètre
 

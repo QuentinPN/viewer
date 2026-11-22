@@ -4,6 +4,7 @@ import aprilFools from "./april-fools.svg";
 import autumn from "./autumn.svg";
 import bastille from "./bastille.svg";
 import christmas from "./christmas.svg";
+import debugLogo from "./debug.svg";
 import defaultLogo from "./default.svg";
 import easter from "./easter.svg";
 import epiphany from "./epiphany.svg";
@@ -15,8 +16,12 @@ import summer from "./summer.svg";
 import valentine from "./valentine.svg";
 import winter from "./winter.svg";
 
-export const LOGO_URLS: Record<SeasonId, string> = {
+/** A season, or the hard hat raccoon of the debug build (not a season). */
+export type LogoId = SeasonId | "debug";
+
+export const LOGO_URLS: Record<LogoId, string> = {
   default: defaultLogo,
+  debug: debugLogo,
   "new-year": newYear,
   epiphany,
   winter,
