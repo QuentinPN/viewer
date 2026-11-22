@@ -17,7 +17,7 @@ Ce fichier dit comment vérifier le code, ce qui ne s'automatise pas, ce qui a r
 | `npm run verify:web` | lint, check, test, build |
 | `npm run verify` | `verify:web` puis `verify:go` |
 
-La CI (`.github/workflows/ci.yml`) lance `npx biome ci .`, `npm run check`, `npm run test`, `npm run build`, puis un job Go sous Windows (`gofmt -l`, `go vet ./...`, `go test ./...`, `CGO_ENABLED=0`, Go de `go-app/go.mod`). Les releases passent par `.gitea/workflows/release.yml`.
+La CI (`.github/workflows/ci.yml`) lance `npx biome ci .`, `npm run check`, `npm run test`, `npm run build`, puis un job Go sous Windows (`gofmt -l`, `go vet ./...`, `go test ./...`, `CGO_ENABLED=0`, Go de `go-app/go.mod`), avec la libmpv épinglée (`VIEWER_MPV_DLL`, `VIEWER_REQUIRE_LIBMPV=1` : les tests moteur échouent au lieu de sauter). Ce job n'a pas encore tourné. Les releases passent par `.gitea/workflows/release.yml`.
 
 ### Go (Wails v3), depuis `go-app/`
 

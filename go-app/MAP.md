@@ -35,7 +35,7 @@ JSON de référence produit par l'ancienne app Rust, figé : plus rien ne le ré
 
 - Golden typé : jetons comparés dans l'ordre, nombres par valeur (serde écrit `0.0` là où Go écrit `0`). Tables `json!` : comparées sans tenir compte de l'ordre.
 - Les messages d'erreur issus des crates `url` et `serde` se comparent sur `kind` seulement (voir `index.json`).
-- `playback.*` `playback_start` et `engine_request` sont des miroirs faits à la main de `emby_play` : `cmd/viewer/commands_play.go` doit rester aligné sur eux.
+- `playback.*` `playback_start` et `engine_request` sont des miroirs faits à la main de `emby_play` : `NewPlaybackStart` et `EngineRequest` (`internal/emby/playback.go`) doivent leur rester conformes (`Test_go_playback_start_and_engine_request_mirror_emby_play`).
 
 ## Conventions du code Go
 
