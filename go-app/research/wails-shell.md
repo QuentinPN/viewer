@@ -10,7 +10,7 @@ Ce qu'il faut savoir de Wails pour que `go-app/cmd/viewer` se comporte comme `sr
 ## Dossier de données WebView2
 - `application_options.go:298` et `webview_window_windows.go:2607` : `WindowsOptions.WebviewUserDataPath` devient `chromium.DataPath` sans transformation, et WebView2 ajoute lui-même `EBWebView` dessous.
 - Tauri 2.12.5 utilise `app_local_data_dir`, soit `%LOCALAPPDATA%\io.github.quentinpn.viewer` (`io.github.quentinpn.viewer.debug` en debug). Le port passe `Paths.LocalData`, ce qui donne le même dossier `EBWebView`.
-- **Bloquant pour la bascule :** le localStorage est rangé par origine. Tauri l'écrit sous `http://tauri.localhost` (vu dans le leveldb), Wails sous `http://wails.localhost`. Le même profil ne rend donc pas les réglages de l'UI (thème, sous-titres, dernier écran) : il faudra une migration, ou garder l'origine.
+- **Bloquant pour la bascule :** le localStorage est rangé par origine. Tauri l'écrit sous `http://tauri.localhost` (vu dans le leveldb), Wails sous `http://wails.localhost`. Le même profil ne rend donc pas les réglages de l'UI (thème, sous-titres, dernier écran). Réglé le 2026-11-22 par la passation `ui-settings.json` (voir MAP.md, « Le localStorage ne suit pas la bascule »).
 
 ## Événements
 - `event_manager.go:31-45` : `Emit(name, data...)` ne met pas une donnée unique dans un tableau (`event.Data = data[0]`). La charge utile arrive donc comme avec `app.emit` de Tauri. Une charge nil donne `null`, comme `()` sérialisé par Tauri.

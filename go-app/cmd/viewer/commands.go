@@ -7,6 +7,7 @@ import (
 	"viewer/internal/bridge"
 	"viewer/internal/diagnostics"
 	"viewer/internal/sysinfo"
+	"viewer/internal/uisettings"
 	"viewer/internal/updater"
 	"viewer/internal/request"
 )
@@ -40,4 +41,8 @@ func registerCommands(reg *bridge.Registry, a *app.App, win Window) {
 	reg.Register("app_update_pending", updater.PendingHandler(a.Updater))
 	reg.Register("app_update_install", updater.InstallHandler(a.Updater))
 	reg.Register("app_update_check", updater.CheckHandler(a.Updater, a.Debug()))
+
+	// UI preferences handed over from the Tauri app (localStorage is per origin).
+	reg.Register("ui_settings_export", arg1("ui_settings_export", "entries", uisettings.ExportHandler(a.Paths().Config)))
+	reg.Register("ui_settings_import", uisettings.ImportHandler(a.Paths().Config))
 }

@@ -112,8 +112,8 @@ func rustCommands(t *testing.T) []string {
 // Every command of the Rust invoke_handler is registered, and nothing else.
 func TestRegisteredCommandsAreTheRustInvokeHandler(t *testing.T) {
 	want := rustCommands(t)
-	if len(want) != 80 {
-		t.Fatalf("lib.rs liste %d commandes, MAP.md en compte 80", len(want))
+	if len(want) != 82 {
+		t.Fatalf("lib.rs liste %d commandes, MAP.md en compte 82", len(want))
 	}
 	reg := bridge.NewRegistry()
 	a, _, win, _ := testApp(t, true)
@@ -156,6 +156,7 @@ func Test_go_first_run_answers(t *testing.T) {
 		{"emby_library_events_stop", `{}`, `null`, ""},
 		{"artwork_cache_stats", `{}`, `{"entries":0,"bytes":0,"quotaBytes":536870912,"hits":0,"misses":0}`, ""},
 		{"app_update_pending", `{}`, `null`, ""},
+		{"ui_settings_import", `{}`, `null`, ""},
 		{"player_close", `{}`, `null`, ""},
 		{"player_tracks", `{}`, "", `"aucune lecture ouverte"`},
 		{"emby_libraries", `{}`, "", `{"kind":"notSignedIn","message":"non connecté au serveur Emby"}`},
@@ -197,6 +198,9 @@ func Test_go_arguments_follow_tauri(t *testing.T) {
 		{"emby_set_favorite", `{"itemId":"i","favorite":null}`, "invalid args `favorite` for command `emby_set_favorite`"},
 		{"window_set_fullscreen", `{}`, `"command window_set_fullscreen missing required key fullscreen"`},
 		{"emby_play", `[]`, "invalid args for command `emby_play`: expected an object"},
+		{"ui_settings_export", `{}`, `"command ui_settings_export missing required key entries"`},
+		{"ui_settings_export", `{"entries":null}`, "invalid args `entries` for command `ui_settings_export`"},
+		{"ui_settings_export", `{"entries":{"a":1}}`, "invalid args `entries` for command `ui_settings_export`"},
 	}
 	for _, c := range cases {
 		_, err := invoke(t, b, c.cmd, c.args)
@@ -325,5 +329,23 @@ func Test_go_set_played_needs_a_session(t *testing.T) {
 	}
 	if len(*events) != 0 {
 		t.Fatal(*events)
+	}
+}
+
+// ui_settings_export then ui_settings_import through the bridge, in the app config
+// folder (a refused export leaves the previous one).
+func TestUISettingsHandover(t *testing.T) {
+	a, b, _, _ := testApp(t, true)
+	if _, err := invoke(t, b, "ui_settings_export", `{"entries":{"viewer.player.volume":"7"}}`); err != "" {
+		t.Fatal(err)
+	}
+	if _, err := invoke(t, b, "ui_settings_export", `{"entries":{"token":"x"}}`); err != `"réglages refusés : clé non autorisée"` {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(a.Paths().Config, "ui-settings.json")); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := invoke(t, b, "ui_settings_import", `{}`); out != `{"viewer.player.volume":"7"}` || err != "" {
+		t.Fatal(out, err)
 	}
 }
