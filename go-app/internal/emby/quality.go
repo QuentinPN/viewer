@@ -9,12 +9,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
+	"viewer/internal/iokind"
 )
 
 // BitrateChoices are the caps offered in the settings, in bits per second; nil is "Maximale".
@@ -224,16 +224,7 @@ func saveQualityFile(file qualityFile, path string) error {
 }
 
 // ioKindText is the Display of the io::ErrorKind Rust logs for err: never the OS text.
-func ioKindText(err error) string {
-	switch {
-	case errors.Is(err, fs.ErrNotExist):
-		return "entity not found"
-	case errors.Is(err, fs.ErrPermission):
-		return "permission denied"
-	default:
-		return "other error"
-	}
-}
+func ioKindText(err error) string { return iokind.Text(err) }
 
 // osErrorText is the OS text of an I/O error, without Go's "op path:" prefix (Rust
 // prints the io::Error alone).

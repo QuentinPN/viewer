@@ -3,13 +3,11 @@ package diagnostics
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
+	"viewer/internal/iokind"
 )
 
 // Error is `DiagnosticsError`. Rust serializes it as its `#[error]` text, a bare
@@ -44,20 +42,7 @@ func (e *Error) MarshalJSON() ([]byte, error) { return json.Marshal(e.Error()) }
 
 // ioKind is the Display of the io::ErrorKind Rust would report for err. Only the
 // kinds a folder creation or a launch gives are told apart; the rest is "other error".
-func ioKind(err error) string {
-	switch {
-	case errors.Is(err, fs.ErrNotExist), errors.Is(err, exec.ErrNotFound):
-		return "entity not found"
-	case errors.Is(err, fs.ErrPermission):
-		return "permission denied"
-	case errors.Is(err, fs.ErrExist):
-		return "entity already exists"
-	case errors.Is(err, syscall.ENOTDIR):
-		return "not a directory"
-	default:
-		return "other error"
-	}
-}
+func ioKind(err error) string { return iokind.Text(err) }
 
 // Opener hands a folder (or a web address) to the Windows shell.
 type Opener func(target string) error

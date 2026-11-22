@@ -8,11 +8,9 @@ package request
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"io/fs"
-	"os/exec"
 
 	"viewer/internal/diagnostics"
+	"viewer/internal/iokind"
 )
 
 // trailerKeyMax is the longest key accepted; YouTube ids are 11 characters.
@@ -59,16 +57,7 @@ type Opener func(page string) error
 var OpenInExplorer = diagnostics.OpenInExplorer
 
 // ioKind is the Display of the io::ErrorKind Rust would report for err.
-func ioKind(err error) string {
-	switch {
-	case errors.Is(err, fs.ErrNotExist), errors.Is(err, exec.ErrNotFound):
-		return "entity not found"
-	case errors.Is(err, fs.ErrPermission):
-		return "permission denied"
-	default:
-		return "other error"
-	}
-}
+func ioKind(err error) string { return iokind.Text(err) }
 
 // OpenTrailer is `ur_open_trailer`: opens the YouTube page of key in the default
 // browser. Nothing else goes to YouTube: no token, no identity.
