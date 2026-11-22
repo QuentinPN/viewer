@@ -342,7 +342,7 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
   - Pas de `nsis_tauri_utils` : `RunAsUser` devient `Exec` (l'installateur n'est pas élevé), `StrReplace` devient des chaînes françaises écrites en dur.
   - Les textes viennent de `French.nsh` de Tauri, sans les chaînes de la page de réinstallation.
 - **À signaler à l'app-shell (hors de cette unité).**
-  - Le binaire Go n'a pas d'icône ni de ressource de version (aucun `.syso`) : sans elle, `DisplayIcon` et les raccourcis auront l'icône générique après le remplacement de l'app Tauri.
+  - Le binaire Go porte l'icône du raton laveur (`cmd/viewer/rsrc_windows_amd64.syso`, issu de `src-tauri/icons/icon.ico` par `scripts/brand/build.ts` avec go-winres épinglé) : `DisplayIcon` et les raccourcis la montrent. Il n'a toujours ni ressource de version ni manifeste.
   - Le dossier de données de WebView2 de Wails peut ne pas être dans `io.github.quentinpn.viewer` : la case « Supprimer les données » ne l'effacerait alors pas.
   - La version de l'installateur vient de package.json, passée à `makensis`. L'exe packagé reçoit version, mode release et `updater.PublicKey` par `scripts/build-wails-exe.ts` (réglé par release-pipeline).
   - **Provenance de l'exe vérifié** : un `go build` direct (mêmes options que `build:wails:exe`) sur le `frontend/dist` déjà présent. Ni `npm run build:wails:exe` ni la branche `-Build` du script n'ont été exécutés : lancer vite dans `cmd/` pendant que d'autres agents y compilent était à éviter.
