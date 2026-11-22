@@ -50,8 +50,9 @@ windows = { version = "0.62", features = [
 ] }
 
 [profile.release]
-codegen-units = 1
-lto = true
+# Thin LTO with the default codegen units: a much shorter release build than fat
+# LTO on one unit, for a slightly bigger binary (libmpv does the heavy work).
+lto = "thin"
 opt-level = 3
 strip = true
 
