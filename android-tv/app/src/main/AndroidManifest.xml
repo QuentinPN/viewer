@@ -22,12 +22,195 @@
             android:name=".MainActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:exported="true"
-            android:screenOrientation="landscape">
+            android:screenOrientation="landscape" />
+
+        <!--
+          The launcher entries, one per season (brand/LauncherIcon.kt switches them): exactly one is enabled.
+          MainActivity has no launcher filter of its own, or the app would show twice. The launcher keeps the
+          alias names: never rename them.
+        -->
+        <activity-alias
+            android:name=".Launcher_default"
+            android:banner="@drawable/banner"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@drawable/icon"
+            android:label="${appLabel}"
+            android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Launcher_epiphany"
+            android:banner="@drawable/banner_epiphany"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/icon_epiphany"
+            android:label="${appLabel}"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Launcher_winter"
+            android:banner="@drawable/banner_winter"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/icon_winter"
+            android:label="${appLabel}"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Launcher_valentine"
+            android:banner="@drawable/banner_valentine"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/icon_valentine"
+            android:label="${appLabel}"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Launcher_april_fools"
+            android:banner="@drawable/banner_april_fools"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/icon_april_fools"
+            android:label="${appLabel}"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Launcher_easter"
+            android:banner="@drawable/banner_easter"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/icon_easter"
+            android:label="${appLabel}"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Launcher_music"
+            android:banner="@drawable/banner_music"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/icon_music"
+            android:label="${appLabel}"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Launcher_summer"
+            android:banner="@drawable/banner_summer"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/icon_summer"
+            android:label="${appLabel}"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Launcher_bastille"
+            android:banner="@drawable/banner_bastille"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/icon_bastille"
+            android:label="${appLabel}"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Launcher_autumn"
+            android:banner="@drawable/banner_autumn"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/icon_autumn"
+            android:label="${appLabel}"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Launcher_halloween"
+            android:banner="@drawable/banner_halloween"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/icon_halloween"
+            android:label="${appLabel}"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Launcher_christmas"
+            android:banner="@drawable/banner_christmas"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/icon_christmas"
+            android:label="${appLabel}"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Launcher_new_year"
+            android:banner="@drawable/banner_new_year"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/icon_new_year"
+            android:label="${appLabel}"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
 
         <activity
             android:name=".PlayerActivity"

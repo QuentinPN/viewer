@@ -593,7 +593,7 @@ function onConfirmKeydown(event: KeyboardEvent) {
     .shelf {
       gap: var(--space-6);
     }
-    .brand :global(svg) {
+    .brand :global(img) {
       width: 64px;
       height: 64px;
     }

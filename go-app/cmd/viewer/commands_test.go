@@ -22,8 +22,9 @@ type fakeWindow struct {
 	calls                 []string
 }
 
-func (w *fakeWindow) IsFullscreen() bool { return w.fullscreen }
-func (w *fakeWindow) IsMaximised() bool  { return w.maximized }
+func (w *fakeWindow) IsFullscreen() bool    { return w.fullscreen }
+func (w *fakeWindow) IsMaximised() bool     { return w.maximized }
+func (w *fakeWindow) NativeWindow() uintptr { return 0 }
 func (w *fakeWindow) SetFullscreen(on bool) {
 	w.calls = append(w.calls, "fullscreen")
 	w.fullscreen = on
@@ -84,7 +85,8 @@ func invoke(t *testing.T, b *bridge.Bridge, cmd, args string) (string, string) {
 }
 
 // commands is every command the frontend may invoke: the 82 of the former Rust
-// invoke_handler minus the two ui_settings_* of the finished Tauri handover.
+// invoke_handler minus the two ui_settings_* of the finished Tauri handover, plus
+// the two of the logo.
 var commands = []string{
 	"app_info", "app_update_check", "app_update_install", "app_update_pending",
 	"artwork_cache_clear", "artwork_cache_stats",
@@ -106,6 +108,8 @@ var commands = []string{
 	"ur_open_trailer", "ur_quota", "ur_request", "ur_request_detail", "ur_revoke_session",
 	"ur_search", "ur_sessions", "ur_set_address", "ur_sign_in", "ur_sign_out", "ur_status",
 	"window_set_fullscreen",
+	// The logo (commands_brand.go): no Rust counterpart.
+	"app_is_debug", "window_set_icon",
 }
 
 // Exactly these commands are registered.
@@ -321,5 +325,39 @@ func Test_go_set_played_needs_a_session(t *testing.T) {
 	}
 	if len(*events) != 0 {
 		t.Fatal(*events)
+	}
+}
+
+// app_is_debug is the build flag, and costs nothing.
+func Test_go_app_is_debug(t *testing.T) {
+	for _, debug := range []bool{true, false} {
+		_, b, _, _ := testApp(t, debug)
+		want := "false"
+		if debug {
+			want = "true"
+		}
+		if out, err := invoke(t, b, "app_is_debug", `{}`); out != want || err != "" {
+			t.Errorf("debug=%v : %s %s", debug, out, err)
+		}
+	}
+}
+
+// window_set_icon refuses an id that is not an embedded logo, and a window that
+// does not exist yet; it never reaches WM_SETICON with either.
+func Test_go_window_set_icon_validates(t *testing.T) {
+	_, b, _, _ := testApp(t, true)
+	for _, id := range []string{"", "Debug", "../default", "default.png", "debug.png"} {
+		if _, err := invoke(t, b, "window_set_icon", `{"id":"`+id+`"}`); err != `"logo inconnu"` {
+			t.Errorf("%q : %s", id, err)
+		}
+	}
+	// "debug" is an embedded logo (the hard hat), like a season.
+	for _, id := range []string{"christmas", "debug"} {
+		if _, err := invoke(t, b, "window_set_icon", `{"id":"`+id+`"}`); err != `"fenêtre indisponible"` {
+			t.Errorf("%s, fenêtre sans HWND : %s", id, err)
+		}
+	}
+	if _, err := invoke(t, b, "window_set_icon", `{}`); err == "" {
+		t.Error("sans id")
 	}
 }

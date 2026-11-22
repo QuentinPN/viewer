@@ -49,9 +49,21 @@ go test ./internal/updater -run Test_go_release_manifest_verifies -v -count=1
 
 Les vecteurs `go-app/internal/updater/testdata/signature-vectors.json` sont lus par le test Go et par `src/release/signature.test.ts` : les deux côtés doivent produire le même message et la même signature.
 
+Les vecteurs `contracts/seasons/vectors.json` (logo saisonnier) sont lus par `src/lib/brand/season.test.ts` et par `SeasonTest` côté Android (chemin relatif `../../contracts/seasons`, pas de copie à synchroniser).
+
+Le logo saisonnier du bureau : `src/lib/brand/logo.test.ts` (réglage, minuit, minuteur, build de débogage toujours au casque de chantier) et `go-app/internal/brand` (ids ; sous Windows, `WM_GETICON` d'une fenêtre cachée avant et après un changement de logo). À la main sur l'exe de débogage (fenêtre hors écran, `VIEWER_E2E_OFFSCREEN`) : `WM_GETICON` grande et petite icône non nulles au démarrage, différentes avec la date forcée au 25 décembre, identiques à celles du départ une fois le réglage coupé. Non vérifié : le bouton épinglé de la barre des tâches (il garde l'icône de l'exe), le rendu de la barre de titre à 125 et 150 %.
+
 ### Android TV, depuis `android-tv/`
 
 `./gradlew testDebugUnitTest assembleDebug` (commande enregistrée le 2026-11-09, AGP 9.5.1, Gradle 9.9.0, SDK 37, minSdk 28). Libmpv Android : `scripts/fetch-libmpv-android.ps1`.
+
+Icône saisonnière du lanceur : la logique pure est testée par `LauncherIconTest` (saison voulue selon réglage, build et date ; ordre activer puis désactiver ; aucun changement quand tout est déjà juste) et `LauncherManifestTest` (un alias par saison, bonnes images, seul `default` activé, `MainActivity` sans filtre de lanceur). Le build debug fige l'alias `default` (casque de chantier), donc le changement par date et le réglage ne se voient que par test unitaire ; pour voir une saison sur la Shield, avec l'app debug installée :
+
+```
+adb shell am start -n io.github.quentinpn.viewer.tv.debug/io.github.quentinpn.viewer.tv.MainActivity --es season christmas
+```
+
+`season` est un identifiant de `Season` (`halloween`, `april-fools`, `new-year`…) ; ignoré en release. Un lancement sans l'extra (tuile du lanceur, `am start` nu) remet l'alias `default`. La bannière du lanceur se met à jour après quelques secondes ; vérifier aussi que l'app n'est pas tuée (`adb shell pidof io.github.quentinpn.viewer.tv.debug` avant et après), qu'il n'y a qu'une tuile et que `am start -n …/io.github.quentinpn.viewer.tv.MainActivity` marche toujours. Vérifié le 2026-11-22 sur la Shield (alias `christmas` puis `halloween` : bannière changée en quelques secondes, même pid, une seule tuile à la même place). Limite : si l'app tourne encore quand l'alias change, la tuile suivante en empile une deuxième instance de `MainActivity` dans la même tâche (Retour revient à l'ancienne).
 
 ### E2E (CDP, `scripts/e2e/`)
 

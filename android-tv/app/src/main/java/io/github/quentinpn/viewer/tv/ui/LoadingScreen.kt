@@ -25,7 +25,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
-import io.github.quentinpn.viewer.tv.R
+import io.github.quentinpn.viewer.tv.brand.rememberLogo
 
 /** The home's first load: the app's logo over a spinning ring, until the shelves are read. */
 @Composable
@@ -35,7 +35,7 @@ internal fun LoadingScreen() {
         verticalArrangement = Arrangement.spacedBy(32.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Image(painterResource(R.drawable.icon), contentDescription = null, modifier = Modifier.size(120.dp))
+        Image(painterResource(rememberLogo()), contentDescription = null, modifier = Modifier.size(120.dp))
         Spinner()
         Text("Chargement…", color = Palette.textSecondary)
     }

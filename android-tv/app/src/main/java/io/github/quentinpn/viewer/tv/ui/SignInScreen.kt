@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import io.github.quentinpn.viewer.tv.R
+import io.github.quentinpn.viewer.tv.brand.rememberLogo
 import io.github.quentinpn.viewer.tv.emby.DeviceIdentity
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyException
@@ -145,7 +145,7 @@ internal fun SignInForm(
 @Composable
 internal fun Brand(title: String, message: String?, logo: Int, titleSize: Int = 22) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (logo > 0) Image(painterResource(R.drawable.icon), contentDescription = null, modifier = Modifier.size(logo.dp))
+        if (logo > 0) Image(painterResource(rememberLogo()), contentDescription = null, modifier = Modifier.size(logo.dp))
         Text(title, color = Palette.text, fontSize = titleSize.sp, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
         message?.let { Text(it, color = Palette.textSecondary, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center) }
     }

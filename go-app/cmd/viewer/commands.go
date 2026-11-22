@@ -12,12 +12,14 @@ import (
 )
 
 // registerCommands wires every command the frontend invokes (the names, arguments
-// and results of the former Rust invoke_handler); commands_test.go pins the set.
+// and results of the former Rust invoke_handler, plus the logo's app_is_debug and
+// window_set_icon); commands_test.go pins the set.
 // An invoke of any other name rejects with unknownCommand.
 func registerCommands(reg *bridge.Registry, a *app.App, win Window) {
 	registerPlayer(reg, a, win)
 	registerEmby(reg, a)
 	registerSync(reg, a)
+	registerBrand(reg, a.Debug(), win)
 
 	// Request: the 16 ur_* commands bound to the Emby session.
 	handlers := request.Handlers(a.Request, a.Identity)

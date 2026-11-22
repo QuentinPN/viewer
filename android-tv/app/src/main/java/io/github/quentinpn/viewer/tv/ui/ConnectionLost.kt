@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Button
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
-import io.github.quentinpn.viewer.tv.R
+import io.github.quentinpn.viewer.tv.brand.rememberLogo
 import io.github.quentinpn.viewer.tv.session.LostConnection
 import io.github.quentinpn.viewer.tv.session.status
 import kotlinx.coroutines.delay
@@ -62,7 +62,7 @@ internal fun ConnectionLost(
         verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Image(painterResource(R.drawable.icon), contentDescription = null, modifier = Modifier.size(88.dp))
+        Image(painterResource(rememberLogo()), contentDescription = null, modifier = Modifier.size(88.dp))
         Text("Serveur injoignable", color = Palette.text, fontSize = 32.sp)
         Text(
             "Ta session est conservée. L'app réessaie toute seule et reprend là où tu étais.",
