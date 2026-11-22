@@ -1,6 +1,6 @@
 <script lang="ts">
-// One playlist of the home row « Playlists » (ADR 0122): opens its page.
-// Artwork comes ready from Rust (ADR 0005).
+// One playlist of the home row « Playlists »: opens its page.
+// Artwork comes ready from Rust.
 import type { PlaylistCard } from "../emby/types";
 import { titlesLabel } from "./playlist";
 
@@ -60,7 +60,7 @@ const count = $derived(
     cursor: pointer;
     border-radius: var(--radius-md);
   }
-  /* Same lift and focus ring as the posters (ADR 0031). */
+  /* Same lift and focus ring as the posters. */
   .card:focus-visible {
     outline: none;
   }

@@ -3,11 +3,11 @@ package io.github.quentinpn.viewer.tv.emby
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
-// Playback negotiation, ported from the Windows client (src-tauri/src/emby/playback.rs,
-// ADR 0007 and 0009): the libmpv profile, the choice of Direct Play, Direct Stream or
+// Playback negotiation, ported from the Windows client (src-tauri/src/emby/playback.rs):
+// the libmpv profile, the choice of Direct Play, Direct Stream or
 // HLS transcode, and stream URLs with their token removed (it travels in a header).
 
-/** Sent when no cap is chosen, as on Windows (ADR 0037). */
+/** Sent when no cap is chosen, as on Windows. */
 const val MAX_STREAMING_BITRATE = 400_000_000L
 
 /** Text formats a transcode delivers as separate files instead of burning them in. */
@@ -20,11 +20,11 @@ enum class PlayMethod { DirectPlay, DirectStream, Transcode }
 
 /**
  * An external subtitle file, URL without token. [title] and [language] come from the
- * server's `MediaStreams` and are handed to mpv: the file itself names nothing (ADR 0084).
+ * server's `MediaStreams` and are handed to mpv: the file itself names nothing.
  */
 data class ExternalSubtitle(val url: String, val title: String?, val language: String?, val selected: Boolean)
 
-/** One of the source's own audio streams: its Emby `Index`, language and title (ADR 0084). */
+/** One of the source's own audio streams: its Emby `Index`, language and title. */
 data class SourceAudio(val index: Int, val language: String?, val title: String?)
 
 /** The source chosen for the player. [url] holds no token. */
@@ -39,7 +39,7 @@ data class PlaybackPlan(
     val subtitles: List<ExternalSubtitle>,
     /** Tracks the server picked from the account's preferences, that this playback can show. */
     val serverTracks: ServerTracks = ServerTracks(),
-    /** The source's own audio streams, for the `AudioStreamIndex` of a transcode (ADR 0084). */
+    /** The source's own audio streams, for the `AudioStreamIndex` of a transcode. */
     val audio: List<SourceAudio> = emptyList(),
 )
 
@@ -67,7 +67,7 @@ private val HEARING_WORDS = Regex("\\b(SDH|CC)\\b|malentendant", RegexOption.IGN
 /**
  * Emby `Index` of the audio and subtitle the server picked (`DefaultAudioStreamIndex`,
  * `DefaultSubtitleStreamIndex`); null when it named none or one this playback cannot
- * show. Same filter as `tracks::choose` on Windows (ADR 0035): when playing the file,
+ * show. Same filter as `tracks::choose` on Windows: when playing the file,
  * only its own streams, as the server's external files are not loaded; for a
  * transcode, only subtitles delivered as files (the others would be burnt in).
  */
@@ -118,14 +118,14 @@ fun deviceProfile(maxStreamingBitrate: Long = MAX_STREAMING_BITRATE) = DevicePro
 )
 
 /**
- * A `MediaSourceId` this client sends, as `is_source_id` on Windows (ADR 0036): other
+ * A `MediaSourceId` this client sends, as `is_source_id` on Windows: other
  * ids are neither offered nor sent.
  */
 fun isSourceId(id: String) =
     id.isNotEmpty() && id.length <= 128 && id.all { (it.isLetterOrDigit() && it.code < 128) || it == '-' || it == '_' }
 
 /**
- * Picks the source asked for (ADR 0058), else the first the server offers, and the best
+ * Picks the source asked for, else the first the server offers, and the best
  * way to play it. A version the server did not offer is not replaced by another.
  */
 fun plan(server: ServerUrl, response: PlaybackInfoResponse, mediaSourceId: String? = null): PlaybackPlan {

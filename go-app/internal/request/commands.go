@@ -1,6 +1,6 @@
 package request
 
-// Commands of the « Demander » tab (ADR 0125), port of
+// Commands of the « Demander » tab, port of
 // src-tauri/src/request/commands.rs. Arguments are typed and validated here, as
 // Tauri does before the Rust body runs; models come back with their ImageRefs
 // filled. Each handler has the signature of bridge.Handler and keeps its Tauri name.

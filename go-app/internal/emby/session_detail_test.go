@@ -159,7 +159,7 @@ func Test_artwork_is_fetched_with_auth_and_checked(t *testing.T) {
 	_, _, err = fx.service.Image(bg, notImage)
 	wantKind(t, err, KindInvalidResponse)
 
-	// A URL built for another server is refused without any request (ADR 0012).
+	// A URL built for another server is refused without any request.
 	before := len(server.requests())
 	foreign, ok := ParseImageRequest("/otherserver/101/Primary", &q)
 	if !ok {
@@ -511,7 +511,7 @@ func Test_episode_detail_has_series_context_guests_and_neighbours_across_seasons
 	}
 }
 
-// Chapters (ADR 0034): the item's `Chapters` of Emby 4.10.2.0, in seconds.
+// Chapters: the item's `Chapters` of Emby 4.10.2.0, in seconds.
 func Test_chapters_come_from_the_item_in_seconds(t *testing.T) {
 	server, fx, revoked := signedInBrowser(t)
 	found, err := fx.service.Chapters(bg, "30207")
@@ -606,7 +606,7 @@ func Test_playback_negotiates_direct_play_with_the_token_in_a_header_only(t *tes
 		t.Fatal(plan.MediaSourceID, detStr(plan.PlaySessionID))
 	}
 
-	// The item is read at the same time (ADR 0017): find PlaybackInfo among both.
+	// The item is read at the same time: find PlaybackInfo among both.
 	req := detFirstInfo(t, server)
 	if req.Method != "POST" || req.Path != "/emby/Items/30207/PlaybackInfo?UserId="+fakeUserID {
 		t.Fatal(req.Method, req.Path)
@@ -679,7 +679,7 @@ func Test_playback_of_one_version_names_it_to_the_server_and_in_reports(t *testi
 		t.Fatal(a.MediaSourceID, "start, progress and stop reports name the version played")
 	}
 
-	// The transcode fallback keeps the version (ADR 0023).
+	// The transcode fallback keeps the version.
 	_, _ = fx.service.PrepareVersion(bg, "30500", ptr("30501"), false, true)
 	forced := detLastInfo(t, server)
 	if forced["MediaSourceId"] != "30501" || forced["EnableDirectPlay"] != false {

@@ -1,4 +1,4 @@
-// Audio and subtitle preferences (ADR 0035): kept on this PC, sent with each
+// Audio and subtitle preferences: kept on this PC, sent with each
 // playback; the native side picks the tracks and styles the subtitles.
 
 export type SubtitleMode = "server" | "off" | "forcedOnly" | "always";

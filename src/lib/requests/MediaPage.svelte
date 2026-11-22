@@ -3,7 +3,7 @@
 // backdrop with its scrim, round back button (Échap), title, metadata, genres,
 // status of the title and of each season, « Lire » when it is on Emby,
 // « Demander » when something is left to request, « Bande-annonce » when the
-// title has one (its YouTube page in the browser, ADR 0127), synopsis and cast.
+// title has one (its YouTube page in the browser), synopsis and cast.
 import { onMount, tick } from "svelte";
 import type { MediaItem } from "../emby/types";
 import "./requests.css";

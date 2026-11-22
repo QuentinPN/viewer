@@ -1,4 +1,4 @@
-// Package updater is the port of src-tauri/src/updater.rs (ADR 0112): in release
+// Package updater is the port of src-tauri/src/updater.rs: in release
 // builds, the manifest is checked 15 s after launch then every 6 h; a newer
 // installer is downloaded into memory, its ed25519 signature is verified against
 // the pinned public key, and the UI is told it is ready (app://update-ready).

@@ -11,7 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-// Real answers of 2026-11-07 (docs/evidence/intros-generiques-2026-11-07.md), as in src-tauri/src/segments/tests.rs.
+// Real answers of 2026-11-07, as in src-tauri/src/segments/tests.rs.
 private const val INTRODB_TV = """{"imdb_id":"tt0903747","media_type":"tv","is_movie":false,"season":1,"episode":1,
   "intro":null,"recap":null,
   "outro":{"start_sec":3431,"end_sec":3500,"start_ms":3431000,"end_ms":3500000,"confidence":1,"submission_count":1,"updated_at":"2026-04-14T12:21:01.935Z"},

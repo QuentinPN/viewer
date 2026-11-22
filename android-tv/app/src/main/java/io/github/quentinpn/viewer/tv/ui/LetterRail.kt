@@ -42,13 +42,13 @@ internal fun letterDescription(letter: Char, available: Boolean): String = when 
 
 /**
  * A letter can take the focus: it has a title in the index, or the index failed and OK reads
- * it again. While the index loads, every letter waits dimmed (ADR 0099).
+ * it again. While the index loads, every letter waits dimmed.
  */
 internal fun letterEnabled(letter: Char, letters: Map<Char, LetterStart>?, failed: Boolean): Boolean =
     letters?.containsKey(letter) ?: failed
 
 /**
- * Vertical rail of `#` and A to Z beside the grid (ADR 0070, 0099), shown for a sort by
+ * Vertical rail of `#` and A to Z beside the grid, shown for a sort by
  * title. The index is one `SortName` query of the grid's own query, read when the rail first
  * shows for that query; a letter without a title is dimmed and skipped by the focus. OK on a
  * letter jumps the grid to its first title.

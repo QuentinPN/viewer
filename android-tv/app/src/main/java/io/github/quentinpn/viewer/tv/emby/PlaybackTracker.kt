@@ -2,8 +2,8 @@ package io.github.quentinpn.viewer.tv.emby
 
 import kotlin.math.roundToLong
 
-// Playback reporting, ported from the Windows client (src-tauri/src/emby/reporting.rs,
-// ADR 0008): player events become Emby start, progress and stop reports.
+// Playback reporting, ported from the Windows client (src-tauri/src/emby/reporting.rs):
+// player events become Emby start, progress and stop reports.
 
 /** Progress cadence, also while paused so the server keeps the session alive. */
 const val PROGRESS_INTERVAL_MS = 10_000L
@@ -12,7 +12,7 @@ private const val TICKS_PER_SECOND = 10_000_000.0
 /** Margin before the end under which an end of file is a normal end (credits, rounding). */
 private const val EARLY_EOF_TICKS = 30 * 10_000_000L
 
-/** Progress event of a stream change, from the Emby wiki « Playback Check-ins » (ADR 0081). */
+/** Progress event of a stream change, from the Emby wiki « Playback Check-ins ». */
 const val QUALITY_CHANGE = "QualityChange"
 
 enum class ReportKind(val path: String) {
@@ -22,7 +22,7 @@ enum class ReportKind(val path: String) {
 }
 
 data class Report(val kind: ReportKind, val body: PlaybackReport) {
-    /** The progress report sent ahead of a lost stop report: it carries the position (ADR 0024). */
+    /** The progress report sent ahead of a lost stop report: it carries the position. */
     fun lateProgress() = Report(
         ReportKind.Progress,
         body.copy(isPaused = false, canSeek = true, eventName = "TimeUpdate", failed = null),
@@ -44,7 +44,7 @@ class PlaybackTracker {
     private var pending: ActivePlayback? = null
     private var playing: Playing? = null
 
-    /** The stream that replaces the playing one, until its file loads (ADR 0081). */
+    /** The stream that replaces the playing one, until its file loads. */
     private var switching: ActivePlayback? = null
 
     /** Nothing announced or playing: a lost stop report can still be resent. */
@@ -94,7 +94,7 @@ class PlaybackTracker {
     }
 
     /**
-     * The same item goes on in another stream (quality changed in the player, ADR 0081):
+     * The same item goes on in another stream (quality changed in the player):
      * nothing is sent now, and no stop ever. Once the new file loads, a progress with
      * `EventName` `QualityChange` carries its source, session and method.
      */

@@ -25,8 +25,8 @@ internal data class Fact(val label: String, val value: String)
 
 /**
  * Director, writer and studio of a film, series or episode; empty ones left out. The cast,
- * once an « Avec » / « Invités » line, is the « Distribution » row now (ADR 0068). Without
- * [studios], the studio line is left to the chips that open it (ADR 0087).
+ * once an « Avec » / « Invités » line, is the « Distribution » row now. Without
+ * [studios], the studio line is left to the chips that open it.
  */
 internal fun facts(item: BaseItemDto, studios: Boolean = true): List<Fact> {
     val series = item.type == "Series"
@@ -44,7 +44,7 @@ internal fun studioLabel(item: BaseItemDto): String = if (item.type == "Series")
 
 /**
  * Scores then genres after the year: "★ 7,4 · 87 % critiques · Action, Fantastique". The age
- * rating is the [RatingBadge] before them; a long line cuts the genres, not a score (ADR 0074).
+ * rating is the [RatingBadge] before them; a long line cuts the genres, not a score.
  */
 internal fun tags(item: BaseItemDto): List<String> = scores(item) + listOfNotNull(genres(item))
 
@@ -52,7 +52,7 @@ internal fun tags(item: BaseItemDto): List<String> = scores(item) + listOfNotNul
 internal fun genres(item: BaseItemDto): String? =
     item.genres.filter { it.isNotBlank() }.take(3).takeIf { it.isNotEmpty() }?.joinToString(", ")
 
-/** The public's and the critics' scores, the ones the server has (ADR 0074). */
+/** The public's and the critics' scores, the ones the server has. */
 internal fun scores(item: BaseItemDto): List<String> =
     listOfNotNull(communityRatingLabel(item.communityRating), criticRatingLabel(item.criticRating))
 

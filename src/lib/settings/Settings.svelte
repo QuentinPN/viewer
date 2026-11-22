@@ -22,7 +22,7 @@ import UpdateSettings from "./UpdateSettings.svelte";
 interface Props {
   /** The user's libraries, for the « Ajoutés récemment » rows of Accueil. */
   libraries: Library[];
-  /** Where the home rows choice is kept (per server and user, ADR 0113). */
+  /** Where the home rows choice is kept (per server and user). */
   rowPrefsKey: string;
 }
 

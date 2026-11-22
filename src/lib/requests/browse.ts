@@ -1,4 +1,4 @@
-// Pure helpers of Découvrir and Parcourir (ADR 0125): filters, pages, cards.
+// Pure helpers of Découvrir and Parcourir: filters, pages, cards.
 import type { MediaItem } from "../emby/types";
 import type {
   BrowseFilters,

@@ -16,7 +16,7 @@ const (
 	UnsupportedAPI
 	// InvalidSource: a source, header or value refused before reaching mpv.
 	InvalidSource
-	// CertificateStore: the Windows roots could not be exported (ADR 0026).
+	// CertificateStore: the Windows roots could not be exported.
 	CertificateStore
 	// Mpv: a libmpv call failed; Context names the option, property or command.
 	Mpv

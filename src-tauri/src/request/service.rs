@@ -1,4 +1,4 @@
-//! Request session service (ADR 0125): address in `request.json`, token in
+//! Request session service: address in `request.json`, token in
 //! the OS credential store per Emby account, single-flight exchange, one retry
 //! after a 401, persistent sign-out.
 
@@ -139,7 +139,7 @@ pub struct RequestService {
     version: String,
     checked: Mutex<Option<Checked>>,
     /// Single-flight exchange: the server allows 10 failures per IP and 5 minutes,
-    /// shared by the household (ADR 0125).
+    /// shared by the household.
     exchange: tokio::sync::Mutex<()>,
     /// Accounts whose exchange was refused, with the Emby token refused: no new
     /// attempt with that token until "Se connecter" or another address.

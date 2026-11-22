@@ -3,12 +3,12 @@ package io.github.quentinpn.viewer.tv.emby
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
-/** Cards of the "À suivre" row, as on Windows (`HOME_ROW`, ADR 0010). */
+/** Cards of the "À suivre" row, as on Windows (`HOME_ROW`). */
 const val NEXT_UP_LIMIT = 16
 
 /**
  * Home row "À suivre": the next episode of each series in progress, the Windows rules
- * (`EmbyService::next_up`, ADR 0010). Emby 4.10.1.0 answers an empty `/Shows/NextUp`
+ * (`EmbyService::next_up`). Emby 4.10.1.0 answers an empty `/Shows/NextUp`
  * once an episode is watched and lists the next one in its "resume" home section
  * instead, so both are read at once.
  */

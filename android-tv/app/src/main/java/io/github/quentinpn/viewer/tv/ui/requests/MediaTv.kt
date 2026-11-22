@@ -82,7 +82,7 @@ internal fun MediaTv(
     art: RequestArt,
     page: RequestsPage.Media,
     capabilities: Capabilities,
-    /** Opens a checked trailer address outside the app; false when no app can (ADR 0083). */
+    /** Opens a checked trailer address outside the app; false when no app can. */
     onTrailer: (url: String) -> Boolean,
     /** OK on « Lire »: the title's Emby page, by its Emby id. */
     onPlay: (EmbyTitle) -> Unit,

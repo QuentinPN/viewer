@@ -28,7 +28,7 @@ import (
 // MpvConfig is the configuration of one engine (`MpvConfig` in mpv.rs).
 type MpvConfig struct {
 	// WID is the native window handle (HWND) mpv renders into, given by the caller
-	// (parent mode, ADR 0003: the main window). 0 with Headless is used by tests;
+	// (parent mode). 0 with Headless is used by tests;
 	// 0 alone lets mpv open its own window.
 	WID uintptr
 	// Headless sets `vo=null` / `ao=null`: decode without presenting (tests).
@@ -36,12 +36,12 @@ type MpvConfig struct {
 	// Hwdec is mpv's `hwdec`. `auto-safe` only enables decoders mpv considers reliable.
 	Hwdec string
 	// Silent sets `ao=null` with the video still shown: scripted UI tests must not
-	// play sound on the user's speakers (ADR 0006).
+	// play sound on the user's speakers.
 	Silent bool
 	// TLSRoots is where to export the Windows root certificates for HTTPS sources.
-	// Empty: `tls-ca-file` stays empty and every HTTPS source is refused (ADR 0026).
+	// Empty: `tls-ca-file` stays empty and every HTTPS source is refused.
 	TLSRoots string
-	// OpenLimit is the wait for a file to load (ADR 0027). Only tests shorten it.
+	// OpenLimit is the wait for a file to load. Only tests shorten it.
 	OpenLimit time.Duration
 	// Logger receives the engine's warnings and mpv's own (redacted); nil is slog.Default().
 	Logger *slog.Logger
@@ -84,7 +84,7 @@ type MpvEngine struct {
 	// (`sub-add` needs a loaded file).
 	pendingSubtitles []pendingSubtitle
 	// pendingTracks of the last Load, selected by the event loop on FILE_LOADED,
-	// once mpv knows the file's streams (ADR 0035).
+	// once mpv knows the file's streams.
 	pendingTracks TrackSelection
 
 	stop atomic.Bool
@@ -147,7 +147,7 @@ func (e *MpvEngine) configure(config MpvConfig) error {
 		{"hwdec", config.Hwdec},
 		// HTTP through FFmpeg rather than the curl stream, whose retries are
 		// immediate and give up within the same millisecond: FFmpeg reopens the
-		// stream after a short network outage (ADR 0022).
+		// stream after a short network outage.
 		{"curl-enabled", "no"},
 		{"stream-lavf-o", streamLavfOptions},
 		{"network-timeout", networkTimeout},
@@ -194,7 +194,7 @@ func (e *MpvEngine) configure(config MpvConfig) error {
 		{obsTracks, "track-list", mpv.FormatString},
 		// With `keep-open`, mpv stays on the last frame at the end of the file and
 		// sends no `end-file`: `eof-reached` is the end, including a stream cut
-		// short by the network once the cache is drained (ADR 0012).
+		// short by the network once the cache is drained.
 		{obsEOF, "eof-reached", mpv.FormatFlag},
 	} {
 		if err := fromMpv(e.h.ObserveProperty(o.id, o.name, o.format), o.name); err != nil {
@@ -288,7 +288,7 @@ func (e *MpvEngine) PositionSeconds() (float64, bool) {
 }
 
 // SelectedStreams gives the FFmpeg indexes of the selected audio and subtitle
-// streams (ADR 0124); nil is unknown.
+// streams; nil is unknown.
 func (e *MpvEngine) SelectedStreams() (audio, subtitle *int32) {
 	list, _ := e.Property("track-list")
 	return selectedStreams(list)
@@ -497,7 +497,7 @@ func (e *MpvEngine) Diagnostics() PlayerDiagnostics {
 
 // Shutdown is `PlayerEngine::shutdown`, plus the Shutdown event that Rust sends
 // from AppState::close_player (lib.rs): after every teardown, whoever started it,
-// the UI must return to idle (ADR 0003). Idempotent; blocks until mpv is gone, so
+// the UI must return to idle. Idempotent; blocks until mpv is gone, so
 // never call it on the UI thread.
 //
 // Called from the event sink it would wait for the event loop, which waits for the
@@ -601,7 +601,7 @@ func (e *MpvEngine) eventLoop(openLimit time.Duration) {
 				message = &m
 			}
 			// Once FFmpeg gives up on an HLS list, mpv tries each segment as a file:
-			// the first failure ends it (ADR 0027). Before the event, as in endStalled.
+			// the first failure ends it. Before the event, as in endStalled.
 			if reason == EndError {
 				if err := e.commandAsync(replyStallStop, "stop"); err != nil {
 					e.log.Warn("arrêt après un échec du flux : " + err.Error())
@@ -684,7 +684,7 @@ func (e *MpvEngine) addPendingSubtitles() {
 	e.pendingSubtitles = nil
 	e.mu.Unlock()
 	// Asynchronous: Emby may take a minute to extract a subtitle from the file, and
-	// a synchronous sub-add would stall playback meanwhile (ADR 0009).
+	// a synchronous sub-add would stall playback meanwhile.
 	for _, p := range pending {
 		flag := "auto"
 		if p.sub.Selected {

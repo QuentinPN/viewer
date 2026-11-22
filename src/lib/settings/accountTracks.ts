@@ -1,7 +1,7 @@
 import { invoke } from "../native";
 import { LANGUAGES, type TrackPreferences } from "../player/subtitles";
 
-// Audio and subtitle languages (ADR 0115): by default the Emby account's
+// Audio and subtitle languages: by default the Emby account's
 // preferences, which the server applies when it picks the default streams of
 // PlaybackInfo; a choice made in Réglages overrides them on this PC.
 

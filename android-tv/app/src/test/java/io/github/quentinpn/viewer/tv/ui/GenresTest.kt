@@ -48,7 +48,7 @@ class GenresTest {
         assertNull(genreLibrary(emptyList(), "Movie"))
     }
 
-    // The owner's four libraries (ADR 0092, 0093)
+    // The owner's four libraries
     private val anime = Library("a", "Anime", "Series")
     private val filmsAnime = Library("fa", "Films Anime", "Movie")
     private val owner = listOf(anime, Library("f", "Films", "Movie"), filmsAnime, Library("st", "Séries TV", "Series"))

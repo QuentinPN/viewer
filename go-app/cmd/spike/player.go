@@ -76,8 +76,8 @@ func (p *Player) handle() *mpv.Handle {
 	return p.h
 }
 
-// start creates and initialises mpv embedded in the window `wid` (ADR 0003
-// "parent" mode), then starts the event goroutine.
+// start creates and initialises mpv embedded in the window `wid` ("parent"
+// mode), then starts the event goroutine.
 func (p *Player) start(wid uintptr, extra map[string]string) (time.Duration, error) {
 	h, err := p.api.Create()
 	if err != nil {

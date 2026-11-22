@@ -15,17 +15,17 @@ import UpdatePrompt from "./lib/updater/UpdatePrompt.svelte";
 import Logo from "./lib/window/Logo.svelte";
 import TitleBar from "./lib/window/TitleBar.svelte";
 
-// Session first (ADR 0012): the saved Emby session is restored behind a branded
+// Session first: the saved Emby session is restored behind a branded
 // screen, never the sign-in form. The signed-in app stays mounted (inert) under
 // the recovery and reauthentication screens, so view, selection and scroll
 // survive a lost connection. The Gate 1 player prototype stays reachable in
-// development builds only (ADR 0025). Playback from Emby shows the player over the
+// development builds only. Playback from Emby shows the player over the
 // library, which stays mounted (hidden) for the same reason.
 
 let conn = $state<ConnectionState>({ kind: "restoring" });
 let spike = $state<"none" | "scenario" | "prototype">("none");
 let playing = $state<PlaybackStart | null>(null);
-/** Playback that ended on an error or too early: offered again (ADR 0012). */
+/** Playback that ended on an error or too early: offered again. */
 let interrupted = $state<{
   itemId: string;
   mediaSourceId: string | null;
@@ -85,7 +85,7 @@ async function stopPlaying() {
   returnFocus = null;
 }
 
-/** The version playing, kept by a fallback or a resume of the same item (ADR 0036). */
+/** The version playing, kept by a fallback or a resume of the same item. */
 function versionOf(itemId: string): string | null {
   return playing?.itemId === itemId ? playing.mediaSourceId : null;
 }
@@ -100,7 +100,7 @@ async function playbackInterrupted(itemId: string) {
 }
 
 /**
- * Next episode from the end-of-episode card (ADR 0018): the player stays open and
+ * Next episode from the end-of-episode card: the player stays open and
  * the focus still goes back, at the end, where the first playback started.
  */
 async function playNext(itemId: string): Promise<string | null> {
@@ -115,7 +115,7 @@ async function playNext(itemId: string): Promise<string | null> {
   }
 }
 
-/** Another quality for the playback in progress (ADR 0117); the player stays open. */
+/** Another quality for the playback in progress; the player stays open. */
 async function changeQuality(
   cap: number | null,
   position: number,
@@ -137,7 +137,7 @@ async function changeQuality(
 }
 
 /**
- * The player could not open the direct source (ADR 0023): the same item again, with
+ * The player could not open the direct source: the same item again, with
  * direct play refused so the server transcodes. Like `playNext`, the player stays open.
  */
 async function playTranscoded(
@@ -202,7 +202,7 @@ async function signOut() {
 <svelte:window ononline={() => void coordinator.online()} />
 
 {#if playing === null}<TitleBar />{/if}
-<!-- Never during playback (ADR 0112). -->
+<!-- Never during playback. -->
 <UpdatePrompt visible={playing === null && spike === "none"} />
 
 {#if spike !== "none"}

@@ -1,4 +1,4 @@
-// The clock and « Fin à » of the player's controls, as on the TV (ADR 0073).
+// The clock and « Fin à » of the player's controls, as on the TV.
 
 const MINUTE_MS = 60_000;
 

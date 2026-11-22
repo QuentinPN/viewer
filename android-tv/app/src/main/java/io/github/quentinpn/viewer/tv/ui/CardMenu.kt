@@ -76,7 +76,7 @@ import io.github.quentinpn.viewer.tv.emby.resumeTicks
 import io.github.quentinpn.viewer.tv.emby.videoPlaylists
 import kotlinx.coroutines.launch
 
-// A card's menu (ADR 0098, after ADR 0097): a panel laid over the card, as on Emby for
+// A card's menu: a panel laid over the card, as on Emby for
 // Android TV, with play, « Ajouter à une playlist », the watched mark and the favourite.
 
 /** Where a card's menu is opened: [resumeShelf] adds « Retirer de Reprendre ». */
@@ -107,7 +107,7 @@ internal sealed interface MenuAction {
         override val icon = MenuIcon.PlaylistAdd
     }
 
-    /** A write on the user's data (ADR 0097). */
+    /** A write on the user's data. */
     data class Write(val action: ItemAction) : MenuAction {
         override val label get() = action.label
         override val icon get() = when (action) {
@@ -122,7 +122,7 @@ internal sealed interface MenuAction {
  * The menu of [item], in its order: play, « Ajouter à une playlist », the watched mark, the
  * favourite, then « Retirer de Reprendre » on that shelf only. A season has no play row (no
  * episode of its own to pick here); no « Tout lire » nor « Aléatoire », since the player has no
- * queue (ADR 0088). None for a playlist or anything else without user data.
+ * queue. None for a playlist or anything else without user data.
  */
 internal fun menuActions(item: BaseItemDto, context: MenuContext = MenuContext()): List<MenuAction> {
     val play = when (item.type) {
@@ -233,7 +233,7 @@ private val PanelColor = Color(0xF71C1C1E)
 private val RowShape = RoundedCornerShape(50)
 
 /**
- * A card's menu (ADR 0098), opened by a long press on OK on a card it is placed in (a `Box`
+ * A card's menu, opened by a long press on OK on a card it is placed in (a `Box`
  * around the card: the popup is anchored on it). Each row runs at once or keeps the panel
  * open while the server answers, with its message on failure. « Ajouter à une playlist »
  * turns the panel into the user's playlists, then into a name field for a new one; Back goes

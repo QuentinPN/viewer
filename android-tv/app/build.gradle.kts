@@ -14,18 +14,18 @@ android {
         targetSdk = 37
         versionCode = 9
         versionName = "1.4.0"
-        // Only arm64-v8a libmpv is fetched (ADR 0038)
+        // Only arm64-v8a libmpv is fetched
         ndk { abiFilters += "arm64-v8a" }
     }
 
     buildTypes {
-        // Its own app next to the release (ADR 0102): own data, session and Emby device, so
+        // Its own app next to the release: own data, session and Emby device, so
         // tests run on another account and never replace the owner's install
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             manifestPlaceholders["appLabel"] = "Viewer Debug"
-            // Test channel of the updater (ADR 0112)
+            // Test channel of the updater
             buildConfigField("String", "UPDATE_MANIFEST_URL", "\"http://git.example.com/QuentinPN/Viewer-releases/raw/branch/main/android-debug/latest.json\"")
         }
         release {
@@ -48,7 +48,7 @@ android {
         buildConfig = true
     }
 
-    // A few lines of C that keep libmpv's verbose log out of logcat (ADR 0052)
+    // A few lines of C that keep libmpv's verbose log out of logcat
     externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
 
     packaging {

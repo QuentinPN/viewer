@@ -2,7 +2,7 @@ package emby
 
 // Fake Emby server shared by the tests of every wave, port of `FakeEmby`,
 // `emby_like` and `browse_like` (src-tauri/src/emby/tests.rs). Answers mirror what
-// Emby Server 4.10.1.0 returned during the Gate 2 probe (ADR 0004); the fixed ones
+// Emby Server 4.10.1.0 returned during the Gate 2 probe; the fixed ones
 // are in testdata/fixtures, extracted from tests.rs by script.
 //
 // Like the Rust server it records every request (method, raw path with its query as
@@ -51,7 +51,7 @@ type fakeRequest struct {
 
 // fakeRoute answers one request. Status 0 drops the connection without an answer. A
 // body starting with `JPEG:` is served as an image; `JFIF:` adds the JPEG signature
-// the artwork cache checks (ADR 0019). Anything else is served as JSON.
+// the artwork cache checks. Anything else is served as JSON.
 type fakeRoute func(r fakeRequest) (int, string)
 
 type fakeEmby struct {
@@ -244,7 +244,7 @@ func fakePlaybackTwoVersions(body string) string {
 }
 
 // fakePlaybackTranscodeAudio is `playback_transcode_audio`: a transcode with French
-// and English audio and subtitle files (ADR 0035).
+// and English audio and subtitle files.
 func fakePlaybackTranscodeAudio(audio int) string {
 	a := strconv.Itoa(audio)
 	return `{"MediaSources":[{"Protocol":"File","Id":"mediasource_40001","Container":"mkv",
@@ -329,7 +329,7 @@ func fakeBrowseLike(revoked *atomic.Bool) fakeRoute {
 			return 200, `{"IsFavorite":false,"Played":false,"PlaybackPositionTicks":0}`
 		case strings.HasPrefix(path, favoriteItems):
 			return 404, fakeNotFoundText
-		// 30299 exists for these calls only: reading it back fails (ADR 0096).
+		// 30299 exists for these calls only: reading it back fails.
 		case (path == playedItems+"30207" || path == playedItems+"30299") && post && strings.HasPrefix(query, "DatePlayed="):
 			return 200, `{"Played":true,"PlayCount":1,"PlaybackPositionTicks":0,"IsFavorite":false}`
 		case path == playedItems+"30207" && del:
@@ -395,7 +395,7 @@ func fakeBrowseLike(revoked *atomic.Bool) fakeRoute {
 			return 200, emptyPage
 		case strings.HasPrefix(path, "/emby/Shows/"):
 			return 404, fakeNotFoundText
-		// 30207 honours a refusal of direct play (ADR 0023); 80475 ignores it.
+		// 30207 honours a refusal of direct play; 80475 ignores it.
 		case path == "/emby/Items/30207/PlaybackInfo" && post && strings.Contains(r.Body, `"EnableDirectPlay":false`):
 			return 200, fakeFixture("playback_transcode")
 		case (path == "/emby/Items/30207/PlaybackInfo" || path == "/emby/Items/80475/PlaybackInfo") && post:
@@ -404,7 +404,7 @@ func fakeBrowseLike(revoked *atomic.Bool) fakeRoute {
 			return 200, fakeFixture("playback_transcode")
 		case path == "/emby/Items/30500/PlaybackInfo" && post:
 			return 200, fakePlaybackTwoVersions(r.Body)
-		// A transcode takes another audio track only with the source named (ADR 0035).
+		// A transcode takes another audio track only with the source named.
 		case path == "/emby/Items/40001/PlaybackInfo" && post:
 			other := strings.Contains(r.Body, `"MediaSourceId":"mediasource_40001"`) && strings.Contains(r.Body, `"AudioStreamIndex":2`)
 			if other {

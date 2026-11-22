@@ -16,20 +16,20 @@ import (
 // streamLavfOptions are FFmpeg's HTTP options: after a network error or an early
 // end of stream, it waits 0, 1, 3 then 7 s before each new try; the next delay
 // (15 s) is past `reconnect_delay_max`, so it gives up there. HTTP errors such as
-// 401 are not retried (ADR 0022). No redirects: they would carry the auth header
-// to another host (ADR 0025).
+// 401 are not retried. No redirects: they would carry the auth header
+// to another host.
 const streamLavfOptions = "reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=7,max_redirects=0"
 
 // demuxerLavfOptions is what FFmpeg may open by itself, such as HLS segments: a
-// playlist from the server must not reach local files (ADR 0025).
+// playlist from the server must not reach local files.
 const demuxerLavfOptions = "protocol_whitelist=[http,https,tcp,tls]"
 
 // networkTimeout is the seconds a connection or a read may hang before FFmpeg
 // counts it as failed. mpv reads again after a failure, so a stream that stays dead
-// is ended by StallWatch, not by these options (ADR 0022).
+// is ended by StallWatch, not by these options.
 const networkTimeout = "15"
 
-// nightFilterChain is night mode (ADR 0072), as on the TV: FFmpeg's `acompressor`
+// nightFilterChain is night mode, as on the TV: FFmpeg's `acompressor`
 // through mpv's `lavfi`, labelled `@night`. Peaks above about -24 dBFS are
 // compressed 4:1, then a makeup gain of about +6 dB lifts speech; no look-ahead,
 // so no latency.
@@ -43,7 +43,7 @@ func nightFilter(on bool) string {
 	return ""
 }
 
-// delayMaxSeconds: past ten seconds either way, the file itself is out of sync (ADR 0062).
+// delayMaxSeconds: past ten seconds either way, the file itself is out of sync.
 const delayMaxSeconds = 10.0
 
 // formatFloat is Rust's `f64::to_string`: shortest digits, never an exponent.
@@ -175,7 +175,7 @@ func parseTracks(s string) (List[Track], error) {
 }
 
 // subtitleOptionNames are the mpv options set for each file from the subtitle
-// style (ADR 0035).
+// style.
 var subtitleOptionNames = [7]string{
 	"sub-scale",
 	"sub-color",

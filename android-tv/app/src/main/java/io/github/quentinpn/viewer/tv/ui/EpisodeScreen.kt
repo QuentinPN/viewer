@@ -50,8 +50,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-// Episode page (ADR 0060), ported from the Windows episode detail (ItemDetail.svelte,
-// format.ts, session.rs `neighbours`, ADR 0016).
+// Episode page, ported from the Windows episode detail (ItemDetail.svelte,
+// format.ts, session.rs `neighbours`).
 
 /** The episodes just before and after one, across seasons. */
 internal data class Neighbours(val previous: BaseItemDto?, val next: BaseItemDto?)
@@ -113,7 +113,7 @@ internal fun airDate(iso: String?, zone: ZoneId = ZoneId.systemDefault()): Strin
 /** One image to draw: item, image type and tag. */
 internal data class Artwork(val itemId: String, val type: String, val tag: String)
 
-/** The episode's own image, else the series backdrop (ADR 0016). */
+/** The episode's own image, else the series backdrop. */
 internal fun episodeArtwork(episode: BaseItemDto): Artwork? =
     episode.imageTags["Primary"]?.let { Artwork(episode.id, "Primary", it) }
         ?: episode.parentBackdropItemId?.let { id ->
@@ -126,7 +126,7 @@ internal fun neighbourTarget(seriesId: String, episode: BaseItemDto): SeriesTarg
 
 /**
  * The series page Back returns to: [target]'s season (the one its card was in), else the
- * loaded episode's own, with the episode's card focused (ADR 0054).
+ * loaded episode's own, with the episode's card focused.
  */
 internal fun returnTarget(target: SeriesTarget, episode: BaseItemDto?): SeriesTarget = target.copy(
     seasonId = target.seasonId ?: episode?.seasonId,
@@ -142,7 +142,7 @@ private data class FocusAsk(val to: Focus, val token: Int)
 
 /**
  * One episode: series, season and number, title, image, air date, length, overview,
- * credits and guest stars (ADR 0068), "Lire" / "Reprendre" / "Lire depuis le début", its version if it has several,
+ * credits and guest stars, "Lire" / "Reprendre" / "Lire depuis le début", its version if it has several,
  * and the episodes before and after it across seasons.
  */
 @Composable
@@ -159,14 +159,14 @@ fun EpisodeScreen(
     onNavigate: (SeriesTarget) -> Unit,
     /** Back: the series page to show, on this episode's season and card. */
     onBack: (SeriesTarget) -> Unit,
-    /** OK on a « Distribution » card opens that person's page (ADR 0068). */
+    /** OK on a « Distribution » card opens that person's page. */
     onOpenPerson: (CastMember) -> Unit,
     onSessionExpired: () -> Unit,
     /** Changes after each playback: the resume point and watched mark are read again. */
     refresh: Int = 0,
     /** The card a person page was opened from: focused instead of the play button. */
     focusPerson: String? = null,
-    /** After a watched mark or favourite sent from here (ADR 0097): the home reads its shelves again. */
+    /** After a watched mark or favourite sent from here: the home reads its shelves again. */
     onUserDataChanged: () -> Unit = {},
 ) {
     val episodeId = target.episodeId ?: return
@@ -183,7 +183,7 @@ fun EpisodeScreen(
         val before = (data as? Load.Ready)?.value
         if (before == null) data = Load.Loading
         val next = try {
-            // Without Fields, as the film page: also carries MediaSources and People (ADR 0058)
+            // Without Fields, as the film page: also carries MediaSources and People
             val episode = client.fullItem(userId, episodeId)
             val around = episode.seriesId?.let { seriesId ->
                 try {
@@ -238,7 +238,7 @@ fun EpisodeScreen(
                             // Back on the buttons, the episode's title shows again
                             Modifier.height(screen).topOnFocus(scroll),
                         ) { onMessage ->
-                            // The answer is the episode's new user data: the page shows it at once (ADR 0097)
+                            // The answer is the episode's new user data: the page shows it at once
                             val update = { userData: UserItemData ->
                                 data = Load.Ready(EpisodeData(episode.copy(userData = userData), d.value.neighbours))
                                 onUserDataChanged()
@@ -301,7 +301,7 @@ private fun Details(
     onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit,
     onNavigate: (BaseItemDto, Focus) -> Unit,
     modifier: Modifier,
-    /** The watched mark and favourite buttons (ADR 0097), on their own row under the play row. */
+    /** The watched mark and favourite buttons, on their own row under the play row. */
     actions: @Composable (onMessage: (String?) -> Unit) -> Unit,
 ) {
     var actionMessage by remember { mutableStateOf<String?>(null) }
@@ -312,7 +312,7 @@ private fun Details(
     val play = remember { FocusRequester() }
     val previous = remember { FocusRequester() }
     val next = remember { FocusRequester() }
-    // Empty with fewer than two versions: no button, and nothing sent to the server (ADR 0058)
+    // Empty with fewer than two versions: no button, and nothing sent to the server
     val choices = remember(episode.mediaSources) { versionChoices(episode.mediaSources) }
     var version by remember(episode.id, choices) { mutableStateOf(versions.load(episode.id, choices)) }
     Column(
@@ -330,7 +330,7 @@ private fun Details(
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             airDate(episode.premiereDate)?.let { Text(it, color = Palette.textSecondary) }
             episode.runTimeTicks?.let { Text(length(it), color = Palette.textSecondary) }
-            // No genres here: an episode rarely has its own (ADR 0074)
+            // No genres here: an episode rarely has its own
             RatingBadge(episode)
             scores(episode).forEach { Text(it, color = Palette.textSecondary, maxLines = 1) }
             if (played) {
@@ -352,12 +352,12 @@ private fun Details(
                 Text(if (resume) "Reprendre à ${clock(position)}" else "Lire")
             }
             if (resume) OutlinedButton(onClick = { onPlay(episode.id, 0, version) }) { Text("Lire depuis le début") }
-            // The desktop leads, the TV follows (ADR 0124)
+            // The desktop leads, the TV follows
             WatchWithDesktopButton()
         }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             actions { actionMessage = it }
-            // The version the page plays (ADR 0119)
+            // The version the page plays
             TechInfoButton(shownSource(episode.mediaSources, version), choices.firstOrNull { it.id == version }?.label)
         }
         actionMessage?.let { Text(it, color = Palette.error) }

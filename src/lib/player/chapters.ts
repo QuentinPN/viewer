@@ -1,4 +1,4 @@
-// Chapter navigation of the player (ADR 0034): the current chapter, where the
+// Chapter navigation of the player: the current chapter, where the
 // previous and next chapter keys go, and the marks on the seek bar.
 import type { Chapter } from "../emby/types";
 

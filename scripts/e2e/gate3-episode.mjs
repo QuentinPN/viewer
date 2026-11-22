@@ -1,4 +1,4 @@
-// Gate 3 episode page (ADR 0016) on the real Emby test account, driven over CDP:
+// Gate 3 episode page on the real Emby test account, driven over CDP:
 // - in a series, the thumbnail plays and the title opens the episode page;
 // - the page shows the series, the season and episode, the image, the play
 //   button, the technical info and no Favori button; the series page under it

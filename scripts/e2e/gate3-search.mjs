@@ -1,9 +1,9 @@
-// Gate 3 search scenario on the real Emby test account, driven over CDP (ADR 0011):
+// Gate 3 search scenario on the real Emby test account, driven over CDP:
 // - "/" and Ctrl+F put the focus in the sidebar search field;
 // - typing searches once after the pause (debounce), films and series in their grids;
 // - the server ignores case and accents: "HEURE" finds what "heure" finds;
 // - a result opens its detail page, Escape comes back with focus on the card;
-// - episodes (ADR 0020): matched on their own title, a card opens the episode page,
+// - episodes: matched on their own title, a card opens the episode page,
 //   "Épisode suivant" replaces it, Escape comes back to the card that opened it;
 // - one letter makes no request, an unknown word shows the empty state;
 // - Escape in the field returns to the view the search replaced, scroll kept.

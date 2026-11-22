@@ -1,6 +1,6 @@
 package emby
 
-// Emby artwork through the local `emby-img` protocol (ADR 0005), port of
+// Emby artwork through the local `emby-img` protocol, port of
 // src-tauri/src/emby/images.rs. The UI gets ready-made URLs on that protocol; the
 // native side fetches the image with the session's auth header.
 
@@ -51,7 +51,7 @@ var (
 	LogoWidths = []uint32{320, 640}
 	// ThumbWidths: 16:9 episode stills.
 	ThumbWidths = []uint32{320, 480, 640}
-	// PhotoWidths: round cast photos of a detail page (ADR 0121).
+	// PhotoWidths: round cast photos of a detail page.
 	PhotoWidths = []uint32{120, 240}
 )
 
@@ -86,7 +86,7 @@ func parseImageType(v string) (ImageType, bool) {
 
 // ImageRequest is one validated artwork request coming from the WebView.
 type ImageRequest struct {
-	// ServerID: Emby server the URL was built for (ADR 0012), refused unless it is the current one.
+	// ServerID: Emby server the URL was built for, refused unless it is the current one.
 	ServerID  string
 	ItemID    string
 	ImageType ImageType
@@ -161,7 +161,7 @@ func (r ImageRequest) APIPath() string {
 // ImageRefFor is `image_ref`: `src`/`srcset` for an item image, or false when the
 // item has no such image (a missing image still answers 200 with a generic picture,
 // so `ImageTags` decides). The server id scopes the WebView's HTTP cache to one
-// server (ADR 0012).
+// server.
 func ImageRefFor(serverID, itemID string, imageType ImageType, tag *string, widths []uint32) (ImageRef, bool) {
 	return imageRefAt(currentImageOrigin(), serverID, itemID, imageType, tag, widths)
 }

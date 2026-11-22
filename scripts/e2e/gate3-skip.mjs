@@ -1,4 +1,4 @@
-// Gate 3 skip intro and credits (ADR 0030) on the real Emby test account, driven
+// Gate 3 skip intro and credits on the real Emby test account, driven
 // over CDP:
 // - the first episodes of the first series are looked up (emby_segments) until one
 //   has segments; with the external sources off, nothing is found (no Emby marker
@@ -11,7 +11,7 @@
 //   into it, the button shows and nothing moves.
 // Server side effects: none kept. Each playback is rewound to 0 before stopping, so
 // no resume point is left. Read-only calls to IntroDB and TheIntroDB, with the
-// provider ids of the looked up series (owner's agreement, ADR 0030).
+// provider ids of the looked up series (owner's agreement).
 import { launch } from "./app.mjs";
 import {
   cards,

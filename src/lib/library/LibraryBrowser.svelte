@@ -1,8 +1,8 @@
 <script lang="ts">
-// Signed-in shell: the floating navigation pill (ADR 0031) with the search field,
-// then the home page
-// (ADR 0010), the paged poster grid of a library (DESIGN.md, Films/Series) or the
-// search results (ADR 0011), and the detail page of the opened item over them.
+// Signed-in shell: the floating navigation pill with the search field,
+// then the home page,
+// the paged poster grid of a library (DESIGN.md, Films/Series) or the
+// search results, and the detail page of the opened item over them.
 import { onMount, tick, untrack } from "svelte";
 import { episodeItem } from "../detail/format";
 import ItemDetail from "../detail/ItemDetail.svelte";
@@ -98,7 +98,7 @@ const MAX_PAGE = 200;
 
 interface Props {
   user: SignedInUser;
-  /** Bumped when the connection comes back (ADR 0012): failed areas reload. */
+  /** Bumped when the connection comes back: failed areas reload. */
   refresh: number;
   signingOut: boolean;
   onSignOut: () => void;
@@ -133,14 +133,14 @@ let scroller = $state<HTMLElement | null>(null);
 let sentinel = $state<HTMLElement | null>(null);
 // Bumped on every library or option switch: answers for older ones are dropped.
 let generation = 0;
-/** Sort and filters of the shown library (ADR 0013), remembered per library. */
+/** Sort and filters of the shown library, remembered per library. */
 let options = $state<ItemsOptions>({ ...DEFAULT_OPTIONS });
 let genres = $state<string[] | null>(null);
 let genresError = $state<EmbyError | null>(null);
 let genresGeneration = 0;
 const directions = $derived(directionLabels(options.sort));
 
-// Compact grid (ADR 0101): letter rail on the left, icon rail on the right.
+// Compact grid: letter rail on the left, icon rail on the right.
 let sortButton = $state<HTMLButtonElement | null>(null);
 let filtersButton = $state<HTMLButtonElement | null>(null);
 let randomButton = $state<HTMLButtonElement | null>(null);
@@ -177,7 +177,7 @@ let observer: IntersectionObserver | null = null;
 let opened = $state<MediaItem | null>(null);
 /** The settings screen replaces the content; a search still takes over. */
 let settingsOpen = $state(false);
-/** The « Demander » tab (Request, ADR 0125). */
+/** The « Demander » tab (Request). */
 let requestsOpen = $state(false);
 /** Page of an Request title over the tab, and what opened it. */
 let requestMedia = $state<{
@@ -185,7 +185,7 @@ let requestMedia = $state<{
   viewer: Viewer | null;
 } | null>(null);
 let requestOpener: Element | null = null;
-/** A playlist's page replaces the home (ADR 0122); a search still takes over. */
+/** A playlist's page replaces the home; a search still takes over. */
 let openedPlaylist = $state<PlaylistCard | null>(null);
 
 function openPlaylist(playlist: PlaylistCard) {
@@ -207,7 +207,7 @@ async function closePlaylist() {
 let openerId: string | null = null;
 /** Neighbour button that replaced the episode page, to focus it again. */
 let openedVia = $state<"previous" | "next" | null>(null);
-/** Pages opened over the detail (ADR 0121): people, other titles, lists. */
+/** Pages opened over the detail: people, other titles, lists. */
 let pages = $state<DetailPage[]>([]);
 /** What had the focus when each page opened, to get it back on return. */
 let pageOpeners: (Element | null)[] = [];
@@ -225,7 +225,7 @@ let searchGeneration = 0;
 let debounce: ReturnType<typeof setTimeout> | undefined;
 /** Scroll of the view the search replaced, restored when leaving it. */
 let scrollBeforeSearch: number | null = null;
-/** Recent searches (ADR 0122), shown under the empty field while it has the focus. */
+/** Recent searches, shown under the empty field while it has the focus. */
 const recentKey = untrack(() => historyKey(user.server.id, user.userId));
 let recent = $state<string[]>(readHistory(storage(), recentKey));
 let searchFocused = $state(false);
@@ -233,10 +233,10 @@ const recentShown = $derived(
   searchFocused && query === "" && recent.length > 0 && opened === null,
 );
 
-/** Bumped after a favorite change on a detail page (ADR 0014). */
+/** Bumped after a favorite change on a detail page. */
 let favoritesVersion = $state(0);
 
-/** The cards' menu (ADR 0100), shared by every card this screen renders. */
+/** The cards' menu, shared by every card this screen renders. */
 const cardMenu = new CardMenuState();
 provideCardMenu(cardMenu);
 
@@ -286,18 +286,18 @@ function open(item: MediaItem) {
   focusAfterDetail = null;
 }
 
-/** An episode found by the search (ADR 0020). */
+/** An episode found by the search. */
 function openEpisode(item: WatchItem) {
   open(episodeItem(item));
 }
 
-/** Previous or next episode in place of the open one (ADR 0016). */
+/** Previous or next episode in place of the open one. */
 function navigateEpisode(link: EpisodeLink, via: "previous" | "next") {
   opened = episodeItem(link);
   openedVia = via;
 }
 
-/** A person, another title or a list over the detail (ADR 0121). */
+/** A person, another title or a list over the detail. */
 function openPage(page: DetailPage) {
   pages = pushPage(pages, page);
   pageOpeners = [...pageOpeners, document.activeElement].slice(-pages.length);
@@ -490,7 +490,7 @@ function onNumberShortcut(e: KeyboardEvent): boolean {
 
 /**
  * `Ctrl+F`, or `/` outside a text field, puts the focus in the search field. A
- * detail page hides the navigation (ADR 0031): it closes first.
+ * detail page hides the navigation: it closes first.
  */
 function onWindowKeydown(e: KeyboardEvent) {
   if (e.defaultPrevented || !browser?.checkVisibility()) return;
@@ -652,7 +652,7 @@ async function resetOptions(keepSort: boolean) {
 }
 
 /**
- * Letter index of the current options (ADR 0101), read when the grid sorts
+ * Letter index of the current options, read when the grid sorts
  * by title: one light request per library or option change, no image.
  */
 async function loadLetters() {
@@ -929,7 +929,7 @@ async function refreshShown() {
 
 onMount(() => {
   void loadLibraries();
-  // Posters shown follow a watched change made anywhere (ADR 0096), then the
+  // Posters shown follow a watched change made anywhere, then the
   // pages shown are read again for the episode counts.
   const unlisten = embyApi.onPlaybackStopped((state) => {
     patchPlayed(pager.items, state);
@@ -1580,7 +1580,7 @@ $effect(() => {
     height: 100%;
     background: var(--color-bg);
   }
-  /* Floats over the content, which scrolls underneath (ADR 0031). */
+  /* Floats over the content, which scrolls underneath. */
   .topnav {
     position: absolute;
     inset: var(--space-2) 0 auto;
@@ -1647,7 +1647,7 @@ $effect(() => {
   .search-box input::placeholder {
     color: var(--color-text-secondary);
   }
-  /* Recent searches (ADR 0122): a small panel under the field. */
+  /* Recent searches: a small panel under the field. */
   .recent {
     position: absolute;
     top: calc(100% + var(--space-2));
@@ -1932,7 +1932,7 @@ $effect(() => {
     --gutter: clamp(var(--space-4), 5vw, 80px);
     padding: 76px var(--gutter) 48px;
   }
-  /* Compact grid (ADR 0101): small header, letter rail, grid, icon rail. */
+  /* Compact grid: small header, letter rail, grid, icon rail. */
   .heading {
     display: flex;
     flex-wrap: wrap;
@@ -2190,7 +2190,7 @@ $effect(() => {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 24px 18px;
   }
-  /* Detail pages stacked over the grid (ADR 0121): a covered one keeps its
+  /* Detail pages stacked over the grid: a covered one keeps its
      scroll position but is not painted, and its keys stay inactive. */
   .page-layer {
     position: absolute;

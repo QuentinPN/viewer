@@ -3,11 +3,11 @@ package player
 import "time"
 
 // StallLimit is how long a loaded file may stay unpaused with its position frozen
-// before the playback counts as interrupted (ADR 0022).
+// before the playback counts as interrupted.
 const StallLimit = 30 * time.Second
 
 // OpenLimit is how long a file may take to load before the opening counts as
-// failed (ADR 0027).
+// failed.
 const OpenLimit = 45 * time.Second
 
 // Stall is which wait of StallWatch ran out.
@@ -21,7 +21,7 @@ const (
 // StallWatch is a pure watch over the player events: a file must load, then its
 // position must move while playing. Time is passed in. FFmpeg retries at each read
 // of the demuxer and skips the HLS segments that fail, so a dead stream may never
-// reach an end of file by itself (ADR 0022, ADR 0027).
+// reach an end of file by itself.
 //
 // This is the engine's only state machine (player/mod.rs has no other): idle
 // (not armed), opening (armed, opening), playing (armed), paused (armed, paused),

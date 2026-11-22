@@ -31,14 +31,14 @@ import okio.Path.Companion.toOkioPath
 object AppServices {
     val http: OkHttpClient by lazy { EmbyClient.defaultHttp() }
 
-    /** Playback reports, with the stop reports kept on disk when the network fails (ADR 0040, 0066). */
+    /** Playback reports, with the stop reports kept on disk when the network fails. */
     fun reporter(context: Context): PlaybackReporter = playbackReporter ?: synchronized(this) {
         playbackReporter ?: PlaybackReporter(PendingStopStore(context)).also { playbackReporter = it }
     }
 
     @Volatile private var playbackReporter: PlaybackReporter? = null
 
-    /** Intro and credits sources, with their in-memory cache (ADR 0048). */
+    /** Intro and credits sources, with their in-memory cache. */
     fun segments(context: Context): SegmentSources = segmentSources ?: synchronized(this) {
         segmentSources ?: SegmentSources(SegmentSources.http(http, device(context).version)).also { segmentSources = it }
     }
@@ -46,7 +46,7 @@ object AppServices {
     @Volatile private var segmentSources: SegmentSources? = null
 
     /**
-     * The account's track preferences (ADR 0065), read once per server and user while the
+     * The account's track preferences, read once per server and user while the
      * app runs. Null when they cannot be read: playback then keeps the server's and mpv's
      * picks, and the next player tries again.
      */
@@ -64,7 +64,7 @@ object AppServices {
 
     @Volatile private var accountCache: Pair<String, AccountTracks?>? = null
 
-    /** The session-wide socket and the linked playback (ADR 0123, 0124). */
+    /** The session-wide socket and the linked playback. */
     fun sync(context: Context): SyncHub = syncHub ?: synchronized(this) {
         syncHub ?: SyncHub(context.applicationContext).also { syncHub = it }
     }
@@ -73,7 +73,7 @@ object AppServices {
 
     fun store(context: Context) = SessionStore(context)
 
-    /** Request (ADR 0125): one repository per process, so its exchange lock covers every call. */
+    /** Request: one repository per process, so its exchange lock covers every call. */
     fun requests(context: Context): RequestRepository = viewerRequests ?: synchronized(this) {
         val app = context.applicationContext
         viewerRequests ?: RequestRepository(
@@ -142,7 +142,7 @@ object AppServices {
 
     /**
      * One disk cache per process, shared by every loader (one per session): two caches
-     * on the same directory would corrupt its journal. Bounded to 256 Mo (ADR 0080).
+     * on the same directory would corrupt its journal. Bounded to 256 Mo.
      */
     private fun imageDiskCache(context: Context): DiskCache = imageCache ?: synchronized(this) {
         imageCache ?: DiskCache.Builder()

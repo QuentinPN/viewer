@@ -1,6 +1,6 @@
 package io.github.quentinpn.viewer.tv.emby
 
-// Recent searches (ADR 0075): kept on the device only, never sent to the server.
+// Recent searches: kept on the device only, never sent to the server.
 
 /** Searches kept, newest first. */
 const val SEARCH_HISTORY_MAX = 8

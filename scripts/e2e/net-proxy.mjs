@@ -1,4 +1,4 @@
-// Local network proxy for the connection scenarios (ADR 0012): the app signs in
+// Local network proxy for the connection scenarios: the app signs in
 // through http://127.0.0.1:<port>, and the scenario simulates server outages here
 // instead of touching the server. Modes:
 // - "up": every connection is forwarded to the target;
@@ -9,18 +9,18 @@
 // - "reject": authenticated requests get 401, like a token revoked on the server.
 //   The public probe still goes through. Nothing reaches the server in that mode;
 // - "junk-direct": direct file requests get bytes no player can read, like a file
-//   mpv cannot open (ADR 0023). The rest is forwarded, transcodes included;
+//   mpv cannot open. The rest is forwarded, transcodes included;
 // - "junk-all": HLS playlists too, so that a transcode cannot open either;
 // - "hold-direct": direct file requests are never answered, like a server that hangs
-//   on one file (ADR 0027). The rest is forwarded;
+//   on one file. The rest is forwarded;
 // - "error-files": direct file and HLS segment requests get HTTP 500, like a file the
 //   server can no longer read. Playlists are forwarded: FFmpeg skips segment after
-//   segment (ADR 0027);
+//   segment;
 // - "log-segments": every request is forwarded; each HLS segment is noted in `segments`
 //   with its number, time and HTTP status. No URL is kept;
 // - "many-views": the library list (`/Users/{Id}/Views`) is answered with each
 //   library repeated under numbered names and made-up ids, like a server with many
-//   libraries (ADR 0031). The rest is forwarded. The server is only read.
+//   libraries. The rest is forwarded. The server is only read.
 import { randomBytes } from "node:crypto";
 import http from "node:http";
 import net from "node:net";

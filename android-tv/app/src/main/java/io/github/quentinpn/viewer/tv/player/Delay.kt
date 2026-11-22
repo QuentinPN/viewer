@@ -3,7 +3,7 @@ package io.github.quentinpn.viewer.tv.player
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
-// "Décalage des sous-titres" and "Décalage audio" of the track menu (ADR 0062).
+// "Décalage des sous-titres" and "Décalage audio" of the track menu.
 
 /** One press of ◀ or ▶. */
 const val DELAY_STEP_SECONDS = 0.1
@@ -24,7 +24,7 @@ enum class DelayKind(val property: String, val label: String) {
 /** ◀ earlier, ▶ later, OK back to none. */
 enum class DelayChange { Earlier, Later, Reset }
 
-/** The delays of the current playback; a new file starts from none on both (ADR 0062). */
+/** The delays of the current playback; a new file starts from none on both. */
 data class Delays(val subtitle: Double = 0.0, val audio: Double = 0.0) {
     fun of(kind: DelayKind) = when (kind) {
         DelayKind.Subtitle -> subtitle

@@ -1,4 +1,4 @@
-// Gate 7 linked playback (ADR 0123, ADR 0124) between this PC and a real Android TV,
+// Gate 7 linked playback between this PC and a real Android TV,
 // driven over CDP on the desktop and adb on the TV:
 // - the desktop plays the first episode of the first series and invites the TV;
 // - the TV opens the same episode and the link is reported « Lié »;

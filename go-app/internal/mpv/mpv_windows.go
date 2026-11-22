@@ -478,7 +478,7 @@ func (h *Handle) Wakeup() {
 
 // TerminateDestroy shuts the player down and frees the handle. It blocks until
 // the core has quit; with an embedded video window it must run off the UI
-// thread (ADR 0003). Safe to call concurrently with other methods and twice.
+// thread. Safe to call concurrently with other methods and twice.
 func (h *Handle) TerminateDestroy() {
 	if h.closing.Swap(true) {
 		h.mu.Lock() // another destroy is running: wait for it

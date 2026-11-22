@@ -136,7 +136,7 @@ pub async fn app_info(state: State<'_, AppState>) -> Result<AppInfo, ()> {
     })
 }
 
-// Emby (ADR 0004). Results carry user and server summaries, never the token.
+// Emby. Results carry user and server summaries, never the token.
 
 /// Name, version and address of the signed-in server, read again from its public
 /// system info: an error when it cannot be reached.
@@ -145,7 +145,7 @@ pub async fn emby_server_info(emby: State<'_, EmbyService>) -> Result<ServerSumm
     emby.server_info().await
 }
 
-/// Audio and subtitle preferences of the Emby account, for Réglages (ADR 0115).
+/// Audio and subtitle preferences of the Emby account, for Réglages.
 #[tauri::command]
 pub async fn emby_account_tracks(
     emby: State<'_, EmbyService>,
@@ -176,7 +176,7 @@ pub async fn emby_restore(emby: State<'_, EmbyService>) -> Result<SessionStatus,
     emby.restore().await
 }
 
-/// Sets the open session aside without revoking it (ADR 0012).
+/// Sets the open session aside without revoking it.
 #[tauri::command]
 pub async fn emby_change_server(
     state: State<'_, AppState>,
@@ -186,13 +186,13 @@ pub async fn emby_change_server(
     emby.change_server()
 }
 
-/// Tiles of the pre-connection shelf (ADR 0103); no token in the answer.
+/// Tiles of the pre-connection shelf; no token in the answer.
 #[tauri::command]
 pub async fn emby_shelf(emby: State<'_, EmbyService>) -> Result<Vec<ShelfServer>, EmbyError> {
     Ok(emby.shelf())
 }
 
-/// "Oublier ce serveur" (ADR 0103): removed locally at once; the revocation on
+/// "Oublier ce serveur": removed locally at once; the revocation on
 /// the server runs afterwards, best effort, and never delays the answer.
 #[tauri::command]
 pub async fn emby_forget_server(
@@ -201,7 +201,7 @@ pub async fn emby_forget_server(
     server_id: String,
     user_id: String,
 ) -> Result<(), EmbyError> {
-    // Read before the Emby service deletes the token with the account (ADR 0125).
+    // Read before the Emby service deletes the token with the account.
     let ur_revocation = ur.revocation_for(&server_id, &user_id);
     if let Some(revocation) = emby.forget_server(&server_id, &user_id)? {
         tauri::async_runtime::spawn(revocation.send());
@@ -228,7 +228,7 @@ pub async fn emby_sign_out(
     ur: State<'_, RequestService>,
 ) -> Result<(), EmbyError> {
     state.sync.stop(SYNC_BYE_WAIT).await;
-    // Read before the Emby service deletes the token with the account (ADR 0125).
+    // Read before the Emby service deletes the token with the account.
     let ur_revocation = emby
         .current_user()
         .and_then(|u| ur.revocation_for(&u.server.id, &u.user_id));
@@ -267,7 +267,7 @@ pub async fn emby_items(
     .await
 }
 
-/// Titles of a library grid in order with their sort name (letter rail, ADR 0101).
+/// Titles of a library grid in order with their sort name (letter rail).
 #[tauri::command]
 pub async fn emby_sort_names(
     emby: State<'_, EmbyService>,
@@ -278,7 +278,7 @@ pub async fn emby_sort_names(
         .await
 }
 
-/// One random title among those the grid shows (ADR 0101).
+/// One random title among those the grid shows.
 #[tauri::command]
 pub async fn emby_random_item(
     emby: State<'_, EmbyService>,
@@ -289,7 +289,7 @@ pub async fn emby_random_item(
         .await
 }
 
-/// Production years of a library, newest first (decade filter, ADR 0101).
+/// Production years of a library, newest first (decade filter).
 #[tauri::command]
 pub async fn emby_production_years(
     emby: State<'_, EmbyService>,
@@ -298,7 +298,7 @@ pub async fn emby_production_years(
     emby.production_years(&library_id).await
 }
 
-/// Artwork cache figures (ADR 0019), `None` when the app has no cache directory.
+/// Artwork cache figures, `None` when the app has no cache directory.
 #[tauri::command]
 pub async fn artwork_cache_stats(
     emby: State<'_, EmbyService>,
@@ -306,7 +306,7 @@ pub async fn artwork_cache_stats(
     Ok(emby.artwork_stats().await)
 }
 
-/// Empties the artwork cache (ADR 0021): images and bytes removed, `None` when the
+/// Empties the artwork cache: images and bytes removed, `None` when the
 /// app has no cache directory.
 #[tauri::command]
 pub async fn artwork_cache_clear(
@@ -315,7 +315,7 @@ pub async fn artwork_cache_clear(
     Ok(emby.clear_artwork().await)
 }
 
-/// Bitrate caps of the current server (ADR 0037).
+/// Bitrate caps of the current server.
 #[tauri::command]
 pub fn emby_playback_quality(emby: State<'_, EmbyService>) -> Result<PlaybackQuality, EmbyError> {
     emby.playback_quality()
@@ -388,7 +388,7 @@ pub async fn emby_set_favorite(
     emby.set_favorite(&item_id, favorite).await
 }
 
-/// Listens for titles added on the server while the home is shown (ADR 0110);
+/// Listens for titles added on the server while the home is shown;
 /// each settled burst emits `emby://library-changed`. Replaces a running listener.
 #[tauri::command]
 pub fn emby_library_events_start(events: State<'_, LibraryEvents>) {
@@ -401,7 +401,7 @@ pub fn emby_library_events_stop(events: State<'_, LibraryEvents>) {
     events.stop();
 }
 
-/// Marks an item played or unplayed (ADR 0096). The new state goes to every view
+/// Marks an item played or unplayed. The new state goes to every view
 /// on the playback-stopped event, as after a playback, and is returned.
 #[tauri::command]
 pub async fn emby_set_played(
@@ -415,7 +415,7 @@ pub async fn emby_set_played(
     Ok(state)
 }
 
-/// Takes a film or episode out of "Reprendre" (ADR 0096); announced the same way.
+/// Takes a film or episode out of "Reprendre"; announced the same way.
 #[tauri::command]
 pub async fn emby_hide_from_resume(
     app: tauri::AppHandle,
@@ -427,7 +427,7 @@ pub async fn emby_hide_from_resume(
     Ok(state)
 }
 
-/// First episode of a series not watched yet, for the card menu (ADR 0100).
+/// First episode of a series not watched yet, for the card menu.
 #[tauri::command]
 pub async fn emby_series_next_episode(
     emby: State<'_, EmbyService>,
@@ -436,13 +436,13 @@ pub async fn emby_series_next_episode(
     emby.series_next_episode(&series_id).await
 }
 
-/// Playlists of the user, by name (ADR 0100).
+/// Playlists of the user, by name.
 #[tauri::command]
 pub async fn emby_playlists(emby: State<'_, EmbyService>) -> Result<Vec<Playlist>, EmbyError> {
     emby.playlists().await
 }
 
-/// Home row « Playlists »: the user's video playlists (ADR 0122).
+/// Home row « Playlists »: the user's video playlists.
 #[tauri::command]
 pub async fn emby_home_playlists(
     emby: State<'_, EmbyService>,
@@ -450,7 +450,7 @@ pub async fn emby_home_playlists(
     emby.home_playlists().await
 }
 
-/// Films and episodes of a playlist, in its order (ADR 0122).
+/// Films and episodes of a playlist, in its order.
 #[tauri::command]
 pub async fn emby_playlist_items(
     emby: State<'_, EmbyService>,
@@ -469,7 +469,7 @@ pub async fn emby_add_to_playlist(
     emby.add_to_playlist(&playlist_id, &item_id).await
 }
 
-/// Creates a video playlist holding the item (ADR 0100).
+/// Creates a video playlist holding the item.
 #[tauri::command]
 pub async fn emby_create_playlist(
     emby: State<'_, EmbyService>,
@@ -487,7 +487,7 @@ pub async fn emby_item_detail(
     emby.item_detail(&item_id).await
 }
 
-/// Intro and credits of an item (ADR 0030). `external: false` keeps everything on
+/// Intro and credits of an item. `external: false` keeps everything on
 /// the Emby server. A failure of an external source is silent: fewer segments.
 #[tauri::command]
 pub async fn emby_segments(
@@ -506,7 +506,7 @@ pub async fn emby_segments(
         .await)
 }
 
-/// Chapters of a film or episode, in seconds of the file (ADR 0034).
+/// Chapters of a film or episode, in seconds of the file.
 #[tauri::command]
 pub async fn emby_chapters(
     emby: State<'_, EmbyService>,
@@ -523,7 +523,7 @@ pub async fn emby_seasons(
     emby.seasons(&series_id).await
 }
 
-/// Titles of a person, collection, genre or studio (ADR 0121).
+/// Titles of a person, collection, genre or studio.
 #[tauri::command]
 pub async fn emby_titles(
     emby: State<'_, EmbyService>,
@@ -532,7 +532,7 @@ pub async fn emby_titles(
     emby.titles(&source).await
 }
 
-/// Id of the first trailer file of a film or series, to play (ADR 0121).
+/// Id of the first trailer file of a film or series, to play.
 #[tauri::command]
 pub async fn emby_local_trailer(
     emby: State<'_, EmbyService>,
@@ -553,7 +553,7 @@ pub async fn emby_episodes(
         .await
 }
 
-/// Réglages › Sous-titres, kept on this PC and sent with each playback (ADR 0035).
+/// Réglages › Sous-titres, kept on this PC and sent with each playback.
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct PlaybackPreferences {
@@ -561,7 +561,7 @@ pub struct PlaybackPreferences {
     subtitle_style: SubtitleStyle,
 }
 
-/// Changes the bitrate cap of the playback in progress (ADR 0117): a new
+/// Changes the bitrate cap of the playback in progress: a new
 /// PlaybackInfo for the version playing at `cap` (`None`: « Maximale »), loaded at
 /// `position_seconds` in the same engine. The session goes on: a `QualityChange`
 /// progress, no stop. Réglages is left as it is.
@@ -623,11 +623,11 @@ pub async fn emby_change_quality(
     })
 }
 
-/// Plays a film or episode from the server (ADR 0007): PlaybackInfo, choice of the
+/// Plays a film or episode from the server: PlaybackInfo, choice of the
 /// source, then the player. The UI gets the method only, never the URL or token.
 /// With `resume`, starts where the server says the user stopped; the playback is
-/// then reported to the server (ADR 0008). `media_source_id` plays one version of an
-/// item with several (ADR 0036).
+/// then reported to the server. `media_source_id` plays one version of an
+/// item with several.
 #[tauri::command]
 pub async fn emby_play(
     state: State<'_, AppState>,
@@ -691,10 +691,10 @@ pub async fn emby_play(
 }
 
 /// A linked TV is told `bye stopped` before sign-out or a server change, waiting
-/// at most this long (ADR 0124).
+/// at most this long.
 const SYNC_BYE_WAIT: std::time::Duration = std::time::Duration::from_secs(3);
 
-/// Viewer TVs open on the account the playback can be sent to (ADR 0124).
+/// Viewer TVs open on the account the playback can be sent to.
 #[tauri::command]
 pub async fn sync_devices(emby: State<'_, EmbyService>) -> Result<Vec<SyncDevice>, EmbyError> {
     crate::sync::devices(&emby).await

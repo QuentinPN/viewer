@@ -1,6 +1,6 @@
 package io.github.quentinpn.viewer.tv.emby
 
-/** Grid sort keys (ADR 0013); ties fall back to the title. */
+/** Grid sort keys; ties fall back to the title. */
 enum class SortKey(val sortBy: String) {
     Name("SortName"),
     DateAdded("DateCreated,SortName"),
@@ -20,16 +20,16 @@ enum class WatchFilter(val filter: String?) {
     InProgress("IsResumable"),
 }
 
-/** Sort and filters of a library grid, ported from the Windows client (ADR 0013). */
+/** Sort and filters of a library grid, ported from the Windows client. */
 data class ItemsOptions(
     val sort: SortKey = SortKey.Name,
     val descending: Boolean = false,
     val watch: WatchFilter = WatchFilter.All,
     val favorites: Boolean = false,
     val genre: String? = null,
-    /** First year of the decade shown, e.g. 1990 (ADR 0082); null for every year. */
+    /** First year of the decade shown, e.g. 1990; null for every year. */
     val decade: Int? = null,
-    /** Studio or network the grid was opened on from a detail page (ADR 0087); never saved. */
+    /** Studio or network the grid was opened on from a detail page; never saved. */
     val studio: String? = null,
 ) {
     /** The `Filters` value, or null when nothing filters. */
@@ -48,7 +48,7 @@ fun isUsableGenre(name: String): Boolean =
     name.isNotBlank() && name.length <= 100 && name.none { it == '|' || it.isISOControl() }
 
 /**
- * A studio name the `Studios` filter can be asked for (ADR 0087): `|` separates studios there
+ * A studio name the `Studios` filter can be asked for: `|` separates studios there
  * and has no escape, so such a name, like a blank, long or control one, is never sent.
  */
 fun isUsableStudio(name: String): Boolean = isUsableGenre(name)

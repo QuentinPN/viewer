@@ -2,9 +2,9 @@ package io.github.quentinpn.viewer.tv.player
 
 import io.github.quentinpn.viewer.tv.emby.ChapterInfo
 
-// Chapters of the player (ADR 0034, 0057), as src-tauri/src/emby/chapters.rs and
+// Chapters of the player, as src-tauri/src/emby/chapters.rs and
 // src/lib/player/chapters.ts: Emby's `Chapters`, kept to the regular `Chapter`
-// markers. The intro and credits markers stay with the segments (ADR 0048).
+// markers. The intro and credits markers stay with the segments.
 
 private const val TICKS_PER_SECOND = 10_000_000.0
 

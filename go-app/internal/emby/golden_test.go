@@ -1,6 +1,6 @@
 package emby
 
-// Golden helpers (ADR 0128). Two comparison modes, per testdata/golden/index.json:
+// Golden helpers. Two comparison modes, per testdata/golden/index.json:
 //   - typed values: same keys in the same order, same values; numbers compare by
 //     value, because serde writes `0.0` where encoding/json writes `0`;
 //   - tables built with json! in golden.rs: same JSON value, key order ignored.

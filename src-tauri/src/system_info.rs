@@ -1,4 +1,4 @@
-//! What this PC says about itself, for Réglages › À propos (ADR 0116): the build,
+//! What this PC says about itself, for Réglages › À propos: the build,
 //! the Windows edition and build, the graphics adapters, their hardware decoders and
 //! the displays' HDR state. Read only: registry values, DXGI descriptions and a
 //! short-lived D3D11 video device; no shell.
@@ -8,7 +8,7 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemReport {
-    /// `debug_assertions`: the separate debug build (ADR 0105).
+    /// `debug_assertions`: the separate debug build.
     pub debug_build: bool,
     /// `None` when the registry could not be read.
     pub os: Option<OsInfo>,

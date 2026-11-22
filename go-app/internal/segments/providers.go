@@ -1,8 +1,8 @@
 package segments
 
-// IntroDB and TheIntroDB read endpoints (ADR 0030), both anonymous. Port of
-// segments/providers.rs. Contracts checked against their docs and real answers:
-// docs/evidence/intros-generiques-2026-11-07.md.
+// IntroDB and TheIntroDB read endpoints, both anonymous. Port of
+// segments/providers.rs. Contracts checked against their docs and real answers
+// captured on 2026-11-07.
 
 import (
 	"context"

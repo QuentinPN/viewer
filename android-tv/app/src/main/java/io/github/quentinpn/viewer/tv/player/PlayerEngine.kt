@@ -27,8 +27,8 @@ interface PlayerListener {
 }
 
 /**
- * Transport-neutral playback engine, as on Windows (ARCHITECTURE.md). The UI
- * never talks to libmpv directly, so Media3 could stand in later (ADR 0038).
+ * Transport-neutral playback engine, as on Windows. The UI
+ * never talks to libmpv directly, so Media3 could stand in later.
  */
 interface PlayerEngine {
     fun addListener(listener: PlayerListener)
@@ -42,14 +42,14 @@ interface PlayerEngine {
     fun detachSurface()
 
     /**
-     * Playback begins at [startSeconds], unpaused unless [paused] (a linked load, ADR 0124); a loaded file is replaced. HTTP headers (the token) are given when the
+     * Playback begins at [startSeconds], unpaused unless [paused] (a linked load); a loaded file is replaced. HTTP headers (the token) are given when the
      * engine is created, never in the URL.
      */
     fun load(source: MediaSource, startSeconds: Double = 0.0, paused: Boolean = false)
 
     /**
      * Adds an external subtitle file to the loaded one; [select] makes it the shown track.
-     * [title] and [lang] name the track, as the server describes it (ADR 0084).
+     * [title] and [lang] name the track, as the server describes it.
      */
     fun addSubtitle(source: MediaSource, select: Boolean = true, title: String? = null, lang: String? = null)
 
@@ -84,16 +84,16 @@ interface PlayerEngine {
     /** Look of text subtitles, from Réglages; [setSubtitlePosition] places them. */
     fun setSubtitleStyle(style: SubtitleStyle)
 
-    /** Sets a delay, in seconds, for the loaded file only (ADR 0062); returns the value mpv then holds, null if unreadable. */
+    /** Sets a delay, in seconds, for the loaded file only; returns the value mpv then holds, null if unreadable. */
     fun setDelay(kind: DelayKind, seconds: Double): Double?
 
-    /** Playback speed for the loaded file only (ADR 0072); returns the value mpv then holds, null if unreadable. */
+    /** Playback speed for the loaded file only; returns the value mpv then holds, null if unreadable. */
     fun setSpeed(speed: Double): Double?
 
-    /** How the picture fills the screen, for the loaded file only (ADR 0078); returns the fit mpv then holds, null if unreadable. */
+    /** How the picture fills the screen, for the loaded file only; returns the fit mpv then holds, null if unreadable. */
     fun setVideoFit(fit: VideoFit): VideoFit?
 
-    /** Night mode's compressor on or off (ADR 0072); true when mpv holds it as asked. Kept for the next files. */
+    /** Night mode's compressor on or off; true when mpv holds it as asked. Kept for the next files. */
     fun setNightMode(on: Boolean): Boolean
 
     /** Audio leaves undecoded (spdif passthrough): no audio filter can apply to it. */

@@ -119,7 +119,7 @@ internal sealed interface SearchState {
     data class Failed(val query: String, val message: String) : SearchState
 }
 
-/** The « À demander » row (ADR 0125): what Request finds that is not in Emby, hidden unless it is connected. */
+/** The « À demander » row: what Request finds that is not in Emby, hidden unless it is connected. */
 internal sealed interface ToRequest {
     data object Hidden : ToRequest
 
@@ -162,7 +162,7 @@ class SearchMemory {
 
 /**
  * A text field, then the films, series and episodes whose title starts with the term;
- * while the field is empty, the recent searches kept on the device (ADR 0075).
+ * while the field is empty, the recent searches kept on the device.
  */
 @Composable
 fun SearchScreen(
@@ -319,7 +319,7 @@ fun SearchScreen(
 }
 
 /**
- * The term, in a glass pill like the home's controls (ADR 0067): white with black text and
+ * The term, in a glass pill like the home's controls: white with black text and
  * ringed in the accent while typing. The ring sits in reserved space, so nothing moves.
  */
 @Composable
@@ -383,7 +383,7 @@ internal fun SearchField(
 
 /**
  * The last searches as glass pills, newest first, then « Effacer l'historique » on its own
- * line: Down from the field reaches the pills, Down again the button (ADR 0075).
+ * line: Down from the field reaches the pills, Down again the button.
  */
 @Composable
 private fun RecentSearches(terms: List<String>, onSearch: (String) -> Unit, onClear: () -> Unit) {

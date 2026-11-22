@@ -2,7 +2,7 @@ package devsync
 
 import "encoding/json"
 
-// Leader side of a linked playback (ADR 0124): the computer's state machine.
+// Leader side of a linked playback: the computer's state machine.
 // Pure: time is a monotonic millisecond count given by the caller, and every
 // outcome is an Effect the IO glue carries out.
 

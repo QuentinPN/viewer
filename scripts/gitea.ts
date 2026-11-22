@@ -1,4 +1,4 @@
-// Releases on the self-hosted Gitea (ADR 0111, 0112). The code is the `origin`
+// Releases on the self-hosted Gitea. The code is the `origin`
 // remote; releases and update manifests go to the public `<repo>-releases`
 // next to it. The token comes from GITEA_TOKEN in the environment, else from the
 // gitignored debug.env at the root of the main checkout. It is never printed.
@@ -59,7 +59,7 @@ export function gitea(root: string) {
     page,
 
     /** Creates the release (and its tag on the releases repository's main), or
-     *  reuses it to redo a failed publish (ADR 0126); uploads the file unless the
+     *  reuses it to redo a failed publish; uploads the file unless the
      *  same bytes are already there (a different one is replaced), then downloads
      *  it back without the token, as the apps will, to check its SHA-256. */
     async publish(

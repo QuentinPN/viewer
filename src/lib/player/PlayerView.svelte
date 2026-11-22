@@ -1,10 +1,10 @@
 <script lang="ts">
-// Player of a playback started from Emby (ADR 0017): title at the top, controls
+// Player of a playback started from Emby: title at the top, controls
 // that fade after a few seconds without activity, audio, subtitles and
 // diagnostic panels. The video is the native surface under this transparent page.
-// At the end of an episode, a card offers the next one (ADR 0018). During an
-// intro or the credits, a button skips them (ADR 0030). Chapters are marked on
-// the seek bar and listed in their own panel (ADR 0034).
+// At the end of an episode, a card offers the next one. During an
+// intro or the credits, a button skips them. Chapters are marked on
+// the seek bar and listed in their own panel.
 import { onDestroy, onMount, tick, untrack } from "svelte";
 import { embyApi } from "../emby/api";
 import type {
@@ -115,8 +115,8 @@ interface Props {
   playback: PlaybackStart;
   onExit: () => void;
   /**
-   * The playback ended on an error or well before the end (the stream broke,
-   * ADR 0012): the player closes and the app offers to resume.
+   * The playback ended on an error or well before the end (the stream broke):
+   * the player closes and the app offers to resume.
    */
   onInterrupted: (itemId: string) => void;
   /**
@@ -125,13 +125,13 @@ interface Props {
    */
   onPlayNext: (itemId: string) => Promise<string | null>;
   /**
-   * The direct source did not open (ADR 0023): asks the server for a transcode of
+   * The direct source did not open: asks the server for a transcode of
    * the same item from the same start; resolves with an error message, `null`
    * once the app shows it.
    */
   onFallback: (itemId: string, resume: boolean) => Promise<string | null>;
   /**
-   * Another bitrate cap for this playback (ADR 0117), from `position` seconds;
+   * Another bitrate cap for this playback, from `position` seconds;
    * resolves with an error message, `null` once the app shows the new stream.
    */
   onChangeQuality: (
@@ -209,19 +209,19 @@ let panel = $state<Panel | null>(null);
 let awake = $state(true);
 let overChrome = $state(false);
 let volume = $state<VolumeSetting>(readVolume(storage()));
-/** Wall clock of the clock and « Fin à » (ADR 0073): each position, and each minute. */
+/** Wall clock of the clock and « Fin à »: each position, and each minute. */
 let now = $state(Date.now());
 let clockTimer: ReturnType<typeof setTimeout> | undefined;
 /** Playback speed in effect; 1 is « Normale ». */
 let speed = $state(1);
-/** Night mode, kept on this PC (ADR 0072). */
+/** Night mode, kept on this PC. */
 let nightMode = $state(readNightMode(storage()));
 let optionsButton = $state<HTMLButtonElement | null>(null);
-/** Delays of the file being played; each new file starts from none (ADR 0062). */
+/** Delays of the file being played; each new file starts from none. */
 let delays = $state<Delays>({ ...NO_DELAYS });
-/** Picture format, for this player session (ADR 0078). */
+/** Picture format, for this player session. */
 let fit = $state<VideoFit>("original");
-/** « Minuterie », for this player session (ADR 0073). */
+/** « Minuterie », for this player session. */
 let sleep = $state<SleepTimer>(SLEEP_OFF);
 /** The timer ran out and paused: said over the picture until playback resumes. */
 let sleepNotice = $state(false);
@@ -236,7 +236,7 @@ let panelElement = $state<HTMLElement | null>(null);
 let nextEpisode = $state<EpisodeLink | null>(null);
 /** Previous episode, for a « précédent » asked by a linked TV. */
 let previousEpisode = $state<EpisodeLink | null>(null);
-/** Linked playback with a TV (ADR 0124), as Rust reports it. */
+/** Linked playback with a TV, as Rust reports it. */
 let sync = $state<SyncStatus>({ phase: "idle" });
 /** TVs listed when the « TV » panel opens; `null` while loading. */
 let tvDevices = $state<SyncDevice[] | null>(null);
@@ -257,7 +257,7 @@ let segments = $state<Segment[]>([]);
 let skipSetting = readSkip(storage());
 /** Segments already skipped on their own: once per playback. */
 let autoSkipped = new Set<string>();
-/** When the button of the segment being played appeared (ADR 0089). */
+/** When the button of the segment being played appeared. */
 let skipSince = $state<SkipShown>(NO_SKIP_SHOWN);
 /** Clock of `skipVisible`: set when a segment starts and when its button hides. */
 let skipNow = $state(0);
@@ -319,7 +319,7 @@ const chromeVisible = $derived(
     upNext !== null ||
     error !== null,
 );
-// Ten seconds on its own, then only with the controls (ADR 0089).
+// Ten seconds on its own, then only with the controls.
 const skipVisible = $derived(
   skip !== null && skipShown(skipSince, skipNow, chromeVisible),
 );
@@ -507,7 +507,7 @@ onMount(async () => {
     if (diag.duration != null) duration = diag.duration;
     if (diag.timePos != null) position = diag.timePos;
     if (diag.timePos != null) everPlayed = true;
-    // An engine that answers may still be opening its file (ADR 0027).
+    // An engine that answers may still be opening its file.
     if (diag.container != null) active = true;
     tracks = await playerApi.tracks();
     await applyVolume();
@@ -575,7 +575,7 @@ function changeDelayOf(kind: DelayKind, change: DelayChange) {
   );
 }
 
-/** Pauses once the timer ran out or « Fin de… » reached its stop (ADR 0073). */
+/** Pauses once the timer ran out or « Fin de… » reached its stop. */
 function checkSleep() {
   if (!active || !sleepDue(sleep, Date.now(), position, duration, segments))
     return;
@@ -607,7 +607,7 @@ function changeVolume(next: VolumeSetting) {
   if (active) void applyVolume();
 }
 
-/** The direct source did not open: same item again, as a transcode (ADR 0023). */
+/** The direct source did not open: same item again, as a transcode. */
 async function fallBack(detail?: string | null) {
   fallingBack = true;
   active = false;
@@ -807,7 +807,7 @@ function onKeydown(e: KeyboardEvent) {
   const inTextField =
     target instanceof HTMLInputElement && target.type === "text";
   // Enter skips while the button shows, whatever control has the focus. Once
-  // it hid, Enter only brings it back with the controls (ADR 0089).
+  // it hid, Enter only brings it back with the controls.
   if (e.key === "Enter" && skip && !inTextField) {
     e.preventDefault();
     if (skipVisible) runSkip(skip);
@@ -1593,7 +1593,7 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     justify-content: space-between;
     gap: var(--space-4);
   }
-  /* Chapter starts (ADR 0034): thin dark cuts across the 24 px high seek bar. */
+  /* Chapter starts: thin dark cuts across the 24 px high seek bar. */
   .marks {
     position: absolute;
     inset: 0 0 auto;
@@ -2022,7 +2022,7 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     background: var(--fill-glass-hover);
   }
 
-  /* End of an episode (ADR 0018): no video under the page any more, so the
+  /* End of an episode: no video under the page any more, so the
      player paints its own background. */
   .player.ended {
     background: var(--color-bg);
@@ -2113,8 +2113,8 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     height: 18px;
   }
 
-  /* Skip intro or credits (ADR 0030): above the controls, and still there for
-     10 s when they fade (ADR 0089). */
+  /* Skip intro or credits: above the controls, and still there for
+     10 s when they fade. */
   .skip {
     position: absolute;
     right: clamp(var(--space-4), 5vw, 80px);

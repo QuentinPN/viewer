@@ -2,7 +2,7 @@
 .SYNOPSIS
   Downloads the pinned libmpv build into vendor/mpv/ and verifies its SHA-256.
 .DESCRIPTION
-  Source: shinchiro/mpv-winbuild-cmake GitHub releases (see ADR 0002).
+  Source: shinchiro/mpv-winbuild-cmake GitHub releases.
   The archive hash is pinned below; the script refuses any mismatch. Bump the
   release, file name and both hashes together, then re-run Gate 1.
   Extraction uses 7-Zip (`7z` on PATH, as on GitHub runners) or the `7zip-bin`

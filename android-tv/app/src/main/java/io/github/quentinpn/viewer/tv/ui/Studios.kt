@@ -5,7 +5,7 @@ import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.ItemsOptions
 import io.github.quentinpn.viewer.tv.emby.isUsableStudio
 
-/** Studios a detail page can open (ADR 0087): three at most, as the genres. */
+/** Studios a detail page can open: three at most, as the genres. */
 internal const val STUDIO_CHIPS_LIMIT = 3
 
 /**
@@ -17,13 +17,13 @@ internal fun studioChips(item: BaseItemDto): List<String> =
     item.studios.map { it.name }.filter(::isUsableStudio).distinct().take(STUDIO_CHIPS_LIMIT)
 
 /**
- * The grid's choices for [studio], as for a genre (ADR 0079): the saved sort and direction, no
+ * The grid's choices for [studio], as for a genre: the saved sort and direction, no
  * other filter. Null for a name the server cannot be asked for.
  */
 internal fun studioOptions(saved: ItemsOptions, studio: String): ItemsOptions? =
     if (isUsableStudio(studio)) ItemsOptions(sort = saved.sort, descending = saved.descending, studio = studio) else null
 
-/** The grid's title: the studio it was opened on, else the library (ADR 0087). */
+/** The grid's title: the studio it was opened on, else the library. */
 internal fun gridTitle(library: Library, options: ItemsOptions): String = options.studio ?: library.name
 
 /** « Réinitialiser » drops the toolbar's choices, not the studio the grid is about. */
@@ -52,7 +52,7 @@ internal class ChipLines(
     val onOpenStudio: (String) -> Unit,
 )
 
-/** « Studio » or « Diffusion » as a line of pills under the genres (ADR 0087); OK opens the grid. */
+/** « Studio » or « Diffusion » as a line of pills under the genres; OK opens the grid. */
 @Composable
 internal fun StudioChips(item: BaseItemDto, chips: List<String>, focus: String?, onOpen: (String) -> Unit) {
     val label = studioLabel(item)

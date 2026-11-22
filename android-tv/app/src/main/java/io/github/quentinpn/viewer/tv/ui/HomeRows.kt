@@ -5,9 +5,9 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 
-// Rangées de l'accueil (ADR 0094): each home row can be hidden from Réglages › Accueil.
+// Rangées de l'accueil: each home row can be hidden from Réglages › Accueil.
 // Kept on the device per Emby user, never on the server. The hero is not a row.
-// Their order can be changed too (ADR 0114).
+// Their order can be changed too.
 
 /** Stored key of the « Reprendre » row. */
 internal const val RESUME_ROW = "resume"
@@ -74,7 +74,7 @@ internal fun rowKey(shelf: Shelf): String = shelf.library?.let { latestRowKey(it
 
 internal fun rowLabel(shown: Boolean) = if (shown) "Affichée" else "Masquée"
 
-// Ordre des rangées (ADR 0114): the user's order is a list of keys. A stored key no longer
+// Ordre des rangées: the user's order is a list of keys. A stored key no longer
 // among the rows is ignored (kept, for a library that comes back); a row missing from it, such
 // as a new library, goes right after the row that precedes it by default, else before the one
 // that follows it, else at the end.
@@ -167,7 +167,7 @@ class HomeRowStore(private val prefs: StringSetPrefs, private val userId: String
         return next
     }
 
-    /** The user's order of the row keys (ADR 0114); empty when never changed. Arrange it with [arrangedKeys]. */
+    /** The user's order of the row keys; empty when never changed. Arrange it with [arrangedKeys]. */
     fun loadOrder(): List<String> = decodeOrder(prefs.getString(orderKey()))
 
     /**

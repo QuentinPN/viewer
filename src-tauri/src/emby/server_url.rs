@@ -1,4 +1,4 @@
-//! Server address validation (ADR 0004): http(s) only, no credentials, query or
+//! Server address validation: http(s) only, no credentials, query or
 //! fragment, and plain HTTP only towards local network addresses.
 
 use std::net::IpAddr;

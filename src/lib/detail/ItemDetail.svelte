@@ -1,6 +1,6 @@
 <script lang="ts">
-// Detail page of a film, series or episode (DESIGN.md, Film detail / Series; ADR
-// 0016). Shown over the library grid, which stays mounted so its scroll position
+// Detail page of a film, series or episode (DESIGN.md, Film detail / Series).
+// Shown over the library grid, which stays mounted so its scroll position
 // survives the return. A series opens its episodes as a nested page over itself.
 import { onMount, tick, untrack } from "svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
@@ -49,16 +49,16 @@ import { changePlayed, playedAction } from "./watched";
 interface Props {
   /** Grid card: title and poster are shown at once while the detail loads. */
   item: MediaItem;
-  /** Bumped when the connection comes back (ADR 0012). */
+  /** Bumped when the connection comes back. */
   refresh: number;
   onClose: () => void;
   /** Returns the error; a rejected token also ends the session. */
   onError: (error: EmbyError) => EmbyError;
   /** Playback started by the server negotiation: show the player. */
   onPlay: (start: PlaybackStart) => void;
-  /** The server took a favorite change: the home row "Favoris" reloads (ADR 0014). */
+  /** The server took a favorite change: the home row "Favoris" reloads. */
   onFavoriteChange?: (itemId: string, favorite: boolean) => void;
-  /** Episode page: shows a neighbour episode instead (ADR 0016). */
+  /** Episode page: shows a neighbour episode instead. */
   onNavigate?: (link: EpisodeLink, via: Direction) => void;
   /** Episode page reached by a previous/next button: the focus goes back to it. */
   focusOnLoad?: Direction | null;
@@ -66,9 +66,9 @@ interface Props {
   onLoaded?: (detail: ItemDetail) => void;
   /** Error state: where the return button goes, when not the default. */
   backLabel?: string | undefined;
-  /** Server and user the chosen version is remembered for (ADR 0036); none: not kept. */
+  /** Server and user the chosen version is remembered for; none: not kept. */
   versionScope?: string | undefined;
-  /** Opens a person, another title or a list over this page (ADR 0121). */
+  /** Opens a person, another title or a list over this page. */
   onOpenPage?: ((page: DetailPage) => void) | undefined;
 }
 
@@ -110,7 +110,7 @@ let fromStartButton = $state<HTMLButtonElement | null>(null);
 /** A favorite change is waiting for the server: further clicks are ignored. */
 let savingFavorite = $state(false);
 let favoriteError = $state<EmbyError | null>(null);
-/** A watched change is waiting for the server (ADR 0096): further clicks are ignored. */
+/** A watched change is waiting for the server: further clicks are ignored. */
 let savingPlayed = $state(false);
 let playedError = $state<EmbyError | null>(null);
 let previousButton = $state<HTMLButtonElement | null>(null);
@@ -132,7 +132,7 @@ const premiere = $derived(formatDate(detail?.premiereDate ?? null));
 const position = $derived(
   detail?.episode ? episodePosition(detail.episode) : null,
 );
-/** Several versions of this film or episode (ADR 0036); empty otherwise. */
+/** Several versions of this film or episode; empty otherwise. */
 const versions = $derived(detail ? versionChoices(detail.media) : []);
 /** `MediaSourceId` played from this page; null lets the server pick. */
 let version = $state<string | null>(null);
@@ -203,7 +203,7 @@ async function play(id: string, resume: boolean) {
   }
 }
 
-/** Plays the trailer file stored with the title (ADR 0121). */
+/** Plays the trailer file stored with the title. */
 async function playTrailer() {
   const d = detail;
   if (!d || starting) return;
@@ -251,7 +251,7 @@ async function toggleFavorite() {
 }
 
 /**
- * Marks the item played or unplayed (ADR 0096). A series or season is read again
+ * Marks the item played or unplayed. A series or season is read again
  * on the event that follows: whether Emby applies it to the episodes is not
  * documented, so the counts come from the server, not from here.
  */
@@ -278,7 +278,7 @@ async function togglePlayed() {
   }
 }
 
-/** New watched status and resume point after a playback (ADR 0008). */
+/** New watched status and resume point after a playback. */
 async function onStopped(state: PlaybackStopped) {
   const d = detail;
   if (!d) return;
@@ -313,7 +313,7 @@ function navigate(link: EpisodeLink, via: Direction) {
   opened = { item: episodeItem(link), via };
 }
 
-/** Back to the series, on the episode shown last (ADR 0016). */
+/** Back to the series, on the episode shown last. */
 async function closeEpisode() {
   const id = opened?.item.id;
   const season = openedSeason;

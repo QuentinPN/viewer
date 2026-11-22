@@ -1,4 +1,4 @@
-//! Local log file and crash diagnostics (ADR 0033).
+//! Local log file and crash diagnostics.
 //!
 //! A small `log` backend writes every record to `viewer.log` in the app log
 //! directory, rotated by size, after [`redact`] removed tokens, passwords and

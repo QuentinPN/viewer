@@ -1,4 +1,4 @@
-//! Session socket (ADR 0110, 0124): while signed in, one WebSocket to the Emby
+//! Session socket: while signed in, one WebSocket to the Emby
 //! server. It declares the session's capabilities on each connect, carries the
 //! linked playback's `SendString` messages and, while the home is shown,
 //! `LibraryChanged`, so a title added on the server reaches « Ajoutés

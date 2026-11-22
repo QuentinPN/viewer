@@ -28,7 +28,7 @@ let prefs = $state<PlaybackPreferences>(readPreferences(preferenceStorage()));
 // `undefined` while asking the server, `null` when it could not answer.
 let account = $state<AccountTracks | null | undefined>(undefined);
 const sources = $derived(trackSources(prefs.tracks));
-// Same store as « Mode nuit » in the player's options (ADR 0072, 0122).
+// Same store as « Mode nuit » in the player's options.
 let nightMode = $state(readNightMode(preferenceStorage()));
 
 function changeNightMode(on: boolean) {

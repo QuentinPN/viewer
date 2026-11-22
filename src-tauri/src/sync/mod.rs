@@ -1,4 +1,4 @@
-//! Linked playback computer ↔ TV (ADR 0123, 0124): the computer leads, the TV
+//! Linked playback computer ↔ TV: the computer leads, the TV
 //! follows, messages go through the Emby session relay (`SendString`).
 
 pub mod envelope;

@@ -1,4 +1,4 @@
-// Gate 3 final player (ADR 0017) on the real Emby test account, driven over CDP:
+// Gate 3 final player on the real Emby test account, driven over CDP:
 // - the title of a film, and series · season · episode above an episode's title;
 // - the controls fade after 3 s without pointer or key, the cursor too, and come
 //   back on a pointer move or a key; they stay while paused;

@@ -1,4 +1,4 @@
-// Version chooser of a film or episode with several media sources (ADR 0036): pure
+// Version chooser of a film or episode with several media sources: pure
 // labels and the per-item memory; unit tested in versions.test.ts.
 import type { MediaInfo } from "../emby/types";
 import {

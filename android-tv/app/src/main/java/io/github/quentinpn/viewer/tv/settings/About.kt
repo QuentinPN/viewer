@@ -5,7 +5,7 @@ import io.github.quentinpn.viewer.tv.emby.PublicSystemInfo
 import okhttp3.HttpUrl
 
 /**
- * « À propos » of the settings (ADR 0076): pure formatting of what the app, the device,
+ * « À propos » of the settings: pure formatting of what the app, the device,
  * the server and the decoders say about themselves. Android reads them in `DeviceReport`.
  */
 data class InfoRow(val label: String, val value: String, val detail: String? = null)

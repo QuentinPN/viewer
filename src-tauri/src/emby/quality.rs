@@ -1,4 +1,4 @@
-//! Streaming quality setting (ADR 0037): a bitrate cap per Emby server, one for a
+//! Streaming quality setting: a bitrate cap per Emby server, one for a
 //! local-network address and one for a remote one, kept in `playback-quality.json`.
 //! Contains no secret.
 

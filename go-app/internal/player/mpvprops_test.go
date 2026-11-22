@@ -169,7 +169,7 @@ func Test_go_track_lists_follow_serde_json(t *testing.T) {
 	}
 }
 
-// Not in Rust: every value of the subtitle style (ADR 0035).
+// Not in Rust: every value of the subtitle style.
 func Test_go_subtitle_options_of_each_style(t *testing.T) {
 	def := subtitleOptions(SubtitleStyle{})
 	if def != [7][2]string{{"sub-scale", "1"}, {"sub-color", "#FFFFFF"}, {"sub-border-style", "outline-and-shadow"},

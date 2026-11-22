@@ -1,6 +1,6 @@
 import type { SearchResults } from "../emby/types";
 
-// Search field helpers (ADR 0011). Rust cleans the query the same way before it
+// Search field helpers. Rust cleans the query the same way before it
 // reaches the server; the UI cleans it too to know when to search at all.
 
 /** Emby returns nothing for a single letter. */

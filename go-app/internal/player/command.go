@@ -30,12 +30,11 @@ const (
 //   - setPaused: Paused;
 //   - seekAbsolute, seekRelative, setSubtitleDelay (positive shows them later),
 //     setAudioDelay (positive plays it later): Seconds; delays are held within ±10
-//     (ADR 0062);
 //   - setAudioTrack, setSubtitleTrack: ID, nil disables the kind (only meaningful
 //     for subtitles);
-//   - setVolume: Percent; setSpeed: Speed, held within 0.25–4 (ADR 0072);
-//   - setNightMode: On, a compressor in mpv's audio chain (ADR 0072);
-//   - setVideoFit: Fit (ADR 0078).
+//   - setVolume: Percent; setSpeed: Speed, held within 0.25–4;
+//   - setNightMode: On, a compressor in mpv's audio chain;
+//   - setVideoFit: Fit.
 type PlayerCommand struct {
 	Type    CommandType
 	Paused  bool
@@ -157,7 +156,7 @@ func (c PlayerCommand) MarshalJSON() ([]byte, error) {
 	return []byte(`{"type":` + string(tag) + `,"` + spec.name + `":` + string(v) + `}`), nil
 }
 
-// VideoFit is how the picture fills the window, as on the TV (ADR 0078).
+// VideoFit is how the picture fills the window, as on the TV.
 type VideoFit string
 
 const (

@@ -2,7 +2,7 @@ package io.github.quentinpn.viewer.tv.request
 
 import kotlin.math.max
 
-/** Error categories shared with the Windows client (ADR 0125), with French messages for the UI. */
+/** Error categories shared with the Windows client, with French messages for the UI. */
 sealed class RequestError(val message: String) {
     data object NotConfigured : RequestError("Request n'est pas connecté.")
 

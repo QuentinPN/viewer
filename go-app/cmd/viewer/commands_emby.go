@@ -10,7 +10,7 @@ import (
 	"viewer/internal/segments"
 )
 
-// Emby commands of commands.rs (ADR 0004). Results carry user and server
+// Emby commands of commands.rs. Results carry user and server
 // summaries, never the token.
 func registerEmby(reg *bridge.Registry, a *app.App) {
 	e := a.Emby
@@ -33,7 +33,7 @@ func registerEmby(reg *bridge.Registry, a *app.App) {
 	reg.Register("emby_restore", noArgs(func(ctx context.Context) (any, error) {
 		return result(e.Restore(ctx))
 	}))
-	// Sets the open session aside without revoking it (ADR 0012); a linked TV is
+	// Sets the open session aside without revoking it; a linked TV is
 	// told `bye stopped` first.
 	reg.Register("emby_change_server", noArgs(func(context.Context) (any, error) {
 		a.Sync.Stop(app.SyncByeWait)
@@ -42,14 +42,14 @@ func registerEmby(reg *bridge.Registry, a *app.App) {
 	reg.Register("emby_shelf", noArgs(func(context.Context) (any, error) {
 		return e.Shelf(), nil
 	}))
-	// « Oublier ce serveur » (ADR 0103): removed locally at once; the revocations
+	// « Oublier ce serveur »: removed locally at once; the revocations
 	// run afterwards, best effort, and never delay the answer.
 	reg.Register("emby_forget_server", withArgs("emby_forget_server", func(_ context.Context, args tauriArgs) (any, error) {
 		var serverID, userID string
 		if err := getAll(args, "serverId", &serverID, "userId", &userID); err != nil {
 			return nil, err
 		}
-		// Read before the Emby service deletes the token with the account (ADR 0125).
+		// Read before the Emby service deletes the token with the account.
 		urRevocation := a.Request.RevocationFor(serverID, userID)
 		revocation, err := e.ForgetServer(serverID, userID)
 		if err != nil {
@@ -72,7 +72,7 @@ func registerEmby(reg *bridge.Registry, a *app.App) {
 	}))
 	reg.Register("emby_sign_out", noArgs(func(ctx context.Context) (any, error) {
 		a.Sync.Stop(app.SyncByeWait)
-		// Read before the Emby service deletes the token with the account (ADR 0125).
+		// Read before the Emby service deletes the token with the account.
 		var urRevocation interface{ Send(context.Context) }
 		if u := e.CurrentUser(); u != nil {
 			if r := a.Request.RevocationFor(u.Server.ID, u.UserID); r != nil {
@@ -103,7 +103,7 @@ func registerEmby(reg *bridge.Registry, a *app.App) {
 		}
 		return result(e.Items(ctx, libraryID, startIndex, limit, orDefault(options)))
 	}))
-	// Titles of a library grid in order with their sort name (letter rail, ADR 0101).
+	// Titles of a library grid in order with their sort name (letter rail).
 	reg.Register("emby_sort_names", withArgs("emby_sort_names", func(ctx context.Context, args tauriArgs) (any, error) {
 		var libraryID string
 		var options *emby.ItemsOptions
@@ -112,7 +112,7 @@ func registerEmby(reg *bridge.Registry, a *app.App) {
 		}
 		return result(e.SortNames(ctx, libraryID, orDefault(options)))
 	}))
-	// One random title among those the grid shows (ADR 0101).
+	// One random title among those the grid shows.
 	reg.Register("emby_random_item", withArgs("emby_random_item", func(ctx context.Context, args tauriArgs) (any, error) {
 		var libraryID string
 		var options *emby.ItemsOptions
@@ -124,7 +124,7 @@ func registerEmby(reg *bridge.Registry, a *app.App) {
 	reg.Register("emby_production_years", arg1("emby_production_years", "libraryId", func(ctx context.Context, id string) (any, error) {
 		return result(e.ProductionYears(ctx, id))
 	}))
-	// Artwork cache figures (ADR 0019, 0021): null when the app has no cache folder.
+	// Artwork cache figures: null when the app has no cache folder.
 	reg.Register("artwork_cache_stats", noArgs(func(context.Context) (any, error) {
 		if a.Artwork == nil {
 			return nil, nil
@@ -139,7 +139,7 @@ func registerEmby(reg *bridge.Registry, a *app.App) {
 		a.Log().Info(fmt.Sprintf("artwork cache cleared: %d images, %d bytes", cleared.Entries, cleared.Bytes))
 		return cleared, nil
 	}))
-	// Bitrate caps of the current server (ADR 0037).
+	// Bitrate caps of the current server.
 	reg.Register("emby_playback_quality", noArgs(func(context.Context) (any, error) {
 		return result(e.PlaybackQuality())
 	}))
@@ -180,7 +180,7 @@ func registerEmby(reg *bridge.Registry, a *app.App) {
 		}
 		return result(e.SetFavorite(ctx, itemID, favorite))
 	}))
-	// Marks an item played or unplayed (ADR 0096); the new state goes to every
+	// Marks an item played or unplayed; the new state goes to every
 	// view on the playback-stopped event, as after a playback, and is returned.
 	reg.Register("emby_set_played", withArgs("emby_set_played", func(ctx context.Context, args tauriArgs) (any, error) {
 		var itemID string
@@ -195,7 +195,7 @@ func registerEmby(reg *bridge.Registry, a *app.App) {
 		a.Emit(emby.PlaybackStoppedEvent, state)
 		return state, nil
 	}))
-	// Takes a film or episode out of « Reprendre » (ADR 0096); announced the same way.
+	// Takes a film or episode out of « Reprendre »; announced the same way.
 	reg.Register("emby_hide_from_resume", arg1("emby_hide_from_resume", "itemId", func(ctx context.Context, itemID string) (any, error) {
 		state, err := e.HideFromResume(ctx, itemID)
 		if err != nil {
@@ -233,7 +233,7 @@ func registerEmby(reg *bridge.Registry, a *app.App) {
 	reg.Register("emby_item_detail", arg1("emby_item_detail", "itemId", func(ctx context.Context, id string) (any, error) {
 		return result(e.ItemDetail(ctx, id))
 	}))
-	// Intro and credits of an item (ADR 0030). `external: false` keeps everything
+	// Intro and credits of an item. `external: false` keeps everything
 	// on the Emby server; a failing external source only gives fewer segments.
 	reg.Register("emby_segments", withArgs("emby_segments", func(ctx context.Context, args tauriArgs) (any, error) {
 		var itemID string
@@ -260,11 +260,11 @@ func registerEmby(reg *bridge.Registry, a *app.App) {
 	reg.Register("emby_seasons", arg1("emby_seasons", "seriesId", func(ctx context.Context, id string) (any, error) {
 		return result(e.Seasons(ctx, id))
 	}))
-	// Titles of a person, collection, genre or studio (ADR 0121).
+	// Titles of a person, collection, genre or studio.
 	reg.Register("emby_titles", arg1("emby_titles", "source", func(ctx context.Context, source emby.TitlesSource) (any, error) {
 		return result(e.Titles(ctx, source))
 	}))
-	// Id of the first trailer file of a film or series, to play (ADR 0121).
+	// Id of the first trailer file of a film or series, to play.
 	reg.Register("emby_local_trailer", arg1("emby_local_trailer", "itemId", func(ctx context.Context, id string) (any, error) {
 		return result(e.LocalTrailer(ctx, id))
 	}))

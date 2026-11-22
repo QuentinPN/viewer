@@ -1,5 +1,5 @@
 //! Request client tests: the shared fixtures (`contracts/request/fixtures`)
-//! and a local fake server recording every request (ADR 0125).
+//! and a local fake server recording every request.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;

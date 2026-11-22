@@ -1,5 +1,5 @@
 <script lang="ts">
-// Home hero (ADR 0015): one title at a time over its backdrop. Titles change only
+// Home hero: one title at a time over its backdrop. Titles change only
 // on request (arrows, dots, ← and →); no automatic rotation.
 import { tick } from "svelte";
 import type { HeroItem, MediaItem } from "../emby/types";
@@ -183,7 +183,7 @@ function onkeydown(e: KeyboardEvent) {
 {/if}
 
 <style>
-  /* Full bleed under the navigation pill and the title bar's row (ADR 0031); the
+  /* Full bleed under the navigation pill and the title bar's row; the
      first row comes up over its fade to black. */
   .hero {
     position: relative;

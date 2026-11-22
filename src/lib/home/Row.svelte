@@ -105,7 +105,7 @@ $effect(() => {
 </section>
 
 <style>
-  /* Over the hero's fade; the cards scroll to the window's edges (ADR 0031). */
+  /* Over the hero's fade; the cards scroll to the window's edges. */
   .row {
     position: relative;
     margin-bottom: 20px;

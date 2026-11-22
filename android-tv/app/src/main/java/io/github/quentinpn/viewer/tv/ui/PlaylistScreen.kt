@@ -35,7 +35,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.playlistEntries
 import io.github.quentinpn.viewer.tv.emby.videoPlaylists
 
-// The « Listes de lecture » row of the home and the page of one playlist, read only (ADR 0088).
+// The « Listes de lecture » row of the home and the page of one playlist, read only.
 
 /** Title of the home row, also its key in `HomeMemory`. */
 internal const val PLAYLISTS_SHELF = "Listes de lecture"
@@ -69,7 +69,7 @@ internal fun playlistEntryPage(item: BaseItemDto): DetailPage? = when (item.type
 }
 
 /**
- * A playlist (ADR 0088): its name, count and length, then its films and episodes in the
+ * A playlist: its name, count and length, then its films and episodes in the
  * playlist's order as the « Reprendre » cards, an episode under its series with « S · É ».
  * OK on an entry opens its page; Back from it focuses that entry again ([page] `opened`).
  * No « Lire »: the player plays one item, with no queue to go on with the next entry.

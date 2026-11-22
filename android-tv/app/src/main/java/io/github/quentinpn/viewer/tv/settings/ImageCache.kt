@@ -1,7 +1,7 @@
 package io.github.quentinpn.viewer.tv.settings
 
 /**
- * « Cache des images » of the settings (ADR 0080): the bounds of Coil's disk cache and
+ * « Cache des images » of the settings: the bounds of Coil's disk cache and
  * the pure French texts of its rows. Android reads and clears it in `SettingsScreen`.
  */
 

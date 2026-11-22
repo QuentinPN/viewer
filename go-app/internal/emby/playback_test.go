@@ -156,7 +156,7 @@ func Test_transcode_reasons_in_french_and_no_subtitles_when_playing_the_file(t *
 }
 
 // Two versions in one answer, as a server that ignores `MediaSourceId` would send
-// them (ADR 0036).
+// them.
 const pbTwoVersions = `{"MediaSources":[
         {"Id":"mediasource_30500","Container":"mkv","SupportsDirectPlay":true,
          "DirectStreamUrl":"/videos/30500/original.mkv?MediaSourceId=mediasource_30500&api_key=SECRET"},

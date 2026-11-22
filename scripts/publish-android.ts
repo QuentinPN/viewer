@@ -1,8 +1,8 @@
-// node scripts/publish-android.ts [--dry-run] (ADR 0107, 0126): run by the `android`
+// node scripts/publish-android.ts [--dry-run]: run by the `android`
 // job of .gitea/workflows/release.yml on the tag android-vX.Y.Z made by the release
 // action. Fetches libmpv, runs the unit tests, the release build and its lint, creates
-// the release android-vX.Y.Z with the APK on the public releases repository (ADR 0111),
-// then rewrites android/latest.json there for the in-app updater (ADR 0112).
+// the release android-vX.Y.Z with the APK on the public releases repository,
+// then rewrites android/latest.json there for the in-app updater.
 // --dry-run stops after the build and prints the notes: nothing is published.
 import { copyFileSync, existsSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";

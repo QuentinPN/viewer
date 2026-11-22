@@ -31,7 +31,7 @@ type appInfo struct {
 
 // Player and window commands of commands.rs. Commands run on Wails call
 // goroutines, never on the UI thread: libmpv teardown with an embedded window
-// must not block the window's message loop (ADR 0003).
+// must not block the window's message loop.
 func registerPlayer(reg *bridge.Registry, a *app.App, win Window) {
 	// Test bench of the Gate 1 prototype: the WebView picks any URL and headers.
 	// Emby playback goes through emby_play, which picks them natively.

@@ -1,6 +1,6 @@
 package emby
 
-// Audio and subtitle preferences kept on this PC (ADR 0035), port of
+// Audio and subtitle preferences kept on this PC, port of
 // src-tauri/src/emby/tracks.rs: which streams of the source to play, from the
 // server's own picks and the user's languages and mode.
 
@@ -105,7 +105,7 @@ var Languages = [...][]string{
 	{"ara", "ar"},
 }
 
-// textSubtitles are the formats the subtitle style applies to (ADR 0035); image
+// textSubtitles are the formats the subtitle style applies to; image
 // formats (PGS, DVD) cannot be restyled, so text wins when both match.
 var textSubtitles = [...]string{"subrip", "srt", "ass", "ssa", "vtt", "webvtt", "mov_text"}
 
@@ -179,7 +179,7 @@ type Choice struct {
 // Choose picks the audio and subtitle streams of a source. Without a preference the
 // server's picks stand. When transcoding, only subtitles the server delivers as
 // files can be shown: the others would be burnt into the picture, which fails on the
-// test server (ADR 0009). When playing the file, the server's external subtitle
+// test server. When playing the file, the server's external subtitle
 // files are not loaded, so only the file's own count.
 func Choose(streams []MediaStreamDto, method PlayMethod, defaultAudio, defaultSubtitle *int32, prefs *TrackPreferences) Choice {
 	var audioStreams []*MediaStreamDto
@@ -314,7 +314,7 @@ func Choose(streams []MediaStreamDto, method PlayMethod, defaultAudio, defaultSu
 		if defaultSubtitle != nil && isCandidate(*defaultSubtitle, func(*MediaStreamDto) bool { return true }) {
 			subtitle = subtitleStream(*defaultSubtitle)
 		} else {
-			// None, or one this playback cannot show: as before ADR 0035.
+			// None, or one this playback cannot show.
 			subtitle = SubtitleChoice{Kind: SubtitlePlayer}
 		}
 	}
@@ -395,8 +395,8 @@ func Apply(plan *PlaybackPlan, prefs *TrackPreferences) Choice {
 	return choice
 }
 
-// AccountTracks are the audio and subtitle preferences of the Emby account (ADR
-// 0115), shown next to the local settings. The server applies them itself when it
+// AccountTracks are the audio and subtitle preferences of the Emby account,
+// shown next to the local settings. The server applies them itself when it
 // picks the default streams of PlaybackInfo, which is what SubtitleServer and an
 // empty audio language keep.
 type AccountTracks struct {

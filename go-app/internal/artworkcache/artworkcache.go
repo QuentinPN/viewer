@@ -1,5 +1,5 @@
 // Package artworkcache is the disk cache of Emby artwork behind the `emby-img`
-// protocol (ADR 0019), port of src-tauri/src/emby/artwork_cache.rs. A request names
+// protocol, port of src-tauri/src/emby/artwork_cache.rs. A request names
 // one immutable image (its tag changes with the image), so the file name is the
 // whole index: size and last use come from the file system.
 //
@@ -155,7 +155,7 @@ func (c *Cache) Stats() Stats {
 }
 
 // Clear removes every cached image of every server, then the empty folders; files
-// that are not ours stay. It returns the images and bytes removed (ADR 0021).
+// that are not ours stay. It returns the images and bytes removed.
 func (c *Cache) Clear() Cleared {
 	// Held throughout: no write counts its size against a half-emptied cache.
 	c.mu.Lock()

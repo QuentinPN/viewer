@@ -1,4 +1,4 @@
-// Package diagnostics is the local log file and crash diagnostics (ADR 0033), port of
+// Package diagnostics is the local log file and crash diagnostics, port of
 // src-tauri/src/diagnostics.rs.
 //
 // A log/slog handler writes every record to `viewer.log` in the app log directory,

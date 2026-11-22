@@ -2,7 +2,7 @@
 .SYNOPSIS
   Builds Viewer_<version>_x64-setup.exe, the NSIS installer of the Wails build.
 .DESCRIPTION
-  ADR 0128, unit "installer". Packages go-app/bin/viewer.exe (from
+  Packages go-app/bin/viewer.exe (from
   `npm run build:wails:exe`: CGO_ENABLED=0, -H=windowsgui) and vendor/mpv/libmpv-2.dll with
   go-app/build/windows/installer.nsi. The version comes from package.json.
   makensis is looked up, never installed: -Makensis, $env:MAKENSIS, PATH, Tauri's cached

@@ -32,7 +32,7 @@ data class RequestLinkStatus(
 )
 
 /**
- * Everything the app does with Request (ADR 0125). Calls carry the session token of the
+ * Everything the app does with Request. Calls carry the session token of the
  * signed-in Emby account, got by trading the Emby token ([embyToken]) once: the trade is
  * single-flight, so a burst of parallel calls costs one exchange, not one each. A 401 drops the
  * token, trades again once and replays the call; a second 401 is [RequestError.Rejected].

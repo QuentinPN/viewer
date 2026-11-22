@@ -1,5 +1,5 @@
 //! Emby API models, limited to fields this client uses. Shapes verified against the
-//! OpenAPI spec served by Emby Server 4.10.1.0 and its actual responses (ADR 0004).
+//! OpenAPI spec served by Emby Server 4.10.1.0 and its actual responses.
 
 use serde::{Deserialize, Serialize};
 
@@ -46,7 +46,7 @@ pub struct UserDto {
     pub name: String,
     #[serde(default)]
     pub policy: Option<UserPolicy>,
-    /// An object, or an array of one as the documentation types it (ADR 0065):
+    /// An object, or an array of one as the documentation types it:
     /// read by [`super::tracks::account_tracks`], which keeps four fields only.
     #[serde(default)]
     pub configuration: Option<serde_json::Value>,
@@ -84,7 +84,7 @@ pub struct SignedInUser {
 }
 
 /// A session known from `session.json`, shown on the recovery, reauthentication
-/// and server screens (ADR 0012). Contains no secret.
+/// and server screens. Contains no secret.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SavedServer {
@@ -97,7 +97,7 @@ pub struct SavedServer {
     pub user_name: String,
 }
 
-/// What a tile of the pre-connection shelf can do (ADR 0103).
+/// What a tile of the pre-connection shelf can do.
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ShelfAccess {
@@ -117,7 +117,7 @@ pub struct ShelfServer {
     pub access: ShelfAccess,
 }
 
-/// Outcome of validating the saved session (ADR 0012). Network failures keep the
+/// Outcome of validating the saved session. Network failures keep the
 /// session; only a rejection by the server asks for the password again.
 #[derive(Debug, Serialize)]
 #[serde(
@@ -176,13 +176,13 @@ pub struct BaseItemDto {
     pub item_type: String,
     #[serde(default)]
     pub collection_type: Option<String>,
-    /// `Video` or `Audio` on a playlist (ADR 0122).
+    /// `Video` or `Audio` on a playlist.
     #[serde(default)]
     pub media_type: Option<String>,
-    /// Only when asked in `Fields`: the entries of a playlist (ADR 0122).
+    /// Only when asked in `Fields`: the entries of a playlist.
     #[serde(default)]
     pub child_count: Option<u32>,
-    /// Only when asked in `Fields` (letter index, ADR 0101).
+    /// Only when asked in `Fields` (letter index).
     #[serde(default)]
     pub sort_name: Option<String>,
     #[serde(default)]
@@ -210,10 +210,10 @@ pub struct BaseItemDto {
     pub studios: Vec<NameDto>,
     #[serde(default)]
     pub people: Vec<PersonDto>,
-    /// `[{Name, Id}]` of the collections holding the item (ADR 0121).
+    /// `[{Name, Id}]` of the collections holding the item.
     #[serde(default)]
     pub collections: Option<serde_json::Value>,
-    /// Trailer files stored with the item (ADR 0121).
+    /// Trailer files stored with the item.
     #[serde(default)]
     pub local_trailer_count: Option<u32>,
     #[serde(default)]
@@ -263,7 +263,7 @@ pub struct BaseItemDto {
     #[serde(default)]
     pub media_sources: Vec<MediaSourceDto>,
     /// `Imdb`, `Tmdb`, `Tvdb`…; the key case varies (`IMDB` on a series, Emby
-    /// 4.10.2.0). Sent to the intro services only (ADR 0030).
+    /// 4.10.2.0). Sent to the intro services only.
     #[serde(default)]
     pub provider_ids: std::collections::HashMap<String, String>,
     #[serde(default)]
@@ -271,7 +271,7 @@ pub struct BaseItemDto {
 }
 
 /// `ChapterInfo`: `MarkerType` is `Chapter`, `IntroStart`, `IntroEnd` or
-/// `CreditsStart` (ADR 0030). `Chapter` ones are the player's chapters (ADR 0034).
+/// `CreditsStart`. `Chapter` ones are the player's chapters.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ChapterDto {
@@ -314,7 +314,7 @@ pub struct PersonDto {
     #[serde(rename = "Type", default)]
     pub person_type: String,
     /// Documented as a string; read as any value so that a number would not
-    /// make the whole item unreadable, as `Studios[].Id` (ADR 0121).
+    /// make the whole item unreadable, as `Studios[].Id`.
     #[serde(default)]
     pub id: Option<serde_json::Value>,
     /// Tag of the person's photo, the `Primary` image of the person item.
@@ -326,7 +326,7 @@ pub struct PersonDto {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct MediaSourceDto {
-    /// What PlaybackInfo's `MediaSourceId` names (ADR 0036).
+    /// What PlaybackInfo's `MediaSourceId` names.
     #[serde(default)]
     pub id: Option<String>,
     #[serde(default)]
@@ -411,7 +411,7 @@ impl LibraryKind {
     }
 }
 
-/// Order of a library grid (ADR 0013).
+/// Order of a library grid.
 #[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum SortKey {
@@ -434,7 +434,7 @@ impl SortKey {
     }
 }
 
-/// Watched state kept in a library grid (ADR 0013).
+/// Watched state kept in a library grid.
 #[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum WatchFilter {
@@ -445,7 +445,7 @@ pub enum WatchFilter {
     InProgress,
 }
 
-/// Sort and filters of a library grid, as the UI chooses them (ADR 0013).
+/// Sort and filters of a library grid, as the UI chooses them.
 #[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ItemsOptions {
@@ -454,7 +454,7 @@ pub struct ItemsOptions {
     pub watch: WatchFilter,
     pub favorites: bool,
     pub genre: Option<String>,
-    /// First year of a decade (`1990`), or every year (ADR 0101).
+    /// First year of a decade (`1990`), or every year.
     pub decade: Option<i32>,
 }
 
@@ -463,7 +463,7 @@ pub fn is_usable_decade(decade: i32) -> bool {
     decade % 10 == 0 && (1880..=2190).contains(&decade)
 }
 
-/// One title of a library in grid order, for the letter index (ADR 0101).
+/// One title of a library in grid order, for the letter index.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SortNameEntry {
@@ -518,7 +518,7 @@ impl ItemsOptions {
     }
 }
 
-/// Image ready for `<img>`: URLs point at the local `emby-img` protocol (ADR 0005).
+/// Image ready for `<img>`: URLs point at the local `emby-img` protocol.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ImageRef {
@@ -550,7 +550,7 @@ pub struct MediaItem {
     pub played: bool,
     /// Series only: episodes not yet watched.
     pub unplayed_count: Option<u32>,
-    /// Labels the card menu's favourite action (ADR 0100).
+    /// Labels the card menu's favourite action.
     pub favorite: bool,
 }
 
@@ -562,7 +562,7 @@ pub enum WatchKind {
     Episode,
 }
 
-/// A film or episode of the home rows "Reprendre" and "À suivre" (ADR 0010): the
+/// A film or episode of the home rows "Reprendre" and "À suivre": the
 /// card plays it, so it carries what the label needs and a 16:9 image.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -578,12 +578,12 @@ pub struct WatchItem {
     pub image: Option<ImageRef>,
     pub runtime_minutes: Option<u32>,
     pub resume: Option<ResumePoint>,
-    /// Label the card menu's played and favourite actions (ADR 0100).
+    /// Label the card menu's played and favourite actions.
     pub played: bool,
     pub favorite: bool,
 }
 
-/// Answer of a search (ADR 0011, 0020): films, series and episodes whose title
+/// Answer of a search: films, series and episodes whose title
 /// matches `query`.
 #[derive(Debug, Clone, Serialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
@@ -611,7 +611,7 @@ pub struct ItemPage {
     pub total: u32,
 }
 
-/// One title of the home hero (ADR 0015): a wide backdrop, what the main button
+/// One title of the home hero: a wide backdrop, what the main button
 /// plays, and the film or series that "Plus d'infos" opens.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -646,7 +646,7 @@ pub struct HeroEpisode {
     pub index: Option<u32>,
 }
 
-/// Kinds of item a detail page shows. Episodes open from their series (ADR 0016).
+/// Kinds of item a detail page shows. Episodes open from their series.
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum DetailKind {
@@ -655,7 +655,7 @@ pub enum DetailKind {
     Episode,
 }
 
-/// Where an episode sits in its series, and its neighbours (ADR 0016).
+/// Where an episode sits in its series, and its neighbours.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct EpisodeContext {
@@ -695,7 +695,7 @@ pub struct ResumePoint {
 pub struct CastMember {
     pub name: String,
     pub role: Option<String>,
-    /// The person item, for its page (ADR 0121); `None` without a usable id.
+    /// The person item, for its page; `None` without a usable id.
     pub id: Option<String>,
     pub photo: Option<ImageRef>,
 }
@@ -730,7 +730,7 @@ pub struct StreamInfo {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaInfo {
-    /// Passed back to `emby_play` to play this version (ADR 0036); `None` when the
+    /// Passed back to `emby_play` to play this version; `None` when the
     /// server gave no usable id.
     pub id: Option<String>,
     pub name: Option<String>,
@@ -778,7 +778,7 @@ pub struct ItemDetail {
     /// The series logo for an episode.
     pub logo: Option<ImageRef>,
     pub played: bool,
-    /// In the user's favorites (ADR 0014).
+    /// In the user's favorites.
     pub favorite: bool,
     pub resume: Option<ResumePoint>,
     /// Series only.
@@ -787,9 +787,9 @@ pub struct ItemDetail {
     pub media: Vec<MediaInfo>,
     /// Episode only.
     pub episode: Option<EpisodeContext>,
-    /// Collections holding the film or series (ADR 0121), at most three.
+    /// Collections holding the film or series, at most three.
     pub collections: Vec<super::titles::CollectionRef>,
-    /// A trailer file is stored with the item (ADR 0121).
+    /// A trailer file is stored with the item.
     pub has_local_trailer: bool,
 }
 
@@ -831,7 +831,7 @@ pub struct EpisodePage {
     pub total: u32,
 }
 
-/// `POST /Items/{Id}/PlaybackInfo` request body (ADR 0007).
+/// `POST /Items/{Id}/PlaybackInfo` request body.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct PlaybackInfoRequest<'a> {
@@ -842,10 +842,10 @@ pub struct PlaybackInfoRequest<'a> {
     pub is_playback: bool,
     pub auto_open_live_stream: bool,
     /// Both false asks for a transcode: the fallback when the player could not open
-    /// what the server offered for direct playback (ADR 0023).
+    /// what the server offered for direct playback.
     pub enable_direct_play: bool,
     pub enable_direct_stream: bool,
-    /// The audio a transcode must carry (ADR 0035). Emby 4.10.1.0 ignores
+    /// The audio a transcode must carry. Emby 4.10.1.0 ignores
     /// `AudioStreamIndex` without `MediaSourceId`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub media_source_id: Option<&'a str>,
@@ -976,7 +976,7 @@ impl PlayMethod {
 #[serde(rename_all = "camelCase")]
 pub struct PlaybackStart {
     pub item_id: String,
-    /// The version played (ADR 0036): a fallback or a resume plays the same one.
+    /// The version played: a fallback or a resume plays the same one.
     pub media_source_id: String,
     /// The start asked for: a fallback keeps "Reprendre" or "Lire depuis le début".
     pub resume: bool,
@@ -984,15 +984,15 @@ pub struct PlaybackStart {
     pub container: Option<String>,
     /// Why the server transcodes, in French.
     pub transcode_reasons: Option<String>,
-    /// What the player shows at the top (ADR 0017); `None` when the item could not be read.
+    /// What the player shows at the top; `None` when the item could not be read.
     pub title: Option<PlaybackTitle>,
-    /// Bitrate cap sent to the server (ADR 0037); `None` for "Maximale".
+    /// Bitrate cap sent to the server; `None` for "Maximale".
     pub bitrate_cap: Option<u64>,
     /// Whether the session's address counts as local, so which cap applied.
     pub local_address: bool,
 }
 
-/// Name of what plays and, for an episode, where it sits in its series (ADR 0017).
+/// Name of what plays and, for an episode, where it sits in its series.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaybackTitle {
@@ -1005,7 +1005,7 @@ pub struct PlaybackTitle {
 }
 
 /// Body of `POST /Sessions/Playing`, `/Sessions/Playing/Progress` and
-/// `/Sessions/Playing/Stopped` (ADR 0008). Fields a report does not use are omitted.
+/// `/Sessions/Playing/Stopped`. Fields a report does not use are omitted.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "PascalCase")]
 pub struct PlaybackReportBody {
@@ -1057,7 +1057,7 @@ pub struct PlaylistCreationResultDto {
     pub item_added_count: u32,
 }
 
-/// A playlist of the user, offered by the card menu (ADR 0100).
+/// A playlist of the user, offered by the card menu.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Playlist {
@@ -1065,7 +1065,7 @@ pub struct Playlist {
     pub name: String,
 }
 
-/// A video playlist of the home row « Playlists » (ADR 0122).
+/// A video playlist of the home row « Playlists ».
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaylistCard {
@@ -1087,7 +1087,7 @@ pub struct PlaylistCreated {
     pub added: u32,
 }
 
-/// One entry of `GET /Sessions` (ADR 0124): the fields linked playback reads.
+/// One entry of `GET /Sessions`: the fields linked playback reads.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct SessionInfoDto {

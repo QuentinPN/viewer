@@ -1,13 +1,13 @@
 <#
 .SYNOPSIS
-  Drives the Go + Wails v3 playback spike (ADR 0128) and collects Gate 1 evidence.
+  Drives the Go + Wails v3 playback spike and collects Gate 1 evidence.
 .DESCRIPTION
   Builds go-app/cmd/spike without cgo, launches it in -selftest mode, captures the
   spike window only (PrintWindow, never the screen) at each checkpoint written by the
   spike (<Out>/checkpoint.txt), posts one synthetic Space key to the spike's own
   WebView2 window (no OS-level input; does not prove real focus, keyboard stays
   UNVERIFIED), and measures how long the process takes to exit after the scenario ends.
-  Modelled on run-gate1.ps1. Screenshots must be reviewed by eye (ADR 0003).
+  Modelled on run-gate1.ps1. Screenshots must be reviewed by eye.
   Synthetic media: `go-app/bin/spike.exe -gen <dir>` (spike.mkv, audio2.mka, spike.ass).
 .EXAMPLE
   ./scripts/spike/run-gate1-go.ps1 -Media C:\tmp\media\spike.mkv -Out C:\tmp\gate1-go\local

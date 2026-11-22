@@ -18,7 +18,7 @@ class LibraryRailsTest {
         assertTrue(RailAction.Reset in railActions(ItemsOptions(favorites = true)))
         assertTrue(RailAction.Reset in railActions(ItemsOptions(descending = true)))
         assertTrue(RailAction.Reset in railActions(ItemsOptions(SortKey.Year, descending = true)))
-        // A studio grid keeps its studio on reset: the studio alone is nothing to reset (ADR 0087)
+        // A studio grid keeps its studio on reset: the studio alone is nothing to reset
         assertFalse(canReset(ItemsOptions(studio = "HBO")))
         // Reset stays last, so the other icons never move when it comes and goes
         assertEquals(RailAction.Reset, railActions(ItemsOptions(decade = 1990)).last())

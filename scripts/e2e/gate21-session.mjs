@@ -1,4 +1,4 @@
-// Gate 2.1 session and reconnection scenario (ADR 0012), driven over CDP. The app
+// Gate 2.1 session and reconnection scenario, driven over CDP. The app
 // signs in through a local proxy (net-proxy.mjs) whose modes simulate the server
 // switched off, hanging, or revoking the token; the server itself is never touched.
 // - restart: the session comes back without the sign-in form;
@@ -51,7 +51,7 @@ const invoke = (page, cmd, args = {}) =>
   );
 const text = async (locator) => (await locator.textContent())?.trim() ?? "";
 
-/** Debug-build tokens in the Windows Credential Manager (names only, no secret, ADR 0105). */
+/** Debug-build tokens in the Windows Credential Manager (names only, no secret). */
 function vaultEntries() {
   const r = spawnSync("cmdkey", ["/list"], { encoding: "utf8" });
   return r.stdout
@@ -126,7 +126,7 @@ try {
   } else if (first.screen === "lost" || first.screen === "reauth") {
     // Left by an interrupted run (proxy gone): the same account signs in again
     // below, which replaces that session and its token.
-    // "Retour" when no app is behind the password card (ADR 0103).
+    // "Retour" when no app is behind the password card.
     await page
       .getByRole("button", { name: /^(Changer de serveur|Retour)$/ })
       .click();
@@ -308,7 +308,7 @@ try {
 
   // 6. Change server, then come back without a password.
   await accountAction(page, "Changer de serveur");
-  // The session set aside is the newest tile of the shelf (ADR 0103).
+  // The session set aside is the newest tile of the shelf.
   const comeBack = page
     .getByRole("button", { name: /^Se connecter à / })
     .first();

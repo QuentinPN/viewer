@@ -1,4 +1,4 @@
-// Gate 4 watched state at the natural end of a film (ADR 0008), on the real Emby
+// Gate 4 watched state at the natural end of a film, on the real Emby
 // test account, driven over CDP: an unwatched film without resume point, played
 // to its end, is marked watched by the server from the stop report alone (the app
 // never calls PlayedItems), keeps no resume point, and its detail page shows it.

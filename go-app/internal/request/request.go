@@ -1,4 +1,4 @@
-// Package request is the Request integration (ADR 0125), the « Demander »
+// Package request is the Request integration, the « Demander »
 // tab, port of src-tauri/src/request. Every call is made here, in Go; the UI
 // never sees a token nor builds an API or image URL.
 package request

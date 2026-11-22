@@ -1,4 +1,4 @@
-//! Intro and credits segments for the player (ADR 0030): Emby's chapter markers
+//! Intro and credits segments for the player: Emby's chapter markers
 //! first, then IntroDB, then TheIntroDB. Each kind comes from the first source that
 //! gives it. Only the film's or series' provider ids leave the app, never a token,
 //! a server address or a title.

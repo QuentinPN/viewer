@@ -27,7 +27,7 @@ export function yearsLabel(d: ItemDetail): string | null {
   return String(d.year);
 }
 
-/** `Saison 2 · Épisode 14`, `Saison 1 · Épisodes 2–3`, `Spécial 3` (ADR 0016). */
+/** `Saison 2 · Épisode 14`, `Saison 1 · Épisodes 2–3`, `Spécial 3`. */
 export function episodePosition(ep: EpisodeContext): string | null {
   if (ep.seasonIndex === 0)
     return ep.index == null ? "Spécial" : `Spécial ${ep.index}`;

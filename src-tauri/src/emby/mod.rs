@@ -1,4 +1,4 @@
-//! Emby integration (ADR 0004). The access token stays in Rust: the UI only sees
+//! Emby integration. The access token stays in Rust: the UI only sees
 //! typed summaries, never the token or raw API URLs.
 
 pub mod artwork_cache;
@@ -48,7 +48,7 @@ pub enum EmbyError {
     NotSignedIn,
     #[error("session expirée ou révoquée : reconnecte-toi")]
     SessionExpired,
-    /// The token is valid but the account is disabled or deleted (ADR 0012).
+    /// The token is valid but the account is disabled or deleted.
     #[error("compte désactivé ou supprimé sur le serveur")]
     AccountUnavailable,
     /// Another Emby server answers at the session's address: the token is not sent.
@@ -66,10 +66,10 @@ pub enum EmbyError {
     /// The player could not start the stream chosen by the server.
     #[error("lecteur indisponible : {0}")]
     Player(String),
-    /// A setting refused or not written (ADR 0037).
+    /// A setting refused or not written.
     #[error("réglage non enregistré : {0}")]
     Settings(String),
-    /// Linked playback with a TV refused or failed (ADR 0124).
+    /// Linked playback with a TV refused or failed.
     #[error("lecture liée impossible : {0}")]
     Sync(String),
 }

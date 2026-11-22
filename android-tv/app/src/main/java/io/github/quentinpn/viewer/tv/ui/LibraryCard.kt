@@ -42,7 +42,7 @@ internal fun badgeText(badge: PosterBadge): String = when (badge) {
 }
 
 /**
- * A poster of the library grid (ADR 0099): as wide as its cell, 2:3, the corner mark top right,
+ * A poster of the library grid: as wide as its cell, 2:3, the corner mark top right,
  * then one line of title and one of facts in smaller type than the home's cards.
  */
 @Composable
@@ -51,7 +51,7 @@ internal fun LibraryCard(
     client: EmbyClient,
     images: ImageLoader,
     modifier: Modifier,
-    /** A long press on OK opens the card's menu (ADR 0098); null leaves it to the click. */
+    /** A long press on OK opens the card's menu; null leaves it to the click. */
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {

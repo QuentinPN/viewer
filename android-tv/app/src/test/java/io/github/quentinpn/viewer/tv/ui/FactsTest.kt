@@ -29,7 +29,7 @@ class FactsTest {
     @Test
     fun seriesShowNoWriterNorCastAndABroadcaster() {
         val series = BaseItemDto(id = "s", type = "Series", people = people.drop(1).take(3), studios = listOf(NameDto("Crunchyroll")))
-        // The cast is the « Distribution » row now (ADR 0068)
+        // The cast is the « Distribution » row now
         assertEquals(listOf(Fact("Diffusion", "Crunchyroll")), facts(series))
         assertEquals(emptyList<Fact>(), facts(BaseItemDto(id = "e")))
     }
@@ -43,7 +43,7 @@ class FactsTest {
             communityRating = 7.44,
             criticRating = 87.0,
         )
-        // The age rating is the badge now (ADR 0074)
+        // The age rating is the badge now
         assertEquals(listOf("★ 7,4", "87 % critiques", "Action, Fantastique, Animation"), tags(item))
         assertEquals(listOf("★ 7,4", "87 % critiques"), scores(item))
         assertEquals(emptyList<String>(), tags(BaseItemDto(id = "j", officialRating = "12", communityRating = 0.0)))

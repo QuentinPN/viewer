@@ -9,7 +9,7 @@ sealed class EmbyError(val message: String) {
 
     data object Unreachable : EmbyError("Serveur injoignable. Vérifie l'adresse et le réseau.")
 
-    /** Another server answers at a saved address (ADR 0012, 0104): its token is never sent there. */
+    /** Another server answers at a saved address: its token is never sent there. */
     data object ServerMismatch :
         EmbyError("Un autre serveur répond à cette adresse. Vérifie l'adresse ou connecte-toi manuellement.")
 

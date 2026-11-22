@@ -16,7 +16,7 @@ import {
   trackSkipShown,
 } from "./segments";
 
-describe("skip button hiding (ADR 0089)", () => {
+describe("skip button hiding", () => {
   it("shows for ten seconds once its segment starts, then hides", () => {
     const shown = trackSkipShown(NO_SKIP_SHOWN, "intro@50", 1_000);
     expect(skipShown(shown, 1_000, false)).toBe(true);

@@ -1,6 +1,6 @@
 <script lang="ts">
 // Titles of a person, collection, genre or studio, opened from a detail page
-// over it (ADR 0121). The posters open their own detail page on top.
+// over it. The posters open their own detail page on top.
 import { onMount, tick, untrack } from "svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";
 import type {
@@ -17,7 +17,7 @@ interface Props {
   title: string;
   subtitle: string;
   photo: ImageRef | null;
-  /** Bumped when the connection comes back (ADR 0012). */
+  /** Bumped when the connection comes back. */
   refresh: number;
   onClose: () => void;
   onError: (error: EmbyError) => EmbyError;

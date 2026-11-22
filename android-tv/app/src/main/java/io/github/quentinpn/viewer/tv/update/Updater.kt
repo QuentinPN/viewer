@@ -22,7 +22,7 @@ import okhttp3.Request
 import java.io.File
 import java.io.IOException
 
-/** What the home's update card shows (ADR 0112). */
+/** What the home's update card shows. */
 sealed interface UpdateState {
     data object Idle : UpdateState
 
@@ -36,7 +36,7 @@ sealed interface UpdateState {
     data class Error(val message: String, val ready: Ready) : UpdateState
 }
 
-/** The outcome of a check, shown only by the manual check of Réglages (ADR 0112). */
+/** The outcome of a check, shown only by the manual check of Réglages. */
 sealed interface CheckResult {
     data object UpToDate : CheckResult
 

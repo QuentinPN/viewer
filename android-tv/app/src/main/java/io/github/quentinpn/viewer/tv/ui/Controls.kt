@@ -27,7 +27,7 @@ import androidx.tv.material3.Text
 /** Fill of a control at rest, as the hero's buttons: DESIGN.md glass `rgb(120 120 128 / 0.36)`. */
 internal val Glass = Color(0x5C787880)
 
-/** Gap between a focused control and its accent ring, as on the hero's buttons (ADR 0064). */
+/** Gap between a focused control and its accent ring, as on the hero's buttons. */
 internal val RING_GAP = 3.dp
 
 /** The system's "remove animations" setting: focused controls then keep their size, the ring stays. */
@@ -40,7 +40,7 @@ internal fun reducedMotion(): Boolean {
 }
 
 /**
- * A control in the home's style (ADR 0064, 0067): glass at rest, white with black text when
+ * A control in the home's style: glass at rest, white with black text when
  * [selected]; focused, white, slightly larger and ringed in the accent. A pill unless [shape]
  * says otherwise.
  */

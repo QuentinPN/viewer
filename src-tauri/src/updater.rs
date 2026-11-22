@@ -1,4 +1,4 @@
-//! Background updates (ADR 0112): in release builds, checks the self-hosted
+//! Background updates: in release builds, checks the self-hosted
 //! manifest 15 s after launch then every 6 h, downloads a newer installer into
 //! memory (its minisign signature is verified against the embedded key) and tells
 //! the UI it is ready. Installing launches the NSIS installer in quiet mode, which

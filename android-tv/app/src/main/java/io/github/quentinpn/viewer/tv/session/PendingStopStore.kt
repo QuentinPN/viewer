@@ -10,7 +10,7 @@ import io.github.quentinpn.viewer.tv.emby.encodeStops
 private const val PREFS = "pending_stops"
 
 /**
- * Lost stop reports (ADR 0066), one JSON list per account key, in the app's private
+ * Lost stop reports, one JSON list per account key, in the app's private
  * preferences (no backup, see the manifest). A report holds ids and a position, never the token.
  */
 class PendingStopStore(context: Context) : PendingStopStorage {

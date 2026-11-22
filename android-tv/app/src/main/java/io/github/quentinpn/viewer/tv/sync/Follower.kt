@@ -2,7 +2,7 @@ package io.github.quentinpn.viewer.tv.sync
 
 import kotlin.math.abs
 
-// The TV's side of a link (ADR 0124): pure, driven by the caller with its monotonic clock.
+// The TV's side of a link: pure, driven by the caller with its monotonic clock.
 
 /** Without `load` or `bye` after `join`, the request is dropped. */
 const val JOIN_TIMEOUT_MS = 10_000L

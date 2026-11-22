@@ -9,7 +9,7 @@ import io.github.quentinpn.viewer.tv.session.TokenCipher
 private const val PREFS = "request"
 internal const val REQUEST_KEY_ALIAS = "viewer.request"
 
-/** The Emby account a session belongs to: `{embyServerId}/{embyUserId}` (ADR 0125). */
+/** The Emby account a session belongs to: `{embyServerId}/{embyUserId}`. */
 fun accountKey(embyServerId: String, embyUserId: String) = "$embyServerId/$embyUserId"
 
 /**

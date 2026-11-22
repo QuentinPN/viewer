@@ -53,8 +53,8 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 
 /**
- * Entries of the home bar (ADR 0064); the one opened last takes the focus back on return.
- * [Library] is one of the libraries, named by [HomeBar]'s `focusLibrary` (ADR 0092).
+ * Entries of the home bar; the one opened last takes the focus back on return.
+ * [Library] is one of the libraries, named by [HomeBar]'s `focusLibrary`.
  */
 internal enum class BarItem { Home, Library, Search, Requests, Settings, Account }
 
@@ -67,7 +67,7 @@ internal fun sectionLibrary(libraries: List<Library>, itemTypes: String, label: 
     return candidates.firstOrNull { it.name.trim().equals(label, ignoreCase = true) } ?: candidates.firstOrNull()
 }
 
-/** The bar's libraries (ADR 0092): every film and series library, in the server's order, as the desktop lists them. */
+/** The bar's libraries: every film and series library, in the server's order, as the desktop lists them. */
 internal fun barLibraries(libraries: List<Library>): List<Library> =
     libraries.filter { it.itemTypes == "Movie" || it.itemTypes == "Series" }.distinctBy { it.id }
 
@@ -80,8 +80,8 @@ private val activeInFocusedBar = Color(0x2EFFFFFF)
 private val idleText = Color(0xD1EBEBF5)
 
 /**
- * The home's floating bar (ADR 0064): Accueil, each film and series library by its name
- * (ADR 0092), the search and settings icons, then the avatar, whose menu holds « Se
+ * The home's floating bar: Accueil, each film and series library by its name,
+ * the search and settings icons, then the avatar, whose menu holds « Se
  * déconnecter ». [home] is the focus target of Up from the hero; Down from the bar goes to
  * [below]. Too many libraries for the screen scroll the bar sideways.
  */
@@ -100,7 +100,7 @@ internal fun HomeBar(
     onOpen: (BarItem) -> Unit,
     onOpenLibrary: (Library) -> Unit,
     onSignOut: () -> Unit,
-    /** Back to the server shelf, the session kept for later (ADR 0104). */
+    /** Back to the server shelf, the session kept for later. */
     onSwitchServer: () -> Unit,
 ) {
     var barFocused by remember { mutableStateOf(false) }
@@ -239,7 +239,7 @@ private fun AccountMenu(userName: String, serverLine: String, onDismiss: () -> U
                 Text(userName, color = Palette.text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text(serverLine, color = Palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
             }
-            // The session stays saved: its tile on the shelf opens it again without a password (ADR 0104)
+            // The session stays saved: its tile on the shelf opens it again without a password
             OutlinedButton(onClick = onSwitchServer, modifier = Modifier.focusRequester(first)) { Text("Changer de serveur") }
             OutlinedButton(onClick = onSignOut) { Text("Se déconnecter") }
         }

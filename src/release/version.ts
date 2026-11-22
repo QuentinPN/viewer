@@ -1,4 +1,4 @@
-// Version and changelog readers of the CI publish scripts (ADR 0126). The release
+// Version and changelog readers of the CI publish scripts. The release
 // action writes versions and changelogs; these pure helpers read them back.
 
 /** The `[package]` version of a Cargo.toml (the first `version =` line). */
@@ -29,7 +29,7 @@ export function changelogSection(
   return (end < 0 ? rest : rest.slice(0, end)).join("\n").trim();
 }
 
-/** Notes of the GitHub release (ADR 0106): changelog section, then the installer. */
+/** Notes of the GitHub release: changelog section, then the installer. */
 export function releaseNotes(
   version: string,
   section: string,
@@ -48,7 +48,7 @@ export function releaseNotes(
   ].join("\n");
 }
 
-/** `versionName` and `versionCode` of the Android TV app's build.gradle.kts (ADR 0107). */
+/** `versionName` and `versionCode` of the Android TV app's build.gradle.kts. */
 export function gradleVersion(
   kts: string,
 ): { name: string; code: number } | undefined {
@@ -57,7 +57,7 @@ export function gradleVersion(
   return name && code ? { name, code: Number(code) } : undefined;
 }
 
-/** Notes of an Android TV GitHub release (ADR 0107): changelog section, then the APK. */
+/** Notes of an Android TV GitHub release: changelog section, then the APK. */
 export function androidReleaseNotes(
   version: { name: string; code: number },
   section: string,

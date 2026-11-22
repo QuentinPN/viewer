@@ -1,5 +1,5 @@
 <script lang="ts">
-// "Chapitres" panel of the player (ADR 0034): one row per chapter with its start,
+// "Chapitres" panel of the player: one row per chapter with its start,
 // the playing one marked. A row seeks there. ↑ ↓, Début and Fin move between rows
 // and stay in the list, so the player's keys do not change the volume meanwhile.
 import type { Chapter } from "../emby/types";

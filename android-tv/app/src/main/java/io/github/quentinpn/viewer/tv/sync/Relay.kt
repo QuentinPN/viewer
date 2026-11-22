@@ -5,7 +5,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-// The Emby side of the relay (ADR 0123): who is online, and the strings pushed on the socket.
+// The Emby side of the relay: who is online, and the strings pushed on the socket.
 
 /** `Client` of the desktop app's sessions, as seen from the TV. */
 const val DESKTOP_CLIENT = "Viewer"

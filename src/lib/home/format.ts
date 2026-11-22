@@ -62,7 +62,7 @@ export function watchAction(item: WatchItem): string {
   return item.resume ? `Reprendre ${what}` : `Lire ${what}`;
 }
 
-/** Search result (ADR 0020): the episode title first, then where it sits. */
+/** Search result: the episode title first, then where it sits. */
 export function foundMeta(item: WatchItem): string {
   return [item.seriesName, episodeCode(item)].filter(Boolean).join(" · ");
 }

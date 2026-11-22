@@ -1,13 +1,13 @@
 package io.github.quentinpn.viewer.tv.emby
 
-// The user's favourite films and series on the home, read only (ADR 0091).
+// The user's favourite films and series on the home, read only.
 
 /** Favourites on the home row, as many as a "Derniers ajouts" shelf. */
 internal const val FAVORITES_LIMIT = 16
 
 /**
  * Query of `GET /Users/{UserId}/Items` for the user's favourite films and series, A → Z: the
- * Windows `favorites` query (ADR 0014). `Filters` comes from the grid's [ItemsOptions], so the
+ * Windows `favorites` query. `Filters` comes from the grid's [ItemsOptions], so the
  * row and a grid filtered on « Favoris » ask the server the same thing.
  */
 internal fun favoritesQuery(limit: Int = FAVORITES_LIMIT): List<Pair<String, String>> = listOf(

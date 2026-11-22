@@ -1,4 +1,4 @@
-//! Tauri commands of the « Demander » tab (ADR 0125). Arguments are typed and
+//! Tauri commands of the « Demander » tab. Arguments are typed and
 //! validated here; models come back with their `ImageRef`s filled.
 
 use reqwest::Method;

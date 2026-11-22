@@ -95,8 +95,8 @@ internal sealed interface HomeState {
     data object Loading : HomeState
 
     /**
-     * [hero]: the titles of the hero above the shelves (ADR 0059), none to hide it;
-     * [libraries]: the film and series libraries « Films » and « Séries » open (ADR 0064).
+     * [hero]: the titles of the hero above the shelves, none to hide it;
+     * [libraries]: the film and series libraries « Films » and « Séries » open.
      */
     data class Ready(
         val shelves: List<Shelf>,
@@ -127,16 +127,16 @@ class HomeMemory {
     /** The `refresh` value the shelves were loaded for. */
     internal var loadedFor = -1
 
-    /** The rows shown when the shelves were loaded (ADR 0094): a change in Réglages loads them again. */
+    /** The rows shown when the shelves were loaded: a change in Réglages loads them again. */
     internal var loadedRows: HomeRowVisibility? = null
 
-    /** Counts the watched marks, favourites and « Reprendre » changes sent (ADR 0097); each reads the shelves again. */
+    /** Counts the watched marks, favourites and « Reprendre » changes sent; each reads the shelves again. */
     internal var changes by mutableIntStateOf(0)
 
     /** The [changes] value the shelves were loaded for. */
     internal var loadedChanges = 0
 
-    /** `elapsedRealtime` of the last shelves read (ADR 0109); 0 before the first. */
+    /** `elapsedRealtime` of the last shelves read; 0 before the first. */
     internal var loadedAt = 0L
 
     /** A page wrote the user's data: the shelves are read again, in place, when the home shows. */
@@ -150,8 +150,8 @@ class HomeMemory {
 }
 
 /**
- * The hero (ADR 0059), "Reprendre", "À suivre" (ADR 0056), "Favoris" (ADR 0091), then the latest
- * additions of each film and series library and, last, the user's playlists (ADR 0088).
+ * The hero, "Reprendre", "À suivre", "Favoris", then the latest
+ * additions of each film and series library and, last, the user's playlists.
  */
 @Composable
 fun HomeScreen(
@@ -171,20 +171,20 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onSessionExpired: () -> Unit,
     onSignOut: () -> Unit,
-    /** « Changer de serveur » of the account menu (ADR 0104). */
+    /** « Changer de serveur » of the account menu. */
     onSwitchServer: () -> Unit,
-    /** Rows hidden in Réglages › Accueil (ADR 0094), read again each time the home is shown. */
+    /** Rows hidden in Réglages › Accueil, read again each time the home is shown. */
     rowStore: HomeRowStore,
     memory: HomeMemory = remember { HomeMemory() },
     /** Changes after each playback: resume points and watched marks are read again. */
     refresh: Int = 0,
-    /** A failed read: a network error is checked and may show « Connexion perdue » (ADR 0119). */
+    /** A failed read: a network error is checked and may show « Connexion perdue ». */
     onConnectionError: (EmbyError) -> Unit = {},
 ) {
     var notice by remember { mutableStateOf<String?>(null) }
     // Read on each return from Réglages: the home leaves the composition while they show
     val rows = remember(rowStore) { rowStore.load() }
-    // The user's row order (ADR 0114), read again likewise
+    // The user's row order, read again likewise
     val order = remember(rowStore) { rowStore.loadOrder() }
     // Up from the hero's buttons lands on « Accueil »; Down from the bar on the hero's main button
     val home = remember { FocusRequester() }
@@ -222,7 +222,7 @@ fun HomeScreen(
         memory.loadedChanges = changes
     }
 
-    // New titles on the server (ADR 0109): while the app is in front, shelves 5 min old are read
+    // New titles on the server: while the app is in front, shelves 5 min old are read
     // again in place; back from the launcher, after 30 s. The focused card is kept by id.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(lifecycle, memory) {
@@ -240,7 +240,7 @@ fun HomeScreen(
     }
 
     // Titles added, updated or removed on the server are pushed through Emby's event socket,
-    // held by the sync hub for the whole session (ADR 0123): the shelves are read again ~2 s
+    // held by the sync hub for the whole session: the shelves are read again ~2 s
     // after a burst settles, only while the home is shown and the app started; the poll above
     // stays as a fallback.
     val hub = AppServices.sync(androidx.compose.ui.platform.LocalContext.current)
@@ -250,7 +250,7 @@ fun HomeScreen(
         }
     }
 
-    // A card's menu (ADR 0097): the answer updates the shelves at once, then they are read again.
+    // A card's menu: the answer updates the shelves at once, then they are read again.
     // A failure goes back to the menu, which shows it and handles an expired session.
     val onAction: suspend (Shelf, BaseItemDto, ItemAction) -> Unit = { shelf, item, action ->
         val data = client.perform(userId, item.id, action)
@@ -263,7 +263,7 @@ fun HomeScreen(
         memory.userDataChanged()
     }
 
-    // The menu of a card (ADR 0098), laid over it; its play rows start playback as the card does
+    // The menu of a card, laid over it; its play rows start playback as the card does
     val cardMenu: @Composable (Shelf, BaseItemDto, () -> Unit) -> Unit = { shelf, item, close ->
         CardMenu(
             item,
@@ -410,7 +410,7 @@ private suspend fun heroOrNothing(client: EmbyClient, userId: String, resumed: L
 }
 
 /**
- * The home's shelves in the user's [order] (ADR 0114), without the rows [rows] hides (ADR 0094)
+ * The home's shelves in the user's [order], without the rows [rows] hides
  * and without the empty ones. [latest]: each library with its latest additions.
  */
 internal fun homeShelves(
@@ -450,12 +450,12 @@ private data class FirstRows(
 /** Title of the favourites row, also its key in [HomeMemory]. */
 internal const val FAVORITES_SHELF = "Favoris"
 
-/** The home row of the user's favourite films and series (ADR 0091); null when there is none, so the row hides. */
+/** The home row of the user's favourite films and series; null when there is none, so the row hides. */
 internal fun favoriteShelf(items: List<BaseItemDto>): Shelf? =
     favoriteTitles(items).takeIf { it.isNotEmpty() }?.let { Shelf(FAVORITES_SHELF, it, landscape = false, resume = false) }
 
 /**
- * The user's favourites (ADR 0091); none when they cannot be read, so the row hides and the
+ * The user's favourites; none when they cannot be read, so the row hides and the
  * rest of the home still shows. An expired session is not hidden: the whole home handles it.
  */
 private suspend fun favoritesOrNothing(client: EmbyClient, userId: String): List<BaseItemDto> = try {
@@ -466,7 +466,7 @@ private suspend fun favoritesOrNothing(client: EmbyClient, userId: String): List
 }
 
 /**
- * The user's playlists (ADR 0088); none when they cannot be read, so the row hides and the
+ * The user's playlists; none when they cannot be read, so the row hides and the
  * rest of the home still shows. An expired session is not hidden: the whole home handles it.
  */
 private suspend fun playlistsOrNothing(client: EmbyClient, userId: String): List<BaseItemDto> = try {
@@ -479,7 +479,7 @@ private suspend fun playlistsOrNothing(client: EmbyClient, userId: String): List
 /** What the hero's buttons do. */
 private class HeroActions(val onPlay: (HeroTitle) -> Unit, val onInfo: (HeroTitle) -> Unit)
 
-/** Where the bar and the hero hand the focus to each other (ADR 0064). */
+/** Where the bar and the hero hand the focus to each other. */
 private class HeroFocus(val main: FocusRequester, val up: FocusRequester)
 
 @Composable
@@ -498,7 +498,7 @@ private fun Shelves(
     memory: HomeMemory,
     client: EmbyClient,
     images: ImageLoader,
-    /** A card's menu (ADR 0098), shown over the card; its last argument closes it. */
+    /** A card's menu, shown over the card; its last argument closes it. */
     cardMenu: @Composable (Shelf, BaseItemDto, () -> Unit) -> Unit,
     onAll: (Shelf, Library) -> Unit,
     onOpen: (Shelf, BaseItemDto) -> Unit,
@@ -640,7 +640,7 @@ internal fun ItemCard(
     images: ImageLoader,
     modifier: Modifier,
     fill: Boolean = false,
-    /** A long press on OK (ADR 0097); null leaves it to the click. */
+    /** A long press on OK; null leaves it to the click. */
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {

@@ -6,7 +6,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
-// Lost stop reports kept on disk and resent (ADR 0024, 0066). Pure: time (wall clock, ms) is passed in.
+// Lost stop reports kept on disk and resent. Pure: time (wall clock, ms) is passed in.
 
 /** Stop reports kept per account, one per item, the oldest forgotten beyond. */
 const val MAX_PENDING_STOPS = 5

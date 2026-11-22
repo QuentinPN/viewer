@@ -28,7 +28,7 @@ const (
 	KindNotFound           ErrorKind = "notFound"
 	KindNotSignedIn        ErrorKind = "notSignedIn"
 	KindSessionExpired     ErrorKind = "sessionExpired"
-	// KindAccountUnavailable: the token is valid but the account is disabled or deleted (ADR 0012).
+	// KindAccountUnavailable: the token is valid but the account is disabled or deleted.
 	KindAccountUnavailable ErrorKind = "accountUnavailable"
 	// KindServerMismatch: another Emby server answers at the session's address; the token is not sent.
 	KindServerMismatch ErrorKind = "serverMismatch"
@@ -39,9 +39,9 @@ const (
 	KindNoCompatible    ErrorKind = "noCompatibleStream"
 	// KindPlayer: the player could not start the stream chosen by the server.
 	KindPlayer ErrorKind = "player"
-	// KindSettings: a setting refused or not written (ADR 0037).
+	// KindSettings: a setting refused or not written.
 	KindSettings ErrorKind = "settings"
-	// KindSync: linked playback with a TV refused or failed (ADR 0124).
+	// KindSync: linked playback with a TV refused or failed.
 	KindSync ErrorKind = "sync"
 )
 

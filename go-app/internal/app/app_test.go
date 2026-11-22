@@ -12,7 +12,7 @@ import (
 	"viewer/internal/player"
 )
 
-// A plain `go build` / `go test` is a debug build (ADR 0105): only the release
+// A plain `go build` / `go test` is a debug build: only the release
 // build passes buildMode=release.
 func Test_go_unflagged_builds_are_debug(t *testing.T) {
 	if !DebugBuild() {

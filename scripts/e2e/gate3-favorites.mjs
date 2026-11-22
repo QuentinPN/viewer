@@ -1,4 +1,4 @@
-// Gate 3 favorites (ADR 0014) on the real Emby test account, driven over CDP. The
+// Gate 3 favorites on the real Emby test account, driven over CDP. The
 // app signs in through the local proxy (net-proxy.mjs) so a failed change can be
 // simulated without touching the server.
 // Read only by default:

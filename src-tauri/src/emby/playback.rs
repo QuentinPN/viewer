@@ -1,4 +1,4 @@
-//! Playback negotiation (ADR 0007, ADR 0009): the libmpv device profile sent to
+//! Playback negotiation: the libmpv device profile sent to
 //! PlaybackInfo, the choice between Direct Play, Direct Stream and an HLS transcode
 //! from the server's answer, and stream and subtitle URLs with their token removed
 //! (the token travels in a header).
@@ -12,11 +12,11 @@ use super::quality::StreamingLimit;
 use super::server_url::ServerUrl;
 use crate::player::{ExternalSubtitle, TrackSelection};
 
-/// Sent when no cap is chosen ("Maximale", ADR 0037).
+/// Sent when no cap is chosen ("Maximale").
 pub const MAX_STREAMING_BITRATE: u64 = 400_000_000;
 
 /// Text formats a transcode can deliver as separate files instead of burning them
-/// into the picture (burn-in fails on the test server, ADR 0009).
+/// into the picture (burn-in fails on the test server).
 const EXTERNAL_TEXT_SUBTITLES: [&str; 5] = ["ass", "ssa", "subrip", "srt", "vtt"];
 
 /// Query parameters that carry the token in server-built URLs (compared lowercase).
@@ -36,7 +36,7 @@ pub fn device_profile(max_streaming_bitrate: u64) -> DeviceProfile {
             video_codec: "h264,hevc,av1,vp8,vp9,mpeg4,mpeg2video,mpeg1video,vc1,wmv3,msmpeg4v3,h263,theora",
             audio_codec: "aac,ac3,eac3,dts,truehd,mlp,flac,opus,vorbis,mp3,mp2,alac,pcm_s16le,pcm_s24le,pcm_bluray,pcm_dvd,wmav2,wmapro",
         }],
-        // HLS in MPEG-TS, read by mpv; audio copied when it fits (ADR 0009).
+        // HLS in MPEG-TS, read by mpv; audio copied when it fits.
         transcoding_profiles: vec![TranscodingProfile {
             kind: "Video",
             container: "ts",
@@ -74,26 +74,26 @@ pub struct PlaybackPlan {
     pub play_session_id: Option<String>,
     pub container: Option<String>,
     pub run_time_ticks: Option<i64>,
-    /// Where the player starts: 0, or the server's resume position (ADR 0008).
+    /// Where the player starts: 0, or the server's resume position.
     pub start_ticks: i64,
     /// French reasons, for a transcode only.
     pub transcode_reasons: Option<String>,
     /// Text subtitles a transcode delivers as files, URLs without token.
     pub subtitles: Vec<ExternalSubtitle>,
-    /// Set by the session from the item, not by PlaybackInfo (ADR 0017).
+    /// Set by the session from the item, not by PlaybackInfo.
     pub title: Option<PlaybackTitle>,
-    /// Set by the session from the bitrate setting (ADR 0037).
+    /// Set by the session from the bitrate setting.
     pub bitrate_limit: Option<StreamingLimit>,
     /// The source's streams (`DeliveryUrl` without token) and the server's picks, for
-    /// the track choice (ADR 0035).
+    /// the track choice.
     pub streams: Vec<MediaStreamDto>,
     pub default_audio_stream_index: Option<i32>,
     pub default_subtitle_stream_index: Option<i32>,
-    /// Set by the session from the user's preferences (ADR 0035).
+    /// Set by the session from the user's preferences.
     pub tracks: TrackSelection,
 }
 
-/// Picks the source asked for (ADR 0036), else the first the server offers, and the
+/// Picks the source asked for, else the first the server offers, and the
 /// best way to play it. A version the server did not offer is not replaced by another.
 pub fn plan(
     server: &ServerUrl,
@@ -413,7 +413,7 @@ mod tests {
     }
 
     // Two versions in one answer, as a server that ignores `MediaSourceId` would
-    // send them (ADR 0036).
+    // send them.
     const TWO_VERSIONS: &str = r#"{"MediaSources":[
         {"Id":"mediasource_30500","Container":"mkv","SupportsDirectPlay":true,
          "DirectStreamUrl":"/videos/30500/original.mkv?MediaSourceId=mediasource_30500&api_key=SECRET"},

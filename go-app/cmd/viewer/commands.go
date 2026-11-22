@@ -20,7 +20,7 @@ func registerCommands(reg *bridge.Registry, a *app.App, win Window) {
 	registerEmby(reg, a)
 	registerSync(reg, a)
 
-	// Request (ADR 0125): the 16 ur_* commands bound to the Emby session.
+	// Request: the 16 ur_* commands bound to the Emby session.
 	handlers := request.Handlers(a.Request, a.Identity)
 	names := make([]string, 0, len(handlers))
 	for name := range handlers {
@@ -32,11 +32,11 @@ func registerCommands(reg *bridge.Registry, a *app.App, win Window) {
 	}
 	reg.Register("ur_open_trailer", request.OpenTrailerHandler(request.OpenInExplorer))
 
-	// Réglages › À propos (ADR 0116) and the log folder (ADR 0033).
+	// Réglages › À propos and the log folder.
 	reg.Register("system_report", sysinfo.SystemReportHandler(a.Debug()))
 	reg.Register("diagnostics_open_log_dir", diagnostics.OpenLogDirHandler(a.Paths().Logs, diagnostics.OpenInExplorer))
 
-	// Updates (ADR 0112), driven from Go only.
+	// Updates, driven from Go only.
 	reg.Register("app_update_pending", updater.PendingHandler(a.Updater))
 	reg.Register("app_update_install", updater.InstallHandler(a.Updater))
 	reg.Register("app_update_check", updater.CheckHandler(a.Updater, a.Debug()))

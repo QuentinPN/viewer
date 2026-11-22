@@ -5,7 +5,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.isTransient
 
-/** Automatic attempts after a failure; then the screen waits for « Réessayer » (ADR 0119, as desktop ADR 0012). */
+/** Automatic attempts after a failure; then the screen waits for « Réessayer ». */
 const val MAX_AUTO_RETRIES = 6
 
 private val BACKOFF_SECONDS = intArrayOf(2, 4, 8, 16, 30, 30)

@@ -1,6 +1,6 @@
 package io.github.quentinpn.viewer.tv.player
 
-// "Format" of the track menu: how the picture fills the screen (ADR 0078).
+// "Format" of the track menu: how the picture fills the screen.
 
 /** mpv's pan-and-scan, 0 to 1: 1 crops until the picture fills the screen, aspect kept. */
 const val PANSCAN_PROPERTY = "panscan"

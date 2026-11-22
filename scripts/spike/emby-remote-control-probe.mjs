@@ -1,4 +1,4 @@
-// Step 0 probe (ADR 0123): does Emby relay remote-control commands between two sessions of the same user?
+// Step 0 probe: does Emby relay remote-control commands between two sessions of the same user?
 // Usage: node scripts/spike/emby-remote-control-probe.mjs <path to debug.env> <result.json>   (MEDIA_CONTROL=0 to declare SupportsMediaControl false)
 // Secrets come from debug.env and are never printed (tokens are redacted from every log line).
 import { readFileSync, writeFileSync } from "node:fs";

@@ -3,7 +3,7 @@ package io.github.quentinpn.viewer.tv.player
 import android.util.Log
 
 /**
- * Keeps libmpv's verbose log out of logcat (ADR 0052): libplayer copies it there
+ * Keeps libmpv's verbose log out of logcat: libplayer copies it there
  * itself, and lavf prints the unused Emby token header of an HLS transcode in it.
  */
 internal object NativeLog {

@@ -6,13 +6,13 @@ import java.net.InetAddress
 
 /**
  * Normalized Emby server base URL, without the `/emby` API prefix. Same rules as
- * the Windows client (ADR 0004): http(s) only, no credentials, query or fragment,
+ * the Windows client: http(s) only, no credentials, query or fragment,
  * and plain HTTP only towards local network addresses.
  */
 class ServerUrl private constructor(val url: HttpUrl) {
     val isHttps: Boolean get() = url.isHttps
 
-    /** Reached through a local-network address: picks the "Réseau local" streaming cap (ADR 0051). */
+    /** Reached through a local-network address: picks the "Réseau local" streaming cap. */
     val isLocal: Boolean get() = isLocalHost(url.host)
 
     /** Base URL without trailing slash, as shown to the user and persisted. */

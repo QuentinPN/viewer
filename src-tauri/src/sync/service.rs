@@ -1,4 +1,4 @@
-//! IO glue of the leader (ADR 0124): one task owns the state machine, reads the
+//! IO glue of the leader: one task owns the state machine, reads the
 //! player, carries out its effects. Envelopes go out in order through a second
 //! task, so a slow server never delays a `pong`. Only kind, seq and reject
 //! reasons are logged, never an envelope.

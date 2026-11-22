@@ -4,7 +4,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import java.util.Locale
 
-// Search, ported from the Windows client (ADR 0011, 0020, src-tauri/src/emby/session.rs).
+// Search, ported from the Windows client (src-tauri/src/emby/session.rs).
 
 /** Results shown per type; one more is asked to know if more exist. */
 const val SEARCH_SHOWN = 24

@@ -1,5 +1,5 @@
 // Package segments is the port of src-tauri/src/segments: intro and credits segments
-// for the player (ADR 0030). Emby's chapter markers come first, then IntroDB, then
+// for the player. Emby's chapter markers come first, then IntroDB, then
 // TheIntroDB; each kind comes from the first source that gives it. Only the film's
 // or series' provider ids leave the app, never a token, a server address or a title.
 //

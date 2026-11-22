@@ -41,7 +41,7 @@ import io.github.quentinpn.viewer.tv.emby.personTitles
 private const val HEADER_ITEMS = 2
 
 /**
- * A person (ADR 0068): photo, name, a short overview when the server has one, then their
+ * A person: photo, name, a short overview when the server has one, then their
  * films and series in the user's library, newest first, as the library grid's posters. OK
  * on a poster opens its page; Back from it focuses that poster again ([page] `opened`).
  */

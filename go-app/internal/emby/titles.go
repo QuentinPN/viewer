@@ -1,8 +1,8 @@
 package emby
 
-// Lists of titles opened from a detail page (ADR 0121), port of
+// Lists of titles opened from a detail page, port of
 // src-tauri/src/emby/titles.rs: a person's films and series, the titles of a genre
-// or a studio. Same queries and parameters as the Android TV (ADR 0068, 0079, 0087),
+// or a studio. Same queries and parameters as the Android TV,
 // the verified reference.
 
 import (
@@ -21,7 +21,7 @@ import (
 const (
 	// TitlesLimit: titles read for one list, one request, enough for a home library.
 	TitlesLimit = 100
-	// SimilarLimit: similar titles shown under a film or series, as on the TV (ADR 0084).
+	// SimilarLimit: similar titles shown under a film or series, as on the TV.
 	SimilarLimit = 12
 	// MaxCollections: collections of a title shown on its page, as on the TV.
 	MaxCollections = 3
@@ -300,7 +300,7 @@ func TitlesParams(source TitlesSource) ([]Param, error) {
 		if source.Kind == TitlesGenre {
 			filter = "Genres"
 		}
-		// `|` separates names in these filters and has no escape (ADR 0079, 0087).
+		// `|` separates names in these filters and has no escape.
 		if !IsUsableGenre(source.Name) || (source.ItemType != "Movie" && source.ItemType != "Series") {
 			return nil, NewInvalidResponse("filtre invalide")
 		}

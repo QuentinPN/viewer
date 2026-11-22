@@ -75,7 +75,7 @@ func startArtworkEmby(t *testing.T) (*httptest.Server, *[]string) {
 			mu.Lock()
 			images = append(images, r.URL.RawQuery)
 			mu.Unlock()
-			// The JPEG signature the artwork cache checks (ADR 0019).
+			// The JPEG signature the artwork cache checks.
 			answer("image/jpeg", "\xFF\xD8\xFFlibrary-10-artwork")
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -149,7 +149,7 @@ func Test_go_library_artwork_is_served_on_the_app_origin(t *testing.T) {
 		t.Errorf("requêtes d'image : %s", got)
 	}
 
-	// Another server's id in the same path: refused like Rust (ADR 0012).
+	// Another server's id in the same path: refused like Rust.
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, strings.Replace(image.Src, e2eServerID, "otherserver", 1), nil))
 	if rec.Code != http.StatusForbidden {

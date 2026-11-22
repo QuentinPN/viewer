@@ -1,4 +1,4 @@
-// Letter rail, icon rail and counter of the compact library grid (ADR 0101):
+// Letter rail, icon rail and counter of the compact library grid:
 // letters, labels, states and jumps. Pure so it can be unit tested.
 import type {
   ItemsOptions,

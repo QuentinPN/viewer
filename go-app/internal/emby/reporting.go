@@ -1,6 +1,6 @@
 package emby
 
-// Playback reporting (ADR 0008), port of emby/reporting.rs: player events become Emby
+// Playback reporting, port of emby/reporting.rs: player events become Emby
 // start, progress and stop reports, sent in order by one background goroutine. The
 // UI never sends reports.
 
@@ -26,7 +26,7 @@ const PlaybackStoppedEvent = "emby://playback-stopped"
 const (
 	reportTicksPerSecond = 10_000_000.0
 	stopRetryDelay       = time.Second
-	// A lost stop report (ADR 0024): waits between tries, doubled up to the cap.
+	// A lost stop report: waits between tries, doubled up to the cap.
 	stopResendFirst = 5 * time.Second
 	stopResendCap   = 15 * time.Second
 	// stopResendGiveUp: an older report could overwrite a playback made elsewhere meanwhile.
@@ -122,7 +122,7 @@ type Report struct {
 	Body PlaybackReportBody
 }
 
-// LateProgress is the progress report sent ahead of a lost stop report (ADR 0024).
+// LateProgress is the progress report sent ahead of a lost stop report.
 func (r Report) LateProgress() Report {
 	body := r.Body
 	body.IsPaused = ptrTo(false)
@@ -141,7 +141,7 @@ const (
 	// phasePending: announced, file not loaded yet: nothing is reported if loading fails.
 	phasePending
 	phasePlaying
-	// phaseSwitching: a quality change (ADR 0117): the old stream plays on until the
+	// phaseSwitching: a quality change: the old stream plays on until the
 	// new one, same item, is loaded. Neither stop nor start is reported.
 	phaseSwitching
 )
@@ -164,7 +164,7 @@ type playing struct {
 }
 
 // endedEarly: an end of file well before the known duration: mpv reports a stream
-// cut by the network as EOF once its cache drains (ADR 0012). Never "watched".
+// cut by the network as EOF once its cache drains. Never "watched".
 func (p *playing) endedEarly() bool {
 	run := p.playback.RunTimeTicks
 	return run != nil && *run-p.positionTicks > earlyEOFTicks
@@ -180,7 +180,7 @@ func (p *playing) report(kind ReportKind, event *string, now time.Time) Report {
 		PlaySessionID: cloneStr(pb.PlaySessionID),
 		PositionTicks: p.positionTicks,
 		RunTimeTicks:  cloneI64(pb.RunTimeTicks),
-		// Also on a stop: LateProgress needs it (ADR 0024).
+		// Also on a stop: LateProgress needs it.
 		PlayMethod: ptrTo(pb.Method.AsEmby()),
 		EventName:  cloneStr(event),
 	}
@@ -196,7 +196,7 @@ func (p *playing) report(kind ReportKind, event *string, now time.Time) Report {
 type Tracker struct {
 	phase phase
 	// endedEncoding: play session of a transcode replaced by a quality change, to
-	// stop on the server once the new stream is loaded (ADR 0117).
+	// stop on the server once the new stream is loaded.
 	endedEncoding *string
 }
 
@@ -215,7 +215,7 @@ func (t *Tracker) Begin(playback ActivePlayback, now time.Time) []Report {
 	return out
 }
 
-// Switch is a quality change of the item playing (ADR 0117): no stop, no new start;
+// Switch is a quality change of the item playing: no stop, no new start;
 // a `QualityChange` progress with the new session once its file is loaded. Anything
 // else playing (or nothing) is a new playback, as Begin.
 func (t *Tracker) Switch(playback ActivePlayback, now time.Time) []Report {
@@ -381,7 +381,7 @@ func ticks(seconds float64) (int64, bool) {
 }
 
 // resendSchedule says when a lost stop report is sent again, and when it is given
-// up (ADR 0024).
+// up.
 type resendSchedule struct {
 	giveUpAt time.Time
 	nextAt   time.Time
@@ -491,7 +491,7 @@ func (r *Reporter) Begin(playback ActivePlayback) {
 	r.send(message{kind: msgBegin, playback: playback})
 }
 
-// Switch is a quality change of the playback in progress (ADR 0117).
+// Switch is a quality change of the playback in progress.
 func (r *Reporter) Switch(playback ActivePlayback) {
 	r.send(message{kind: msgSwitch, playback: playback})
 }
@@ -524,7 +524,7 @@ func (r *Reporter) Flush(timeout time.Duration) bool {
 }
 
 // ResendStop sends a lost stop report now, so that the server's position is the
-// right one before a new playback asks for it (ADR 0024). Waits a bounded time.
+// right one before a new playback asks for it. Waits a bounded time.
 func (r *Reporter) ResendStop(ctx context.Context) {
 	ack := make(chan struct{}, 1)
 	if !r.send(message{kind: msgResendStop, ack: ack}) {

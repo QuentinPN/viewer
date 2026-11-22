@@ -6,7 +6,7 @@ import io.github.quentinpn.viewer.tv.emby.LetterStart
 import io.github.quentinpn.viewer.tv.emby.UserItemData
 import io.github.quentinpn.viewer.tv.emby.WatchFilter
 
-// A card menu's write on the library grid (ADR 0098, « Grille bibliothèque »): the card changes
+// A card menu's write on the library grid (« Grille bibliothèque »): the card changes
 // in place, or leaves the grid when its filters no longer hold it. The grid is not read again.
 
 /**
@@ -62,7 +62,7 @@ internal fun gridChange(items: List<BaseItemDto>, itemId: String, data: UserItem
  * later starts move up by one. A letter that started there starts on the title now at
  * [position] when no other letter starts there; else, or past the end, it has no title left.
  * That title is [next] when loaded; otherwise the removed id stays, and a jump finds the title
- * by its position (ADR 0070).
+ * by its position.
  */
 internal fun lettersAfterRemoval(
     letters: Map<Char, LetterStart>,

@@ -36,7 +36,7 @@ import androidx.tv.material3.Text
 enum class UpdateCardMode { Ready, Permission, Installing }
 
 /**
- * The update card of the home (ADR 0112): centred glass over the shelves, « Installer » white
+ * The update card of the home: centred glass over the shelves, « Installer » white
  * and focused first, « Plus tard » in glass. Back is « Plus tard ».
  */
 @Composable

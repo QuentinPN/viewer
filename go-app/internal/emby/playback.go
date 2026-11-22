@@ -1,6 +1,6 @@
 package emby
 
-// Playback negotiation (ADR 0007, ADR 0009), port of src-tauri/src/emby/playback.rs:
+// Playback negotiation, port of src-tauri/src/emby/playback.rs:
 // the libmpv device profile sent to PlaybackInfo, the choice between Direct Play,
 // Direct Stream and an HLS transcode from the server's answer, and stream and
 // subtitle URLs with their token removed (the token travels in a header).
@@ -21,12 +21,11 @@ import (
 	"viewer/internal/player"
 )
 
-// MaxStreamingBitrate is sent when no cap is chosen ("Maximale", ADR 0037).
+// MaxStreamingBitrate is sent when no cap is chosen ("Maximale").
 const MaxStreamingBitrate uint64 = 400_000_000
 
 // externalTextSubtitles are the text formats a transcode can deliver as separate
-// files instead of burning them into the picture (burn-in fails on the test server,
-// ADR 0009).
+// files instead of burning them into the picture (burn-in fails on the test server).
 var externalTextSubtitles = [...]string{"ass", "ssa", "subrip", "srt", "vtt"}
 
 // tokenParams are the query parameters that carry the token in server-built URLs
@@ -55,7 +54,7 @@ func DeviceProfileFor(maxStreamingBitrate uint64) DeviceProfile {
 			VideoCodec: "h264,hevc,av1,vp8,vp9,mpeg4,mpeg2video,mpeg1video,vc1,wmv3,msmpeg4v3,h263,theora",
 			AudioCodec: "aac,ac3,eac3,dts,truehd,mlp,flac,opus,vorbis,mp3,mp2,alac,pcm_s16le,pcm_s24le,pcm_bluray,pcm_dvd,wmav2,wmapro",
 		}},
-		// HLS in MPEG-TS, read by mpv; audio copied when it fits (ADR 0009).
+		// HLS in MPEG-TS, read by mpv; audio copied when it fits.
 		TranscodingProfiles: List[TranscodingProfile]{{
 			Kind:                "Video",
 			Container:           "ts",
@@ -81,22 +80,22 @@ type PlaybackPlan struct {
 	PlaySessionID *string
 	Container     *string
 	RunTimeTicks  *int64
-	// StartTicks is where the player starts: 0, or the server's resume position (ADR 0008).
+	// StartTicks is where the player starts: 0, or the server's resume position.
 	StartTicks int64
 	// TranscodeReasons: French reasons, for a transcode only.
 	TranscodeReasons *string
 	// Subtitles: text subtitles a transcode delivers as files, URLs without token.
 	Subtitles []player.ExternalSubtitle
-	// Title is set by the session from the item, not by PlaybackInfo (ADR 0017).
+	// Title is set by the session from the item, not by PlaybackInfo.
 	Title *PlaybackTitle
-	// BitrateLimit is set by the session from the bitrate setting (ADR 0037).
+	// BitrateLimit is set by the session from the bitrate setting.
 	BitrateLimit *StreamingLimit
 	// Streams: the source's streams (`DeliveryUrl` without token) and the server's
-	// picks, for the track choice (ADR 0035).
+	// picks, for the track choice.
 	Streams                    []MediaStreamDto
 	DefaultAudioStreamIndex    *int32
 	DefaultSubtitleStreamIndex *int32
-	// Tracks is set by the session from the user's preferences (ADR 0035).
+	// Tracks is set by the session from the user's preferences.
 	Tracks player.TrackSelection
 }
 
@@ -108,7 +107,7 @@ func sameIndex(a, b *int32) bool {
 	return *a == *b
 }
 
-// Plan picks the source asked for (ADR 0036), else the first the server offers, and
+// Plan picks the source asked for, else the first the server offers, and
 // the best way to play it. A version the server did not offer is not replaced by
 // another. A nil mediaSourceID means none asked for.
 func Plan(server ServerURL, response PlaybackInfoResponse, mediaSourceID *string) (PlaybackPlan, error) {

@@ -2,7 +2,7 @@ package emby
 
 // Typed Emby HTTP client, port of src-tauri/src/emby/client.rs. Authentication
 // travels only in the `X-Emby-Authorization` header, never in URLs (except the
-// library socket URL, as in Rust: ADR 0110).
+// library socket URL, as in Rust).
 //
 // net/http against reqwest (research/http-client.md): same timeouts, no redirect
 // followed, no retry (client.rs has none), no gzip, system TLS roots. Every call
@@ -112,7 +112,7 @@ func (c *Client) WithToken(token AccessToken) *Client {
 }
 
 // SameToken: both clients carry the same token. A 401 only ends the session whose
-// token was refused, not a newer one (ADR 0012).
+// token was refused, not a newer one.
 func (c *Client) SameToken(other *Client) bool {
 	if c == nil || other == nil || c.token == nil || other.token == nil {
 		return false
@@ -120,15 +120,15 @@ func (c *Client) SameToken(other *Client) bool {
 	return c.token.Expose() == other.token.Expose()
 }
 
-// accessToken is only for EmbyService.exchange_identity (ADR 0125).
+// accessToken is only for EmbyService.exchange_identity.
 func (c *Client) accessToken() *AccessToken { return c.token }
 
 func (c *Client) Server() ServerURL { return c.server }
 
-// DeviceID is the id of this device, matched against `GET /Sessions` (ADR 0124).
+// DeviceID is the id of this device, matched against `GET /Sessions`.
 func (c *Client) DeviceID() string { return c.device.ID }
 
-// LibrarySocketURL is `ws(s)://…/embywebsocket` of the library events (ADR 0110).
+// LibrarySocketURL is `ws(s)://…/embywebsocket` of the library events.
 // Emby 4.10 only binds the socket to the session with the token in `api_key`, so this
 // URL holds a secret: never log it.
 func (c *Client) LibrarySocketURL() (string, error) {
@@ -425,7 +425,7 @@ func (c *Client) Views(ctx context.Context, userID string) (itemsPage, error) {
 		func() string { return c.server.API("/Users/" + userID + "/Views") }, nil)
 }
 
-// ItemsShape is what a library query returns (ADR 0101). StartIndex and Limit only
+// ItemsShape is what a library query returns. StartIndex and Limit only
 // apply to ShapePage.
 type ItemsShape int
 
@@ -447,7 +447,7 @@ type ItemsQuery struct {
 }
 
 // Items is one page of a library, sorted and filtered as asked; or, by Shape, the
-// sort names of the whole list or one random title of it (ADR 0101). The server
+// sort names of the whole list or one random title of it. The server
 // ignores an unknown `ParentId` and returns the whole server: callers pass known
 // library ids only.
 func (c *Client) Items(ctx context.Context, userID string, query ItemsQuery) (itemsPage, error) {
@@ -506,7 +506,7 @@ func (c *Client) Items(ctx context.Context, userID string, query ItemsQuery) (it
 }
 
 // ProductionYears is the production year of every film or series of a library,
-// without filters (decade picker, ADR 0101).
+// without filters (decade picker).
 func (c *Client) ProductionYears(ctx context.Context, userID, parentID, itemTypes string) (itemsPage, error) {
 	return userCall[itemsPage](ctx, c, http.MethodGet, []string{userID, parentID},
 		func() string { return c.server.API("/Users/" + userID + "/Items") },
@@ -548,7 +548,7 @@ func (c *Client) ResumeItems(ctx context.Context, userID string, limit uint32) (
 	return c.resume(ctx, userID, limit, watchFields, watchImages)
 }
 
-// HeroResume is the home hero (ADR 0015): the items of ResumeItems, with the overview
+// HeroResume is the home hero: the items of ResumeItems, with the overview
 // and the wide artwork (episodes also get their series' backdrop and logo).
 func (c *Client) HeroResume(ctx context.Context, userID string, limit uint32) (itemsPage, error) {
 	return c.resume(ctx, userID, limit, heroFields, heroImages)
@@ -570,7 +570,7 @@ func (c *Client) resume(ctx context.Context, userID string, limit uint32, fields
 		})
 }
 
-// HeroLatest is the home hero (ADR 0015): films and series not watched yet that have
+// HeroLatest is the home hero: films and series not watched yet that have
 // a backdrop, most recently added first.
 func (c *Client) HeroLatest(ctx context.Context, userID string, limit uint32) (itemsPage, error) {
 	return userCall[itemsPage](ctx, c, http.MethodGet, []string{userID},
@@ -697,15 +697,15 @@ func (c *Client) Item(ctx context.Context, userID, itemID string) (BaseItemDto, 
 		func() string { return c.server.API("/Users/" + userID + "/Items/" + itemID) }, nil)
 }
 
-// Titles is the titles of a person, collection, genre or studio (`/Users/{Id}/Items`,
-// ADR 0121); the query comes checked from TitlesParams.
+// Titles is the titles of a person, collection, genre or studio (`/Users/{Id}/Items`);
+// the query comes checked from TitlesParams.
 func (c *Client) Titles(ctx context.Context, userID string, params []Param) (itemsPage, error) {
 	return userCall[itemsPage](ctx, c, http.MethodGet, []string{userID},
 		func() string { return c.server.API("/Users/" + userID + "/Items") },
 		func() []Param { return params })
 }
 
-// Similar is the films and series like an item (`/Items/{Id}/Similar`, ADR 0121); the
+// Similar is the films and series like an item (`/Items/{Id}/Similar`); the
 // query comes checked from SimilarParams.
 func (c *Client) Similar(ctx context.Context, itemID string, params []Param) (itemsPage, error) {
 	return userCall[itemsPage](ctx, c, http.MethodGet, []string{itemID},
@@ -714,7 +714,7 @@ func (c *Client) Similar(ctx context.Context, itemID string, params []Param) (it
 }
 
 // LocalTrailers is the trailer files of an item (`/Users/{Id}/Items/{Id}/LocalTrailers`,
-// a bare `BaseItemDto[]`), as the TV reads them (ADR 0121).
+// a bare `BaseItemDto[]`), as the TV reads them.
 func (c *Client) LocalTrailers(ctx context.Context, userID, itemID string) ([]BaseItemDto, error) {
 	return userCall[[]BaseItemDto](ctx, c, http.MethodGet, []string{userID, itemID},
 		func() string { return c.server.API("/Users/" + userID + "/Items/" + itemID + "/LocalTrailers") },
@@ -764,7 +764,7 @@ func (c *Client) Episodes(ctx context.Context, userID string, query EpisodesQuer
 		})
 }
 
-// AdjacentEpisodes is the episodes around one of a series, across seasons (ADR 0016).
+// AdjacentEpisodes is the episodes around one of a series, across seasons.
 // Emby 4.10.1.0 answers up to 5 episodes before it then the rest of the series, not
 // just its two neighbours: no images nor user data, to keep the answer small.
 func (c *Client) AdjacentEpisodes(ctx context.Context, userID, seriesID, episodeID string) (itemsPage, error) {
@@ -780,7 +780,7 @@ func (c *Client) AdjacentEpisodes(ctx context.Context, userID, seriesID, episode
 		})
 }
 
-// PlaybackInfo is the playback negotiation (ADR 0007): the server answers with its
+// PlaybackInfo is the playback negotiation: the server answers with its
 // sources and how each can be played for this profile. Unknown id: 404.
 func (c *Client) PlaybackInfo(ctx context.Context, userID, itemID string, profile *DeviceProfile,
 	forceTranscode bool, mediaSourceID *string, audioStreamIndex *int32) (PlaybackInfoResponse, error) {
@@ -805,7 +805,7 @@ func (c *Client) PlaybackInfo(ctx context.Context, userID, itemID string, profil
 		[]Param{{"UserId", userID}}, body, true)
 }
 
-// ReportPlayback is a playback report (ADR 0008) to `/Sessions/Playing`, `…/Progress`
+// ReportPlayback is a playback report to `/Sessions/Playing`, `…/Progress`
 // or `…/Stopped`. Emby 4.10.1.0 answers 204.
 func (c *Client) ReportPlayback(ctx context.Context, path string, body PlaybackReportBody) error {
 	if err := c.requireToken(); err != nil {
@@ -818,7 +818,7 @@ func (c *Client) ReportPlayback(ctx context.Context, path string, body PlaybackR
 }
 
 // PostCapabilities declares this session controllable and able to receive
-// `SendString` (`POST /Sessions/Capabilities/Full`, ADR 0124). Emby answers 204.
+// `SendString` (`POST /Sessions/Capabilities/Full`). Emby answers 204.
 func (c *Client) PostCapabilities(ctx context.Context) error {
 	if err := c.requireToken(); err != nil {
 		return err
@@ -853,7 +853,7 @@ func (c *Client) SendString(ctx context.Context, sessionID, text string) error {
 }
 
 // StopActiveEncodings stops the server's encodings of one play session of this device
-// (`DELETE /Videos/ActiveEncodings?DeviceId=&PlaySessionId=`, ADR 0117).
+// (`DELETE /Videos/ActiveEncodings?DeviceId=&PlaySessionId=`).
 func (c *Client) StopActiveEncodings(ctx context.Context, playSessionID string) error {
 	if err := c.requireToken(); err != nil {
 		return err
@@ -897,7 +897,7 @@ func (c *Client) Favorites(ctx context.Context, userID string, limit uint32) (it
 }
 
 // SetPlayed marks an item played on datePlayed (`yyyyMMddHHmmss`, UTC), or unplayed
-// with nil (`POST` / `DELETE /Users/{Id}/PlayedItems/{Id}`, ADR 0096); the server
+// with nil (`POST` / `DELETE /Users/{Id}/PlayedItems/{Id}`); the server
 // answers with the item's new user data.
 func (c *Client) SetPlayed(ctx context.Context, userID, itemID string, datePlayed *string) (UserItemData, error) {
 	method := http.MethodDelete
@@ -912,7 +912,7 @@ func (c *Client) SetPlayed(ctx context.Context, userID, itemID string, datePlaye
 }
 
 // HideFromResume takes an item out of "Reprendre", or puts it back
-// (`POST /Users/{Id}/Items/{Id}/HideFromResume?Hide=`, ADR 0096).
+// (`POST /Users/{Id}/Items/{Id}/HideFromResume?Hide=`).
 func (c *Client) HideFromResume(ctx context.Context, userID, itemID string, hide bool) (UserItemData, error) {
 	return userCall[UserItemData](ctx, c, http.MethodPost, []string{userID, itemID},
 		func() string { return c.server.API("/Users/" + userID + "/Items/" + itemID + "/HideFromResume") },
@@ -920,7 +920,7 @@ func (c *Client) HideFromResume(ctx context.Context, userID, itemID string, hide
 }
 
 // Playlists is the playlists of the user, by name
-// (`/Users/{Id}/Items?IncludeItemTypes=Playlist&Recursive=true`, ADR 0100).
+// (`/Users/{Id}/Items?IncludeItemTypes=Playlist&Recursive=true`).
 func (c *Client) Playlists(ctx context.Context, userID string, limit uint32) (itemsPage, error) {
 	return userCall[itemsPage](ctx, c, http.MethodGet, []string{userID},
 		func() string { return c.server.API("/Users/" + userID + "/Items") },
@@ -937,8 +937,8 @@ func (c *Client) Playlists(ctx context.Context, userID string, limit uint32) (it
 		})
 }
 
-// HomePlaylists is the playlists of the home row, A → Z with their entry count (ADR
-// 0122). No `MediaTypes`: on Emby 4.10.2.0 `MediaTypes=Video` next to
+// HomePlaylists is the playlists of the home row, A → Z with their entry count.
+// No `MediaTypes`: on Emby 4.10.2.0 `MediaTypes=Video` next to
 // `IncludeItemTypes=Playlist` answered every video of the server; audio playlists are
 // left out by the caller.
 func (c *Client) HomePlaylists(ctx context.Context, userID string, limit uint32) (itemsPage, error) {
@@ -960,7 +960,7 @@ func (c *Client) HomePlaylists(ctx context.Context, userID string, limit uint32)
 }
 
 // PlaylistItems is the entries of a playlist in its order
-// (`GET /Playlists/{Id}/Items?UserId=`, ADR 0122).
+// (`GET /Playlists/{Id}/Items?UserId=`).
 func (c *Client) PlaylistItems(ctx context.Context, userID, playlistID string, limit uint32) (itemsPage, error) {
 	return userCall[itemsPage](ctx, c, http.MethodGet, []string{playlistID, userID},
 		func() string { return c.server.API("/Playlists/" + playlistID + "/Items") },
@@ -977,7 +977,7 @@ func (c *Client) PlaylistItems(ctx context.Context, userID, playlistID string, l
 }
 
 // AddToPlaylist appends an item to a playlist
-// (`POST /Playlists/{Id}/Items?Ids=&UserId=` → `AddToPlaylistResult`, ADR 0100).
+// (`POST /Playlists/{Id}/Items?Ids=&UserId=` → `AddToPlaylistResult`).
 func (c *Client) AddToPlaylist(ctx context.Context, userID, playlistID, itemID string) (AddToPlaylistResultDto, error) {
 	return userCall[AddToPlaylistResultDto](ctx, c, http.MethodPost, []string{playlistID, itemID, userID},
 		func() string { return c.server.API("/Playlists/" + playlistID + "/Items") },
@@ -985,8 +985,8 @@ func (c *Client) AddToPlaylist(ctx context.Context, userID, playlistID, itemID s
 }
 
 // CreatePlaylist creates a video playlist holding one item
-// (`POST /Playlists?Name=&Ids=&MediaType=Video&UserId=` → `PlaylistCreationResult`,
-// ADR 0100). The name is checked by the caller.
+// (`POST /Playlists?Name=&Ids=&MediaType=Video&UserId=` → `PlaylistCreationResult`).
+// The name is checked by the caller.
 func (c *Client) CreatePlaylist(ctx context.Context, userID, name, itemID string) (PlaylistCreationResultDto, error) {
 	return userCall[PlaylistCreationResultDto](ctx, c, http.MethodPost, []string{itemID, userID},
 		func() string { return c.server.API("/Playlists") },
@@ -995,7 +995,7 @@ func (c *Client) CreatePlaylist(ctx context.Context, userID, name, itemID string
 		})
 }
 
-// Image is the artwork bytes and content type for the `emby-img` protocol (ADR 0005).
+// Image is the artwork bytes and content type for the `emby-img` protocol.
 // Like Rust, it does not require a token: the service checks the session first.
 func (c *Client) Image(ctx context.Context, req ImageRequest) (string, []byte, error) {
 	query := []Param{

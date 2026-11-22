@@ -1,4 +1,4 @@
-//! Request artwork through the local `requestimg` protocol (ADR 0125). Models
+//! Request artwork through the local `requestimg` protocol. Models
 //! sent to the UI carry ready-made `ImageRef`s; Rust fetches the image with the
 //! Bearer token, so the WebView never sees a token nor the server address.
 
@@ -43,7 +43,7 @@ impl UrImage {
         })
     }
 
-    /// Key in the shared artwork cache (ADR 0019): `request/{stem}/…-{width}-{ext}`.
+    /// Key in the shared artwork cache: `request/{stem}/…-{width}-{ext}`.
     pub fn cache_key(&self) -> ImageRequest {
         let (stem, ext) = self.file.rsplit_once('.').unwrap_or((&self.file, ""));
         ImageRequest {

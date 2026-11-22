@@ -76,7 +76,7 @@ internal suspend fun <T> tried(block: suspend () -> T): Result<T> = try {
 internal fun Throwable.requestMessage(): String = (this as? RequestException)?.error?.message ?: message.orEmpty()
 
 /**
- * Découvrir (ADR 0125): « Mes demandes en cours » when there are some, then the server's rows with
+ * Découvrir: « Mes demandes en cours » when there are some, then the server's rows with
  * « Tout voir ». The focused card's title and meta show under its row. Read again after a request.
  */
 @Composable

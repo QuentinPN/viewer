@@ -31,7 +31,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.collectionRefs
 import io.github.quentinpn.viewer.tv.emby.collectionTitles
 
-// The « Collection : … » rows of a film page and the navigation from them (ADR 0071).
+// The « Collection : … » rows of a film page and the navigation from them.
 
 /** One collection row: the BoxSet and its titles in release order, the page's own film among them. */
 internal data class CollectionShelf(val ref: CollectionRef, val titles: List<BaseItemDto>)
