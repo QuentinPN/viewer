@@ -64,6 +64,8 @@ go test ./internal/updater -run Test_go_release_manifest_verifies -v -count=1
 
 Les vecteurs `go-app/internal/updater/testdata/signature-vectors.json` sont lus par le test Go et par `src/release/signature.test.ts` : les deux côtés doivent produire le même message et la même signature.
 
+Les vecteurs `contracts/seasons/vectors.json` (logo saisonnier) sont lus par `src/lib/brand/season.test.ts` et par `SeasonTest` côté Android (chemin relatif `../../contracts/seasons`, pas de copie à synchroniser).
+
 ### Android TV, depuis `android-tv/`
 
 `./gradlew testDebugUnitTest assembleDebug` (commande enregistrée le 2026-11-09, AGP 9.5.1, Gradle 9.9.0, SDK 37, minSdk 28). Libmpv Android : `scripts/fetch-libmpv-android.ps1`.
