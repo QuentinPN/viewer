@@ -1,6 +1,5 @@
-// Smoke test of the Go + Wails debug build (Go/Wails port, go-app/MAP.md « Checklist
-// smoke ») on the real Emby server, driven over CDP like the Tauri scenarios
-// (scripted UI tests never take over the desktop): no OS input, no screen capture. Keys go to the page through
+// Smoke test of the Go + Wails debug build on the real Emby server, driven over
+// CDP like the other scenarios (scripted UI tests never take over the desktop): no OS input, no screen capture. Keys go to the page through
 // Input.dispatchKeyEvent; the HTML is captured with Page.captureScreenshot and the
 // window itself, mpv video included, with PrintWindow on the app's own HWND
 // (print-window.ps1).
@@ -24,7 +23,7 @@
 //
 //   node scripts/e2e/wails-smoke.mjs [--build] [--offline] [--out <dir>]
 //
-// --build    npm run build:wails, then a debug `go build` of go-app/cmd/viewer
+// --build    npm run build, then a debug `go build` of go-app/cmd/viewer
 // --offline  first-run screen and exit only: no server is contacted by the script
 // --out      evidence folder (default: <tmp>/viewer-wails-smoke-<timestamp>)
 // --film     id of the film to play (on the first page of the Films grid), even
@@ -39,7 +38,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { launch, root } from "./app.mjs";
+import { buildDebug, debugExe as exe, launch, root } from "./app.mjs";
 import {
   cards,
   debugEnv,
@@ -64,7 +63,6 @@ const stamp = new Date()
   .slice(0, 15);
 const out =
   outArg >= 0 ? argv[outArg + 1] : join(tmpdir(), `viewer-wails-smoke-${stamp}`);
-const exe = join(root, "go-app", "bin", "viewer-debug.exe");
 const PORT = 9341;
 const INVOKE = "viewer/internal/bridge.Bridge.Invoke";
 const EMBY_IMG = "http://wails.localhost/emby-img/";
@@ -343,30 +341,6 @@ function vaultEntries() {
   return spawnSync("cmdkey", ["/list"], { encoding: "utf8" })
     .stdout.split(/\r?\n/)
     .filter((l) => /target=.*Viewer-debug/i.test(l)).length;
-}
-
-function buildApp() {
-  const opts = { cwd: root, stdio: "inherit", shell: true, windowsHide: true };
-  if (spawnSync("npm", ["run", "build:wails"], opts).status !== 0)
-    throw new Error("npm run build:wails a échoué");
-  const go = spawnSync(
-    "go",
-    [
-      "build",
-      "-ldflags",
-      "-H=windowsgui",
-      "-o",
-      "bin/viewer-debug.exe",
-      "./cmd/viewer",
-    ],
-    {
-      cwd: join(root, "go-app"),
-      stdio: "inherit",
-      windowsHide: true,
-      env: { ...process.env, CGO_ENABLED: "0" },
-    },
-  );
-  if (go.status !== 0) throw new Error("go build a échoué");
 }
 
 // ---- steps ------------------------------------------------------------------
@@ -821,7 +795,7 @@ const state = {
   resumeCleared: false,
 };
 try {
-  if (argv.includes("--build")) buildApp();
+  if (argv.includes("--build")) buildDebug();
   if (!existsSync(exe)) throw new Error(`build absent : ${exe} (--build)`);
   if (vaultBefore > 0 && !OFFLINE)
     throw new Error("le coffre a déjà des entrées Viewer-debug");

@@ -1,6 +1,6 @@
 # Viewer
 
-Client Windows 10/11 natif pour un serveur Emby (hébergé sur un mini-PC, médias sur un NAS QNAP). Stack : Go + Wails v3, Svelte 5 + TypeScript, libmpv. Depuis la v1.7.0, l'installateur publié est l'app Go (`go-app/`) ; l'ancienne app Tauri 2 + Rust (`src-tauri/`) reste dans le dépôt jusqu'au ménage de la bascule.
+Client Windows 10/11 natif pour un serveur Emby (hébergé sur un mini-PC, médias sur un NAS QNAP). Stack : Go + Wails v3 (`go-app/`), Svelte 5 + TypeScript, libmpv. Depuis la v1.7.0, l'installateur publié est l'app Go ; l'ancienne app Tauri 2 + Rust a été retirée du dépôt après cette version.
 
 **État actuel** :
 - Gate 0 (outillage) : validée localement ; la CI n'a encore jamais tourné sur GitHub.
@@ -15,9 +15,9 @@ L'application se lance depuis les sources et fonctionne avec un vrai serveur Emb
 
 ## Prérequis (Windows x64)
 - Node ≥ 22 et npm.
-- Rust stable MSVC (`rustup`, composants `rustfmt` et `clippy`).
-- Visual Studio Build Tools avec « MSVC x64/x86 » et un Windows SDK.
+- Go, à la version de `go-app/go.mod`. Pas de cgo : tout se construit avec `CGO_ENABLED=0`, sans compilateur C.
 - WebView2 Runtime (inclus dans Windows 11).
+- Pour l'installateur seulement : NSIS 3.x (`makensis`).
 
 ## Démarrage
 ```bash
@@ -27,28 +27,27 @@ npm ci
 powershell -ExecutionPolicy Bypass -File scripts/fetch-libmpv.ps1
 ```
 ```bash
-npm run tauri dev
+node scripts/e2e/app.mjs --build
+go-app/bin/viewer-debug.exe
 ```
-`fetch-libmpv.ps1` télécharge la build libmpv épinglée dans `vendor/mpv/` et vérifie son SHA-256.
-
-Si `cargo` échoue avec `LNK1104 msvcrt.lib`, une installation Visual Studio incomplète est choisie par défaut. Préfixer alors les commandes par `scripts/with-msvc.ps1`.
+`fetch-libmpv.ps1` télécharge la build libmpv épinglée dans `vendor/mpv/` et vérifie son SHA-256. `app.mjs --build` lance `npm run build` (le frontend va dans `go-app/cmd/viewer/frontend/dist`, embarqué par l'exe), puis un `go build` debug. Le build debug trouve libmpv dans `vendor/mpv/` et garde ses données à part (identifiant `io.github.quentinpn.viewer.debug`). `npm run dev` ne sert qu'à voir l'interface dans un navigateur : sans l'app Go, aucune commande native ne répond.
 
 ## Vérifications
 ```bash
 npm run verify
 ```
-Cette commande enchaîne Biome, svelte-check, Vitest, le build Vite, `cargo fmt --check`, clippy en `-D warnings` et `cargo test` (avec un test moteur réel sur libmpv).
+Cette commande enchaîne Biome, svelte-check, Vitest, le build Vite, puis `gofmt -l`, `go vet` et `go test` dans `go-app` (`CGO_ENABLED=0`).
 
-Les scénarios de bout en bout pilotent le build debug, fenêtre hors écran, sur un compte de test Emby. Ils demandent `cargo build`, le serveur Vite (`npm run dev`) et le compte de test dans le Gestionnaire d'identification Windows (voir `TESTING.md`, qui indique aussi lesquels écrivent sur le serveur) :
+Les scénarios de bout en bout pilotent le build debug Go par CDP, fenêtre hors écran, sur un compte de test Emby. Ils demandent le compte de test dans le Gestionnaire d'identification Windows (voir `TESTING.md`, qui indique aussi lesquels écrivent sur le serveur) ; `-Build` reconstruit l'exe debug avant :
 ```bash
-powershell -ExecutionPolicy Bypass -File scripts/e2e/run.ps1 gate2-play
+powershell -ExecutionPolicy Bypass -File scripts/e2e/run.ps1 gate2-play -Build
 ```
 
-Le scénario de lecture Gate 1 (captures d'écran et vraie touche clavier) se lance ainsi :
+Le banc de lecture Gate 1 (spike Go, captures de la seule fenêtre du spike) se lance ainsi :
 ```bash
-powershell -ExecutionPolicy Bypass -File scripts/spike/run-gate1.ps1 -Media "D:\chemin\vers\video.mkv"
+pwsh scripts/spike/run-gate1-go.ps1 -Media "D:\chemin\vers\video.mkv"
 ```
-Les résultats arrivent dans `artifacts/gate1/` (non versionné). **Il faut toujours relire les captures** : des contrôles automatiques peuvent tous passer alors que l'image est invisible.
+Les résultats arrivent dans `artifacts/gate1-go/` (non versionné). **Il faut toujours relire les captures** : des contrôles automatiques peuvent tous passer alors que l'image est invisible.
 
 ## Documentation
 - Produit : `PRODUCT.md`.

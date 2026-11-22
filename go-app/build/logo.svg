@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <!-- Viewer logo: a "U" holding a play triangle, on a dark glass tile. Source of
-       every app icon: `npx tauri icon src-tauri/icons/source/logo.svg`. -->
+       the installer icon (go-app/build/windows/icon.ico) and of src/lib/window/Logo.svelte. -->
   <title>Viewer</title>
   <defs>
     <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">

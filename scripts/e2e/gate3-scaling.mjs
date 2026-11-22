@@ -38,10 +38,7 @@ const { check, shot, finish } = createReport("gate3-scaling");
 const proxy = await startProxy(account.url);
 
 const invoke = (page, cmd, args) =>
-  page.evaluate(
-    ([c, a]) => window.__TAURI_INTERNALS__.invoke(c, a),
-    [cmd, args],
-  );
+  page.evaluate(([c, a]) => window.__viewer.invoke(c, a), [cmd, args]);
 
 // A 1280 × 720 window at 125 % and 150 %, and a 1920 × 1080 screen at 150 %
 // (same CSS size as 1280 × 720 at 100 %, sharper).
@@ -139,7 +136,7 @@ async function player(page, label) {
   await shot(page, `${label}-player-subtitles`);
   await page.keyboard.press("Escape");
   await page.evaluate(() =>
-    window.__TAURI_INTERNALS__.invoke("player_command", {
+    window.__viewer.invoke("player_command", {
       command: { type: "seekAbsolute", seconds: 0 },
     }),
   );

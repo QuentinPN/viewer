@@ -6,7 +6,10 @@
   The archive hash is pinned below; the script refuses any mismatch. Bump the
   release, file name and both hashes together, then re-run Gate 1.
   Extraction uses 7-Zip (`7z` on PATH, as on GitHub runners) or the `7zip-bin`
-  devDependency.
+  devDependency. The verified archive is kept outside the repository
+  (`%LOCALAPPDATA%\Viewer-cache\mpv`, or `VIEWER_LIBMPV_CACHE`), so a fresh
+  checkout, like each release run on the Windows runner, does not download it
+  again; its SHA-256 is still checked every time.
 #>
 $ErrorActionPreference = 'Stop'
 
@@ -24,19 +27,24 @@ if ((Test-Path $dll) -and (Get-FileHash $dll -Algorithm SHA256).Hash -eq $DllSha
   exit 0
 }
 
-$dl = Join-Path $root 'vendor\_dl'
+$dl = $env:VIEWER_LIBMPV_CACHE
+if (-not $dl) { $dl = Join-Path $env:LOCALAPPDATA 'Viewer-cache\mpv' }
 New-Item -ItemType Directory -Force $dl, $dest | Out-Null
 $archive = Join-Path $dl $Asset
-$url = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/$Release/$Asset"
-Write-Output "Téléchargement $url"
-$ProgressPreference = 'SilentlyContinue'
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $archive
+if ((Test-Path $archive) -and (Get-FileHash $archive -Algorithm SHA256).Hash -eq $ArchiveSha256) {
+  Write-Output "Archive libmpv en cache : $archive"
+} else {
+  $url = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/$Release/$Asset"
+  Write-Output "Téléchargement $url"
+  $ProgressPreference = 'SilentlyContinue'
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $archive
 
-$actual = (Get-FileHash $archive -Algorithm SHA256).Hash
-if ($actual -ne $ArchiveSha256) {
-  Remove-Item $archive -Force
-  throw "SHA-256 inattendu pour $Asset : $actual"
+  $actual = (Get-FileHash $archive -Algorithm SHA256).Hash
+  if ($actual -ne $ArchiveSha256) {
+    Remove-Item $archive -Force
+    throw "SHA-256 inattendu pour $Asset : $actual"
+  }
 }
 
 $sevenZip = (Get-Command 7z -ErrorAction SilentlyContinue).Source

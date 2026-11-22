@@ -9,10 +9,8 @@
 // - "Lire maintenant" starts it at once.
 // Server side effects: the first episode is marked played each time it reaches its
 // end; when it was unplayed before, the scenario marks it unplayed again at the
-// end (cargo test real_server_mark_unplayed). The next episode is rewound to 0
-// before stopping, so it keeps no resume point.
-import { spawnSync } from "node:child_process";
-import { join } from "node:path";
+// end, through the app's emby_set_played while it is still signed in. The next
+// episode is rewound to 0 before stopping, so it keeps no resume point.
 import { launch } from "./app.mjs";
 import {
   cards,
@@ -20,6 +18,7 @@ import {
   detailTitle,
   diagnostics,
   libraryNav,
+  markUnplayed,
   playerBadge,
   signIn,
   signOut,
@@ -31,12 +30,11 @@ import {
 
 const account = testAccount();
 const { check, shot, finish } = createReport("gate3-upnext");
-const root = join(import.meta.dirname, "..", "..");
 
 const call = async (page, cmd, args) => {
   const r = await page.evaluate(
     ([c, a]) =>
-      window.__TAURI_INTERNALS__
+      window.__viewer
         .invoke(c, a)
         .then((value) => ({ value }))
         .catch((e) => ({ error: JSON.stringify(e) })),
@@ -104,6 +102,18 @@ async function nextPlays(page, label, next, code) {
 
 let app = await launch();
 let first = null;
+let restored = false;
+/** Undoes the played mark of the first episode, when it was unplayed before. */
+async function restore(page) {
+  if (restored || !first || first.played) return;
+  restored = true;
+  const played = await markUnplayed(page, first.id).catch((e) => e);
+  check(
+    "first_episode_unplayed_again",
+    played === false,
+    played instanceof Error ? played.message : first.id,
+  );
+}
 try {
   const page = app.page;
   if ((await startScreen(page)) === "signedOut") {
@@ -231,6 +241,7 @@ try {
   );
   const firstAfter = await detailOf(page, firstId);
   check("first_episode_played", firstAfter.played === true);
+  await restore(page);
 
   await page.keyboard.press("Escape");
   await signOut(page);
@@ -244,35 +255,7 @@ try {
   );
   if (app) await shot(app.page, "error").catch(() => {});
 } finally {
+  if (app) await restore(app.page);
   if (app) await app.close().catch(() => {});
-  // Undo the played mark of the first episode, which was unplayed before.
-  if (first && !first.played) {
-    const r = spawnSync(
-      "powershell",
-      [
-        "-NoProfile",
-        "-File",
-        join(root, "scripts", "with-msvc.ps1"),
-        "cargo",
-        "test",
-        "--manifest-path",
-        join(root, "src-tauri", "Cargo.toml"),
-        "real_server_mark_unplayed",
-        "--",
-        "--ignored",
-        "--nocapture",
-      ],
-      {
-        cwd: root,
-        encoding: "utf8",
-        env: { ...process.env, VIEWER_UNPLAY_IDS: first.id },
-      },
-    );
-    check(
-      "first_episode_unplayed_again",
-      r.status === 0 && r.stdout.includes(`${first.id} unplayed`),
-      r.status === 0 ? first.id : (r.stdout + r.stderr).slice(-300),
-    );
-  }
   finish();
 }

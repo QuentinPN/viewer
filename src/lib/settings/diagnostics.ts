@@ -1,6 +1,6 @@
 import { invoke } from "../native";
 
-// Typed wrapper over the diagnostics command of src-tauri/src/diagnostics.rs.
+// Typed wrapper over the diagnostics command of go-app/internal/diagnostics.
 
 export const diagnosticsApi = {
   /** Opens the log folder in the file explorer; the folder is chosen by Rust. */

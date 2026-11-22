@@ -24,7 +24,7 @@ const cacheDir = mkdtempSync(join(tmpdir(), "viewer-e2e-artwork-"));
 const POSTERS = 12;
 
 const stats = (page) =>
-  page.evaluate(() => window.__TAURI_INTERNALS__.invoke("artwork_cache_stats"));
+  page.evaluate(() => window.__viewer.invoke("artwork_cache_stats"));
 
 /** Opens the films grid and waits for the first posters; returns their URLs. */
 async function filmPosters(page) {

@@ -109,10 +109,31 @@ export async function signOut(page) {
 export const playerBadge = (page) =>
   page.locator('[title="Décision du serveur Emby"]');
 
+/** A command of the app (window.__viewer, see app.mjs); throws with its error as JSON. */
+export async function invoke(page, cmd, args = {}) {
+  const r = await page.evaluate(
+    ([c, a]) =>
+      window.__viewer.invoke(c, a).then(
+        (value) => ({ value }),
+        (e) => ({ error: JSON.stringify(e) }),
+      ),
+    [cmd, args],
+  );
+  if ("error" in r) throw new Error(`${cmd} : ${r.error}`);
+  return r.value;
+}
+
+/** Marks an item unplayed again (scenarios that mark it played); resolves to
+ *  its `played` state read back from the server. Needs a signed-in app. */
+export async function markUnplayed(page, id) {
+  await invoke(page, "emby_set_played", { itemId: id, played: false });
+  return (await invoke(page, "emby_item_detail", { itemId: id })).played;
+}
+
 /** Engine diagnostics (`timePos`, `duration`, codecs…), or `{ ok: false }`. */
 export const diagnostics = (page) =>
   page.evaluate(() =>
-    window.__TAURI_INTERNALS__
+    window.__viewer
       .invoke("player_diagnostics")
       .then((d) => ({ ok: true, ...d }))
       .catch((e) => ({ ok: false, error: String(e) })),

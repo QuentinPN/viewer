@@ -30,7 +30,7 @@ import type {
   WatchItem,
 } from "./types";
 
-// Thin typed wrapper over the Emby commands of src-tauri/src/commands.rs.
+// Thin typed wrapper over the Emby commands of go-app/cmd/viewer/commands_emby.go.
 
 export const PLAYBACK_STOPPED_EVENT = "emby://playback-stopped";
 /** Titles added, changed or removed on the server. */

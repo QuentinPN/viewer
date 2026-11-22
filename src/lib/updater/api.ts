@@ -1,6 +1,6 @@
 import { invoke, listen, type Unlisten } from "../native";
 
-// Thin typed wrapper over the update commands of src-tauri/src/updater.rs.
+// Thin typed wrapper over the update commands of go-app/internal/updater.
 
 export const UPDATE_READY_EVENT = "app://update-ready";
 

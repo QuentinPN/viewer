@@ -8,7 +8,6 @@
 # debug build has its own data and vault entries).
 #
 #   ./scripts/with-test-account.ps1 node scripts/e2e/gate2-ui.mjs
-#   ./scripts/with-test-account.ps1 ./scripts/with-msvc.ps1 cargo test … '--' --ignored
 $ErrorActionPreference = 'Stop'
 if ($args.Count -eq 0) { throw 'usage: with-test-account.ps1 <command> [args…]' }
 $Target = 'viewer-e2e-emby'

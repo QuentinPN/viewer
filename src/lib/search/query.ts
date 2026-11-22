@@ -8,7 +8,7 @@ export const SEARCH_MIN_CHARS = 2;
 export const SEARCH_MAX_CHARS = 100;
 /** Delay after the last key before searching; Enter searches at once. */
 export const SEARCH_DEBOUNCE_MS = 250;
-/** Per type, as `SEARCH_SHOWN` in src-tauri/src/emby/session.rs. */
+/** Per type, as `SearchShown` in go-app/internal/emby/session.go. */
 export const SEARCH_SHOWN = 24;
 
 /**
