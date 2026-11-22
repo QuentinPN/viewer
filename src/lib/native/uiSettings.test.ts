@@ -140,14 +140,16 @@ describe("handOverUiSettings on Tauri", () => {
     expect(warn).toHaveBeenCalled();
   });
 
-  it("exports nothing when the app has no key", async () => {
-    const invoke = vi.fn();
+  it("exports an empty set when the app has no key, so an older file is cleared", async () => {
+    const invoke = vi.fn().mockResolvedValue(undefined);
     await handOverUiSettings({
       backend: "tauri",
       invoke,
       storage: memoryStorage({ other: "x" }),
     });
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledExactlyOnceWith("ui_settings_export", {
+      entries: {},
+    });
   });
 });
 

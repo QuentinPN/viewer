@@ -129,8 +129,9 @@ export async function handOverUiSettings(deps: Deps): Promise<void> {
   const { storage } = deps;
   if (!storage) return;
   if (deps.backend === "tauri") {
+    // Even empty: a key removed since the last launch (a cleared search
+    // history) must not come back from an older file.
     const entries = collectUiSettings(storage);
-    if (Object.keys(entries).length === 0) return;
     deps
       .invoke("ui_settings_export", { entries })
       .catch((e) => console.warn("UI settings not exported", e));
