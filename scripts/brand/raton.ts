@@ -289,6 +289,17 @@ export const SEASONS: Season[] = [
   },
 ];
 
+/** Debug builds only (not a season): the raccoon in a yellow hard hat, the technician. */
+export const DEBUG: Season = {
+  id: "debug",
+  bg: NAVY,
+  content: dressed(
+    `<path fill="#FFC83D" d="M152 206 Q150 104 256 100 Q362 104 360 206 Z"/>` +
+      `<path fill="#FFE07A" d="M240 102 Q256 98 272 102 L270 200 L242 200 Z"/>` +
+      `<rect x="124" y="190" width="264" height="28" rx="14" fill="#E0A526"/>`,
+  ),
+};
+
 /** The standalone logo: the rounded tile of the season with its content. */
 export function logoSvg({ bg, content }: Season): string {
   return (

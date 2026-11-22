@@ -10,7 +10,7 @@
 //                                               NSIS installer takes it as its icon
 //   android-tv/app/src/main/res/drawable-nodpi/icon.png (432), banner.png (640x360): default;
 //   ... icon_<id>.png / banner_<id>.png for the other seasons (<id> with _ for -),
-//   ... and android-tv/app/src/debug/res/drawable-nodpi/banner.png (default + orange band)
+//   ... and android-tv/app/src/debug/res/drawable-nodpi/icon.png, banner.png (hard hat; banner + orange band)
 //
 //   go-app/cmd/viewer/rsrc_windows_amd64.syso   the exe's icon resource, made from icon.ico
 //                                               (`go build` links any .syso of the package by itself)
@@ -32,7 +32,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { inflateSync } from "node:zlib";
 import { fail, root } from "../step.ts";
-import { logoSvg, SEASONS, type Season } from "./raton.ts";
+import { DEBUG, logoSvg, SEASONS, type Season } from "./raton.ts";
 
 const chrome =
   process.env.CHROME ?? "C:/Program Files/Google/Chrome/Application/chrome.exe";
@@ -228,9 +228,14 @@ try {
     );
     put(`${androidRes}/icon.png`, androidIcon);
     put(`${androidRes}/banner.png`, banner);
-    const debugBanner = rasterize(bannerSvg(season, true), 640, 360);
+    // Debug build: the raccoon in a hard hat, and the banner keeps its orange band.
+    const debugRes = "android-tv/app/src/debug/res/drawable-nodpi";
+    const debugBanner = rasterize(bannerSvg(DEBUG, true), 640, 360);
     checkAlpha(debugBanner, "debug banner", false);
-    put("android-tv/app/src/debug/res/drawable-nodpi/banner.png", debugBanner);
+    put(`${debugRes}/banner.png`, debugBanner);
+    const debugIcon = rasterize(logoSvg(DEBUG), 432, 432);
+    checkAlpha(debugIcon, "debug icon", true);
+    put(`${debugRes}/icon.png`, debugIcon);
   }
   // Icon resource of the Windows exe. go-winres: pinned, icon only (no manifest: the
   // exe has none today, and one could change the DPI behaviour of the video window;
