@@ -1,0 +1,11 @@
+{"Items":[
+        {"Name":"Runner","Id":"103617","Type":"Movie","RunTimeTicks":58680640000,"ImageTags":{},
+         "UserData":{"PlaybackPositionTicks":6000000000,"Played":false}},
+        {"Name":"01h00 - 02h00","Id":"44443","Type":"Episode","IndexNumber":2,"ParentIndexNumber":1,
+         "SeriesName":"24 Heures chrono","SeriesId":"44440","RunTimeTicks":24705280000,
+         "ImageTags":{"Primary":"df10f940_6381"},"ParentThumbItemId":"44440","ParentThumbImageTag":"858f5468_6381",
+         "UserData":{"PlaybackPositionTicks":0,"PlayCount":0,"Played":false}},
+        {"Name":"Épisode 4","Id":"70229","Type":"Episode","IndexNumber":4,"ParentIndexNumber":5,
+         "SeriesName":"La casa de papel","SeriesId":"70185","ImageTags":{},
+         "UserData":{"PlaybackPositionTicks":0,"Played":false}}
+    ],"TotalRecordCount":3}

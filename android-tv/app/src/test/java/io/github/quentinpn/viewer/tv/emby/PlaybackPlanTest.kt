@@ -88,7 +88,7 @@ class PlaybackPlanTest {
 
     @Test
     fun theChosenVersionIsPlayedAndNeverReplaced() {
-        // Two versions in one answer, as a server that ignores `MediaSourceId` would send (ADR 0036)
+        // Two versions in one answer, as a server that ignores `MediaSourceId` would send
         val answer = response(
             """{"MediaSources":[
             {"Id":"m1","SupportsDirectPlay":true,"DirectStreamUrl":"/videos/i1/original.mkv?MediaSourceId=m1"},
@@ -110,7 +110,7 @@ class PlaybackPlanTest {
 
     @Test
     fun transcodeSubtitlesAreNamedFromTheServerStreams() {
-        // Overgeared S1E6 at 1,5 Mbit/s (ADR 0084): three French ASS files
+        // Overgeared S1E6 at 1,5 Mbit/s: three French ASS files
         val plan = plan(
             server,
             response(

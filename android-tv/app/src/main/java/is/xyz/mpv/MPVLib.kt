@@ -1,5 +1,5 @@
 // Copied unchanged from mpv-android tag 2026-09-17 (app/src/main/java/is/xyz/mpv/MPVLib.kt),
-// MIT licence: see LICENSE.mpv-android. libplayer.so binds to this exact class (ADR 0038).
+// MIT licence: see LICENSE.mpv-android. libplayer.so binds to this exact class.
 package `is`.xyz.mpv
 
 import android.content.Context

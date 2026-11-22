@@ -2,7 +2,8 @@
 // Page of an Request title (Fiche A), laid out as the Emby film page:
 // backdrop with its scrim, round back button (Échap), title, metadata, genres,
 // status of the title and of each season, « Lire » when it is on Emby,
-// « Demander » when something is left to request, synopsis and cast.
+// « Demander » when something is left to request, « Bande-annonce » when the
+// title has one (its YouTube page in the browser), synopsis and cast.
 import { onMount, tick } from "svelte";
 import type { MediaItem } from "../emby/types";
 import "./requests.css";
@@ -32,6 +33,7 @@ let details = $state<MediaDetails | null>(null);
 let error = $state<RequestsError | null>(null);
 let asking = $state(false);
 let notice = $state("");
+let trailerError = $state("");
 let backdropFailed = $state(false);
 let section = $state<HTMLElement | null>(null);
 let heading = $state<HTMLElement | null>(null);
@@ -77,6 +79,15 @@ async function requested() {
   await load();
   await tick();
   heading?.focus({ preventScroll: true });
+}
+
+async function openTrailer(key: string) {
+  trailerError = "";
+  try {
+    await requestsApi.openTrailer(key);
+  } catch (e) {
+    trailerError = `Impossible d'ouvrir la bande-annonce : ${toRequestsError(e).message}`;
+  }
 }
 
 async function closeDialog() {
@@ -186,9 +197,16 @@ onMount(() => {
           {:else if !playable}
             <button type="button" class="ur-btn large" disabled>Rien à demander</button>
           {/if}
+          {#if details.trailerKey}
+            {@const key = details.trailerKey}
+            <button type="button" class="ur-btn large" onclick={() => openTrailer(key)}>
+              Bande-annonce
+            </button>
+          {/if}
         {/if}
       </div>
       {#if notice}<p class="notice ur-tone-success" role="status">{notice}</p>{/if}
+      {#if trailerError}<p class="notice ur-tone-danger" role="alert">{trailerError}</p>{/if}
     </div>
   </div>
 

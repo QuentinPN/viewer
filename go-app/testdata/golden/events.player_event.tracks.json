@@ -1,0 +1,35 @@
+{
+  "type": "tracks",
+  "tracks": [
+    {
+      "id": 1,
+      "kind": "video",
+      "title": null,
+      "lang": null,
+      "codec": "hevc",
+      "selected": true,
+      "external": false,
+      "default": true
+    },
+    {
+      "id": 1,
+      "kind": "audio",
+      "title": "Français 5.1",
+      "lang": "fre",
+      "codec": "ac3",
+      "selected": true,
+      "external": false,
+      "default": true
+    },
+    {
+      "id": 2,
+      "kind": "sub",
+      "title": "Forcés",
+      "lang": "fre",
+      "codec": "subrip",
+      "selected": false,
+      "external": true,
+      "default": false
+    }
+  ]
+}

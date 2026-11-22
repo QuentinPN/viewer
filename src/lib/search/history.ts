@@ -1,6 +1,6 @@
 import { cleanQuery, isSearchable } from "./query";
 
-// Recent searches (ADR 0122), as on the TV (ADR 0075): kept on this PC only,
+// Recent searches, as on the TV: kept on this PC only,
 // per Emby server and user, never sent to the server. Search terms are not a
 // secret; the token is never kept here.
 

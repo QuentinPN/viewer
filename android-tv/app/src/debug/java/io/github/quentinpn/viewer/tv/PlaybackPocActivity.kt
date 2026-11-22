@@ -36,7 +36,7 @@ private val DIAG_PROPERTIES = listOf(
 
 /**
  * Gate TV-1 proof of concept: plays one source given by `adb shell am start`
- * extras, driven by the remote. Not the final player UI (ADR 0038).
+ * extras, driven by the remote. Not the final player UI.
  *
  * Extras: `url` (absolute path or http(s)), optional `sub` (external subtitle),
  * `token` (sent as X-Emby-Token, never in the URL) and `start` (seconds).

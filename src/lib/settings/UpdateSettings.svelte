@@ -1,5 +1,5 @@
 <script lang="ts">
-// Réglages › Mises à jour (ADR 0112): the version, a manual check that shares the
+// Réglages › Mises à jour: the version, a manual check that shares the
 // background loop's path on the Rust side, and the restart once an update is ready.
 import { onMount } from "svelte";
 import { updaterApi } from "../updater/api";

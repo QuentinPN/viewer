@@ -1,5 +1,5 @@
 //! Contract tests against a local fake Emby server. Response shapes mirror what
-//! Emby Server 4.10.1.0 returned during the Gate 2 probe (ADR 0004).
+//! Emby Server 4.10.1.0 returned during the Gate 2 probe.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
@@ -13,30 +13,30 @@ use super::credentials::{CredentialStore, MemoryCredentialStore, account};
 use super::models::{SessionStatus, ShelfAccess, SignedInUser};
 use super::session::{EmbyService, SessionFile};
 
-const SERVER_ID: &str = "d969e3d9465b49ec8f73a5f1eab2e86f";
-const USER_ID: &str = "4a1f0e2b9c8d4e7fa6b5c4d3e2f1a0b9";
-const TOKEN: &str = "0123456789abcdef0123456789abcdef";
-const PASSWORD: &str = "s3cret-pw";
+pub(crate) const SERVER_ID: &str = "d969e3d9465b49ec8f73a5f1eab2e86f";
+pub(crate) const USER_ID: &str = "4a1f0e2b9c8d4e7fa6b5c4d3e2f1a0b9";
+pub(crate) const TOKEN: &str = "0123456789abcdef0123456789abcdef";
+pub(crate) const PASSWORD: &str = "s3cret-pw";
 const REAL_DEVICE_ID: &str = "viewer-real-server-test";
 
 #[derive(Debug, Clone)]
-struct Recorded {
-    method: String,
-    path: String,
-    auth: Option<String>,
-    body: String,
+pub(crate) struct Recorded {
+    pub(crate) method: String,
+    pub(crate) path: String,
+    pub(crate) auth: Option<String>,
+    pub(crate) body: String,
 }
 
 type Route = Box<dyn Fn(&Recorded) -> (u16, String) + Send + Sync>;
 
 /// One-request-per-connection HTTP server on 127.0.0.1 recording every request.
-struct FakeEmby {
-    url: String,
+pub(crate) struct FakeEmby {
+    pub(crate) url: String,
     requests: Arc<Mutex<Vec<Recorded>>>,
 }
 
 impl FakeEmby {
-    fn start(route: Route) -> Self {
+    pub(crate) fn start(route: Route) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
         let requests = Arc::new(Mutex::new(Vec::new()));
@@ -82,7 +82,7 @@ impl FakeEmby {
                     continue;
                 }
                 // A body starting with `JPEG:` is served as an image; `JFIF:` adds the
-                // JPEG signature the artwork cache checks (ADR 0019).
+                // JPEG signature the artwork cache checks.
                 let (content_type, body) = if let Some(b) = body.strip_prefix("JFIF:") {
                     (
                         "image/jpeg",
@@ -103,7 +103,7 @@ impl FakeEmby {
         Self { url, requests }
     }
 
-    fn requests(&self) -> Vec<Recorded> {
+    pub(crate) fn requests(&self) -> Vec<Recorded> {
         self.requests.lock().unwrap().clone()
     }
 }
@@ -125,7 +125,7 @@ fn user() -> String {
 }
 
 /// Fake server behaving like Emby 4.10: correct password, token checks, logout.
-fn emby_like(logout_status: u16) -> Route {
+pub(crate) fn emby_like(logout_status: u16) -> Route {
     Box::new(move |r| {
         let has_token = r
             .auth
@@ -209,7 +209,7 @@ fn years_answer() -> String {
 }
 
 /// `emby_like` plus library browsing. `revoked` makes every token call answer 401.
-fn browse_like(revoked: Arc<AtomicBool>) -> Route {
+pub(crate) fn browse_like(revoked: Arc<AtomicBool>) -> Route {
     let base = emby_like(204);
     Box::new(move |r| {
         let token_ok = !revoked.load(Ordering::SeqCst)
@@ -289,7 +289,7 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
                 r#"{"IsFavorite":false,"Played":false,"PlaybackPositionTicks":0}"#.into(),
             ),
             p if p.starts_with(&favorite_items) => (404, NOT_FOUND_TEXT.into()),
-            // 30299 exists for these calls only: reading it back fails (ADR 0096).
+            // 30299 exists for these calls only: reading it back fails.
             p if (p == format!("{played_items}30207") || p == format!("{played_items}30299"))
                 && r.method == "POST"
                 && query.starts_with("DatePlayed=") =>
@@ -365,7 +365,7 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
                 (200, r#"{"Items":[],"TotalRecordCount":0}"#.into())
             }
             p if p.starts_with("/emby/Shows/") => (404, NOT_FOUND_TEXT.into()),
-            // 30207 honours a refusal of direct play (ADR 0023); 80475 ignores it.
+            // 30207 honours a refusal of direct play; 80475 ignores it.
             "/emby/Items/30207/PlaybackInfo"
                 if r.method == "POST" && r.body.contains("\"EnableDirectPlay\":false") =>
             {
@@ -380,7 +380,7 @@ fn browse_like(revoked: Arc<AtomicBool>) -> Route {
             "/emby/Items/30500/PlaybackInfo" if r.method == "POST" => {
                 (200, playback_two_versions(&r.body))
             }
-            // A transcode takes another audio track only with the source named (ADR 0035).
+            // A transcode takes another audio track only with the source named.
             "/emby/Items/40001/PlaybackInfo" if r.method == "POST" => {
                 let other = r.body.contains("\"MediaSourceId\":\"mediasource_40001\"")
                     && r.body.contains("\"AudioStreamIndex\":2");
@@ -432,7 +432,7 @@ fn playback_transcode() -> String {
     )
 }
 
-/// A film with two versions (ADR 0036). No item of the real server has two (scan of
+/// A film with two versions. No item of the real server has two (scan of
 /// 11 954 films and episodes, Emby 4.10.2.0), so the second version's id follows the
 /// merged-version shape (the other item's id); its own file keeps `mediasource_…`.
 fn two_versions_detail() -> String {
@@ -472,7 +472,7 @@ fn playback_two_versions(body: &str) -> String {
 }
 
 /// A transcode with French and English audio, French and English subtitle files,
-/// as the test server answers with and without `AudioStreamIndex` (ADR 0035).
+/// as the test server answers with and without `AudioStreamIndex`.
 fn playback_transcode_audio(audio: i32) -> String {
     format!(
         r#"{{"MediaSources":[{{"Protocol":"File","Id":"mediasource_40001","Container":"mkv",
@@ -530,7 +530,7 @@ fn movie_detail() -> String {
         .into()
 }
 
-/// A person's titles as `/Users/{Id}/Items?PersonIds=` answers them (ADR 0121).
+/// A person's titles as `/Users/{Id}/Items?PersonIds=` answers them.
 fn person_titles() -> String {
     r#"{"Items":[
         {"Name":"Saltburn","Id":"30400","Type":"Movie","ProductionYear":2023,"ImageTags":{"Primary":"aa11"}},
@@ -838,7 +838,7 @@ fn latest_movies() -> String {
     .into()
 }
 
-fn signed_in_browser() -> (FakeEmby, Fixture, Arc<AtomicBool>) {
+pub(crate) fn signed_in_browser() -> (FakeEmby, Fixture, Arc<AtomicBool>) {
     let revoked = Arc::new(AtomicBool::new(false));
     let server = FakeEmby::start(browse_like(Arc::clone(&revoked)));
     let fx = fixture();
@@ -846,8 +846,8 @@ fn signed_in_browser() -> (FakeEmby, Fixture, Arc<AtomicBool>) {
     (server, fx, revoked)
 }
 
-struct Fixture {
-    service: EmbyService,
+pub(crate) struct Fixture {
+    pub(crate) service: EmbyService,
     store: Arc<MemoryCredentialStore>,
     path: PathBuf,
 }
@@ -866,7 +866,7 @@ impl CredentialStore for SharedStore {
     }
 }
 
-fn fixture() -> Fixture {
+pub(crate) fn fixture() -> Fixture {
     let dir = std::env::temp_dir().join(format!("viewer-emby-test-{}", uuid::Uuid::new_v4()));
     reopen(
         Arc::new(MemoryCredentialStore::default()),
@@ -889,7 +889,7 @@ fn reopen(store: Arc<MemoryCredentialStore>, path: PathBuf) -> Fixture {
     }
 }
 
-fn run<T>(f: impl std::future::Future<Output = T>) -> T {
+pub(crate) fn run<T>(f: impl std::future::Future<Output = T>) -> T {
     tauri::async_runtime::block_on(f)
 }
 
@@ -1973,7 +1973,7 @@ fn artwork_is_fetched_with_auth_and_checked() {
     let err = run(fx.service.image(&not_image)).unwrap_err();
     assert!(matches!(err, EmbyError::InvalidResponse(_)), "{err:?}");
 
-    // A URL built for another server is refused without any request (ADR 0012).
+    // A URL built for another server is refused without any request.
     let before = server.requests().len();
     let foreign = ImageRequest::parse(
         "/otherserver/101/Primary",
@@ -2061,7 +2061,7 @@ fn artwork_cache_spares_the_server_and_keeps_its_checks() {
     assert!(matches!(err, EmbyError::NotSignedIn), "{err:?}");
     assert_eq!(fetched(), 3);
 
-    // Emptied from the settings (ADR 0021): local only, no session needed.
+    // Emptied from the settings: local only, no session needed.
     let cleared = run(fx.service.clear_artwork()).unwrap();
     assert_eq!((cleared.entries, cleared.bytes), (1, 3 + 14));
     assert!(!file.exists());
@@ -2348,7 +2348,7 @@ fn episode_detail_has_series_context_guests_and_neighbours_across_seasons() {
     assert!(bare.poster.is_none() && bare.logo.is_none());
 }
 
-/// Chapters (ADR 0034): the item's `Chapters` of Emby 4.10.2.0, in seconds.
+/// Chapters: the item's `Chapters` of Emby 4.10.2.0, in seconds.
 #[test]
 fn chapters_come_from_the_item_in_seconds() {
     let (server, fx, revoked) = signed_in_browser();
@@ -2428,7 +2428,7 @@ fn playback_negotiates_direct_play_with_the_token_in_a_header_only() {
     assert_eq!(plan.media_source_id, "mediasource_30207");
     assert_eq!(plan.play_session_id.as_deref(), Some("ps1"));
 
-    // The item is read at the same time (ADR 0017): find PlaybackInfo among both.
+    // The item is read at the same time: find PlaybackInfo among both.
     let req = server
         .requests()
         .into_iter()
@@ -2489,7 +2489,7 @@ fn playback_of_one_version_names_it_to_the_server_and_in_reports() {
         "start, progress and stop reports name the version played"
     );
 
-    // The transcode fallback keeps the version (ADR 0023).
+    // The transcode fallback keeps the version.
     let _ = run(fx
         .service
         .prepare_version("30500", Some("30501"), false, true));
@@ -4256,7 +4256,7 @@ fn real_server_home_rows() {
     assert!(after.iter().all(|r| r.id != film.id), "cleanup failed");
 }
 
-/// Next Up on the real server (ADR 0010): marks the first episode of a series
+/// Next Up on the real server: marks the first episode of a series
 /// played, expects the second one in "À suivre" (Emby 4.10.1.0 lists it in its
 /// "resume" home section, not in `/Shows/NextUp`), then marks it unplayed again.
 /// Writes on the test account only, undone before signing out.
@@ -4372,7 +4372,7 @@ fn real_server_next_up() {
     );
 }
 
-/// Cleanup of `scripts/e2e/gate3-upnext.mjs` (ADR 0018): playing an episode to its
+/// Cleanup of `scripts/e2e/gate3-upnext.mjs`: playing an episode to its
 /// end marks it played, so the scenario marks the items it listed in
 /// `VIEWER_UNPLAY_IDS` (comma-separated) unplayed again on the test account.
 #[test]
@@ -4411,8 +4411,8 @@ fn utc_stamp() -> String {
     super::client::date_played_now()
 }
 
-/// Search on the real server (ADR 0011), read-only: accents and case folded,
-/// Sort and filters of library grids against the real server (ADR 0013), read
+/// Search on the real server, read-only: accents and case folded,
+/// Sort and filters of library grids against the real server, read
 /// only: orders, watched split, favorites and genres as Emby 4.10 applies them.
 #[test]
 #[ignore = "needs the real Emby server and VIEWER_EMBY_* variables"]
@@ -4637,7 +4637,7 @@ fn real_server_search() {
     assert!(plain.series.iter().all(|s| s.item_type == "Series"));
     assert!(plain.movies.iter().all(|m| m.poster.is_some()));
 
-    // Episodes (ADR 0020): the server also matches the series name; only
+    // Episodes: the server also matches the series name; only
     // episodes whose own title matches are kept.
     assert!(plain.episodes.iter().all(|e| {
         super::session::title_matches(&e.name, "reincarne")
@@ -4661,7 +4661,7 @@ fn real_server_search() {
     run(fx.service.sign_out()).unwrap();
 }
 
-// --- Gate 2.1: persistent session and reconnection (ADR 0012) ---
+// --- Gate 2.1: persistent session and reconnection ---
 
 /// Points the saved session at another address and restarts the service, e.g. a
 /// server that is off at startup.
@@ -5277,7 +5277,7 @@ fn forget_server_without_token_only_removes_the_record() {
     );
 }
 
-/// Home hero (ADR 0015) on the real server, read only: at most five titles, one per
+/// Home hero on the real server, read only: at most five titles, one per
 /// film or series, each with a backdrop; a series plays an episode not watched.
 #[test]
 #[ignore = "needs the real Emby server and VIEWER_EMBY_* variables"]
@@ -5337,7 +5337,7 @@ fn real_server_hero() {
 }
 
 /// Read only: the last episode of a season of a series with several seasons has
-/// its neighbours in the same season before and in the next season after (ADR 0016).
+/// its neighbours in the same season before and in the next season after.
 #[test]
 #[ignore = "needs the real Emby server and VIEWER_EMBY_* variables"]
 fn real_server_episode_detail() {
@@ -5428,7 +5428,7 @@ fn real_server_episode_detail() {
     assert!(checked > 0, "no series with two regular seasons");
 }
 
-/// Linked playback calls (ADR 0124): capabilities, the session list and the
+/// Linked playback calls: capabilities, the session list and the
 /// `SendString` relay, with the token in the header only.
 #[test]
 fn linked_playback_calls_use_the_session_relay() {

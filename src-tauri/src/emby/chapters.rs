@@ -1,6 +1,6 @@
-//! Chapters of an item for the player (ADR 0034): Emby's `Chapters`, kept to the
+//! Chapters of an item for the player: Emby's `Chapters`, kept to the
 //! regular `Chapter` markers, in seconds of the file. The intro and credits markers
-//! stay with the segments (ADR 0030).
+//! stay with the segments.
 
 use serde::Serialize;
 

@@ -2,9 +2,9 @@ package io.github.quentinpn.viewer.tv.player
 
 import io.github.quentinpn.viewer.tv.emby.UserConfigurationDto
 
-// The audio and subtitle preferences of the Emby account (ADR 0065), applied by the
-// client to the tracks mpv lists. They come after the remembered choice (ADR 0042) and
-// the server's pick (ADR 0055): they replace mpv's own guess (`slang`) when the server
+// The audio and subtitle preferences of the Emby account, applied by the
+// client to the tracks mpv lists. They come after the remembered choice and
+// the server's pick: they replace mpv's own guess (`slang`) when the server
 // names no track, or names one that cannot be found in the file.
 
 /** `SubtitlePlaybackMode` of the account, the values the Emby documentation lists. */

@@ -79,7 +79,7 @@ import io.github.quentinpn.viewer.tv.update.HomeUpdate
 import io.github.quentinpn.viewer.tv.update.Updater
 import kotlinx.coroutines.launch
 
-/** Launcher: the server shelf when no session is open (ADR 0104), else the home shelves, a library grid or the search, the settings, the series and film pages. */
+/** Launcher: the server shelf when no session is open, else the home shelves, a library grid or the search, the settings, the series and film pages. */
 class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
@@ -95,7 +95,7 @@ class MainActivity : ComponentActivity() {
         val store = AppServices.store(this)
         val device = AppServices.device(this)
         val reporter = AppServices.reporter(this)
-        // Updates (ADR 0112): checked at start, then every 6 h while the app is in front
+        // Updates: checked at start, then every 6 h while the app is in front
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 while (true) {
@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             ViewerTheme {
                 var session by remember { mutableStateOf(store.load()) }
-                // A session refused while in use: the shelf opens on its « Session expirée » card (ADR 0104)
+                // A session refused while in use: the shelf opens on its « Session expirée » card
                 var reauth by remember { mutableStateOf<String?>(null) }
                 val scope = rememberCoroutineScope()
                 val current = session
@@ -135,7 +135,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     val client = remember(current) { AppServices.client(this, current) }
                     val images = remember(client) { AppServices.images(this, client) }
-                    // Detail pages, the shown one last: a similar title, an episode, a person and their titles stack theirs (ADR 0063, 0068)
+                    // Detail pages, the shown one last: a similar title, an episode, a person and their titles stack theirs
                     var pages by remember(current) { mutableStateOf<List<DetailPage>>(emptyList()) }
                     val openSeries = { target: SeriesTarget -> pages = listOf(DetailPage.Series(target)) }
                     val openMovie = { id: String -> pages = listOf(DetailPage.Movie(id)) }
@@ -145,7 +145,7 @@ class MainActivity : ComponentActivity() {
                     var library by remember(current) { mutableStateOf<LibraryMemory?>(null) }
                     var search by remember(current) { mutableStateOf<SearchMemory?>(null) }
                     var settings by remember(current) { mutableStateOf(false) }
-                    // The Demander tab (ADR 0125): its state outlives a film or series page opened from it
+                    // The Demander tab: its state outlives a film or series page opened from it
                     var requests by remember(current) { mutableStateOf<RequestsMemory?>(null) }
                     val requestImages = remember(current) { AppServices.requestImages(this) }
                     val libraryPrefs = remember(current) { LibraryPreferenceStore(this, current.userId) }
@@ -153,13 +153,13 @@ class MainActivity : ComponentActivity() {
                     val homeRows = remember(current) { HomeRowStore(this, current.userId) }
                     val searchHistory = remember(current) { SearchHistoryStore(this, current.server, current.userId) }
                     val home = remember(current) { HomeMemory() }
-                    // Sign-in or restored session: stop reports lost to the network go out now (ADR 0066)
+                    // Sign-in or restored session: stop reports lost to the network go out now
                     LaunchedEffect(client) { reporter.signedIn(client, current.userId) }
-                    // The session's socket (ADR 0123): open while signed in and started, closed at sign-out
+                    // The session's socket: open while signed in and started, closed at sign-out
                     LaunchedEffect(client) {
                         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { AppServices.sync(this@MainActivity).hold(client, current.userId) }
                     }
-                    // The tile of a session opened at start (or migrated) learns the server's name (ADR 0104)
+                    // The tile of a session opened at start (or migrated) learns the server's name
                     LaunchedEffect(client) {
                         try {
                             val info = client.publicInfo()
@@ -169,7 +169,7 @@ class MainActivity : ComponentActivity() {
                     }
                     val refresh by reporter.stopped.collectAsState()
                     val versions = remember(current) { VersionStore(this, current.userId) }
-                    // A version is only chosen on the film and episode pages (ADR 0058, 0060); elsewhere the server picks
+                    // A version is only chosen on the film and episode pages; elsewhere the server picks
                     val playSource = { itemId: String, startTicks: Long, mediaSourceId: String? ->
                         startActivity(
                             Intent(this, PlayerActivity::class.java)
@@ -179,7 +179,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     val play = { itemId: String, startTicks: Long -> playSource(itemId, startTicks, null) }
-                    // A local trailer plays without reports; a checked web address opens outside the app, as is (ADR 0083)
+                    // A local trailer plays without reports; a checked web address opens outside the app, as is
                     val trailers = TrailerHandlers(
                         play = { itemId ->
                             startActivity(
@@ -204,13 +204,13 @@ class MainActivity : ComponentActivity() {
                         reauth = current.key
                         session = null
                     }
-                    // The token is kept: OK on the tile opens this session again (ADR 0104)
+                    // The token is kept: OK on the tile opens this session again
                     val switchServer = {
                         reporter.signedOut()
                         store.deactivate()
                         session = null
                     }
-                    // « Connexion perdue » (ADR 0119): a network error of the home is checked once,
+                    // « Connexion perdue »: a network error of the home is checked once,
                     // quietly; if the server is really away the screen shows, with automatic attempts.
                     // Every state above stays remembered, so the app comes back where it was.
                     var suspect by remember(current) { mutableStateOf(false) }
@@ -262,14 +262,14 @@ class MainActivity : ComponentActivity() {
                         )
                         return@ViewerTheme
                     }
-                    // A genre chip opens the library holding the title on that genre (ADR 0079, 0093)
+                    // A genre chip opens the library holding the title on that genre
                     val libraries = (home.state as? HomeState.Ready)?.libraries.orEmpty()
                     val genreOpener: (String, List<String>?) -> ((String) -> Unit)? = { itemType, ancestors ->
                         titleLibrary(libraries, itemType, ancestors)?.let { library ->
                             { genre -> genreOptions(libraryPrefs.load(library), genre)?.let { pages = openGenre(pages, DetailPage.Grid(LibraryMemory(library, it)), genre) } }
                         }
                     }
-                    // A studio chip opens that same library on the studio, by name (ADR 0087)
+                    // A studio chip opens that same library on the studio, by name
                     val studioOpener: (String, List<String>?) -> ((String) -> Unit)? = { itemType, ancestors ->
                         titleLibrary(libraries, itemType, ancestors)?.let { library ->
                             { studio -> studioOptions(libraryPrefs.load(library), studio)?.let { pages = openStudio(pages, DetailPage.Grid(LibraryMemory(library, it)), studio) } }
@@ -281,7 +281,7 @@ class MainActivity : ComponentActivity() {
                         BackHandler { pages = pages.dropLast(1) }
                         // Fresh state per page: a similar series replaces this one at the same place
                         key(pages.size, pageKey(page)) {
-                            // Read with the page, cancelled with it; until then the chips open sectionLibrary's choice (ADR 0093)
+                            // Read with the page, cancelled with it; until then the chips open sectionLibrary's choice
                             val titleId = when (page) {
                                 is DetailPage.Movie -> page.id
                                 is DetailPage.Series -> page.target.seriesId
@@ -291,7 +291,7 @@ class MainActivity : ComponentActivity() {
                                 value = titleId?.let { ancestorIdsOrNull(client, current.userId, it) }
                             }
                             when (page) {
-                                // Over the series page: Back shows it again, on the episode's season and card (ADR 0060)
+                                // Over the series page: Back shows it again, on the episode's season and card
                                 is DetailPage.Episode -> EpisodeScreen(
                                     client,
                                     current.userId,
@@ -312,7 +312,7 @@ class MainActivity : ComponentActivity() {
                                     current.userId,
                                     images,
                                     page.memory,
-                                    // Not saved: the grid of the home bar keeps its own choices (ADR 0079, 0087)
+                                    // Not saved: the grid of the home bar keeps its own choices
                                     onOptionsChanged = {},
                                     onOpenSeries = { pages = openOver(pages, DetailPage.Series(SeriesTarget(it))) },
                                     onOpenMovie = { pages = openOver(pages, DetailPage.Movie(it)) },
@@ -334,7 +334,7 @@ class MainActivity : ComponentActivity() {
                                     current.userId,
                                     page,
                                     images,
-                                    // The playlist remembers the entry, focused again on Back (ADR 0088)
+                                    // The playlist remembers the entry, focused again on Back
                                     onOpen = { item -> playlistEntryPage(item)?.let { pages = openOver(pages, it, item.id) } },
                                     onSessionExpired = expired,
                                 )
@@ -366,7 +366,7 @@ class MainActivity : ComponentActivity() {
                                     onPlay = playSource,
                                     onOpenSimilar = openSimilar,
                                     onOpenPerson = openPerson,
-                                    // The film remembers the poster, focused again on Back (ADR 0071)
+                                    // The film remembers the poster, focused again on Back
                                     onOpenCollectionItem = { item -> similarPage(item)?.let { pages = openFromCollection(pages, it, item.id) } },
                                     onSessionExpired = expired,
                                     refresh = refresh,
@@ -409,6 +409,7 @@ class MainActivity : ComponentActivity() {
                             requestImages,
                             // The title's own page, over the tab: Back returns to it
                             onOpenEmby = { type, id -> if (type == MediaType.Movie) openMovie(id) else openSeries(SeriesTarget(id)) },
+                            onTrailer = trailers.open,
                             onClose = { requests = null },
                         )
                         return@ViewerTheme
@@ -478,7 +479,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             reporter.signedOut()
-                            // The tile stays on the shelf, without its token (ADR 0104)
+                            // The tile stays on the shelf, without its token
                             store.signOut()
                             session = null
                         },

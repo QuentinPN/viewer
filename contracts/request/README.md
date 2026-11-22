@@ -1,6 +1,6 @@
 # Contrat Request
 
-Contrat figé de l'API Request utilisée par l'onglet « Demander » (desktop et Android TV). Voir l'ADR 0125.
+Contrat figé de l'API Request utilisée par l'onglet « Demander » (desktop et Android TV).
 
 - Source : dépôt Request, fichier `docs/openapi.json`
 - Commit : `54cd791217a9f3f18b6312c7070089382dfb7938` (`main@54cd791`)

@@ -5,7 +5,7 @@ data class ResendOutcome(val sent: Int = 0, val dropped: Int = 0, val error: Emb
 
 /**
  * Keeps lost stop reports on disk, per account, and sends them again to the signed-in
- * account only (ADR 0066). Not thread-safe: [PlaybackReporter] calls it from its one coroutine.
+ * account only. Not thread-safe: [PlaybackReporter] calls it from its one coroutine.
  */
 class StopResender(private val storage: PendingStopStorage, private val clock: () -> Long = System::currentTimeMillis) {
     private var client: EmbyClient? = null
@@ -68,7 +68,7 @@ class StopResender(private val storage: PendingStopStorage, private val clock: (
 
     /**
      * Sends the signed-in account's kept stops, oldest first, each after a progress report
-     * that carries its position (ADR 0024). Stops at the first failure that may pass.
+     * that carries its position. Stops at the first failure that may pass.
      */
     suspend fun resend(): ResendOutcome {
         val key = account ?: return ResendOutcome()
@@ -101,7 +101,7 @@ class StopResender(private val storage: PendingStopStorage, private val clock: (
 
     private suspend fun send(client: EmbyClient, stop: Report): EmbyError? = try {
         // The server ignores the position of a stop once it closed the playback itself;
-        // a progress report carries it and reopens the playback (ADR 0024)
+        // a progress report carries it and reopens the playback
         client.reportPlayback(stop.lateProgress())
         client.reportPlayback(stop)
         null

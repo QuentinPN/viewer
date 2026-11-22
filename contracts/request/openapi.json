@@ -3,7 +3,7 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Request",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "API REST d’Request : demandes de films et de séries des membres d’un serveur Emby, Jellyfin ou Plex. Erreurs : JSON `{ \"error\": \"message\" }`. Un seul justificatif par requête (cookie, Bearer ou clé d’API) : plusieurs → 400. Justificatif en en-tête invalide → 401, puis 429 (en-tête `Retry-After`) après des essais répétés depuis la même adresse."
   },
   "tags": [
@@ -348,14 +348,14 @@
           "auth"
         ],
         "summary": "Membre connecté et ses droits",
-        "description": "Prolonge aussi le cookie de session (expiration glissante).",
+        "description": "Prolonge aussi le cookie de session (expiration glissante). `apiKeyScope` : portée de la clé d’API qui a servi à l’appel (`read`, `requests` ou `full`), `null` avec un cookie ou un Bearer.",
         "responses": {
           "200": {
             "description": "Succès",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ViewerResponse"
+                  "$ref": "#/components/schemas/CurrentViewerResponse"
                 }
               }
             }
@@ -3534,6 +3534,33 @@
           "parts"
         ]
       },
+      "CurrentViewerResponse": {
+        "type": "object",
+        "properties": {
+          "viewer": {
+            "$ref": "#/components/schemas/Viewer"
+          },
+          "apiKeyScope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "read",
+                  "requests",
+                  "full"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "viewer",
+          "apiKeyScope"
+        ]
+      },
       "DiscoverResponse": {
         "type": "object",
         "properties": {
@@ -5841,7 +5868,7 @@
         "type": "apiKey",
         "in": "header",
         "name": "x-api-key",
-        "description": "Script ou outil externe : clé d’API créée par le propriétaire (Réglages › API), qui agit avec les droits de son créateur. Pas de contrôle CSRF."
+        "description": "Script ou outil externe : clé d’API créée par le propriétaire (Réglages › API), qui agit au plus avec les droits de son créateur. Sa portée (`read`, `requests` ou `full`) limite les routes : une route hors portée répond 403. Pas de contrôle CSRF."
       }
     }
   }

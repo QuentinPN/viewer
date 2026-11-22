@@ -1,0 +1,27 @@
+{
+  "plan": {
+    "bitrateLimit": null,
+    "container": null,
+    "defaultAudioStreamIndex": null,
+    "defaultSubtitleStreamIndex": null,
+    "headers": [],
+    "mediaSourceId": "30501",
+    "method": "transcode",
+    "playSessionId": "p",
+    "runTimeTicks": null,
+    "startTicks": 0,
+    "streamCount": 0,
+    "subtitles": [],
+    "title": null,
+    "tracks": {
+      "audio": {
+        "type": "auto"
+      },
+      "subtitle": {
+        "type": "auto"
+      }
+    },
+    "transcodeReasons": "débit trop élevé",
+    "url": "https://emby.test/emby/videos/30500/master.m3u8?MediaSourceId=30501&TranscodeReasons=VideoBitrateNotSupported"
+  }
+}

@@ -7,7 +7,7 @@ import io.github.quentinpn.viewer.tv.settings.mbits
 import io.github.quentinpn.viewer.tv.settings.offeredCap
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
-// « Qualité » in the player's menu (ADR 0081): the caps of Réglages (ADR 0051), for the
+// « Qualité » in the player's menu: the caps of Réglages, for the
 // playback in progress only. ◀ ▶ pick a cap without reloading anything; OK applies it.
 
 /** The caps of Réglages, highest first: « Maximale » (null), then 40 down to 1,5 Mbit/s. */
@@ -39,7 +39,7 @@ enum class QualityPhase {
 /**
  * The row's state. [applied] is the cap of the stream playing, [chosen] the one shown,
  * picked with ◀ ▶ and not applied until OK; [method] how the server delivers the stream,
- * and [reasons] why it transcodes, as « Informations de lecture » shows them (ADR 0086).
+ * and [reasons] why it transcodes, as « Informations de lecture » shows them.
  */
 data class Quality(
     val applied: Long? = null,
@@ -85,7 +85,7 @@ fun qualityNote(quality: Quality): String = when {
 
 /**
  * Whether a server-built stream URL carries `StartTimeTicks`: logged after a quality
- * change, to see on the device if the server offsets the stream itself (ADR 0081).
+ * change, to see on the device if the server offsets the stream itself.
  * Only the parameter's name is read; the URL is never logged.
  */
 fun hasStartParameter(url: String): Boolean {
@@ -93,7 +93,7 @@ fun hasStartParameter(url: String): Boolean {
     return (0 until parsed.querySize).any { parsed.queryParameterName(it).equals("StartTimeTicks", ignoreCase = true) }
 }
 
-/** « Débit maximal » of « Informations de lecture » (ADR 0061), and whether the player chose it (ADR 0081). */
+/** « Débit maximal » of « Informations de lecture », and whether the player chose it. */
 fun capFact(cap: Long?, localAddress: Boolean, chosenInPlayer: Boolean): String =
     (cap?.let(::mbits) ?: "Maximale") +
         (if (localAddress) " · réseau local" else " · accès distant") +

@@ -2,7 +2,7 @@ package io.github.quentinpn.viewer.tv.emby
 
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
-// Trailers of a film or series page (ADR 0083): a file on the server plays in the app,
+// Trailers of a film or series page: a file on the server plays in the app,
 // a web page opens outside it, only on an allow-list of YouTube hosts.
 
 /** Hosts a remote trailer may open on; any other host is not offered. */
@@ -52,7 +52,7 @@ internal fun isItemId(id: String) = id.isNotEmpty() && id.length <= 128 && id.al
 
 /** What a press on « Bande-annonce » does. */
 sealed interface TrailerAction {
-    /** Plays this trailer item in the app's player, without any report (ADR 0083). */
+    /** Plays this trailer item in the app's player, without any report. */
     data class Play(val itemId: String) : TrailerAction
 
     /** Opens this checked address outside the app. */

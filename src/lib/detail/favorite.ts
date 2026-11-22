@@ -1,4 +1,4 @@
-// Favorite toggle of the detail page (ADR 0014).
+// Favorite toggle of the detail page.
 
 /**
  * Optimistic change: `show` gets the wanted state at once, then the state the

@@ -4,7 +4,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-// The clock and « Fin à » of the controls (ADR 0073).
+// The clock and « Fin à » of the controls.
 
 private const val MINUTE_MS = 60_000L
 
@@ -14,7 +14,7 @@ private val HOUR_MINUTE: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm"
 fun formatClock(nowMs: Long, zone: ZoneId): String = HOUR_MINUTE.format(Instant.ofEpochMilli(nowMs).atZone(zone))
 
 /**
- * When playback ends if it plays on from [position], at [speed] (ADR 0072): what is left of
+ * When playback ends if it plays on from [position], at [speed]: what is left of
  * [duration] lasts that much less at a higher speed. Null while the duration is unknown (a
  * live stream, or before mpv gives it).
  */

@@ -2,7 +2,7 @@ package io.github.quentinpn.viewer.tv.sync
 
 import kotlin.math.abs
 
-// The TV's correction toward the leader (ADR 0124 § Recalage de la TV). Every time comes
+// The TV's correction toward the leader. Every time comes
 // from the TV's own monotonic clock: the two devices' clocks are never compared.
 
 /** Round trips kept for [rttMs]. */
@@ -86,7 +86,7 @@ data class Correction(
 )
 
 /**
- * The ADR's decision, for the gap [e] = TV position − target (positive when the TV is
+ * The decision, for the gap [e] = TV position − target (positive when the TV is
  * ahead). [correcting]: the speed is away from normal. [sinceSeekMs]: time since the
  * last seek.
  */

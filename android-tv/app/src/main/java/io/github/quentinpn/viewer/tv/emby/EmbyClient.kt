@@ -20,14 +20,14 @@ import java.io.IOException
 private const val CLIENT_NAME = "Viewer TV"
 private val JSON_TYPE = "application/json".toMediaType()
 
-/** A download larger than the caller's cap, stopped there (ADR 0069). */
+/** A download larger than the caller's cap, stopped there. */
 class TooLargeException(limit: Int) : Exception("larger than $limit bytes")
 
 /** Sent with every request; [id] is a random id kept per installation. */
 data class DeviceIdentity(val name: String, val id: String, val version: String)
 
 /**
- * Typed Emby operations, ported from the Windows client (ADR 0004, 0007). The token
+ * Typed Emby operations, ported from the Windows client. The token
  * travels in the `X-Emby-Authorization` header, never in a URL, except for the event
  * socket that Emby only binds through `api_key` (see [openEventSocket]).
  */
@@ -77,10 +77,10 @@ class EmbyClient(
         return socketHttp.newWebSocket(Request.Builder().url(url).build(), listener)
     }
 
-    /** This installation's `DeviceId`: finds the TV's own entry among the sessions (ADR 0124). */
+    /** This installation's `DeviceId`: finds the TV's own entry among the sessions. */
     val deviceId: String get() = device.id
 
-    /** Declares the session controllable and able to receive `SendString`, at each socket opening (ADR 0123). */
+    /** Declares the session controllable and able to receive `SendString`, at each socket opening. */
     suspend fun postCapabilities(body: String) {
         execute(post(server.api("/Sessions/Capabilities/Full"), body.toRequestBody(JSON_TYPE)), authenticated = true).close()
     }
@@ -92,7 +92,7 @@ class EmbyClient(
     }
 
     /**
-     * Relays [text] to the session [sessionId] through `SendString` (ADR 0123). The server
+     * Relays [text] to the session [sessionId] through `SendString`. The server
      * answers 204 even for a session gone: losses are found by the missing replies.
      */
     suspend fun sendString(sessionId: String, text: String) {
@@ -120,7 +120,7 @@ class EmbyClient(
         call(get(server.api("/Users/${segment(userId)}")), UserDto.serializer())
 
     /**
-     * The account's track preferences, from `Configuration` of `GET /Users/{Id}` (ADR 0065).
+     * The account's track preferences, from `Configuration` of `GET /Users/{Id}`.
      * The documentation types it `UserConfiguration[]`: an object or the first object of
      * an array is read. Null when the user has none.
      */
@@ -150,7 +150,7 @@ class EmbyClient(
 
     /**
      * Films and episodes started but not finished, most recent first. With the Windows
-     * hero `Fields` (ADR 0015): one request serves the "Reprendre" shelf and the hero (ADR 0059).
+     * hero `Fields`: one request serves the "Reprendre" shelf and the hero.
      */
     suspend fun resumeItems(userId: String, limit: Int): QueryResult<BaseItemDto> {
         val url = server.api("/Users/${segment(userId)}/Items/Resume").newBuilder()
@@ -166,7 +166,7 @@ class EmbyClient(
     }
 
     /**
-     * Home hero (ADR 0015, 0059): films and series not watched yet that have a backdrop,
+     * Home hero: films and series not watched yet that have a backdrop,
      * most recently added first; the Windows `hero_latest` query, without the logos.
      */
     suspend fun heroLatest(userId: String, limit: Int): QueryResult<BaseItemDto> {
@@ -188,7 +188,7 @@ class EmbyClient(
 
     /**
      * First episode of a series not watched yet, in the series' order; the Windows
-     * `first_unplayed_episode` query (ADR 0015). Unknown series: 404.
+     * `first_unplayed_episode` query. Unknown series: 404.
      */
     suspend fun firstUnplayedEpisode(userId: String, seriesId: String): QueryResult<BaseItemDto> {
         val url = server.api("/Shows/${segment(seriesId)}/Episodes").newBuilder()
@@ -202,7 +202,7 @@ class EmbyClient(
         return call(get(url), QueryResult.serializer(BaseItemDto.serializer()))
     }
 
-    /** Next episode to watch of each series in progress (`/Shows/NextUp`), the Windows query (ADR 0010). */
+    /** Next episode to watch of each series in progress (`/Shows/NextUp`), the Windows query. */
     suspend fun nextUp(userId: String, limit: Int): QueryResult<BaseItemDto> {
         val url = server.api("/Shows/NextUp").newBuilder()
             .addQueryParameter("UserId", segment(userId))
@@ -224,7 +224,7 @@ class EmbyClient(
 
     /**
      * Items of one home section (`/Users/{Id}/Sections/{Id}/Items`). On Emby 4.10.1.0 the
-     * "resume" section holds the next episodes `/Shows/NextUp` omits (ADR 0010).
+     * "resume" section holds the next episodes `/Shows/NextUp` omits.
      */
     suspend fun sectionItems(userId: String, sectionId: String, limit: Int): QueryResult<BaseItemDto> {
         val url = server.api("/Users/${segment(userId)}/Sections/${segment(sectionId)}/Items").newBuilder()
@@ -274,7 +274,7 @@ class EmbyClient(
 
     /**
      * Every title of the grid's query, in its order and filters, with `SortName` only: the
-     * letter index of the jump (ADR 0070). No images, no user data, no paging.
+     * letter index of the jump. No images, no user data, no paging.
      */
     suspend fun sortNames(userId: String, parentId: String, itemTypes: String, options: ItemsOptions): List<SortNameDto> {
         val url = libraryQuery(userId, parentId, itemTypes, options)
@@ -296,13 +296,13 @@ class EmbyClient(
         options.filters()?.let { builder.addQueryParameter("Filters", it) }
         options.genre?.takeIf(::isUsableGenre)?.let { builder.addQueryParameter("Genres", it) }
         options.years()?.let { builder.addQueryParameter("Years", it) }
-        // By name: `StudioIds` would need `Studios[].Id`, a number on Emby 4.10 (ADR 0087)
+        // By name: `StudioIds` would need `Studios[].Id`, a number on Emby 4.10
         options.studio?.takeIf(::isUsableStudio)?.let { builder.addQueryParameter("Studios", it) }
         return builder
     }
 
     /**
-     * Decades of a library's films or series, newest first (ADR 0082): the production year of
+     * Decades of a library's films or series, newest first: the production year of
      * every title, read once with no image nor user data, since no year list is documented.
      */
     suspend fun decades(userId: String, parentId: String, itemTypes: String): List<Int> {
@@ -319,7 +319,7 @@ class EmbyClient(
 
     /**
      * Films, series or episodes whose name matches [term], across every library the user
-     * can see (ADR 0011, 0020); the Windows query. [itemType] is `Movie`, `Series` or
+     * can see; the Windows query. [itemType] is `Movie`, `Series` or
      * `Episode`; episodes come with the 16:9 images of the home cards.
      */
     suspend fun search(userId: String, term: String, itemType: String, limit: Int): QueryResult<BaseItemDto> {
@@ -361,7 +361,7 @@ class EmbyClient(
     }
 
     /**
-     * Every parent of [itemId] (ADR 0093): `GET /Items/{Id}/Ancestors?UserId=`, documented as
+     * Every parent of [itemId]: `GET /Items/{Id}/Ancestors?UserId=`, documented as
      * a bare `BaseItemDto[]`; the library holding the title is among them.
      */
     suspend fun ancestors(userId: String, itemId: String): List<BaseItemDto> {
@@ -372,7 +372,7 @@ class EmbyClient(
     }
 
     /**
-     * Films and series the server finds close to [itemId] (`/Items/{Id}/Similar`, ADR 0063),
+     * Films and series the server finds close to [itemId] (`/Items/{Id}/Similar`),
      * with the posters and user data of the library grid.
      */
     suspend fun similar(userId: String, itemId: String, limit: Int): QueryResult<BaseItemDto> {
@@ -389,7 +389,7 @@ class EmbyClient(
     }
 
     /**
-     * The films and series of one person in the user's library (ADR 0068): the items query
+     * The films and series of one person in the user's library: the items query
      * filtered by `PersonIds`, built by [personItemsQuery]. A person is an item too: its
      * overview comes from [item] with the person's id.
      */
@@ -400,7 +400,7 @@ class EmbyClient(
     }
 
     /**
-     * The titles of one collection (BoxSet, ADR 0071): the items query with the BoxSet as
+     * The titles of one collection (BoxSet): the items query with the BoxSet as
      * `ParentId`, built by [collectionItemsQuery].
      */
     suspend fun collectionItems(userId: String, collectionId: String, limit: Int = COLLECTION_TITLES_LIMIT): QueryResult<BaseItemDto> {
@@ -410,7 +410,7 @@ class EmbyClient(
     }
 
     /**
-     * One item without `Fields`, as the Windows client reads it for segments (ADR 0030):
+     * One item without `Fields`, as the Windows client reads it for segments:
      * Emby 4.10.2.0 then returns its `Chapters` and `ProviderIds`.
      */
     suspend fun fullItem(userId: String, itemId: String): BaseItemDto =
@@ -453,7 +453,7 @@ class EmbyClient(
     }
 
     /**
-     * Episodes around one of a series, across seasons (ADR 0016). Emby 4.10.1.0 answers
+     * Episodes around one of a series, across seasons. Emby 4.10.1.0 answers
      * up to 5 episodes before it then the rest of the series; no images, but user data
      * for the resume point of the next one.
      */
@@ -468,11 +468,11 @@ class EmbyClient(
     }
 
     /**
-     * Playback negotiation (ADR 0007): the server answers with its sources for this profile,
-     * only [mediaSourceId]'s when one version is asked for (ADR 0058). [startTicks]: the
-     * position playback goes on from, when the quality changes in the player (ADR 0081).
-     * [audioStreamIndex]: the audio a transcode must carry (ADR 0084), only sent with
-     * [mediaSourceId], as the server ignores it without (ADR 0035).
+     * Playback negotiation: the server answers with its sources for this profile,
+     * only [mediaSourceId]'s when one version is asked for. [startTicks]: the
+     * position playback goes on from, when the quality changes in the player.
+     * [audioStreamIndex]: the audio a transcode must carry, only sent with
+     * [mediaSourceId], as the server ignores it without.
      */
     suspend fun playbackInfo(
         userId: String,
@@ -504,7 +504,7 @@ class EmbyClient(
     }
 
     /**
-     * Ends the server's transcode of a replaced stream (ADR 0081):
+     * Ends the server's transcode of a replaced stream:
      * `DELETE /Videos/ActiveEncodings?DeviceId=&PlaySessionId=`, both documented as
      * required. Neither is a secret; the token stays in the header. An id outside the
      * shape of source ids is never sent.
@@ -519,7 +519,7 @@ class EmbyClient(
         execute(request(url).delete().build(), authenticated = true).close()
     }
 
-    /** Playback report (ADR 0008); the server answers 204 without a body. */
+    /** Playback report; the server answers 204 without a body. */
     suspend fun reportPlayback(report: Report) {
         requireToken()
         val body = json.encodeToString(PlaybackReport.serializer(), report.body)
@@ -527,7 +527,7 @@ class EmbyClient(
     }
 
     /**
-     * Seek thumbnails of an item (ADR 0069): `GET /Videos/{Id}/index.bif?Width=`, a Roku BIF
+     * Seek thumbnails of an item: `GET /Videos/{Id}/index.bif?Width=`, a Roku BIF
      * file, read whole into memory. Null on 404, the answer of a server that has extracted
      * none. A file announced or read beyond [maxBytes] throws [TooLargeException] without
      * reading the rest.
@@ -636,8 +636,8 @@ class EmbyClient(
     }
 
     /**
-     * One title of a library drawn by the server among those the grid's filters keep
-     * (ADR 0077), or null when none does. Reads only: no user data is written.
+     * One title of a library drawn by the server among those the grid's filters keep,
+     * or null when none does. Reads only: no user data is written.
      */
     suspend fun randomLibraryItem(userId: String, parentId: String, itemTypes: String, options: ItemsOptions): BaseItemDto? {
         val url = randomPick(libraryQuery(userId, parentId, itemTypes, options)).build()
@@ -645,7 +645,7 @@ class EmbyClient(
     }
 
     /**
-     * The trailer files of a film or series (ADR 0083): `GET /Users/{Id}/Items/{Id}/LocalTrailers`,
+     * The trailer files of a film or series: `GET /Users/{Id}/Items/{Id}/LocalTrailers`,
      * documented as a bare `BaseItemDto[]`. Each trailer is an item of its own, played by its id.
      */
     suspend fun localTrailers(userId: String, itemId: String): List<BaseItemDto> {
@@ -656,14 +656,14 @@ class EmbyClient(
         return call(get(url), kotlinx.serialization.builtins.ListSerializer(BaseItemDto.serializer()))
     }
 
-    /** The user's playlists (ADR 0088): the items query built by [playlistsQuery]. */
+    /** The user's playlists: the items query built by [playlistsQuery]. */
     suspend fun playlists(userId: String, limit: Int = PLAYLISTS_LIMIT): QueryResult<BaseItemDto> {
         val builder = server.api("/Users/${segment(userId)}/Items").newBuilder()
         playlistsQuery(limit).forEach { (name, value) -> builder.addQueryParameter(name, value) }
         return call(get(builder.build()), QueryResult.serializer(BaseItemDto.serializer()))
     }
 
-    /** The user's favourite films and series (ADR 0091): the items query built by [favoritesQuery]. */
+    /** The user's favourite films and series: the items query built by [favoritesQuery]. */
     suspend fun favorites(userId: String, limit: Int = FAVORITES_LIMIT): QueryResult<BaseItemDto> {
         val builder = server.api("/Users/${segment(userId)}/Items").newBuilder()
         favoritesQuery(limit).forEach { (name, value) -> builder.addQueryParameter(name, value) }
@@ -671,7 +671,7 @@ class EmbyClient(
     }
 
     /**
-     * Marks [itemId] watched or not (ADR 0097): `POST` / `DELETE /Users/{Id}/PlayedItems/{Id}`,
+     * Marks [itemId] watched or not: `POST` / `DELETE /Users/{Id}/PlayedItems/{Id}`,
      * answered with the item's new user data. No `DatePlayed`: the server dates it itself. On a
      * series or season the server's cascade to the episodes is not documented: read them again.
      */
@@ -680,14 +680,14 @@ class EmbyClient(
         return call(if (played) post(url, ByteArray(0).toRequestBody()) else delete(url), UserItemData.serializer())
     }
 
-    /** Adds [itemId] to the favourites or removes it (ADR 0097): `POST` / `DELETE /Users/{Id}/FavoriteItems/{Id}`. */
+    /** Adds [itemId] to the favourites or removes it: `POST` / `DELETE /Users/{Id}/FavoriteItems/{Id}`. */
     suspend fun setFavorite(userId: String, itemId: String, favorite: Boolean): UserItemData {
         val url = server.api("/Users/${segment(userId)}/FavoriteItems/${segment(itemId)}")
         return call(if (favorite) post(url, ByteArray(0).toRequestBody()) else delete(url), UserItemData.serializer())
     }
 
     /**
-     * Takes [itemId] out of « Reprendre » or puts it back (ADR 0097):
+     * Takes [itemId] out of « Reprendre » or puts it back:
      * `POST /Users/{Id}/Items/{Id}/HideFromResume?Hide=`, answered with the new user data.
      */
     suspend fun hideFromResume(userId: String, itemId: String, hide: Boolean): UserItemData {
@@ -697,7 +697,7 @@ class EmbyClient(
         return call(post(url, ByteArray(0).toRequestBody()), UserItemData.serializer())
     }
 
-    /** The entries of one playlist, in its order (ADR 0088): `GET /Playlists/{Id}/Items`, built by [playlistItemsQuery]. */
+    /** The entries of one playlist, in its order: `GET /Playlists/{Id}/Items`, built by [playlistItemsQuery]. */
     suspend fun playlistItems(userId: String, playlistId: String, limit: Int = PLAYLIST_ITEMS_LIMIT): QueryResult<BaseItemDto> {
         val builder = server.api("/Playlists/${segment(playlistId)}/Items").newBuilder()
         playlistItemsQuery(segment(userId), limit).forEach { (name, value) -> builder.addQueryParameter(name, value) }
@@ -705,7 +705,7 @@ class EmbyClient(
     }
 
     /**
-     * Adds [itemId] to the end of [playlistId] (ADR 0098): `POST /Playlists/{Id}/Items?Ids=&UserId=`,
+     * Adds [itemId] to the end of [playlistId]: `POST /Playlists/{Id}/Items?Ids=&UserId=`,
      * no body. A series is added by its own id: the server adds its episodes.
      */
     suspend fun addToPlaylist(userId: String, playlistId: String, itemId: String): AddToPlaylistResult {
@@ -717,7 +717,7 @@ class EmbyClient(
     }
 
     /**
-     * A new video playlist named [name] holding [itemId] (ADR 0098):
+     * A new video playlist named [name] holding [itemId]:
      * `POST /Playlists?Name=&Ids=&MediaType=Video&UserId=`, no body. `UserId` is always sent:
      * the server is reported to need it to know whose playlist it is.
      */

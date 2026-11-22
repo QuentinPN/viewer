@@ -4,7 +4,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
-/** Most titles of the home hero, as on Windows (`HERO_SIZE`, ADR 0015, 0059). */
+/** Most titles of the home hero, as on Windows (`HERO_SIZE`). */
 const val HERO_SIZE = 5
 
 /** The Windows hero `Fields` (`HERO_FIELDS`): the overview and the year come with each item. */
@@ -17,7 +17,7 @@ data class HeroImage(val itemId: String, val tag: String)
 data class HeroEpisode(val name: String, val season: Int?, val index: Int?)
 
 /**
- * One title of the home hero (ADR 0059, from Windows `HeroItem`). [id] and [type] name
+ * One title of the home hero (from Windows `HeroItem`). [id] and [type] name
  * the film or series page "Plus d'infos" opens; [playId] is what the main button plays
  * from [startTicks], none for a series with nothing left to watch.
  */
@@ -37,7 +37,7 @@ data class HeroTitle(
     val startTicks: Long = 0,
     /** From "Reprendre", not from the latest additions. */
     val resumed: Boolean = false,
-    /** The title's logo, shown in place of its name when it loads (ADR 0064). */
+    /** The title's logo, shown in place of its name when it loads. */
     val logo: HeroImage? = null,
     /** Length of what [playId] plays, for the time left under a resume point. */
     val playLength: Long? = null,

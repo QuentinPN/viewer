@@ -1,4 +1,4 @@
-// Pure helpers of the pre-connection shelf (ADR 0103): tile identity, labels,
+// Pure helpers of the pre-connection shelf: tile identity, labels,
 // what a tile does, and keyboard moves between tiles. Covered by Vitest.
 import type { EmbyError, ShelfServer } from "../emby/types";
 

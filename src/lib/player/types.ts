@@ -65,13 +65,13 @@ export interface PlayerDiagnostics {
   timePos: number | null;
   duration: number | null;
   paused: boolean | null;
-  /** Engine volume in percent (ADR 0017). */
+  /** Engine volume in percent. */
   volume: number | null;
   frameDropCount: number | null;
   decoderFrameDropCount: number | null;
-  /** Chapters mpv found in the file (ADR 0034). */
+  /** Chapters mpv found in the file. */
   chapterCount: number | null;
-  /** Subtitle options in effect, as mpv reads them back (ADR 0035). */
+  /** Subtitle options in effect, as mpv reads them back. */
   subtitleOptions: [string, string][];
 }
 

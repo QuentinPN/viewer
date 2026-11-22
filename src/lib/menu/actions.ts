@@ -1,4 +1,4 @@
-// Card menu (ADR 0100): which actions a card offers, in the order of the
+// Card menu: which actions a card offers, in the order of the
 // official Emby apps, and the labels the menu shows.
 import type { ImageRef, MediaItem, WatchItem } from "../emby/types";
 import { episodeCode } from "../home/format";
@@ -56,7 +56,7 @@ export interface MenuAction {
 /**
  * Actions of a card, in order: play (resume, or the next episode of a series),
  * add to a playlist, played, favourite, then "Retirer de Reprendre" on that row.
- * No "Tout lire" or "Aléatoire": the app plays no queue (ADR 0100).
+ * No "Tout lire" or "Aléatoire": the app plays no queue.
  */
 export function menuActions(
   target: MenuTarget,

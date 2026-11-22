@@ -1,6 +1,6 @@
-//! Lists of titles opened from a detail page (ADR 0121): a person's films and
+//! Lists of titles opened from a detail page: a person's films and
 //! series, the titles of a genre or a studio. Same queries and parameters as the
-//! Android TV (ADR 0068, 0079, 0087), the verified reference.
+//! Android TV, the verified reference.
 
 use serde::Deserialize;
 
@@ -10,7 +10,7 @@ use super::models::{BaseItemDto, PersonDto, is_usable_genre};
 /// Titles read for one list: one request, enough for a home library.
 pub const TITLES_LIMIT: u32 = 100;
 
-/// Similar titles shown under a film or series, as on the TV (ADR 0084).
+/// Similar titles shown under a film or series, as on the TV.
 pub const SIMILAR_LIMIT: u32 = 12;
 
 /// Collections of a title shown on its page, as on the TV.
@@ -131,7 +131,7 @@ pub fn titles_params(source: &TitlesSource) -> Result<Vec<(&'static str, String)
             } else {
                 "Studios"
             };
-            // `|` separates names in these filters and has no escape (ADR 0079, 0087).
+            // `|` separates names in these filters and has no escape.
             if !is_usable_genre(name) || !matches!(item_type.as_str(), "Movie" | "Series") {
                 return Err(EmbyError::InvalidResponse("filtre invalide".into()));
             }

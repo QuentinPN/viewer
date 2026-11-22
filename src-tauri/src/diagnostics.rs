@@ -1,4 +1,4 @@
-//! Local log file and crash diagnostics (ADR 0033).
+//! Local log file and crash diagnostics.
 //!
 //! A small `log` backend writes every record to `viewer.log` in the app log
 //! directory, rotated by size, after [`redact`] removed tokens, passwords and
@@ -426,25 +426,26 @@ impl Serialize for DiagnosticsError {
 pub async fn diagnostics_open_log_dir(dir: State<'_, LogDir>) -> Result<(), DiagnosticsError> {
     let dir = dir.0.as_deref().ok_or(DiagnosticsError::Unavailable)?;
     fs::create_dir_all(dir).map_err(|e| DiagnosticsError::Open(e.kind().to_string()))?;
-    open_in_explorer(dir)
+    open_in_explorer(dir.as_os_str()).map_err(|e| DiagnosticsError::Open(e.kind().to_string()))
 }
 
+/// Hands `target` (a folder, or a web address opened in the default browser) to
+/// the Windows shell. Callers build `target` themselves: never from the WebView as is.
 #[cfg(windows)]
-fn open_in_explorer(dir: &Path) -> Result<(), DiagnosticsError> {
+pub(crate) fn open_in_explorer(target: &std::ffi::OsStr) -> io::Result<()> {
     // Full path: no lookup of `explorer` in the current directory or PATH.
     let windows =
         std::env::var_os("SystemRoot").map_or_else(|| PathBuf::from(r"C:\Windows"), PathBuf::from);
     // explorer.exe exits with 1 even on success: only the launch is checked.
     std::process::Command::new(windows.join("explorer.exe"))
-        .arg(dir)
+        .arg(target)
         .spawn()
         .map(drop)
-        .map_err(|e| DiagnosticsError::Open(e.kind().to_string()))
 }
 
 #[cfg(not(windows))]
-fn open_in_explorer(_dir: &Path) -> Result<(), DiagnosticsError> {
-    Err(DiagnosticsError::Unavailable)
+pub(crate) fn open_in_explorer(_target: &std::ffi::OsStr) -> io::Result<()> {
+    Err(io::ErrorKind::Unsupported.into())
 }
 
 #[cfg(test)]

@@ -1,8 +1,8 @@
 <script lang="ts">
-// Sign-in card (DESIGN.md, ADR 0103). Without `reauth`: « Connexion manuelle »,
+// Sign-in card (DESIGN.md). Without `reauth`: « Connexion manuelle »,
 // one form with the address, the user name and the password; the address is
 // probed, then the account signs in. With `reauth`: a known server and user,
-// only the password is asked (« Session expirée » after a rejection, ADR 0012).
+// only the password is asked (« Session expirée » after a rejection).
 // The password is never stored: only the session token, in the vault.
 import { onMount, tick, untrack } from "svelte";
 import { hostOf, isPlainHttp } from "../connection/shelf";

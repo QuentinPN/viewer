@@ -17,7 +17,7 @@ import io.github.quentinpn.viewer.tv.emby.trailerAction
 import io.github.quentinpn.viewer.tv.emby.trailerChoices
 import kotlinx.coroutines.launch
 
-/** How a trailer leaves the page (ADR 0083), wired by `MainActivity`. */
+/** How a trailer leaves the page, wired by `MainActivity`. */
 class TrailerHandlers(
     /** Plays a local trailer item in the app's player, without any report. */
     val play: (itemId: String) -> Unit,
@@ -29,7 +29,7 @@ internal const val TRAILER_NO_APP = "Aucune application ne peut ouvrir cette ban
 internal const val TRAILER_MISSING = "Bande-annonce introuvable sur le serveur."
 
 /**
- * « Bande-annonce » when [item] has one (ADR 0083): the server's file first, else the web
+ * « Bande-annonce » when [item] has one: the server's file first, else the web
  * page. Never the first button of its row, so a reload does not move the focus. [onMessage]
  * shows a French message under the row, or clears it with null.
  */

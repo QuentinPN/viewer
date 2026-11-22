@@ -21,7 +21,7 @@ import java.io.IOException
 
 internal val viewerJson = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = true }
 
-/** API major and features this client needs (ADR 0125). */
+/** API major and features this client needs. */
 const val SUPPORTED_MAJOR = "1"
 val REQUIRED_FEATURES = listOf("auth.emby-token", "auth.bearer", "auth.sessions", "media.item-id")
 
@@ -41,7 +41,7 @@ private const val MAX_DEVICE_NAME = 64
 private const val DEFAULT_RETRY_AFTER_SECONDS = 60L
 
 /**
- * Normalizes what the user typed (ADR 0125): trimmed, no trailing slash, `https://` when no
+ * Normalizes what the user typed: trimmed, no trailing slash, `https://` when no
  * scheme is given. Plain `http://` is only accepted on the local network, so the Emby token of
  * the exchange never travels in clear over the Internet.
  */
@@ -73,7 +73,7 @@ fun ensureCompatible(version: ApiVersion) {
 }
 
 /**
- * Hosts where plain `http://` is accepted (ADR 0125): loopback (`localhost`, `127/8`, `::1`),
+ * Hosts where plain `http://` is accepted: loopback (`localhost`, `127/8`, `::1`),
  * `10/8`, `172.16/12`, `192.168/16` and `*.local`. Nothing else: not link-local, not `.lan`.
  * Never resolves a name.
  */

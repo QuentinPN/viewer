@@ -1,4 +1,4 @@
-// Pre-connection shelf (ADR 0103) on the real Emby test account, driven over CDP:
+// Pre-connection shelf on the real Emby test account, driven over CDP:
 // - a tile without token opens the password card, user prefilled, focus on password;
 // - « Changer de serveur » keeps the token: OK on the tile reopens without password;
 // - « Gérer »: the confirmation focuses « Annuler », Annuler keeps the tile;

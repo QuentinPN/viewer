@@ -1,5 +1,5 @@
 <script lang="ts">
-// Update ready (ADR 0112, DESIGN.md « Mise à jour prête »): a discreet glass pill at
+// Update ready (DESIGN.md « Mise à jour prête »): a discreet glass pill at
 // the top right, and a frosted 440 px card with the release notes. Never shown
 // during playback; the update itself is downloaded and verified on the Rust side.
 import { onMount, tick } from "svelte";

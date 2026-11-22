@@ -49,7 +49,7 @@ class LibraryPreferenceStore(context: Context, private val userId: String) {
     }
 }
 
-/** The « Années » pill (ADR 0082): « Toutes » or the decade's first year. */
+/** The « Années » pill: « Toutes » or the decade's first year. */
 internal fun decadePillLabel(decade: Int?): String = "Années : ${decade ?: "Toutes"}"
 
 /** A line of the decade list: « Toutes les années », then « Années 1990 ». */

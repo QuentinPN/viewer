@@ -1,0 +1,16 @@
+{
+  "id": "80475",
+  "name": "Secrets",
+  "kind": "episode",
+  "seriesName": null,
+  "seasonIndex": 1,
+  "index": 1,
+  "image": null,
+  "runtimeMinutes": 50,
+  "resume": {
+    "positionSeconds": 300,
+    "fraction": 0.1
+  },
+  "played": false,
+  "favorite": false
+}

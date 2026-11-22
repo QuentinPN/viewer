@@ -34,12 +34,12 @@ pub struct MpvConfig {
     /// mpv `hwdec` value. `auto-safe` only enables decoders mpv considers reliable.
     pub hwdec: String,
     /// `ao=null` with video still shown: scripted UI tests must not play sound on
-    /// the user's speakers (ADR 0006).
+    /// the user's speakers.
     pub silent: bool,
     /// Where to export the Windows root certificates for HTTPS sources. Without it,
-    /// `tls-ca-file` stays empty and every HTTPS source is refused (ADR 0026).
+    /// `tls-ca-file` stays empty and every HTTPS source is refused.
     pub tls_roots: Option<PathBuf>,
-    /// Wait for a file to load (ADR 0027). Only tests shorten it.
+    /// Wait for a file to load. Only tests shorten it.
     pub open_limit: Duration,
 }
 
@@ -66,17 +66,17 @@ unsafe impl Sync for RawHandle {}
 /// FFmpeg HTTP options: after a network error or an early end of stream, waits
 /// 0, 1, 3 then 7 s before each new try; the next delay (15 s) is past
 /// `reconnect_delay_max`, so it gives up there. HTTP errors such as 401 are not
-/// retried (ADR 0022). No redirects: they would carry the auth header to another
-/// host (ADR 0025).
+/// retried. No redirects: they would carry the auth header to another
+/// host.
 const STREAM_LAVF_OPTIONS: &str = "reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=7,max_redirects=0";
 
 /// What FFmpeg may open by itself, such as HLS segments: a playlist from the server
-/// must not reach local files (ADR 0025).
+/// must not reach local files.
 const DEMUXER_LAVF_OPTIONS: &str = "protocol_whitelist=[http,https,tcp,tls]";
 
 /// Seconds a connection or a read may hang before FFmpeg counts it as failed. mpv
 /// reads again after a failure, so a stream that stays dead is ended by
-/// [`StallWatch`], not by these options (ADR 0022).
+/// [`StallWatch`], not by these options.
 const NETWORK_TIMEOUT: &str = "15";
 
 struct Inner {
@@ -86,7 +86,7 @@ struct Inner {
     /// (`sub-add` needs a loaded file).
     pending_subtitles: Mutex<Vec<(String, ExternalSubtitle)>>,
     /// Tracks of the last `load`, selected by the event thread on `FILE_LOADED`,
-    /// once mpv knows the file's streams (ADR 0035).
+    /// once mpv knows the file's streams.
     pending_tracks: Mutex<TrackSelection>,
 }
 
@@ -276,7 +276,7 @@ impl MpvEngine {
             ("hwdec", config.hwdec.as_str()),
             // HTTP through FFmpeg rather than the curl stream, whose retries are
             // immediate and give up within the same millisecond: FFmpeg reopens
-            // the stream after a short network outage (ADR 0022).
+            // the stream after a short network outage.
             ("curl-enabled", "no"),
             ("stream-lavf-o", STREAM_LAVF_OPTIONS),
             ("network-timeout", NETWORK_TIMEOUT),
@@ -311,7 +311,7 @@ impl MpvEngine {
         inner.observe(OBS_TRACKS, "track-list", ffi::MPV_FORMAT_STRING)?;
         // With `keep-open`, mpv stays on the last frame at the end of the file and
         // sends no `end-file`: `eof-reached` is the end, including a stream cut
-        // short by the network once the cache is drained (ADR 0012).
+        // short by the network once the cache is drained.
         inner.observe(OBS_EOF, "eof-reached", ffi::MPV_FORMAT_FLAG)?;
         Ok(())
     }
@@ -326,7 +326,7 @@ impl MpvEngine {
         self.inner.get_property("time-pos")?.parse().ok()
     }
 
-    /// FFmpeg indexes of the selected audio and subtitle streams (ADR 0124).
+    /// FFmpeg indexes of the selected audio and subtitle streams.
     pub fn selected_streams(&self) -> (Option<i32>, Option<i32>) {
         selected_streams(&self.inner.get_property("track-list").unwrap_or_default())
     }
@@ -507,7 +507,7 @@ fn finite(v: f64) -> Result<f64, PlayerError> {
     }
 }
 
-/// Night mode (ADR 0072), as on the TV: FFmpeg's `acompressor` through mpv's
+/// Night mode, as on the TV: FFmpeg's `acompressor` through mpv's
 /// `lavfi`, labelled `@night`. Peaks above about -24 dBFS are compressed 4:1,
 /// then a makeup gain of about +6 dB lifts speech; no look-ahead, so no latency.
 const NIGHT_FILTER: &str =
@@ -518,7 +518,7 @@ fn night_filter(on: bool) -> &'static str {
     if on { NIGHT_FILTER } else { "" }
 }
 
-/// Past ten seconds either way, the file itself is out of sync (ADR 0062).
+/// Past ten seconds either way, the file itself is out of sync.
 const DELAY_MAX_SECONDS: f64 = 10.0;
 
 fn delay_value(seconds: f64) -> Result<String, PlayerError> {
@@ -566,7 +566,7 @@ fn parse_tracks(json: &str) -> Result<Vec<Track>, PlayerError> {
         .collect())
 }
 
-/// mpv options set for each file from the subtitle style (ADR 0035).
+/// mpv options set for each file from the subtitle style.
 const SUBTITLE_OPTIONS: [&str; 7] = [
     "sub-scale",
     "sub-color",
@@ -691,7 +691,7 @@ fn add_pending_subtitles(inner: &Inner) {
             .unwrap_or_else(|p| p.into_inner()),
     );
     // Asynchronous: Emby may take a minute to extract a subtitle from the file, and
-    // a synchronous sub-add would stall playback meanwhile (ADR 0009).
+    // a synchronous sub-add would stall playback meanwhile.
     for (target, sub) in pending {
         let flag = if sub.selected { "select" } else { "auto" };
         let title = sub.title.as_deref().unwrap_or("");
@@ -792,7 +792,7 @@ fn event_loop(inner: &Inner, stop: &AtomicBool, sink: &EventSink, open_limit: Du
                         .into_owned()
                 });
                 // Once FFmpeg gives up on an HLS list, mpv tries each segment as a file:
-                // the first failure ends it (ADR 0027). Before the event, as in `end_stalled`.
+                // the first failure ends it. Before the event, as in `end_stalled`.
                 if reason == EndReason::Error
                     && let Err(e) = inner.command_async(REPLY_STALL_STOP, &["stop"])
                 {
@@ -1083,7 +1083,7 @@ mod tests {
         assert_eq!(selected_streams("not json"), (None, None));
     }
 
-    /// Preferences of ADR 0035 reach libmpv: style options, subtitles off, and the
+    /// Preferences reach libmpv: style options, subtitles off, and the
     /// audio stream picked by its index in the file.
     #[test]
     fn applies_subtitle_style_and_track_preferences() {
@@ -1289,7 +1289,7 @@ mod tests {
             .count()
     }
 
-    /// ADR 0027: once FFmpeg gives up on the list, mpv reads it as a playlist of files.
+    /// Once FFmpeg gives up on the list, mpv reads it as a playlist of files.
     /// The first failure ends it: no second wave of requests, no series of errors.
     #[test]
     fn a_failed_hls_list_is_not_walked_as_a_playlist() {
@@ -1319,7 +1319,7 @@ mod tests {
         engine.shutdown();
     }
 
-    /// ADR 0027: FFmpeg skips HLS segments that fail, one after the other, and neither
+    /// FFmpeg skips HLS segments that fail, one after the other, and neither
     /// loads the file nor ends it. The limit ends the opening and stops the requests.
     #[test]
     fn failing_hls_segments_end_at_the_opening_limit() {
@@ -1365,7 +1365,7 @@ mod tests {
         assert_eq!(segments(), after_stop);
     }
 
-    /// ADR 0025: the token stops at the server the request was meant for.
+    /// The token stops at the server the request was meant for.
     #[test]
     fn redirect_does_not_carry_the_token_to_another_host() {
         let (other, other_seen) = serve(|_| http_response("404 Not Found", "", ""));
@@ -1382,7 +1382,7 @@ mod tests {
         assert!(other_seen.lock().unwrap().is_empty());
     }
 
-    /// ADR 0025: a playlist from the server does not open local files. Without the
+    /// A playlist from the server does not open local files. Without the
     /// protocol whitelist, FFmpeg reads and plays this one.
     #[test]
     fn hls_playlist_cannot_open_a_local_file() {

@@ -1,4 +1,4 @@
-// Audio and subtitle preferences (ADR 0035) on the real Emby test account, driven
+// Audio and subtitle preferences on the real Emby test account, driven
 // over CDP:
 // - Réglages › Audio et sous-titres: English audio, French subtitles always, very
 //   large yellow text on a dark box, raised; the choice is kept in localStorage;

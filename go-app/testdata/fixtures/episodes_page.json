@@ -1,0 +1,10 @@
+{"Items":[
+        {"Name":"La Nouvelle Recrue","Id":"80475","IndexNumber":1,"ParentIndexNumber":1,"Type":"Episode",
+         "SeriesId":"80473","SeasonId":"80474","RunTimeTicks":14400640000,"Overview":"Seul membre du club…",
+         "PremiereDate":"2024-07-04T22:00:00.0000000Z","ImageTags":{"Primary":"9e617fa1_6385"},
+         "UserData":{"PlaybackPositionTicks":7200320000,"Played":false}},
+        {"Name":"Double","Id":"80476","IndexNumber":2,"IndexNumberEnd":3,"ParentIndexNumber":1,"Type":"Episode",
+         "SeriesId":"80473","SeasonId":"80474","ImageTags":{},"UserData":{"Played":true}},
+        {"Name":"Date to Date","Id":"80490","IndexNumber":1,"ParentIndexNumber":0,"Type":"Episode",
+         "SeriesId":"80473","SeasonId":"80480","SeasonName":"Épisodes spéciaux"}
+    ],"TotalRecordCount":24}

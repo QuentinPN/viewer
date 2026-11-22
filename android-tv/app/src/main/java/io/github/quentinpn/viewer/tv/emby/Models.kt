@@ -38,7 +38,7 @@ data class UserDto(
 )
 
 /**
- * The track fields of `UserDto.Configuration` (`UserConfiguration`, ADR 0065). The
+ * The track fields of `UserDto.Configuration` (`UserConfiguration`). The
  * other fields, `ProfilePin` among them, are never decoded. `SubtitleMode` stays text:
  * an unknown value then means no preference rather than an unreadable user.
  */
@@ -81,11 +81,11 @@ data class BaseItemDto(
     @SerialName("Overview") val overview: String? = null,
     @SerialName("SeriesName") val seriesName: String? = null,
     @SerialName("SeriesId") val seriesId: String? = null,
-    /** An episode's season; a special aired within a season has the specials' one (ADR 0016, gate 2). */
+    /** An episode's season; a special aired within a season has the specials' one (gate 2). */
     @SerialName("SeasonId") val seasonId: String? = null,
     @SerialName("ParentIndexNumber") val parentIndexNumber: Int? = null,
     @SerialName("IndexNumber") val indexNumber: Int? = null,
-    /** Last number of a double episode (ADR 0016). */
+    /** Last number of a double episode. */
     @SerialName("IndexNumberEnd") val indexNumberEnd: Int? = null,
     /** An episode's air date, ISO 8601 in UTC (`2024-07-04T22:00:00.0000000Z`). */
     @SerialName("PremiereDate") val premiereDate: String? = null,
@@ -96,7 +96,7 @@ data class BaseItemDto(
     @SerialName("ParentBackdropImageTags") val parentBackdropImageTags: List<String> = emptyList(),
     @SerialName("ParentThumbItemId") val parentThumbItemId: String? = null,
     @SerialName("ParentThumbImageTag") val parentThumbImageTag: String? = null,
-    /** An episode's series logo, when `EnableImageTypes` holds `Logo` (ADR 0015). */
+    /** An episode's series logo, when `EnableImageTypes` holds `Logo`. */
     @SerialName("ParentLogoItemId") val parentLogoItemId: String? = null,
     @SerialName("ParentLogoImageTag") val parentLogoImageTag: String? = null,
     @SerialName("UserData") val userData: UserItemData? = null,
@@ -106,25 +106,25 @@ data class BaseItemDto(
     @SerialName("People") val people: List<PersonDto> = emptyList(),
     @SerialName("OfficialRating") val officialRating: String? = null,
     @SerialName("CommunityRating") val communityRating: Double? = null,
-    /** Out of 100; sent as an integer (`17`) by Emby 4.10, documented as a number (ADR 0074). */
+    /** Out of 100; sent as an integer (`17`) by Emby 4.10, documented as a number. */
     @SerialName("CriticRating") val criticRating: Double? = null,
-    /** Key case varies (`Imdb` on an episode, `IMDB` on its series): sent to the intro services only (ADR 0048). */
+    /** Key case varies (`Imdb` on an episode, `IMDB` on its series): sent to the intro services only. */
     @SerialName("ProviderIds") val providerIds: Map<String, String> = emptyMap(),
     @SerialName("Chapters") val chapters: List<ChapterInfo> = emptyList(),
-    /** The versions of a film or episode (ADR 0058); PlaybackInfo decides how each one plays. */
+    /** The versions of a film or episode; PlaybackInfo decides how each one plays. */
     @SerialName("MediaSources") val mediaSources: List<MediaSourceDto> = emptyList(),
     /**
-     * The BoxSets holding the item, documented as `NameLongIdPair[]` (ADR 0071). Kept raw and
+     * The BoxSets holding the item, documented as `NameLongIdPair[]`. Kept raw and
      * read by [collectionRefs]: a shape the client does not expect hides the row, not the film.
      */
     @SerialName("Collections") val rawCollections: JsonElement? = null,
-    /** Trailers on the web (`MediaUrl[]`, ADR 0083), usually YouTube; opened outside the app once checked by [trailerUrl]. */
+    /** Trailers on the web (`MediaUrl[]`), usually YouTube; opened outside the app once checked by [trailerUrl]. */
     @SerialName("RemoteTrailers") val remoteTrailers: List<MediaUrlDto> = emptyList(),
-    /** Trailer files on the server (ADR 0083), listed by [EmbyClient.localTrailers]. */
+    /** Trailer files on the server, listed by [EmbyClient.localTrailers]. */
     @SerialName("LocalTrailerCount") val localTrailerCount: Int? = null,
-    /** `Video` or `Audio` on a playlist (ADR 0088): audio playlists are left out. */
+    /** `Video` or `Audio` on a playlist: audio playlists are left out. */
     @SerialName("MediaType") val mediaType: String? = null,
-    /** The entries of a playlist, with `Fields=ChildCount` (ADR 0088). */
+    /** The entries of a playlist, with `Fields=ChildCount`. */
     @SerialName("ChildCount") val childCount: Int? = null,
 )
 
@@ -135,7 +135,7 @@ data class MediaUrlDto(
     @SerialName("Name") val name: String? = null,
 )
 
-/** One version in an item's detail, as `MediaSourceDto` on Windows (ADR 0036). */
+/** One version in an item's detail, as `MediaSourceDto` on Windows. */
 @Serializable
 data class MediaSourceDto(
     /** What PlaybackInfo's `MediaSourceId` names. */
@@ -144,7 +144,7 @@ data class MediaSourceDto(
     @SerialName("Size") val size: Long? = null,
     @SerialName("Bitrate") val bitrate: Long? = null,
     @SerialName("MediaStreams") val mediaStreams: List<SourceStreamDto> = emptyList(),
-    /** `mkv`, `mp4`… shown in « Informations techniques » (ADR 0119). */
+    /** `mkv`, `mp4`… shown in « Informations techniques ». */
     @SerialName("Container") val container: String? = null,
 )
 
@@ -173,7 +173,7 @@ data class SourceStreamDto(
 @Serializable
 data class NameDto(@SerialName("Name") val name: String = "")
 
-/** `BaseItemPerson` of an item's `People` (ADR 0016, 0068). */
+/** `BaseItemPerson` of an item's `People`. */
 @Serializable
 data class PersonDto(
     @SerialName("Name") val name: String = "",
@@ -193,7 +193,7 @@ data class PersonDto(
     val id: String? get() = rawId?.takeUnless { it is JsonNull }?.content?.trim()?.takeIf { it.isNotEmpty() }
 }
 
-/** `MarkerType` is `Chapter`, `IntroStart`, `IntroEnd` or `CreditsStart` (ADR 0030). */
+/** `MarkerType` is `Chapter`, `IntroStart`, `IntroEnd` or `CreditsStart`. */
 @Serializable
 data class ChapterInfo(
     @SerialName("StartPositionTicks") val startPositionTicks: Long = 0,
@@ -210,14 +210,14 @@ data class UserItemData(
     @SerialName("IsFavorite") val isFavorite: Boolean = false,
 )
 
-/** Answer of `POST /Playlists/{Id}/Items` (ADR 0098). */
+/** Answer of `POST /Playlists/{Id}/Items`. */
 @Serializable
 data class AddToPlaylistResult(
     @SerialName("Id") val id: String? = null,
     @SerialName("ItemAddedCount") val itemAddedCount: Int = 0,
 )
 
-/** Answer of `POST /Playlists` (ADR 0098): the new playlist's id. */
+/** Answer of `POST /Playlists`: the new playlist's id. */
 @Serializable
 data class PlaylistCreationResult(
     @SerialName("Id") val id: String,
@@ -234,13 +234,13 @@ internal data class PlaybackInfoRequest(
     @SerialName("AutoOpenLiveStream") val autoOpenLiveStream: Boolean = false,
     @SerialName("EnableDirectPlay") val enableDirectPlay: Boolean = true,
     @SerialName("EnableDirectStream") val enableDirectStream: Boolean = true,
-    /** The version to play (ADR 0036, 0058); left out, the server picks its first. */
+    /** The version to play; left out, the server picks its first. */
     @SerialName("MediaSourceId") val mediaSourceId: String? = null,
-    /** Where playback goes on, when the quality changes mid-playback (ADR 0081); left out otherwise. */
+    /** Where playback goes on, when the quality changes mid-playback; left out otherwise. */
     @SerialName("StartTimeTicks") val startTimeTicks: Long? = null,
     /**
-     * Emby `Index` of the audio a transcode must carry (ADR 0084); left out otherwise.
-     * Only sent with [mediaSourceId]: Emby 4.10.1.0 ignores it without (ADR 0035).
+     * Emby `Index` of the audio a transcode must carry; left out otherwise.
+     * Only sent with [mediaSourceId]: Emby 4.10.1.0 ignores it without.
      */
     @SerialName("AudioStreamIndex") val audioStreamIndex: Int? = null,
 )
@@ -298,7 +298,7 @@ data class MediaSourceInfo(
     @SerialName("DirectStreamUrl") val directStreamUrl: String? = null,
     @SerialName("TranscodingUrl") val transcodingUrl: String? = null,
     @SerialName("RequiredHttpHeaders") val requiredHttpHeaders: Map<String, String>? = null,
-    /** Audio the server picked from the account's preferences (its `Configuration`, ADR 0035). */
+    /** Audio the server picked from the account's preferences (its `Configuration`). */
     @SerialName("DefaultAudioStreamIndex") val defaultAudioStreamIndex: Int? = null,
     /** Subtitle the server picked from the account's preferences. */
     @SerialName("DefaultSubtitleStreamIndex") val defaultSubtitleStreamIndex: Int? = null,
@@ -307,7 +307,7 @@ data class MediaSourceInfo(
 
 /**
  * Body of `POST /Sessions/Playing`, `/Sessions/Playing/Progress` and
- * `/Sessions/Playing/Stopped` (ADR 0008). Null fields are left out.
+ * `/Sessions/Playing/Stopped`. Null fields are left out.
  */
 @Serializable
 data class PlaybackReport(
@@ -333,12 +333,12 @@ data class MediaStreamDto(
     @SerialName("DeliveryUrl") val deliveryUrl: String? = null,
     /** A file beside the media (`.srt`…), not one of its own streams. */
     @SerialName("IsExternal") val isExternal: Boolean = false,
-    /** Named in a transcode's subtitle files, which carry no title of their own (ADR 0084). */
+    /** Named in a transcode's subtitle files, which carry no title of their own. */
     @SerialName("IsForced") val isForced: Boolean = false,
     @SerialName("IsHearingImpaired") val isHearingImpaired: Boolean = false,
 )
 
-/** One entry of `GET /Sessions?ControllableByUserId=` (ADR 0123): only what the linked playback reads. */
+/** One entry of `GET /Sessions?ControllableByUserId=`: only what the linked playback reads. */
 @Serializable
 data class SessionInfoDto(
     @SerialName("Id") val id: String,
@@ -351,7 +351,7 @@ data class SessionInfoDto(
 @Serializable
 internal data class SendStringArguments(@SerialName("String") val string: String)
 
-/** Body of `POST /Sessions/{Id}/Command` for the relay; the `/Command/SendString` path drops the arguments (ADR 0123). */
+/** Body of `POST /Sessions/{Id}/Command` for the relay; the `/Command/SendString` path drops the arguments. */
 @Serializable
 internal data class SendStringCommand(
     @SerialName("Arguments") val arguments: SendStringArguments,

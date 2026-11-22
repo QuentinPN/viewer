@@ -14,7 +14,7 @@ class EpisodePageTest {
     private fun ep(id: String, season: Int?, index: Int?, series: String? = "ser1", name: String = "", seasonId: String? = null) =
         BaseItemDto(id = id, type = "Episode", seriesId = series, parentIndexNumber = season, indexNumber = index, name = name, seasonId = seasonId)
 
-    // AdjacentTo: a few episodes before, then the rest of the series, across seasons (ADR 0016)
+    // AdjacentTo: a few episodes before, then the rest of the series, across seasons
     private val adjacent = listOf(ep("e1", 1, 9), ep("e2", 1, 10), ep("x", 3, 1, series = "other"), ep("e3", 2, 1), ep("e4", 2, 2))
 
     @Test
@@ -101,7 +101,7 @@ class EpisodePageTest {
             PersonDto("Invitée", "GuestStar", rawId = JsonPrimitive("2")),
         )
         val episode = BaseItemDto(id = "e", type = "Episode", people = people)
-        // The « Invités » line is the « Distribution » row now (ADR 0068)
+        // The « Invités » line is the « Distribution » row now
         assertEquals(listOf(Fact("Réalisation", "Réalisatrice")), facts(episode))
         assertEquals(listOf("Invitée"), castMembers(episode).map { it.name })
         assertEquals(listOf("Acteur"), castMembers(BaseItemDto(id = "m", type = "Movie", people = people)).map { it.name })

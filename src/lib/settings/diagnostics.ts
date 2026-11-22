@@ -1,6 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../native";
 
-// Typed wrapper over the diagnostics command of src-tauri/src/diagnostics.rs (ADR 0033).
+// Typed wrapper over the diagnostics command of src-tauri/src/diagnostics.rs.
 
 export const diagnosticsApi = {
   /** Opens the log folder in the file explorer; the folder is chosen by Rust. */

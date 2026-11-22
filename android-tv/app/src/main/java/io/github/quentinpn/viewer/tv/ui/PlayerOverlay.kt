@@ -107,7 +107,7 @@ private const val NEXT_COUNTDOWN = 10
 // Fade above the text of the controls: the picture shows through it
 private val FADE = 96.dp
 
-/** The seek thumbnail stays this long after the last ◀ ▶ (ADR 0069). */
+/** The seek thumbnail stays this long after the last ◀ ▶. */
 private const val SEEK_PREVIEW_MS = 1_500L
 
 // Seek thumbnail: about a quarter of a 960 dp wide TV screen, above the bar's thumb
@@ -138,55 +138,55 @@ class PlayerUi {
     /** The "Épisode suivant" card is shown while this is not null. */
     var upNext by mutableStateOf<UpNext?>(null)
 
-    /** "Passer l'intro" or "Passer le générique" during a segment (ADR 0048). */
+    /** "Passer l'intro" or "Passer le générique" during a segment. */
     var skip by mutableStateOf<SkipPrompt.Button?>(null)
 
-    /** When [skip] appeared: it shows 10 s on its own, then only with the controls (ADR 0089). */
+    /** When [skip] appeared: it shows 10 s on its own, then only with the controls. */
     var skipSince by mutableStateOf(SkipShown())
 
     /** [skip] is on screen; read again at each position, through [now]. */
     val skipVisible get() = skip != null && skipShown(skipSince, now, controls || paused)
 
-    /** OK presses [skip] and it holds the focus; off after a ◀ ▶ seek until the controls fade (ADR 0108). */
+    /** OK presses [skip] and it holds the focus; off after a ◀ ▶ seek until the controls fade. */
     var skipArmed by mutableStateOf(true)
 
-    /** Chapters of the item, none with fewer than two (ADR 0057). */
+    /** Chapters of the item, none with fewer than two. */
     var chapters by mutableStateOf<List<Chapter>>(emptyList())
 
     /** The "Chapitres" menu is open. */
     var chapterMenu by mutableStateOf(false)
 
-    /** The "Informations de lecture" panel is open while this is not null (ADR 0061); refreshed by the player. */
+    /** The "Informations de lecture" panel is open while this is not null; refreshed by the player. */
     var info by mutableStateOf<List<InfoRow>?>(null)
 
-    /** Subtitle and audio delays, as mpv holds them; this playback only (ADR 0062). */
+    /** Subtitle and audio delays, as mpv holds them; this playback only. */
     var delays by mutableStateOf(Delays())
 
-    /** Playback speed as mpv holds it; this playback only (ADR 0072). */
+    /** Playback speed as mpv holds it; this playback only. */
     var speed by mutableDoubleStateOf(NORMAL_SPEED)
 
-    /** How the picture fills the screen, as mpv holds it; this playback only (ADR 0078). */
+    /** How the picture fills the screen, as mpv holds it; this playback only. */
     var fit by mutableStateOf(VideoFit.Original)
 
-    /** Streaming cap of this playback, from Réglages or the menu (ADR 0081). */
+    /** Streaming cap of this playback, from Réglages or the menu. */
     var quality by mutableStateOf(Quality())
 
-    /** Night mode, from Réglages or the menu (ADR 0072). */
+    /** Night mode, from Réglages or the menu. */
     var night by mutableStateOf(Night())
 
-    /** Wall clock of the clock and « Fin à » (ADR 0073): set on each position, and at each minute while the controls show. */
+    /** Wall clock of the clock and « Fin à »: set on each position, and at each minute while the controls show. */
     var now by mutableLongStateOf(System.currentTimeMillis())
 
-    /** Episode or film, for « Fin de l'épisode » / « Fin du film »; null for anything else or until known (ADR 0073). */
+    /** Episode or film, for « Fin de l'épisode » / « Fin du film »; null for anything else or until known. */
     var item by mutableStateOf<SleepItem?>(null)
 
-    /** The sleep timer: the whole player session, kept from one episode to the next (ADR 0073). */
+    /** The sleep timer: the whole player session, kept from one episode to the next. */
     var sleep by mutableStateOf(SleepTimer())
 
     /** Over the paused picture once the timer has run out; gone when playback resumes. */
     var notice by mutableStateOf<String?>(null)
 
-    /** « Lié à Bureau · ±40 ms » while linked to a desktop (ADR 0124); kept from one file to the next. */
+    /** « Lié à Bureau · ±40 ms » while linked to a desktop; kept from one file to the next. */
     var linkPill by mutableStateOf<String?>(null)
 
     /** Out of a link, the menu offers to join one; linked, to leave it. */
@@ -195,7 +195,7 @@ class PlayerUi {
     /** The desktop list, open over the player. */
     var linkPicker by mutableStateOf<SyncHub?>(null)
 
-    /** Target of the last ◀ ▶ seek while its thumbnail may show (ADR 0069); null once the seek settles. */
+    /** Target of the last ◀ ▶ seek while its thumbnail may show; null once the seek settles. */
     var seekTarget by mutableStateOf<Double?>(null)
         private set
 
@@ -279,7 +279,7 @@ class PlayerUi {
     }
 }
 
-/** A decoded seek thumbnail; [index] is its BIF image, so the same one is not decoded twice (ADR 0069). */
+/** A decoded seek thumbnail; [index] is its BIF image, so the same one is not decoded twice. */
 class SeekFrame(val index: Int, val image: ImageBitmap)
 
 /** The episode offered at the end of the current one, or from the start of its credits ([atCredits]). */
@@ -334,9 +334,9 @@ fun PlayerOverlay(
         }
         val skip = ui.skip
         if (skip != null && upNext == null && ui.status == null && ui.skipVisible) {
-            // Above the text of the controls while they show; stays 10 s when they fade (ADR 0089).
+            // Above the text of the controls while they show; stays 10 s when they fade.
             // Gone while focused, the focus goes back to the player: OK then shows it again
-            // Disarmed after a seek: shown without the focus, OK plays or pauses (ADR 0108)
+            // Disarmed after a seek: shown without the focus, OK plays or pauses
             SkipButton(skip, !ui.menuOpen && ui.skipArmed, !ui.menuOpen, onSkip,Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
         }
         ui.tracks?.let {
@@ -407,7 +407,7 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
             .padding(start = 48.dp, end = 48.dp, top = FADE, bottom = 36.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        // The clock moves on with each position; paused, the minute's start moves it on (ADR 0073)
+        // The clock moves on with each position; paused, the minute's start moves it on
         LaunchedEffect(Unit) {
             while (true) {
                 delay(untilNextMinute(System.currentTimeMillis()))
@@ -448,9 +448,9 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
                     modifier = Modifier.padding(start = 16.dp).background(Palette.text, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
                 )
             }
-            // Only away from 1x: a reminder that the speed was changed in the menu (ADR 0072)
-            // Likewise away from « Original »: the picture format chosen in the menu (ADR 0078)
-            // As the speed's: the timer set in the menu, and what is left of it (ADR 0073)
+            // Only away from 1x: a reminder that the speed was changed in the menu
+            // Likewise away from « Original »: the picture format chosen in the menu
+            // As the speed's: the timer set in the menu, and what is left of it
             listOfNotNull(ui.linkPill, speedBadge(ui.speed), ui.fit.badge, sleepBadge(ui.sleep, ui.now, ui.item)).forEach {
                 Text(
                     it,
@@ -475,7 +475,7 @@ private fun Controls(ui: PlayerUi, modifier: Modifier) {
     }
 }
 
-/** The thumbnail at the seek target, its time under it, rounded as the menus (ADR 0069). */
+/** The thumbnail at the seek target, its time under it, rounded as the menus. */
 @Composable
 private fun SeekPreview(frame: SeekFrame, time: String, modifier: Modifier) {
     val ratio = frame.image.width.toFloat() / frame.image.height.coerceAtLeast(1)
@@ -507,28 +507,28 @@ private sealed interface MenuRow {
 
     data class Choice(val type: TrackType, val id: Int?, val label: String, val selected: Boolean) : MenuRow
 
-    /** ◀ ▶ shift by a tenth of a second, OK goes back to none (ADR 0062). */
+    /** ◀ ▶ shift by a tenth of a second, OK goes back to none. */
     data class Delay(val kind: DelayKind, val seconds: Double) : MenuRow
 
-    /** ◀ ▶ pick a streaming cap, OK applies it to this playback (ADR 0081). */
+    /** ◀ ▶ pick a streaming cap, OK applies it to this playback. */
     data class QualityRow(val quality: Quality) : MenuRow
 
-    /** ◀ ▶ step through the offered speeds, OK goes back to « Normale » (ADR 0072). */
+    /** ◀ ▶ step through the offered speeds, OK goes back to « Normale ». */
     data class Speed(val speed: Double) : MenuRow
 
-    /** ◀ ▶ step through the picture formats, OK goes back to « Original » (ADR 0078). */
+    /** ◀ ▶ step through the picture formats, OK goes back to « Original ». */
     data class Fit(val fit: VideoFit) : MenuRow
 
-    /** OK turns night mode on or off (ADR 0072). */
+    /** OK turns night mode on or off. */
     data class NightMode(val night: Night) : MenuRow
 
-    /** ◀ ▶ step through the timer's values, OK goes to the next one and wraps (ADR 0073). */
+    /** ◀ ▶ step through the timer's values, OK goes to the next one and wraps. */
     data class Sleep(val choice: SleepChoice, val item: SleepItem?) : MenuRow
 
-    /** « Regarder avec l'ordi », or « Délier » in a link (ADR 0124). */
+    /** « Regarder avec l'ordi », or « Délier » in a link. */
     data class Link(val busy: Boolean) : MenuRow
 
-    /** Last row: opens "Informations de lecture" in place of the menu (ADR 0061). */
+    /** Last row: opens "Informations de lecture" in place of the menu. */
     data object Info : MenuRow
 }
 
@@ -626,7 +626,7 @@ private fun TrackMenu(tracks: List<Track>, state: MenuState, actions: MenuAction
                     headlineContent = { Text("Qualité", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     supportingContent = { Text(qualityNote(row.quality), maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     trailingContent = { Text(qualityValue(row.quality)) },
-                    // ◀ ▶ only pick: one reload, on OK, however many steps were taken (ADR 0081)
+                    // ◀ ▶ only pick: one reload, on OK, however many steps were taken
                     modifier = Modifier.leftRight(QualityChange.Lower, QualityChange.Higher, actions.qualityStep),
                 )
                 is MenuRow.Speed -> ListItem(
@@ -682,7 +682,7 @@ private fun TrackMenu(tracks: List<Track>, state: MenuState, actions: MenuAction
 }
 
 /**
- * One row per chapter with its start, the playing one marked (ADR 0057). Focus
+ * One row per chapter with its start, the playing one marked. Focus
  * starts on it, the list scrolled there, so it is composed when asked to focus.
  */
 @Composable
@@ -722,7 +722,7 @@ private fun ChapterMenu(chapters: List<Chapter>, current: Int, onChapter: (Doubl
 }
 
 /**
- * "Informations de lecture" (ADR 0061): one row per value the player knows, refreshed
+ * "Informations de lecture": one row per value the player knows, refreshed
  * about once per second. Rows take the focus, so ▲ ▼ scroll a list taller than the screen
  * and the skip button never takes it; OK does nothing, Retour closes the panel.
  */

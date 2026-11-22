@@ -1,0 +1,6 @@
+{"Items":[
+        {"Name":"Anime","Id":"10","Type":"CollectionFolder","CollectionType":"tvshows","ImageTags":{"Primary":"56f6b8b2_6384"}},
+        {"Name":"Films","Id":"5","Type":"CollectionFolder","CollectionType":"movies","ImageTags":{}},
+        {"Name":"Musique","Id":"7","Type":"CollectionFolder","CollectionType":"music","ImageTags":{}},
+        {"Name":"TV en direct","Id":"9","Type":"UserView","CollectionType":"livetv"}
+    ],"TotalRecordCount":4}

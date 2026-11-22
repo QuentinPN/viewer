@@ -1,5 +1,5 @@
 // Request models as the Tauri commands return them (src-tauri/src/request/
-// models.rs), field for field from contracts/request/openapi.json (ADR 0125).
+// models.rs), field for field from contracts/request/openapi.json.
 // Images come ready from Rust on the `requestimg` protocol: never build a URL here.
 import type { ImageRef } from "../emby/types";
 

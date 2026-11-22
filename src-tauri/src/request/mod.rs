@@ -1,4 +1,4 @@
-//! Request integration (ADR 0125): the « Demander » tab. Every call is made
+//! Request integration: the « Demander » tab. Every call is made
 //! here, in Rust; the UI never sees a token nor builds an API or image URL.
 
 pub mod client;
@@ -8,6 +8,7 @@ pub mod models;
 pub mod service;
 #[cfg(test)]
 mod tests;
+pub mod trailer;
 
 use std::net::IpAddr;
 

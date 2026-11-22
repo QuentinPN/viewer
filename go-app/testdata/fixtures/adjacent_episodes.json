@@ -1,0 +1,7 @@
+{"Items":[
+        {"Name":"Spécial","Id":"80470","Type":"Episode","SeriesId":"80473","ParentIndexNumber":0,"IndexNumber":1},
+        {"Name":"Intrus","Id":"67640","Type":"Episode","SeriesId":"67638","ParentIndexNumber":1,"IndexNumber":9},
+        {"Name":"La Nouvelle Recrue","Id":"80475","Type":"Episode","SeriesId":"80473","ParentIndexNumber":1,"IndexNumber":1},
+        {"Name":" Double ","Id":"80476","Type":"Episode","SeriesId":"80473","ParentIndexNumber":1,"IndexNumber":2,"IndexNumberEnd":3},
+        {"Name":"Saison 2","Id":"80490","Type":"Episode","SeriesId":"80473","ParentIndexNumber":2,"IndexNumber":1}
+    ],"TotalRecordCount":5}

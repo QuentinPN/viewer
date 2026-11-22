@@ -1,0 +1,40 @@
+{
+  "bitrateLimit": {
+    "bitrate": 400000000,
+    "cap": null,
+    "localAddress": true
+  },
+  "container": "mkv",
+  "defaultAudioStreamIndex": 1,
+  "defaultSubtitleStreamIndex": 3,
+  "headers": [
+    [
+      "X-Emby-Token",
+      "TOKEN_PLACEHOLDER"
+    ]
+  ],
+  "mediaSourceId": "mediasource_30207",
+  "method": "directPlay",
+  "playSessionId": "ps1",
+  "runTimeTicks": 60000000000,
+  "startTicks": 18310167000,
+  "streamCount": 0,
+  "subtitles": [],
+  "title": {
+    "index": null,
+    "indexEnd": null,
+    "name": "2 Coeurs",
+    "seasonIndex": null,
+    "seriesName": null
+  },
+  "tracks": {
+    "audio": {
+      "type": "auto"
+    },
+    "subtitle": {
+      "type": "auto"
+    }
+  },
+  "transcodeReasons": null,
+  "url": "http://emby.test/emby/videos/30207/original.mkv?DeviceId=dev&MediaSourceId=mediasource_30207&PlaySessionId=ps1"
+}

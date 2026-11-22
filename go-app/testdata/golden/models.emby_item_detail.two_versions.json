@@ -1,0 +1,75 @@
+{
+  "id": "30500",
+  "kind": "movie",
+  "name": "Deux Versions",
+  "originalTitle": null,
+  "year": null,
+  "endYear": null,
+  "continuing": null,
+  "overview": null,
+  "tagline": null,
+  "genres": [],
+  "studios": [],
+  "directors": [],
+  "writers": [],
+  "cast": [],
+  "officialRating": null,
+  "communityRating": null,
+  "criticRating": null,
+  "runtimeMinutes": 100,
+  "premiereDate": null,
+  "poster": null,
+  "backdrop": null,
+  "logo": null,
+  "played": false,
+  "favorite": false,
+  "resume": null,
+  "unplayedCount": null,
+  "media": [
+    {
+      "id": "mediasource_30500",
+      "name": "1080p",
+      "container": "mkv",
+      "sizeBytes": 4000000000,
+      "bitrate": 8000000,
+      "video": {
+        "codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "bitDepth": null,
+        "range": "SDR"
+      },
+      "audio": [],
+      "subtitles": []
+    },
+    {
+      "id": "30501",
+      "name": "2160p",
+      "container": "mkv",
+      "sizeBytes": 30000000000,
+      "bitrate": 60000000,
+      "video": {
+        "codec": "hevc",
+        "width": 3840,
+        "height": 2160,
+        "bitDepth": 10,
+        "range": "HDR 10"
+      },
+      "audio": [],
+      "subtitles": []
+    },
+    {
+      "id": null,
+      "name": "sans identifiant utilisable",
+      "container": null,
+      "sizeBytes": null,
+      "bitrate": null,
+      "video": null,
+      "audio": [],
+      "subtitles": []
+    }
+  ],
+  "episode": null,
+  "collections": [],
+  "hasLocalTrailer": false
+}

@@ -1,12 +1,15 @@
 mod commands;
 mod diagnostics;
 pub mod emby;
+#[cfg(test)]
+mod golden;
 pub mod player;
 pub mod segments;
 #[cfg(debug_assertions)]
 mod spike;
 mod sync;
 mod system_info;
+mod ui_settings;
 mod updater;
 pub mod request;
 mod video_surface;
@@ -24,15 +27,15 @@ use video_surface::SurfaceMode;
 pub const PLAYER_EVENT: &str = "player://event";
 
 /// Owns the native player. The engine is created lazily on first playback and
-/// torn down on close; teardown always runs off the UI thread (see ADR 0003).
+/// torn down on close; teardown always runs off the UI thread.
 pub struct AppState {
     pub player: Mutex<Option<Arc<MpvEngine>>>,
     pub mode: SurfaceMode,
     pub library: PathBuf,
     pub wid: Option<i64>,
-    /// Emby playback reports (ADR 0008), fed with every player event.
+    /// Emby playback reports, fed with every player event.
     pub reporter: Reporter,
-    /// Linked playback with a TV (ADR 0124), fed with every player event.
+    /// Linked playback with a TV, fed with every player event.
     pub sync: sync::SyncHandle,
     app: tauri::AppHandle,
     #[cfg(windows)]
@@ -112,7 +115,7 @@ fn device_name() -> String {
     std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC Windows".into())
 }
 
-/// Token store shared by the Emby and Request services (ADR 0004, 0125).
+/// Token store shared by the Emby and Request services.
 fn credential_store() -> Arc<dyn emby::credentials::CredentialStore> {
     #[cfg(windows)]
     return Arc::new(emby::credentials::WindowsCredentialStore);
@@ -120,7 +123,7 @@ fn credential_store() -> Arc<dyn emby::credentials::CredentialStore> {
     return Arc::new(emby::credentials::MemoryCredentialStore::default());
 }
 
-/// Request service (ADR 0125): address in the app config directory, artwork in
+/// Request service: address in the app config directory, artwork in
 /// the Emby artwork cache.
 fn request_service(
     app: &tauri::App,
@@ -137,7 +140,7 @@ fn request_service(
     .with_artwork_cache(artwork))
 }
 
-/// Serves `requestimg` requests (ADR 0125): only validated `/{size}/{file}` paths,
+/// Serves `requestimg` requests: only validated `/{size}/{file}` paths,
 /// fetched with the Request Bearer so the token never reaches the WebView.
 async fn request_image(
     app: &tauri::AppHandle,
@@ -184,7 +187,7 @@ async fn request_image(
 }
 
 /// Emby session service: token in the OS credential store, metadata in the app
-/// config directory (ADR 0004).
+/// config directory.
 fn emby_service(
     app: &tauri::App,
     store: Box<dyn emby::credentials::CredentialStore>,
@@ -202,7 +205,7 @@ fn emby_service(
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
         .filter(|_| cfg!(debug_assertions));
-    // Artwork cache (ADR 0019): disposable, so it lives in the local cache directory.
+    // Artwork cache: disposable, so it lives in the local cache directory.
     // Debug builds only: scripted UI tests (scripts/e2e) use their own folder.
     let e2e_artwork = std::env::var_os("VIEWER_E2E_ARTWORK_DIR")
         .filter(|_| cfg!(debug_assertions))
@@ -227,7 +230,7 @@ fn emby_service(
     })
 }
 
-/// Serves `emby-img` requests (ADR 0005): only validated artwork paths, fetched
+/// Serves `emby-img` requests: only validated artwork paths, fetched
 /// with the session's auth header so the token never reaches the WebView.
 async fn emby_image(
     app: &tauri::AppHandle,
@@ -258,7 +261,7 @@ async fn emby_image(
                     StatusCode::UNAUTHORIZED
                 }
                 emby::EmbyError::NotFound => StatusCode::NOT_FOUND,
-                // An image of another server than the open session's (ADR 0012).
+                // An image of another server than the open session's.
                 emby::EmbyError::Forbidden => StatusCode::FORBIDDEN,
                 _ => StatusCode::BAD_GATEWAY,
             })
@@ -266,7 +269,7 @@ async fn emby_image(
     }
 }
 
-/// Log folder (ADR 0033). Debug builds only: scripted UI tests (scripts/e2e) use
+/// Log folder. Debug builds only: scripted UI tests (scripts/e2e) use
 /// their own folder through `VIEWER_E2E_LOG_DIR`.
 fn log_dir(app: &tauri::App) -> Option<PathBuf> {
     std::env::var_os("VIEWER_E2E_LOG_DIR")
@@ -275,7 +278,7 @@ fn log_dir(app: &tauri::App) -> Option<PathBuf> {
         .or_else(|| app.path().app_log_dir().ok())
 }
 
-/// Identifier of debug builds, next to `io.github.quentinpn.viewer` of the release (ADR 0105).
+/// Identifier of debug builds, next to `io.github.quentinpn.viewer` of the release.
 #[cfg(debug_assertions)]
 const DEBUG_IDENTIFIER: &str = "io.github.quentinpn.viewer.debug";
 
@@ -286,7 +289,7 @@ const DEBUG_IDENTIFIER: &str = "io.github.quentinpn.viewer.debug";
 fn context() -> tauri::Context<tauri::Wry> {
     #[allow(unused_mut)]
     let mut context = tauri::generate_context!();
-    // Debug builds are another app (ADR 0105): their own config, cache, logs and
+    // Debug builds are another app: their own config, cache, logs and
     // WebView storage, so scripted UI tests never touch the installed app's data.
     #[cfg(debug_assertions)]
     {
@@ -309,7 +312,7 @@ fn context() -> tauri::Context<tauri::Wry> {
 
 pub fn run() {
     let app = tauri::Builder::default()
-        // Driven from Rust only (ADR 0112): no updater permission for the WebView.
+        // Driven from Rust only: no updater permission for the WebView.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .register_asynchronous_uri_scheme_protocol(
             emby::images::SCHEME,
@@ -330,7 +333,7 @@ pub fn run() {
             },
         )
         .setup(|app| {
-            // First, so everything after it is logged (ADR 0033).
+            // First, so everything after it is logged.
             let log_dir = log_dir(app);
             diagnostics::init(log_dir.as_deref());
             app.manage(diagnostics::LogDir(log_dir));
@@ -512,10 +515,13 @@ pub fn run() {
             request::commands::ur_cancel,
             request::commands::ur_sessions,
             request::commands::ur_revoke_session,
+            request::trailer::ur_open_trailer,
             diagnostics::diagnostics_open_log_dir,
             updater::app_update_pending,
             updater::app_update_install,
             updater::app_update_check,
+            ui_settings::ui_settings_export,
+            ui_settings::ui_settings_import,
         ])
         .build(context())
         .expect("error while building Viewer");

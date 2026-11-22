@@ -9,7 +9,7 @@ import org.junit.Test
 private const val TV = "tv-self"
 private const val PC = "pc-1"
 
-/** The follower on a fake monotonic clock (ADR 0124). */
+/** The follower on a fake monotonic clock. */
 class FollowerTest {
     private var now = 1_000L
     private var links = 0

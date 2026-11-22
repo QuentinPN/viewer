@@ -31,7 +31,7 @@ import io.github.quentinpn.viewer.tv.sync.SyncHub
 const val WATCH_WITH_DESKTOP = "Regarder avec l'ordi"
 
 /**
- * The desktops online, read again when it opens; OK on one sends `join` (ADR 0124).
+ * The desktops online, read again when it opens; OK on one sends `join`.
  * Shared by the film and episode pages and the player.
  */
 @Composable

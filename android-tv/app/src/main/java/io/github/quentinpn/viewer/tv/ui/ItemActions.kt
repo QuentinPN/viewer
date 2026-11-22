@@ -17,8 +17,8 @@ import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.UserItemData
 import kotlinx.coroutines.launch
 
-// Write actions on the user's data (ADR 0097): watched mark, favourite, « Reprendre ».
-// The card menu offering them on the home is in CardMenu.kt (ADR 0098).
+// Write actions on the user's data: watched mark, favourite, « Reprendre ».
+// The card menu offering them on the home is in CardMenu.kt.
 
 /** One write a card's menu or a detail page offers. */
 internal enum class ItemAction(val label: String) {
@@ -87,7 +87,7 @@ internal fun focusAfter(before: List<Shelf>, after: List<Shelf>, shelfTitle: Str
 }
 
 /**
- * A button of a detail page sending [action] for [item] (ADR 0097). While the server answers
+ * A button of a detail page sending [action] for [item]. While the server answers
  * it is dimmed and a press does nothing; it stays focusable, so the focus does not jump.
  * [onDone] gets the new user data; a failure goes to [onMessage] and changes nothing.
  */

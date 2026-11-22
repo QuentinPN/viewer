@@ -7,7 +7,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.ServerUrl
 import okhttp3.OkHttpClient
 
-/** What OK on a tile of the shelf found (ADR 0104). */
+/** What OK on a tile of the shelf found. */
 sealed interface Reconnect {
     /** The token was accepted: the session opens, the tile takes the server's id and name. */
     data class Opened(val serverId: String, val serverName: String) : Reconnect
@@ -20,7 +20,7 @@ sealed interface Reconnect {
 }
 
 /**
- * Checks a saved token as ADR 0012 does at start: the public probe goes without the token,
+ * Checks a saved token at start: the public probe goes without the token,
  * and the token is only sent once the server answering is the one saved (when its id is
  * known); then `GET /Users/{Id}` with the token. Only a 401 means [Reconnect.Refused].
  */

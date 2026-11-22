@@ -6,7 +6,7 @@
   The file is served from this PC by serve-file.mjs (127.0.0.1 only, token
   required in the X-Emby-Token header) and reached by the device through
   `adb reverse`, so nothing is copied to the device. Screenshots of real media
-  stay in artifacts/ (ignored by git); describe them in docs/evidence/.
+  stay in artifacts/ (ignored by git); note results in TESTING.md or the PR.
 .EXAMPLE
   ./scripts/spike/run-gate-tv1.ps1 -Media '\\server\media\film.mkv'
 #>

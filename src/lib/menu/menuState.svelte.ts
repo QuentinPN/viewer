@@ -1,4 +1,4 @@
-// The one card menu of the library screen (ADR 0100): cards ask for it through
+// The one card menu of the library screen: cards ask for it through
 // the Svelte context, the host component shows it and runs its actions.
 import { getContext, setContext } from "svelte";
 import type { PlaybackStopped } from "../emby/types";
@@ -52,7 +52,7 @@ export class CardMenuState {
     this.#favorites.set(itemId, favorite);
   }
 
-  /** A playback stopped or the watched state changed (ADR 0096). */
+  /** A playback stopped or the watched state changed. */
   noteWatched(state: PlaybackStopped) {
     this.#watched.set(state.itemId, {
       played: state.played,

@@ -11,7 +11,7 @@ data class StatusLabel(val text: String, val tone: Tone)
 /** A fraction `0.0..1.0` as a whole percentage, or null when the server sent none. */
 fun percent(progress: Double?): Int? = progress?.let { (it * 100).roundToInt().coerceIn(0, 100) }
 
-/** The status of a title (ADR 0125); [progress] only shows on `downloading`. */
+/** The status of a title; [progress] only shows on `downloading`. */
 fun mediaStatusLabel(status: MediaStatus, progress: Double? = null): StatusLabel = when (status) {
     MediaStatus.Available -> StatusLabel("Disponible", Tone.Success)
     MediaStatus.Partial -> StatusLabel("Partiel", Tone.Warning)

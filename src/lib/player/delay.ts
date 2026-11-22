@@ -1,5 +1,5 @@
 // « Synchronisation » of the player's options: subtitle and audio delays, as on
-// the TV (ADR 0062). A new file starts from none on both.
+// the TV. A new file starts from none on both.
 
 /** One press of − or +, or of Z / X. */
 export const DELAY_STEP_SECONDS = 0.1;

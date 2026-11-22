@@ -1,5 +1,5 @@
 //! The Windows root certificates as a PEM file for mpv's `tls-ca-file`: FFmpeg's
-//! OpenSSL has no certificate store of its own (ADR 0026).
+//! OpenSSL has no certificate store of its own.
 
 use std::io;
 use std::path::Path;

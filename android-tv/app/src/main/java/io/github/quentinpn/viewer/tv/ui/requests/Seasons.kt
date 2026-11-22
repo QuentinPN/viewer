@@ -11,7 +11,7 @@ import java.time.ZoneOffset
 
 /*
  * What can be requested, as Request decides it (src/shared/requests.ts and status.ts of
- * Request at 54cd791, ADR 0125); the same rule as the desktop app's seasons.ts.
+ * Request at 54cd791); the same rule as the desktop app's seasons.ts.
  */
 
 /** Today's date, UTC, as `AAAA-MM-JJ`: the day a season counts as aired. */

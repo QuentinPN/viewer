@@ -8,7 +8,7 @@ import android.os.Build
 import android.util.Log
 
 /**
- * Result of the installer session (ADR 0112). Not exported: only the system, through the
+ * Result of the installer session. Not exported: only the system, through the
  * PendingIntent given to `commit`, reaches it. On success Android stops the app to replace it.
  */
 class UpdateReceiver : BroadcastReceiver() {

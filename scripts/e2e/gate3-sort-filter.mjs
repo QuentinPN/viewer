@@ -1,4 +1,4 @@
-// Gate 3 sort and filters of a library grid (ADR 0013, rails of ADR 0101), on the
+// Gate 3 sort and filters of a library grid, on the
 // real Emby test account, driven over CDP. Read only: nothing is written to the server.
 // - defaults: title A→Z, nothing filtered, no "Réinitialiser";
 // - each sort orders the grid as the server does (years checked on the cards);

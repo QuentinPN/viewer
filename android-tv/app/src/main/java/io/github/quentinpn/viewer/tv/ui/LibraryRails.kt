@@ -53,7 +53,7 @@ import io.github.quentinpn.viewer.tv.emby.ItemsOptions
 import io.github.quentinpn.viewer.tv.emby.SortKey
 import io.github.quentinpn.viewer.tv.emby.WatchFilter
 
-/** Icons of the grid's right rail, top to bottom (ADR 0099); [Reset] only when something differs. */
+/** Icons of the grid's right rail, top to bottom; [Reset] only when something differs. */
 internal enum class RailAction { Sort, Watch, Favorites, Filters, Random, Reset }
 
 /** True when « Réinitialiser » would change something: sort, direction or a filter. */
@@ -122,7 +122,7 @@ internal fun directionChoices(options: ItemsOptions): List<PanelChoice> = listOf
 }
 
 /**
- * The right rail (ADR 0099): small round icons without text, one under the other. The focused
+ * The right rail: small round icons without text, one under the other. The focused
  * one shows its [railLabel] to its left, over the grid; an [isActive] one is drawn in the accent.
  */
 @Composable
@@ -190,7 +190,7 @@ private fun RailButton(icon: ImageVector, label: String, active: Boolean, modifi
 }
 
 /**
- * Side panel of titled sections of choices, as the genre list (ADR 0045): the focus opens on
+ * Side panel of titled sections of choices, as the genre list: the focus opens on
  * the first selected line. Back closes it without a change.
  */
 @Composable

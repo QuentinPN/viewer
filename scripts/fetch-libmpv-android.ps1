@@ -3,7 +3,7 @@
   Downloads the pinned mpv-android release and extracts its arm64-v8a native
   libraries into android-tv/app/src/main/jniLibs/ (ignored by git).
 .DESCRIPTION
-  Source: mpv-android/mpv-android GitHub releases (see ADR 0038). The APK hash
+  Source: mpv-android/mpv-android GitHub releases. The APK hash
   is pinned below; the script refuses any mismatch. Bump the tag, the hashes
   and android-tv/app/src/main/java/is/xyz/mpv/MPVLib.kt together, then re-run
   Gate TV-1.

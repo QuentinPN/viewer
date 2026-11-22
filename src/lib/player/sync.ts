@@ -1,7 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { invoke, listen, type Unlisten } from "../native";
 
-// Linked playback with a TV (ADR 0124). Rust leads the link; the view shows its
+// Linked playback with a TV. Rust leads the link; the view shows its
 // status and notices and carries out the few actions it asks for. Only session
 // ids and device names reach the UI.
 
@@ -32,12 +31,12 @@ export const syncApi = {
   invite: (sessionId: string) => invoke<void>("sync_invite", { sessionId }),
   unlink: () => invoke<void>("sync_unlink"),
   status: () => invoke<SyncStatus>("sync_status"),
-  onStatus: (handler: (s: SyncStatus) => void): Promise<UnlistenFn> =>
-    listen<SyncStatus>("sync://status", (e) => handler(e.payload)),
-  onNotice: (handler: (n: SyncNotice) => void): Promise<UnlistenFn> =>
-    listen<SyncNotice>("sync://notice", (e) => handler(e.payload)),
-  onAction: (handler: (a: SyncAction) => void): Promise<UnlistenFn> =>
-    listen<SyncAction>("sync://action", (e) => handler(e.payload)),
+  onStatus: (handler: (s: SyncStatus) => void): Promise<Unlisten> =>
+    listen<SyncStatus>("sync://status", handler),
+  onNotice: (handler: (n: SyncNotice) => void): Promise<Unlisten> =>
+    listen<SyncNotice>("sync://notice", handler),
+  onAction: (handler: (a: SyncAction) => void): Promise<Unlisten> =>
+    listen<SyncAction>("sync://action", handler),
 };
 
 /** « Lié à Shield · ±40 ms », the gap once the TV measured one. */

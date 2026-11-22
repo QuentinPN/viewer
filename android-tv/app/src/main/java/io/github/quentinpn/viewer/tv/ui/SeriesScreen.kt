@@ -63,18 +63,18 @@ internal sealed interface Load<out T> {
 
 private class SeriesData(val series: BaseItemDto, val seasons: List<BaseItemDto>)
 
-/** The series with its new user data, after an action on it (ADR 0097). */
+/** The series with its new user data, after an action on it. */
 private fun SeriesData.withSeries(data: UserItemData) = SeriesData(series.copy(userData = data), seasons)
 
-/** The season [id] with its new user data, after an action on it (ADR 0097). */
+/** The season [id] with its new user data, after an action on it. */
 private fun SeriesData.withSeason(id: String, data: UserItemData) =
     SeriesData(series, seasons.map { if (it.id == id) it.copy(userData = data) else it })
 
-/** « Marquer la série comme vue » or « … non vue » (ADR 0097). */
+/** « Marquer la série comme vue » or « … non vue ». */
 internal fun seriesPlayedLabel(series: BaseItemDto): String =
     if (series.userData?.played == true) "Marquer la série comme non vue" else "Marquer la série comme vue"
 
-/** « Marquer la saison comme vue » or « … non vue » (ADR 0097). */
+/** « Marquer la saison comme vue » or « … non vue ». */
 internal fun seasonPlayedLabel(season: BaseItemDto): String =
     if (season.userData?.played == true) "Marquer la saison comme non vue" else "Marquer la saison comme vue"
 
@@ -107,14 +107,14 @@ internal fun initialEpisodeIndex(episodes: List<BaseItemDto>, episodeId: String?
 
 /**
  * The page of an episode card: the season shown, so Back comes to this row even when the
- * episode itself names another season (a special aired within it, ADR 0054).
+ * episode itself names another season (a special aired within it).
  */
 internal fun cardTarget(seriesId: String, seasonId: String, episode: BaseItemDto): SeriesTarget =
     SeriesTarget(seriesId, seasonId = seasonId, seasonNumber = episode.parentIndexNumber, episodeId = episode.id)
 
 /**
- * A series: its overview, « Bande-annonce » (ADR 0083), a chip per season, the season's episodes in a row, then
- * « Distribution » (ADR 0068) and « Titres similaires » (ADR 0063).
+ * A series: its overview, « Bande-annonce », a chip per season, the season's episodes in a row, then
+ * « Distribution » and « Titres similaires ».
  */
 @Composable
 fun SeriesScreen(
@@ -124,43 +124,43 @@ fun SeriesScreen(
     images: ImageLoader,
     /** A long press on an episode card plays it at once. */
     onPlay: (itemId: String, startTicks: Long) -> Unit,
-    /** OK on an episode card opens its page, naming the season it was shown in (ADR 0060). */
+    /** OK on an episode card opens its page, naming the season it was shown in. */
     onOpenEpisode: (SeriesTarget) -> Unit,
     /** OK on a similar title opens its film or series page. */
     onOpenSimilar: (BaseItemDto) -> Unit,
-    /** OK on a « Distribution » card opens that person's page (ADR 0068). */
+    /** OK on a « Distribution » card opens that person's page. */
     onOpenPerson: (CastMember) -> Unit,
     onSessionExpired: () -> Unit,
     /** Changes after each playback: the episodes' watched state is read again. */
     refresh: Int = 0,
     /** The card a person page was opened from: focused instead of an episode card. */
     focusPerson: String? = null,
-    /** OK on a genre chip opens the series library on it (ADR 0079); null hides the chips. */
+    /** OK on a genre chip opens the series library on it; null hides the chips. */
     onOpenGenre: ((String) -> Unit)? = null,
     /** The genre chip a grid was opened from: focused instead of an episode card. */
     focusGenre: String? = null,
-    /** « Bande-annonce » under the genres (ADR 0083); null hides it. */
+    /** « Bande-annonce » under the genres; null hides it. */
     trailers: TrailerHandlers? = null,
-    /** OK on a studio chip opens the series library on it (ADR 0087); null hides the chips. */
+    /** OK on a studio chip opens the series library on it; null hides the chips. */
     onOpenStudio: ((String) -> Unit)? = null,
     /** The studio chip a grid was opened from: focused instead of an episode card. */
     focusStudio: String? = null,
-    /** After a watched mark or favourite sent from here (ADR 0097): the home reads its shelves again. */
+    /** After a watched mark or favourite sent from here: the home reads its shelves again. */
     onUserDataChanged: () -> Unit = {},
 ) {
     var data by remember { mutableStateOf<Load<SeriesData>>(Load.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
     // After a watched mark on the series or a season: seasons and episodes are read again in place,
-    // since the server's cascade to the episodes is not documented (ADR 0097)
+    // since the server's cascade to the episodes is not documented
     var reloads by remember { mutableIntStateOf(0) }
     var seasonId by remember { mutableStateOf<String?>(null) }
     // The searched episode is focused until another season is chosen
     var focusEpisode by remember { mutableStateOf(target.episodeId) }
     // Back from a person page: the episode row leaves the focus to the cast until another season is chosen
     var castFocus by remember { mutableStateOf(focusPerson) }
-    // Back from a genre's grid: the chip keeps the focus likewise (ADR 0079)
+    // Back from a genre's grid: the chip keeps the focus likewise
     var chipFocus by remember { mutableStateOf(focusGenre) }
-    // And from a studio's grid (ADR 0087)
+    // And from a studio's grid
     var studioChipFocus by remember { mutableStateOf(focusStudio) }
     val seriesId = target.seriesId
 
@@ -278,7 +278,7 @@ internal fun Backdrop(series: BaseItemDto, client: EmbyClient, images: ImageLoad
 @Composable
 private fun Header(
     series: BaseItemDto,
-    /** Genres and networks to open (ADR 0079, 0087). */
+    /** Genres and networks to open. */
     chips: ChipLines,
 ) {
     Column(Modifier.padding(horizontal = 48.dp).fillMaxWidth(0.6f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -287,7 +287,7 @@ private fun Header(
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             series.productionYear?.let { Text(it.toString(), color = Palette.textSecondary) }
             RatingBadge(series)
-            // The genres are the chips below when they open a grid (ADR 0079)
+            // The genres are the chips below when they open a grid
             val line = scores(series) + listOfNotNull(yearLineGenres(series, chips.genres))
             if (line.isNotEmpty()) Text(line.joinToString("  ·  "), color = Palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -295,7 +295,7 @@ private fun Header(
             Text(it, color = Palette.textSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
         }
         // Two lines at most: the episodes row needs the room
-        // The networks are the chips below when they open a grid (ADR 0087)
+        // The networks are the chips below when they open a grid
         Facts(series, limit = 2, studios = chips.studios.isEmpty())
         GenreChips(chips.genres, chips.focusGenre, chips.onOpenGenre)
         StudioChips(series, chips.studios, chips.focusStudio, chips.onOpenStudio)
@@ -303,9 +303,9 @@ private fun Header(
 }
 
 /**
- * The series' buttons, never focused first, as wide as the page: « Bande-annonce » (ADR 0083),
- * then the watched mark and favourite of the series and the watched mark of the season shown
- * (ADR 0097). A message shows at the end of the line.
+ * The series' buttons, never focused first, as wide as the page: « Bande-annonce »,
+ * then the watched mark and favourite of the series and the watched mark of the season shown.
+ * A message shows at the end of the line.
  */
 @Composable
 private fun Actions(
@@ -389,7 +389,7 @@ private fun Episodes(
     seriesId: String,
     seasonId: String,
     focusEpisode: String?,
-    /** False when the « Distribution » row takes the first focus (ADR 0068). */
+    /** False when the « Distribution » row takes the first focus. */
     takeFocus: Boolean,
     series: BaseItemDto,
     images: ImageLoader,
@@ -397,7 +397,7 @@ private fun Episodes(
     onOpenEpisode: (SeriesTarget) -> Unit,
     onSessionExpired: () -> Unit,
     refresh: Int,
-    /** Changes after a watched mark on the series or the season (ADR 0097): read again in place. */
+    /** Changes after a watched mark on the series or the season: read again in place. */
     reloads: Int,
 ) {
     var episodes by remember(seasonId) { mutableStateOf<Load<List<BaseItemDto>>>(Load.Loading) }

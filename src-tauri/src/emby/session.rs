@@ -41,7 +41,7 @@ pub struct SessionFile {
     /// Prefills the connection form after sign-out or an expired session.
     pub last_server_url: Option<String>,
     pub session: Option<SessionRecord>,
-    /// Sessions set aside by "Changer de serveur", newest first (ADR 0012). Their
+    /// Sessions set aside by "Changer de serveur", newest first. Their
     /// tokens stay in the credential store.
     #[serde(default)]
     pub saved: Vec<SessionRecord>,
@@ -61,7 +61,7 @@ pub struct SessionRecord {
     pub user_id: String,
     pub user_name: String,
     /// The server rejected this session before it was put on the shelf: its tile
-    /// says "Mot de passe requis" (ADR 0103).
+    /// says "Mot de passe requis".
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub rejected: bool,
 }
@@ -153,11 +153,11 @@ impl SessionFile {
 pub const MAX_PAGE: u32 = 200;
 /// Cards per home row: about two window widths.
 const HOME_ROW: u32 = 16;
-/// Most titles of the home hero (ADR 0015).
+/// Most titles of the home hero.
 const HERO_SIZE: usize = 5;
-/// Search results shown per type (ADR 0011); one more is asked to know if more exist.
+/// Search results shown per type; one more is asked to know if more exist.
 pub const SEARCH_SHOWN: usize = 24;
-/// Episodes asked per search (ADR 0020): Emby also matches the series name, so
+/// Episodes asked per search: Emby also matches the series name, so
 /// the episodes of a matching series come first and are dropped here.
 pub const SEARCH_EPISODES_ASKED: u32 = 100;
 /// Shorter queries are not sent: the server answers nothing to one letter.
@@ -167,11 +167,11 @@ const TICKS_PER_MINUTE: i64 = 600_000_000;
 const IMAGE_CONCURRENCY: usize = 6;
 /// Sessions kept aside by "Changer de serveur"; the oldest is forgotten beyond.
 pub const MAX_SAVED: usize = 8;
-/// Playlists the card menu offers (ADR 0100).
+/// Playlists the card menu offers.
 const PLAYLISTS_MAX: u32 = 200;
-/// Playlists on the home row (ADR 0122): more would make a row nobody scrolls through.
+/// Playlists on the home row: more would make a row nobody scrolls through.
 const HOME_PLAYLISTS: u32 = 50;
-/// Entries read for one playlist: one request, no paging (ADR 0122).
+/// Entries read for one playlist: one request, no paging.
 const PLAYLIST_ITEMS_MAX: u32 = 300;
 /// Longest playlist name accepted, in characters.
 pub const PLAYLIST_NAME_MAX: usize = 200;
@@ -190,21 +190,21 @@ pub struct EmbyService {
     device_name: String,
     version: String,
     current: Mutex<Option<Current>>,
-    /// Bounds concurrent artwork downloads to spare the server (ADR 0005).
+    /// Bounds concurrent artwork downloads to spare the server.
     image_permits: tokio::sync::Semaphore,
-    /// Debug limit of the scenarios (ADR 0009); wins over the setting.
+    /// Debug limit of the scenarios; wins over the setting.
     bitrate_override: Option<u64>,
-    /// Bitrate caps per server (ADR 0037).
+    /// Bitrate caps per server.
     quality: QualityStore,
     /// Bumped (under the `current` lock) by every sign-in, sign-out, server change
-    /// and resume: a restore started before commits nothing (ADR 0012).
+    /// and resume: a restore started before commits nothing.
     epoch: AtomicU64,
     /// Connect and request bounds of new clients; `None` keeps the client defaults.
     timeouts: Option<(Duration, Duration)>,
     /// Client of the last session ended by a 401: its other requests in flight
     /// still answer `SessionExpired`, not `Cancelled`.
     expired: Mutex<Option<EmbyClient>>,
-    /// Artwork kept on disk across launches (ADR 0019); `None` fetches every time.
+    /// Artwork kept on disk across launches; `None` fetches every time.
     artwork: Option<Arc<ArtworkCache>>,
 }
 
@@ -239,7 +239,7 @@ impl EmbyService {
         self
     }
 
-    /// The disk cache, shared with Request artwork (one quota, ADR 0125).
+    /// The disk cache, shared with Request artwork (one quota).
     pub fn artwork_cache(&self) -> Option<Arc<ArtworkCache>> {
         self.artwork.clone()
     }
@@ -251,7 +251,7 @@ impl EmbyService {
             .ok()
     }
 
-    /// Empties the artwork cache of every server (ADR 0021); `None` without a cache.
+    /// Empties the artwork cache of every server; `None` without a cache.
     /// Returns what was removed. Images are downloaded again when next shown.
     pub async fn clear_artwork(&self) -> Option<ArtworkCacheCleared> {
         let cache = Arc::clone(self.artwork.as_ref()?);
@@ -290,7 +290,7 @@ impl EmbyService {
         self
     }
 
-    /// Bitrate caps of the current server (ADR 0037).
+    /// Bitrate caps of the current server.
     pub fn playback_quality(&self) -> Result<PlaybackQuality, EmbyError> {
         let (server_id, local_address) = self.quality_scope()?;
         let caps = self.quality.get(&server_id);
@@ -317,7 +317,7 @@ impl EmbyService {
     }
 
     /// The debug override, then the server's cap for the kind of address of the
-    /// session, then the default limit (ADR 0037).
+    /// session, then the default limit.
     fn streaming_limit(&self, client: &EmbyClient) -> StreamingLimit {
         let local_address = client.server().is_local();
         let cap = self
@@ -360,7 +360,7 @@ impl EmbyService {
         *guard = current;
     }
 
-    /// Server id of the open session, or empty: scopes image URLs (ADR 0012).
+    /// Server id of the open session, or empty: scopes image URLs.
     fn scope(&self) -> String {
         self.lock_current()
             .as_ref()
@@ -404,7 +404,7 @@ impl EmbyService {
     }
 
     /// Server id, user id and token of the open session, traded for a Request
-    /// session (ADR 0125). The only way the Emby token leaves this service.
+    /// session. The only way the Emby token leaves this service.
     pub fn exchange_identity(&self) -> Result<(String, String, AccessToken), EmbyError> {
         let guard = self.lock_current();
         let c = guard.as_ref().ok_or(EmbyError::NotSignedIn)?;
@@ -416,7 +416,7 @@ impl EmbyService {
         ))
     }
 
-    /// The Request session of an Emby account ends with it (ADR 0125).
+    /// The Request session of an Emby account ends with it.
     fn forget_request(&self, server_id: &str, user_id: &str) {
         if let Err(e) = self
             .store
@@ -437,7 +437,7 @@ impl EmbyService {
 
     /// A token rejected while browsing is forgotten like at startup, so the next
     /// launch does not retry it. Only the session whose token was refused ends: a
-    /// late 401 from a previous session answers `Cancelled` (ADR 0012).
+    /// late 401 from a previous session answers `Cancelled`.
     pub(super) fn expire_on_401<T>(
         &self,
         client: &EmbyClient,
@@ -526,8 +526,8 @@ impl EmbyService {
         }
     }
 
-    /// One page of films or series of a library, sorted and filtered as asked
-    /// (ADR 0013). `limit` is clamped to `1..=MAX_PAGE`.
+    /// One page of films or series of a library, sorted and filtered as asked.
+    /// `limit` is clamped to `1..=MAX_PAGE`.
     pub async fn items(
         &self,
         library_id: &str,
@@ -562,7 +562,7 @@ impl EmbyService {
     }
 
     /// Every title of a library grid in its order, with its sort name: the
-    /// letter rail jumps from it (ADR 0101). Unlike pages, nothing is dropped, so
+    /// letter rail jumps from it. Unlike pages, nothing is dropped, so
     /// positions match the server's.
     pub async fn sort_names(
         &self,
@@ -594,7 +594,7 @@ impl EmbyService {
             .collect())
     }
 
-    /// One title drawn by the server among those the grid shows (ADR 0101),
+    /// One title drawn by the server among those the grid shows,
     /// `None` when none matches.
     pub async fn random_item(
         &self,
@@ -618,7 +618,7 @@ impl EmbyService {
     }
 
     /// Production years of a library, newest first, without repeats (decade
-    /// filter, ADR 0101).
+    /// filter).
     pub async fn production_years(&self, library_id: &str) -> Result<Vec<i32>, EmbyError> {
         let kind = self.known_library(library_id).await?;
         let (client, user_id) = self.session()?;
@@ -670,7 +670,7 @@ impl EmbyService {
             .collect())
     }
 
-    /// Home hero (ADR 0015): up to five titles with a backdrop, the ones to resume
+    /// Home hero: up to five titles with a backdrop, the ones to resume
     /// first, then films and series added recently and not watched; one title per
     /// film or series. A series plays its first episode not watched yet.
     pub async fn hero(&self) -> Result<Vec<HeroItem>, EmbyError> {
@@ -725,7 +725,7 @@ impl EmbyService {
         let (client, user_id) = self.session()?;
         let scope = self.scope();
         // Emby 4.10.1.0 answers an empty `/Shows/NextUp` once an episode is watched,
-        // and lists the next one in its "resume" home section instead (ADR 0010).
+        // and lists the next one in its "resume" home section instead.
         let (shows, section) = tokio::join!(
             client.next_up(&user_id, HOME_ROW),
             self.resume_section(&client, &user_id)
@@ -773,7 +773,7 @@ impl EmbyService {
         Ok(page.items)
     }
 
-    /// Films, series and episodes whose title matches `query` (ADR 0011, 0020),
+    /// Films, series and episodes whose title matches `query`,
     /// all searched at once. A query shorter than two characters once cleaned
     /// reaches no server.
     pub async fn search(&self, query: &str) -> Result<SearchResults, EmbyError> {
@@ -846,7 +846,7 @@ impl EmbyService {
             .collect())
     }
 
-    /// Home row "Favoris" (ADR 0014): favorite films and series, by title.
+    /// Home row "Favoris": favorite films and series, by title.
     pub async fn favorites(&self) -> Result<Vec<MediaItem>, EmbyError> {
         let (client, user_id) = self.session()?;
         let scope = self.scope();
@@ -873,7 +873,7 @@ impl EmbyService {
         Ok(data.is_favorite)
     }
 
-    /// Marks a film, episode, season or series played or unplayed (ADR 0096), then
+    /// Marks a film, episode, season or series played or unplayed, then
     /// reads back what the server holds. For a season or series, whether Emby
     /// applies it to the episodes is not documented: callers read them again.
     pub async fn set_played(
@@ -893,7 +893,7 @@ impl EmbyService {
         Ok(self.state_after_change(item_id, data).await)
     }
 
-    /// Takes a film or episode out of "Reprendre" (ADR 0096); the resume point
+    /// Takes a film or episode out of "Reprendre"; the resume point
     /// is the server's business afterwards, read back as for `set_played`.
     pub async fn hide_from_resume(&self, item_id: &str) -> Result<PlaybackStopped, EmbyError> {
         if !is_id(item_id) {
@@ -908,7 +908,7 @@ impl EmbyService {
     }
 
     /// Next episode to play of a series, as the home hero picks it: the first one
-    /// not watched yet, in the series' order (ADR 0100). `None` when all are.
+    /// not watched yet, in the series' order. `None` when all are.
     pub async fn series_next_episode(
         &self,
         series_id: &str,
@@ -929,7 +929,7 @@ impl EmbyService {
             .find_map(|d| watch_item(d, &scope)))
     }
 
-    /// Playlists of the user, by name (ADR 0100).
+    /// Playlists of the user, by name.
     pub async fn playlists(&self) -> Result<Vec<Playlist>, EmbyError> {
         let (client, user_id) = self.session()?;
         let page = self.expire_on_401(&client, client.playlists(&user_id, PLAYLISTS_MAX).await)?;
@@ -944,7 +944,7 @@ impl EmbyService {
             .collect())
     }
 
-    /// Home row « Playlists » (ADR 0122): the user's video playlists, A → Z.
+    /// Home row « Playlists »: the user's video playlists, A → Z.
     pub async fn home_playlists(&self) -> Result<Vec<PlaylistCard>, EmbyError> {
         let (client, user_id) = self.session()?;
         let scope = self.scope();
@@ -955,7 +955,7 @@ impl EmbyService {
         Ok(video_playlists(page.items, &scope))
     }
 
-    /// Films and episodes of a playlist, in its order (ADR 0122).
+    /// Films and episodes of a playlist, in its order.
     pub async fn playlist_items(&self, playlist_id: &str) -> Result<Vec<WatchItem>, EmbyError> {
         if !is_id(playlist_id) {
             return Err(EmbyError::InvalidResponse("identifiant invalide".into()));
@@ -971,7 +971,7 @@ impl EmbyService {
         Ok(playlist_entries(page.items, &scope))
     }
 
-    /// Appends a film or episode to one of the user's playlists (ADR 0100);
+    /// Appends a film or episode to one of the user's playlists;
     /// returns how many items the server says it added.
     pub async fn add_to_playlist(
         &self,
@@ -989,7 +989,7 @@ impl EmbyService {
         Ok(res.item_added_count)
     }
 
-    /// Creates a video playlist named `name` holding the item (ADR 0100).
+    /// Creates a video playlist named `name` holding the item.
     pub async fn create_playlist(
         &self,
         name: &str,
@@ -1032,7 +1032,7 @@ impl EmbyService {
     }
 
     /// Detail page of a film, series or episode. Other item types are refused.
-    /// An episode also gets its neighbours in the series (ADR 0016).
+    /// An episode also gets its neighbours in the series.
     pub async fn item_detail(&self, item_id: &str) -> Result<ItemDetail, EmbyError> {
         let (client, user_id) = self.session()?;
         let dto = self.expire_on_401(&client, client.item(&user_id, item_id).await)?;
@@ -1055,7 +1055,7 @@ impl EmbyService {
     }
 
     /// Titles of a person, collection, genre or studio opened from a detail
-    /// page (ADR 0121): films and series only, once each, in the source's order.
+    /// page: films and series only, once each, in the source's order.
     pub async fn titles(&self, source: &TitlesSource) -> Result<Vec<MediaItem>, EmbyError> {
         let (client, user_id) = self.session()?;
         let scope = self.scope();
@@ -1078,7 +1078,7 @@ impl EmbyService {
             .collect())
     }
 
-    /// Id of the first trailer file of a film or series (ADR 0121), played like
+    /// Id of the first trailer file of a film or series, played like
     /// any item; `None` when the server lists none.
     pub async fn local_trailer(&self, item_id: &str) -> Result<Option<String>, EmbyError> {
         if !titles::is_item_id(item_id) {
@@ -1101,8 +1101,8 @@ impl EmbyService {
         ))
     }
 
-    /// Emby's markers of an item and what the external sources are asked about it
-    /// (ADR 0030): a film by its ids, an episode by its series' ids and numbers.
+    /// Emby's markers of an item and what the external sources are asked about it:
+    /// a film by its ids, an episode by its series' ids and numbers.
     /// `None` when the item has no usable id.
     pub async fn segment_query(
         &self,
@@ -1154,7 +1154,7 @@ impl EmbyService {
         Ok((markers, query))
     }
 
-    /// Chapters of a film or episode for the player (ADR 0034), from the item's
+    /// Chapters of a film or episode for the player, from the item's
     /// `Chapters`; none when it has fewer than two.
     pub async fn chapters(&self, item_id: &str) -> Result<Vec<Chapter>, EmbyError> {
         let (client, user_id) = self.session()?;
@@ -1188,10 +1188,10 @@ impl EmbyService {
             .collect())
     }
 
-    /// Negotiates playback of a film or episode (ADR 0007). Returns the plan and the
+    /// Negotiates playback of a film or episode. Returns the plan and the
     /// headers the player must send, authentication included; the URL holds no token.
-    /// With `resume`, the plan starts at the position the server holds now (ADR 0008).
-    /// The item is read alongside PlaybackInfo for the player's title (ADR 0017); without
+    /// With `resume`, the plan starts at the position the server holds now.
+    /// The item is read alongside PlaybackInfo for the player's title; without
     /// `resume`, failing to read it only leaves the title out.
     pub async fn prepare_playback(
         &self,
@@ -1204,7 +1204,7 @@ impl EmbyService {
 
     /// Same as `prepare_playback`, for when the player could not open the direct
     /// source: Direct Play and Direct Stream are refused to the server so it
-    /// transcodes (ADR 0023). A server that still offers the file as is gives
+    /// transcodes. A server that still offers the file as is gives
     /// `NoCompatibleStream`, so the fallback never loops on the same source.
     pub async fn prepare_transcode(
         &self,
@@ -1216,7 +1216,7 @@ impl EmbyService {
     }
 
     /// `prepare_playback` or `prepare_transcode` for one version of an item with
-    /// several (ADR 0036); `None` lets the server pick, as before.
+    /// several; `None` lets the server pick, as before.
     pub async fn prepare_version(
         &self,
         item_id: &str,
@@ -1235,7 +1235,7 @@ impl EmbyService {
     }
 
     /// `prepare_playback` or, with `force_transcode`, `prepare_transcode`, with the
-    /// audio and subtitles picked from the user's preferences (ADR 0035).
+    /// audio and subtitles picked from the user's preferences.
     pub async fn prepare(
         &self,
         item_id: &str,
@@ -1248,7 +1248,6 @@ impl EmbyService {
     }
 
     /// `prepare` for one version of the item, or the server's pick with `None`
-    /// (ADR 0035, 0036).
     pub async fn prepare_source(
         &self,
         item_id: &str,
@@ -1269,7 +1268,7 @@ impl EmbyService {
     }
 
     /// A new negotiation of the version playing at another bitrate cap, for this
-    /// playback only (ADR 0117): Réglages is left as it is. `None` is « Maximale ».
+    /// playback only: Réglages is left as it is. `None` is « Maximale ».
     /// The plan starts at `start_ticks`, the position reached.
     pub async fn prepare_at_cap(
         &self,
@@ -1297,7 +1296,7 @@ impl EmbyService {
     }
 
     /// Stops the transcode of a replaced play session (`DELETE
-    /// /Videos/ActiveEncodings`, ADR 0117); the token stays in the header.
+    /// /Videos/ActiveEncodings`); the token stays in the header.
     pub async fn stop_encoding(&self, play_session_id: &str) -> Result<(), EmbyError> {
         let client = self.client()?;
         self.expire_on_401(&client, client.stop_active_encodings(play_session_id).await)
@@ -1345,7 +1344,7 @@ impl EmbyService {
             .filter(|&a| Some(a) != plan.default_audio_stream_index);
         if let Some(audio) = other_audio.filter(|_| plan.method == PlayMethod::Transcode) {
             // A transcode carries the audio the server picked; it takes another one
-            // only with the source named (ADR 0035).
+            // only with the source named.
             let source = plan.media_source_id.as_str();
             let info = client
                 .playback_info(
@@ -1396,7 +1395,7 @@ impl EmbyService {
         Ok((plan, headers))
     }
 
-    /// Sends one playback report (ADR 0008).
+    /// Sends one playback report.
     pub async fn report_playback(&self, report: &Report) -> Result<(), EmbyError> {
         let client = self.client()?;
         self.expire_on_401(
@@ -1408,7 +1407,7 @@ impl EmbyService {
     }
 
     /// Sends a lost stop report again, only while `owner` is still the open session:
-    /// it must never reach another account or server (ADR 0024).
+    /// it must never reach another account or server.
     pub async fn resend_stop(&self, owner: &EmbyClient, report: &Report) -> Result<(), EmbyError> {
         if !self.client()?.same_token(owner) {
             return Err(EmbyError::Cancelled);
@@ -1478,7 +1477,7 @@ impl EmbyService {
 
     /// Artwork for the `emby-img` protocol, fetched with the open session.
     /// Artwork of the open session's server: from the disk cache when it has it, else
-    /// downloaded (at most `IMAGE_CONCURRENCY` at once) and kept (ADR 0019).
+    /// downloaded (at most `IMAGE_CONCURRENCY` at once) and kept.
     pub async fn image(&self, req: &ImageRequest) -> Result<(String, Vec<u8>), EmbyError> {
         // Session and server first: the cache never answers for another session.
         self.session()?;
@@ -1519,7 +1518,7 @@ impl EmbyService {
     }
 
     /// Validates the address and reads the server's public identity.
-    /// Audio and subtitle preferences of the signed-in Emby account (ADR 0115).
+    /// Audio and subtitle preferences of the signed-in Emby account.
     pub async fn account_tracks(&self) -> Result<tracks::AccountTracks, EmbyError> {
         let (client, user_id) = self.session()?;
         let dto = self.expire_on_401(&client, client.user(&user_id).await)?;
@@ -1576,7 +1575,7 @@ impl EmbyService {
         Ok(user)
     }
 
-    /// Validates the saved session (ADR 0012), at startup and whenever the UI
+    /// Validates the saved session, at startup and whenever the UI
     /// suspects the network. Only a rejection by the server forgets the token:
     /// timeouts, 5xx and unreachable servers keep everything for a later retry.
     /// `Err(Cancelled)`: a sign-in, sign-out or server change happened meanwhile.
@@ -1675,9 +1674,9 @@ impl EmbyService {
     }
 
     /// "Changer de serveur": closes the session without revoking it and sets it
-    /// aside so the user can come back to it (ADR 0012).
+    /// aside so the user can come back to it.
     /// A rejected session (the reauthentication hint) stays on the shelf with
-    /// "Mot de passe requis" (ADR 0103).
+    /// "Mot de passe requis".
     pub fn change_server(&self) -> Result<(), EmbyError> {
         self.set_current(None);
         let evicted = self.update_file(|f| {
@@ -1707,7 +1706,7 @@ impl EmbyService {
         matches!(self.store.load(&record.account()), Ok(Some(_)))
     }
 
-    /// Tiles of the pre-connection shelf (ADR 0103), newest first, one per
+    /// Tiles of the pre-connection shelf, newest first, one per
     /// server and user: the session left by a failed check (never the open
     /// one), the rejected session, then the shelf.
     pub fn shelf(&self) -> Vec<ShelfServer> {
@@ -1745,7 +1744,7 @@ impl EmbyService {
         tiles
     }
 
-    /// "Oublier ce serveur" (ADR 0103): the record (address, user name) leaves
+    /// "Oublier ce serveur": the record (address, user name) leaves
     /// `session.json` and the token leaves the credential store. Nothing changes
     /// on the server; the returned revocation is a best effort the caller may
     /// run later, it never holds the removal back.
@@ -1850,7 +1849,7 @@ impl EmbyService {
 
     /// Revokes the token on the server when reachable, then always forgets it
     /// locally: an offline sign-out must not leave a usable token on disk. The
-    /// address and user name stay on the shelf, without token (ADR 0103).
+    /// address and user name stay on the shelf, without token.
     pub async fn sign_out(&self) -> Result<(), EmbyError> {
         let current = {
             let mut guard = self.lock_current();
@@ -1884,9 +1883,9 @@ impl EmbyService {
     }
 }
 
-/// Best-effort revocation of a forgotten session (ADR 0103): the public probe
+/// Best-effort revocation of a forgotten session: the public probe
 /// goes **without** the token, which is only sent to the server with the saved
-/// id, like a restore (ADR 0012).
+/// id, like a restore.
 pub struct Revocation {
     client: EmbyClient,
     server_id: String,
@@ -1937,7 +1936,7 @@ fn check_options(options: &ItemsOptions) -> Result<(), EmbyError> {
 }
 
 /// Video playlists, once each, in the server's order; one without `MediaType`
-/// is kept, audio ones are dropped (ADR 0122).
+/// is kept, audio ones are dropped.
 fn video_playlists(items: Vec<BaseItemDto>, server: &str) -> Vec<PlaylistCard> {
     let mut cards: Vec<PlaylistCard> = Vec::new();
     for dto in items {
@@ -1969,7 +1968,7 @@ fn video_playlists(items: Vec<BaseItemDto>, server: &str) -> Vec<PlaylistCard> {
 }
 
 /// Films and episodes of a playlist in its order; anything else has no page to
-/// open. An item listed twice shows once, where it comes first (ADR 0122).
+/// open. An item listed twice shows once, where it comes first.
 fn playlist_entries(items: Vec<BaseItemDto>, server: &str) -> Vec<WatchItem> {
     let mut entries: Vec<WatchItem> = Vec::new();
     for item in items.into_iter().filter_map(|d| watch_item(d, server)) {
@@ -2206,8 +2205,8 @@ pub fn clean_search(query: &str) -> String {
 }
 
 /// Whether `query` starts a word of `title`, ignoring case and accents, as Emby
-/// matches titles (ADR 0011). Used on episodes, which the server also finds by
-/// their series name (ADR 0020).
+/// matches titles. Used on episodes, which the server also finds by
+/// their series name.
 pub fn title_matches(title: &str, query: &str) -> bool {
     let title = fold(title);
     let query = fold(query);
@@ -2257,7 +2256,7 @@ fn is_id(id: &str) -> bool {
 }
 
 /// Media source ids seen: `mediasource_30207` for an item's own file, an item id
-/// for a merged version (ADR 0036).
+/// for a merged version.
 fn is_source_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 128
@@ -2290,7 +2289,7 @@ fn resume(user_data: &UserItemData, runtime_ticks: Option<i64>) -> Option<Resume
     })
 }
 
-/// Title of a film or episode for the player (ADR 0017).
+/// Title of a film or episode for the player.
 fn playback_title(dto: &BaseItemDto) -> Option<PlaybackTitle> {
     let episode = dto.item_type == "Episode";
     Some(PlaybackTitle {

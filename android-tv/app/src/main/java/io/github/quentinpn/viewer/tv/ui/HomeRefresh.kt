@@ -1,6 +1,6 @@
 package io.github.quentinpn.viewer.tv.ui
 
-// The home reads its shelves again on its own (ADR 0109): a title added on the
+// The home reads its shelves again on its own: a title added on the
 // server shows in « Ajoutés récemment » without restarting the app.
 
 /** While the home stays shown, its shelves are read again after this long. */

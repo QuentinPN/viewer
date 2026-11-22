@@ -88,7 +88,7 @@ internal class BrowseState(val type: MediaType, filters: BrowseFilters = BrowseF
 private enum class Pill(val title: String) { Sort("Tri"), Genre("Genre"), Years("Années"), Rating("Note") }
 
 /**
- * Parcourir (ADR 0125): the filter pills, each opening a list to pick from, over a six-column
+ * Parcourir: the filter pills, each opening a list to pick from, over a six-column
  * grid of posters that reads the next page as the focus nears its end.
  */
 @Composable
@@ -124,11 +124,7 @@ internal fun BrowseTv(
             }
         }
     }
-    LaunchedEffect(state) {
-        snapshotFlow { state.grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }.collect { last ->
-            if (last >= state.pager.items.size - LOAD_AHEAD) state.more(repository, scope)
-        }
-    }
+    LoadAhead(state, state.grid, state.pager) { state.more(repository, scope) }
     FocusRestore(memory, state.pager.items.isNotEmpty(), restore)
 
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -157,25 +153,7 @@ internal fun BrowseTv(
             pager.items.isEmpty() && pager.finished -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Aucun titre ne correspond à ces filtres", color = Palette.textSecondary, textAlign = TextAlign.Center)
             }
-            else -> LazyVerticalGrid(
-                columns = GridCells.Fixed(GRID_COLUMNS),
-                state = state.grid,
-                // Room around the cards for the focused one's scale and ring
-                contentPadding = PaddingValues(start = 48.dp, end = 44.dp, top = 12.dp, bottom = 40.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                items(pager.items, key = { it.key() }) { media ->
-                    MediaCardTv(
-                        media,
-                        art,
-                        modifier = if (media.key() == memory.opened) Modifier.focusRequester(restore) else Modifier,
-                        showTitle = true,
-                    ) { onOpen(media) }
-                }
-                // A later page that failed: the loaded cards stay, with a way to try again
-                if (error != null) item(span = { GridItemSpan(maxLineSpan) }) { Retry(error) { state.retry(repository, scope) } }
-            }
+            else -> MediaGridTv(pager, state.grid, art, memory, restore, onRetry = { state.retry(repository, scope) }, onOpen = onOpen)
         }
     }
 
@@ -198,6 +176,51 @@ internal fun BrowseTv(
             },
             onDismiss = { choosing = null },
         )
+    }
+}
+
+/**
+ * The six-column grid of posters of a [pager] (Parcourir, the search of Demander); the card
+ * [RequestsMemory.opened] holds [restore]. A later page that failed keeps the cards, with a retry.
+ */
+@Composable
+internal fun MediaGridTv(
+    pager: Pager<MediaSummary>,
+    grid: LazyGridState,
+    art: RequestArt,
+    memory: RequestsMemory,
+    restore: FocusRequester,
+    onRetry: () -> Unit,
+    onOpen: (MediaSummary) -> Unit,
+) {
+    val error = pager.error
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(GRID_COLUMNS),
+        state = grid,
+        // Room around the cards for the focused one's scale and ring
+        contentPadding = PaddingValues(start = 48.dp, end = 44.dp, top = 12.dp, bottom = 40.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        items(pager.items, key = { it.key() }) { media ->
+            MediaCardTv(
+                media,
+                art,
+                modifier = if (media.key() == memory.opened) Modifier.focusRequester(restore) else Modifier,
+                showTitle = true,
+            ) { onOpen(media) }
+        }
+        if (error != null) item(span = { GridItemSpan(maxLineSpan) }) { Retry(error, onRetry) }
+    }
+}
+
+/** Reads the next page of [pager] once the focus nears the end of [grid]. */
+@Composable
+internal fun LoadAhead(key: Any, grid: LazyGridState, pager: Pager<MediaSummary>, more: () -> Unit) {
+    LaunchedEffect(key) {
+        snapshotFlow { grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }.collect { last ->
+            if (last >= pager.items.size - LOAD_AHEAD) more()
+        }
     }
 }
 

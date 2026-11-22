@@ -119,7 +119,7 @@ internal sealed interface SearchState {
     data class Failed(val query: String, val message: String) : SearchState
 }
 
-/** The « À demander » row (ADR 0125): what Request finds that is not in Emby, hidden unless it is connected. */
+/** The « À demander » row: what Request finds that is not in Emby, hidden unless it is connected. */
 internal sealed interface ToRequest {
     data object Hidden : ToRequest
 
@@ -162,7 +162,7 @@ class SearchMemory {
 
 /**
  * A text field, then the films, series and episodes whose title starts with the term;
- * while the field is empty, the recent searches kept on the device (ADR 0075).
+ * while the field is empty, the recent searches kept on the device.
  */
 @Composable
 fun SearchScreen(
@@ -319,11 +319,17 @@ fun SearchScreen(
 }
 
 /**
- * The term, in a glass pill like the home's controls (ADR 0067): white with black text and
+ * The term, in a glass pill like the home's controls: white with black text and
  * ringed in the accent while typing. The ring sits in reserved space, so nothing moves.
  */
 @Composable
-private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Modifier, onSearch: () -> Unit) {
+internal fun SearchField(
+    value: String,
+    onChange: (String) -> Unit,
+    modifier: Modifier,
+    placeholder: String = "Titre d'un film, d'une série ou d'un épisode",
+    onSearch: () -> Unit,
+) {
     // Read on the field itself: a text field's interaction source does not report its focus here
     var focused by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
@@ -343,7 +349,7 @@ private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Mod
         Box(Modifier.weight(1f)) {
             if (value.isEmpty()) {
                 Text(
-                    "Titre d'un film, d'une série ou d'un épisode",
+                    placeholder,
                     color = if (focused) Color(0x99000000) else Palette.textSecondary,
                     fontSize = 18.sp,
                     maxLines = 1,
@@ -358,13 +364,16 @@ private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Mod
                 cursorBrush = SolidColor(ink),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-                // A text field keeps the D-pad for its cursor: Down goes on to the results
+                // A text field keeps the D-pad for its cursor: Down goes on to the results, Up to what is above, if anything
                 modifier = modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }.onPreviewKeyEvent {
-                    if (it.key == Key.DirectionDown && it.type == KeyEventType.KeyDown) {
-                        focusManager.moveFocus(FocusDirection.Down)
-                        true
-                    } else {
-                        false
+                    when {
+                        it.type != KeyEventType.KeyDown -> false
+                        it.key == Key.DirectionDown -> {
+                            focusManager.moveFocus(FocusDirection.Down)
+                            true
+                        }
+                        it.key == Key.DirectionUp -> focusManager.moveFocus(FocusDirection.Up)
+                        else -> false
                     }
                 },
             )
@@ -374,7 +383,7 @@ private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Mod
 
 /**
  * The last searches as glass pills, newest first, then « Effacer l'historique » on its own
- * line: Down from the field reaches the pills, Down again the button (ADR 0075).
+ * line: Down from the field reaches the pills, Down again the button.
  */
 @Composable
 private fun RecentSearches(terms: List<String>, onSearch: (String) -> Unit, onClear: () -> Unit) {

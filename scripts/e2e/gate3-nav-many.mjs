@@ -1,4 +1,4 @@
-// Navigation pill (ADR 0031) with many libraries, at the CSS sizes of 125 % and
+// Navigation pill with many libraries, at the CSS sizes of 125 % and
 // 150 % scaling, on the real Emby test account driven over CDP. The local proxy
 // `net-proxy.mjs` ("many-views") answers the library list with each library
 // repeated, so the server keeps its own libraries: it is only read. The made-up

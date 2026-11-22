@@ -1,6 +1,6 @@
 package io.github.quentinpn.viewer.tv.emby
 
-// The user's playlists and their entries, read only (ADR 0088).
+// The user's playlists and their entries, read only.
 
 /** Playlists on the home row: more would make a row nobody scrolls to the end of. */
 internal const val PLAYLISTS_LIMIT = 50

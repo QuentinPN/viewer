@@ -1,4 +1,4 @@
-// Pages opened from a detail page over it (ADR 0121): another title, or a list
+// Pages opened from a detail page over it: another title, or a list
 // of titles (a person, a collection, a genre, a studio). Back pops the top one.
 // Pure, so it can be unit tested.
 import type {

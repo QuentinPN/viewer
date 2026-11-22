@@ -1,5 +1,5 @@
 // Status of a title as last read on its page: the cards of Découvrir, Parcourir
-// and the searches loaded before keep showing it after a request (ADR 0125).
+// and the searches loaded before keep showing it after a request.
 import { SvelteMap } from "svelte/reactivity";
 import { mediaKey } from "./browse";
 import type { MediaStatus, MediaSummary } from "./types";

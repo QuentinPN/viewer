@@ -1,4 +1,4 @@
-// Gate 3 next episode at the end of an episode (ADR 0018) on the real Emby test
+// Gate 3 next episode at the end of an episode on the real Emby test
 // account, driven over CDP:
 // - an episode played to its end shows the "Épisode suivant" card: the next
 //   episode's code and title (the server's and the series page's), a countdown

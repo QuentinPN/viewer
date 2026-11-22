@@ -1,4 +1,4 @@
-// Generates docs/sync/vectors.json (ADR 0124). Run: node scripts/sync-vectors.cjs .
+// Generates docs/sync/vectors.json. Run: node scripts/sync-vectors.cjs .
 const fs = require("node:fs");
 const path = require("node:path");
 const root = process.argv[2];
@@ -485,7 +485,7 @@ const decide = [
 
 const out = {
   comment:
-    "Shared test vectors for ADR 0124. Desktop (Rust) and Android TV (Kotlin) tests read this file.",
+    "Shared test vectors (PC/TV linked playback sync). Desktop (Rust) and Android TV (Kotlin) tests read this file.",
   maxBytes: 1024,
   valid,
   invalid,

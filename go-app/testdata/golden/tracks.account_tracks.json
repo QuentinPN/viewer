@@ -1,0 +1,77 @@
+[
+  {
+    "accountTracks": {
+      "audioLanguages": [
+        "fre",
+        "eng"
+      ],
+      "playDefaultAudio": true,
+      "subtitleLanguages": [
+        "fre"
+      ],
+      "subtitleMode": "OnlyForced"
+    },
+    "case": "object",
+    "configuration": {
+      "AudioLanguagePreference": "fre, ENG,fre,not a code",
+      "PlayDefaultAudioTrack": true,
+      "SubtitleLanguagePreference": "fre",
+      "SubtitleMode": "onlyforced"
+    }
+  },
+  {
+    "accountTracks": {
+      "audioLanguages": [
+        "fre",
+        "eng"
+      ],
+      "playDefaultAudio": true,
+      "subtitleLanguages": [
+        "fre"
+      ],
+      "subtitleMode": "OnlyForced"
+    },
+    "case": "array",
+    "configuration": [
+      {
+        "AudioLanguagePreference": "fre, ENG,fre,not a code",
+        "PlayDefaultAudioTrack": true,
+        "SubtitleLanguagePreference": "fre",
+        "SubtitleMode": "onlyforced"
+      }
+    ]
+  },
+  {
+    "accountTracks": {
+      "audioLanguages": [],
+      "playDefaultAudio": false,
+      "subtitleLanguages": [],
+      "subtitleMode": null
+    },
+    "case": "missing",
+    "configuration": null
+  },
+  {
+    "accountTracks": {
+      "audioLanguages": [],
+      "playDefaultAudio": false,
+      "subtitleLanguages": [],
+      "subtitleMode": null
+    },
+    "case": "empty_array",
+    "configuration": []
+  },
+  {
+    "accountTracks": {
+      "audioLanguages": [],
+      "playDefaultAudio": false,
+      "subtitleLanguages": [],
+      "subtitleMode": null
+    },
+    "case": "unknown_mode",
+    "configuration": {
+      "AudioLanguagePreference": "",
+      "SubtitleMode": "Sometimes"
+    }
+  }
+]

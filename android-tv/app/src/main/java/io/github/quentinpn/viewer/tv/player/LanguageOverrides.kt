@@ -1,6 +1,6 @@
 package io.github.quentinpn.viewer.tv.player
 
-// Audio and subtitle languages set on this device (ADR 0120, owner decision of ADR 0115):
+// Audio and subtitle languages set on this device:
 // each choice defaults to « Comme le compte Emby »; a choice made here is applied first,
 // the account's preferences after it. Pure, so the whole selection is unit-tested.
 

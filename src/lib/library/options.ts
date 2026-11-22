@@ -1,4 +1,4 @@
-// Sort and filters of a library grid (ADR 0013): choices, defaults, labels and
+// Sort and filters of a library grid: choices, defaults, labels and
 // their per-library memory. Pure apart from the storage passed in, so it can be
 // unit tested.
 import type {

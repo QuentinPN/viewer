@@ -15,9 +15,9 @@ data class Session(val server: String, val userId: String, val userName: String,
 }
 
 /**
- * Persists the saved servers (ADR 0104): addresses and users in plain preferences, each
+ * Persists the saved servers: addresses and users in plain preferences, each
  * token encrypted with an AES-GCM key held by the Android Keystore (non-exportable). As
- * on Windows (ADR 0005), a token that cannot be decrypted means signing in again.
+ * on Windows, a token that cannot be decrypted means signing in again.
  */
 class SessionStore(context: Context) :
     SavedServerRepository(PreferencesStore(prefs(context)), KeystoreCipher(SESSION_KEY_ALIAS)) {

@@ -1,4 +1,4 @@
-// Gate 3 home page scenario on the real Emby test account, driven over CDP (ADR 0010):
+// Gate 3 home page scenario on the real Emby test account, driven over CDP:
 // - the home page is the default view, with one "Ajoutés récemment" row per library;
 // - Left/Right move between the cards of a row, the arrow buttons scroll it;
 // - "Tout voir" opens the library grid, "Accueil" comes back;

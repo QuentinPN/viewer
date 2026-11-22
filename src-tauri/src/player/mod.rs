@@ -25,15 +25,15 @@ pub struct PlaybackRequest {
     /// delivers separately). Validated like `source`.
     #[serde(default)]
     pub subtitles: Vec<ExternalSubtitle>,
-    /// Audio and subtitle tracks to select once the file is loaded (ADR 0035).
+    /// Audio and subtitle tracks to select once the file is loaded.
     #[serde(default)]
     pub tracks: TrackSelection,
-    /// How text subtitles look (ADR 0035).
+    /// How text subtitles look.
     #[serde(default)]
     pub subtitle_style: SubtitleStyle,
 }
 
-/// Which track of a kind to select once the file is loaded (ADR 0035).
+/// Which track of a kind to select once the file is loaded.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum TrackPick {
@@ -57,7 +57,7 @@ pub struct TrackSelection {
 }
 
 /// Look of text subtitles (SRT, WebVTT…). ASS/SSA keep their own styling unless
-/// `override_ass` is set (ADR 0035).
+/// `override_ass` is set.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SubtitleStyle {
@@ -191,30 +191,30 @@ pub enum PlayerCommand {
     SetVolume {
         percent: f64,
     },
-    /// Playback speed factor, held within 0.25–4 (ADR 0072).
+    /// Playback speed factor, held within 0.25–4.
     SetSpeed {
         speed: f64,
     },
-    /// Night mode: a compressor in mpv's audio filter chain (ADR 0072).
+    /// Night mode: a compressor in mpv's audio filter chain.
     SetNightMode {
         on: bool,
     },
-    /// Subtitle delay in seconds, positive shows them later; held within ±10 (ADR 0062).
+    /// Subtitle delay in seconds, positive shows them later; held within ±10.
     SetSubtitleDelay {
         seconds: f64,
     },
-    /// Audio delay in seconds, positive plays it later; held within ±10 (ADR 0062).
+    /// Audio delay in seconds, positive plays it later; held within ±10.
     SetAudioDelay {
         seconds: f64,
     },
-    /// How the picture fills the window (ADR 0078).
+    /// How the picture fills the window.
     SetVideoFit {
         fit: VideoFit,
     },
     Stop,
 }
 
-/// How the picture fills the window, as on the TV (ADR 0078).
+/// How the picture fills the window, as on the TV.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum VideoFit {
@@ -318,13 +318,13 @@ pub struct PlayerDiagnostics {
     pub time_pos: Option<f64>,
     pub duration: Option<f64>,
     pub paused: Option<bool>,
-    /// Engine volume in percent (0–130), as set by `SetVolume` (ADR 0017).
+    /// Engine volume in percent (0–130), as set by `SetVolume`.
     pub volume: Option<f64>,
     pub frame_drop_count: Option<i64>,
     pub decoder_frame_drop_count: Option<i64>,
-    /// Chapters mpv found in the file (`chapters`), compared with Emby's (ADR 0034).
+    /// Chapters mpv found in the file (`chapters`), compared with Emby's.
     pub chapter_count: Option<i64>,
-    /// Subtitle options in effect (ADR 0035): `sub-scale`, `sub-color`,
+    /// Subtitle options in effect: `sub-scale`, `sub-color`,
     /// `sub-border-style`, `sub-pos`, `sub-align-y`, `sub-ass-override`.
     pub subtitle_options: Vec<(String, String)>,
 }
@@ -352,10 +352,10 @@ impl Serialize for PlayerError {
 }
 
 /// How long a loaded file may stay unpaused with its position frozen before the
-/// playback counts as interrupted (ADR 0022).
+/// playback counts as interrupted.
 pub const STALL_LIMIT: Duration = Duration::from_secs(30);
 
-/// How long a file may take to load before the opening counts as failed (ADR 0027).
+/// How long a file may take to load before the opening counts as failed.
 pub const OPEN_LIMIT: Duration = Duration::from_secs(45);
 
 /// Which wait of [`StallWatch`] ran out.
@@ -368,7 +368,7 @@ pub enum Stall {
 /// Pure watch over the player events: a file must load, then its position must move
 /// while playing. Time is passed in. FFmpeg retries at each read of the demuxer and
 /// skips the HLS segments that fail, so a dead stream may never reach an end of file
-/// by itself (ADR 0022, ADR 0027).
+/// by itself.
 #[derive(Debug)]
 pub struct StallWatch {
     limit: Duration,

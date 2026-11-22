@@ -1,4 +1,4 @@
-// Gate 3 settings screen (ADR 0021) on the real Emby test account, driven over
+// Gate 3 settings screen on the real Emby test account, driven over
 // CDP, with an empty temporary artwork cache (`VIEWER_E2E_ARTWORK_DIR`, debug builds
 // only, never the user's cache):
 // - the home fills the cache; « Réglages » shows its size and image count, and
@@ -8,7 +8,7 @@
 // - « Diagnostics » offers « Ouvrir le dossier des journaux » (not clicked: it opens
 //   the file explorer on the desktop); the log, in a temporary folder
 //   (`VIEWER_E2E_LOG_DIR`), records the start and a panic raised on purpose
-//   (`VIEWER_E2E_PANIC`) with its backtrace, and holds no secret (ADR 0033).
+//   (`VIEWER_E2E_PANIC`) with its backtrace, and holds no secret.
 // Read only on the server (image GETs); only the temporary folders are emptied.
 import {
   mkdtempSync,
@@ -104,7 +104,7 @@ try {
     shown,
   );
   check("reads_since_launch", /Depuis le lancement : /.test(shown));
-  // ADR 0032: the version of the build, the one in package.json.
+  // The version of the build, the one in package.json.
   const { version } = JSON.parse(
     readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
   );
@@ -115,7 +115,7 @@ try {
       .textContent(),
   );
   check("version_shown", about === `Viewer version ${version}`, about);
-  // ADR 0033: the diagnostics section and its button, reachable from the keyboard.
+  // The diagnostics section and its button, reachable from the keyboard.
   const diagnostics = page.getByRole("region", { name: "Diagnostics" });
   const openLogs = diagnostics.getByRole("button", {
     name: "Ouvrir le dossier des journaux",

@@ -1,4 +1,4 @@
-/* Shared look of the « Demander » screens (ADR 0125): one copy for every
+/* Shared look of the « Demander » screens: one copy for every
    component of src/lib/requests, prefixed `ur-` so nothing else is touched. */
 
 .ur-btn {

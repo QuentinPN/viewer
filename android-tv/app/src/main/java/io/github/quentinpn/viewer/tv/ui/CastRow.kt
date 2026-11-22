@@ -50,7 +50,7 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 // The « Distribution » row of the film, series and episode pages, and the navigation to a
-// person page (ADR 0068).
+// person page.
 
 /** People in the row: a screen and a half of cards, as the similar titles. */
 internal const val CAST_LIMIT = 12
@@ -115,8 +115,8 @@ internal fun openOver(pages: List<DetailPage>, page: DetailPage, focus: String? 
 }
 
 /**
- * Back from an episode: its series page, on the [target] season and card, pages below kept
- * (ADR 0060); the playlist it was opened from, when there is one below (ADR 0088).
+ * Back from an episode: its series page, on the [target] season and card, pages below kept;
+ * the playlist it was opened from, when there is one below.
  */
 internal fun backFromEpisode(pages: List<DetailPage>, target: SeriesTarget): List<DetailPage> {
     val below = pages.dropLast(1)
@@ -126,7 +126,7 @@ internal fun backFromEpisode(pages: List<DetailPage>, target: SeriesTarget): Lis
 
 /**
  * What keys a page's composition: a fresh one per page, but one episode page across its
- * previous / next moves, which keep the button used focused (ADR 0060).
+ * previous / next moves, which keep the button used focused.
  */
 internal fun pageKey(page: DetailPage): Any = if (page is DetailPage.Episode) DetailPage.Episode::class else page
 
@@ -183,7 +183,7 @@ internal fun CastRow(
         LazyRow(state = row, modifier = Modifier.focusRestorer(requester), contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             itemsIndexed(people, key = { _, it -> it.id }) { index, member ->
                 Column(Modifier.width(132.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // The ring and scale of the glass controls (ADR 0067), the size kept with reduced motion
+                    // The ring and scale of the glass controls, the size kept with reduced motion
                     Surface(
                         onClick = { onOpen(member) },
                         modifier = (if (index == start.coerceAtLeast(0)) Modifier.focusRequester(requester) else Modifier)

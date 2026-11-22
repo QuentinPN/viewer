@@ -96,26 +96,26 @@ class LibraryMemory(val library: Library, options: ItemsOptions = ItemsOptions()
     /** Genres of the library, read once when the genre list first opens. */
     internal var genres by mutableStateOf<List<String>?>(null)
 
-    /** Decades of the library, newest first, read once when the decade list first opens (ADR 0082). */
+    /** Decades of the library, newest first, read once when the decade list first opens. */
     internal var decades by mutableStateOf<List<Int>?>(null)
 
-    /** Items to read before paging waits for the scroll again: the end of a jump's page (ADR 0070). */
+    /** Items to read before paging waits for the scroll again: the end of a jump's page. */
     internal var wanted by mutableIntStateOf(0)
 
     /** A letter picked whose first title is not focused yet. */
     internal var jump by mutableStateOf<Jump?>(null)
 
-    /** First title of each letter for the current query, read when the letter rail first shows it (ADR 0099). */
+    /** First title of each letter for the current query, read when the letter rail first shows it. */
     internal var letters by mutableStateOf<Map<Char, LetterStart>?>(null)
 
     /** Letter picked last: drawn in the accent on the rail. */
     internal var letter by mutableStateOf<Char?>(null)
 
-    /** True after « Aléatoire » opened a title: Back gives the focus to that icon (ADR 0077, 0099). */
+    /** True after « Aléatoire » opened a title: Back gives the focus to that icon. */
     internal var focusRandom = false
 
     /**
-     * A card menu's write answered with [data] for [itemId] (ADR 0098, « Grille bibliothèque »):
+     * A card menu's write answered with [data] for [itemId] (« Grille bibliothèque »):
      * the card changes in place, or leaves when the filters no longer hold it, with the count,
      * the next page's start and the letter index moved up by one. The card, or the one that took
      * its place, takes the focus.
@@ -168,7 +168,7 @@ internal class Jump(val start: LetterStart)
 internal fun shouldLoadMore(lastVisible: Int, loaded: Int, total: Int, margin: Int = PAGE_MARGIN, wanted: Int = 0): Boolean =
     total < 0 || (loaded < total && (lastVisible >= loaded - margin || loaded < wanted))
 
-/** Distance from the screen's sides to the rails, inside the TV's safe area at 960 x 540 dp (ADR 0099). */
+/** Distance from the screen's sides to the rails, inside the TV's safe area at 960 x 540 dp. */
 private val EDGE = 32.dp
 
 /** Width of the letter rail, and of the icon rail's round buttons. */
@@ -182,8 +182,8 @@ private val ICON_RAIL_SPACE = EDGE + ICON_RAIL + 12.dp
 private enum class Panel { Sort, Filters, Genre, Decade }
 
 /**
- * Every film or series of a library in a poster grid paged as it scrolls (ADR 0044), between a
- * rail of letters on the left and a rail of icons for sort and filters on the right (ADR 0099).
+ * Every film or series of a library in a poster grid paged as it scrolls, between a
+ * rail of letters on the left and a rail of icons for sort and filters on the right.
  */
 @Composable
 fun LibraryScreen(
@@ -195,7 +195,7 @@ fun LibraryScreen(
     onOpenSeries: (seriesId: String) -> Unit,
     onOpenMovie: (movieId: String) -> Unit,
     onSessionExpired: () -> Unit,
-    /** A card menu's play rows (ADR 0098), as the home's: the player negotiates the stream. */
+    /** A card menu's play rows, as the home's: the player negotiates the stream. */
     onPlay: (itemId: String, startTicks: Long) -> Unit,
     /** After a write or a playlist change from a card's menu: the home reads its rows again. */
     onUserDataChanged: () -> Unit,
@@ -204,7 +204,7 @@ fun LibraryScreen(
     var panel by remember { mutableStateOf<Panel?>(null) }
     val rail = remember { RailAction.entries.associateWith { FocusRequester() } }
     val scope = rememberCoroutineScope()
-    // A random pick on its way: more presses are ignored (ADR 0077)
+    // A random pick on its way: more presses are ignored
     var drawing by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
     // Position of the focused card, for the counter; -1 before one has the focus
@@ -248,7 +248,7 @@ fun LibraryScreen(
         }
     }
 
-    // One title drawn by the server with the grid's filters, opened as its poster would be (ADR 0077)
+    // One title drawn by the server with the grid's filters, opened as its poster would be
     fun pickRandom() {
         if (drawing) return
         drawing = true
@@ -309,7 +309,7 @@ fun LibraryScreen(
             }
     }
 
-    // A card's menu (ADR 0098), as on the home but without « Retirer de Reprendre ». A write
+    // A card's menu, as on the home but without « Retirer de Reprendre ». A write
     // changes its card in place or takes it off the grid; a failure goes back to the menu,
     // which shows it and handles an expired session.
     val cardMenu: @Composable (BaseItemDto, () -> Unit) -> Unit = { item, close ->
@@ -355,14 +355,14 @@ fun LibraryScreen(
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                // A studio's grid is named after it (ADR 0087)
+                // A studio's grid is named after it
                 Text(gridTitle(memory.library, memory.options), style = MaterialTheme.typography.titleLarge, color = Palette.text, maxLines = 1)
                 if (memory.total >= 0) Text(titlesLabel(memory.total), color = Palette.textSecondary, fontSize = 13.sp, modifier = Modifier.padding(bottom = 2.dp))
                 notice?.let { Text(it, color = Palette.textSecondary, fontSize = 13.sp, maxLines = 1, modifier = Modifier.padding(bottom = 2.dp)) }
             }
             Row(Modifier.fillMaxWidth().weight(1f)) {
                 Box(Modifier.padding(start = EDGE, top = 12.dp, bottom = 16.dp).width(LETTER_RAIL).fillMaxHeight()) {
-                    // Jumping by letter only follows a sort by title (ADR 0070)
+                    // Jumping by letter only follows a sort by title
                     if (memory.options.sort == SortKey.Name) {
                         LetterRail(client, userId, memory, Modifier.fillMaxSize(), onSessionExpired, ::jumpTo)
                     }
@@ -406,7 +406,7 @@ fun LibraryScreen(
             }
             Panel.Filters -> {
                 val options = memory.options
-                // One entry for both lists: each opens the side list it had as a pill (ADR 0045, 0082)
+                // One entry for both lists: each opens the side list it had as a pill
                 val genre = PanelChoice("Genre : ${options.genre ?: "Tous"}", options, options.genre != null)
                 val decade = PanelChoice(decadePillLabel(options.decade), options, options.decade != null)
                 ChoicePanel(listOf("Filtres" to listOf(genre, decade)), Modifier.align(Alignment.CenterEnd)) { choice ->
@@ -458,7 +458,7 @@ internal fun PillText(text: String) {
 private class Picked<T>(val value: T?)
 
 /**
- * Side list of the library's genres or decades (ADR 0045, 0082): « all » first, then [loaded],
+ * Side list of the library's genres or decades: « all » first, then [loaded],
  * read by [load] while still null. Back closes it without a change.
  */
 @Composable
@@ -521,7 +521,7 @@ private fun <T : Any> SidePicker(
     }
 }
 
-/** Posters per row (ADR 0099): with both rails, six 2:3 cards about 120 dp wide fit 960 dp. */
+/** Posters per row: with both rails, six 2:3 cards about 120 dp wide fit 960 dp. */
 private const val GRID_COLUMNS = 6
 
 @Composable
@@ -530,7 +530,7 @@ private fun Grid(
     client: EmbyClient,
     images: ImageLoader,
     error: String?,
-    /** A card's menu (ADR 0098), shown over the card; its last argument closes it. */
+    /** A card's menu, shown over the card; its last argument closes it. */
     cardMenu: @Composable (BaseItemDto, () -> Unit) -> Unit,
     onFocused: (Int) -> Unit,
     onRetry: () -> Unit,
@@ -548,7 +548,7 @@ private fun Grid(
         withFrameNanos {}
         runCatching { focus.requestFocus() }
     }
-    // A letter jump (ADR 0070): once its page is in, show its first title and focus it, with
+    // A letter jump: once its page is in, show its first title and focus it, with
     // no animation. Found by id; if the list moved since the index was read, by position.
     LaunchedEffect(memory.jump, memory.items.size, memory.total) {
         val jump = memory.jump ?: return@LaunchedEffect

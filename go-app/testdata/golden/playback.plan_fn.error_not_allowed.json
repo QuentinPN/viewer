@@ -1,0 +1,6 @@
+{
+  "error": {
+    "kind": "playbackRefused",
+    "message": "lecture refusée : lecture non autorisée pour ce compte"
+  }
+}

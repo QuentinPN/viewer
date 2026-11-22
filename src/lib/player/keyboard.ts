@@ -51,12 +51,12 @@ export function mapPlayerKey(
       return { kind: "toggleFullscreen" };
     case "Escape":
       return { kind: "exitFullscreen" };
-    // Previous and next chapter (ADR 0034), as in mpv.
+    // Previous and next chapter, as in mpv.
     case "PageUp":
       return { kind: "chapter", delta: -1 };
     case "PageDown":
       return { kind: "chapter", delta: 1 };
-    // Subtitle delay (ADR 0062), as in mpv.
+    // Subtitle delay, as in mpv.
     case "z":
       return { kind: "subtitleDelay", change: "earlier" };
     case "x":

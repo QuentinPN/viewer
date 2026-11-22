@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.text.Normalizer
 
-/** Jump targets in the picker's order (ADR 0070): `#` for digits and symbols, then A to Z. */
+/** Jump targets in the picker's order: `#` for digits and symbols, then A to Z. */
 val LETTERS: List<Char> = listOf('#') + ('A'..'Z')
 
 /**

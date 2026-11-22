@@ -1,5 +1,5 @@
 <script lang="ts">
-// Every state of the « Demander » tab but `ready` (ADR 0125): first setup on the
+// Every state of the « Demander » tab but `ready`: first setup on the
 // spot, signed out, server too old, unreachable or refused.
 import "./requests.css";
 import AddressForm from "./AddressForm.svelte";

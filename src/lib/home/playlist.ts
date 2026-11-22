@@ -1,8 +1,8 @@
 import type { WatchItem } from "../emby/types";
 import { formatMinutes } from "../format/duration";
 
-// Labels of the « Playlists » row and of a playlist's page (ADR 0122), as on
-// the TV (ADR 0088).
+// Labels of the « Playlists » row and of a playlist's page, as on
+// the TV.
 
 /** "1 titre", "12 titres". */
 export function titlesLabel(count: number): string {

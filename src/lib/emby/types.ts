@@ -1,4 +1,4 @@
-// Mirrors src-tauri/src/emby/models.rs and EmbyError (ADR 0004). No type here
+// Mirrors src-tauri/src/emby/models.rs and EmbyError. No type here
 // ever carries the access token.
 
 export interface ServerSummary {
@@ -43,7 +43,7 @@ export interface EmbyError {
   message: string;
 }
 
-/** A session known from `session.json` (ADR 0012). Never carries the token. */
+/** A session known from `session.json`. Never carries the token. */
 export interface SavedServer {
   url: string;
   id: string;
@@ -54,7 +54,7 @@ export interface SavedServer {
   userName: string;
 }
 
-/** What a tile of the pre-connection shelf does (ADR 0103). */
+/** What a tile of the pre-connection shelf does. */
 export type ShelfAccess =
   /** A token is saved: the tile validates it, no password. */
   | "session"
@@ -76,7 +76,7 @@ export type SessionStatus =
   | { state: "serverUnreachable"; server: SavedServer; error: EmbyError }
   | { state: "authenticationRequired"; server: SavedServer; error: EmbyError };
 
-/** Artwork on the local `emby-img` protocol (ADR 0005), ready for `<img>`. */
+/** Artwork on the local `emby-img` protocol, ready for `<img>`. */
 export interface ImageRef {
   src: string;
   srcset: string;
@@ -102,11 +102,11 @@ export interface MediaItem {
   played: boolean;
   /** Series only: episodes not yet watched. */
   unplayedCount: number | null;
-  /** Labels the card menu's favourite action (ADR 0100). */
+  /** Labels the card menu's favourite action. */
   favorite: boolean;
 }
 
-/** Films, series and episodes whose title words start with the query (ADR 0011, 0020). */
+/** Films, series and episodes whose title words start with the query. */
 export interface SearchResults {
   /** The query as sent to the server, after cleaning; empty when too short. */
   query: string;
@@ -121,7 +121,7 @@ export interface SearchResults {
   moreEpisodes: boolean;
 }
 
-/** A film or episode of the home rows "Reprendre" and "À suivre" (ADR 0010). */
+/** A film or episode of the home rows "Reprendre" and "À suivre". */
 export interface WatchItem {
   id: string;
   name: string;
@@ -134,12 +134,12 @@ export interface WatchItem {
   image: ImageRef | null;
   runtimeMinutes: number | null;
   resume: ResumePoint | null;
-  /** Label the card menu's played and favourite actions (ADR 0100). */
+  /** Label the card menu's played and favourite actions. */
   played: boolean;
   favorite: boolean;
 }
 
-/** One title of the home hero (ADR 0015). */
+/** One title of the home hero. */
 export interface HeroItem {
   /** Film or series the detail page opens; a resumed episode gives its series. */
   detail: MediaItem;
@@ -159,7 +159,7 @@ export interface HeroEpisode {
   index: number | null;
 }
 
-/** Sort of a library grid (ADR 0013); Rust maps it to `SortBy`. */
+/** Sort of a library grid; Rust maps it to `SortBy`. */
 export type SortKey = "name" | "dateAdded" | "year" | "rating";
 /** Watched-state filter; `inProgress` is offered for films only. */
 export type WatchFilter = "all" | "unplayed" | "played" | "inProgress";
@@ -172,11 +172,11 @@ export interface ItemsOptions {
   favorites: boolean;
   /** One genre among `emby_genres`, or none. */
   genre: string | null;
-  /** First year of a decade (`1990`), or every year (ADR 0101). */
+  /** First year of a decade (`1990`), or every year. */
   decade: number | null;
 }
 
-/** One title of a library grid in its order, for the letter rail (ADR 0101). */
+/** One title of a library grid in its order, for the letter rail. */
 export interface SortNameEntry {
   id: string;
   /** `SortName`, or `Name` when the server sends none. */
@@ -193,7 +193,7 @@ export interface ItemPage {
 
 export type DetailKind = "movie" | "series" | "episode";
 
-/** Neighbour of an episode in its series (ADR 0016). */
+/** Neighbour of an episode in its series. */
 export interface EpisodeLink {
   id: string;
   name: string;
@@ -202,7 +202,7 @@ export interface EpisodeLink {
   indexEnd: number | null;
 }
 
-/** Where an episode sits in its series (ADR 0016). */
+/** Where an episode sits in its series. */
 export interface EpisodeContext {
   seriesId: string;
   seriesName: string;
@@ -226,18 +226,18 @@ export interface ResumePoint {
 export interface CastMember {
   name: string;
   role: string | null;
-  /** The person item, for its page (ADR 0121); null without a usable id. */
+  /** The person item, for its page; null without a usable id. */
   id: string | null;
   photo: ImageRef | null;
 }
 
-/** What a list of titles opened from a detail page shows (ADR 0121). */
+/** What a list of titles opened from a detail page shows. */
 export type TitlesSource =
   | { kind: "person"; id: string }
   | { kind: "genre" | "studio"; name: string; itemType: "Movie" | "Series" }
   | { kind: "collection" | "similar"; id: string };
 
-/** A collection (BoxSet) a title belongs to (ADR 0121). */
+/** A collection (BoxSet) a title belongs to. */
 export interface CollectionRef {
   id: string;
   name: string;
@@ -265,7 +265,7 @@ export interface StreamInfo {
 
 /** One version of a film. Says nothing about whether it plays directly. */
 export interface MediaInfo {
-  /** Passed to `emby_play` to play this version (ADR 0036). */
+  /** Passed to `emby_play` to play this version. */
   id: string | null;
   name: string | null;
   container: string | null;
@@ -302,16 +302,16 @@ export interface ItemDetail {
   backdrop: ImageRef | null;
   logo: ImageRef | null;
   played: boolean;
-  /** In the user's favorites (ADR 0014). */
+  /** In the user's favorites. */
   favorite: boolean;
   resume: ResumePoint | null;
   unplayedCount: number | null;
   media: MediaInfo[];
   /** Episode only. */
   episode: EpisodeContext | null;
-  /** Film or series: collections holding it, at most three (ADR 0121). */
+  /** Film or series: collections holding it, at most three. */
   collections: CollectionRef[];
-  /** Film or series: a trailer file is stored with it (ADR 0121). */
+  /** Film or series: a trailer file is stored with it. */
   hasLocalTrailer: boolean;
 }
 
@@ -346,13 +346,13 @@ export interface EpisodePage {
   total: number;
 }
 
-/** How the server delivers the media (ADR 0007). */
+/** How the server delivers the media. */
 export type PlayMethod = "directPlay" | "directStream" | "transcode";
 
 /** A started playback: the method only, never the stream URL or the token. */
 export interface PlaybackStart {
   itemId: string;
-  /** The version played (ADR 0036): a fallback or a resume plays the same one. */
+  /** The version played: a fallback or a resume plays the same one. */
   mediaSourceId: string;
   /** The start asked for: a fallback keeps "Reprendre" or "Lire depuis le début". */
   resume: boolean;
@@ -360,9 +360,9 @@ export interface PlaybackStart {
   container: string | null;
   /** Why the server transcodes, in French ("débit trop élevé"); null otherwise. */
   transcodeReasons: string | null;
-  /** What the player shows at the top (ADR 0017); null when the item could not be read. */
+  /** What the player shows at the top; null when the item could not be read. */
   title: PlaybackTitle | null;
-  /** Bitrate cap sent to the server, in bit/s (ADR 0037); null for "Maximale". */
+  /** Bitrate cap sent to the server, in bit/s; null for "Maximale". */
   bitrateCap: number | null;
   /** Whether the server address counts as local, so which cap applied. */
   localAddress: boolean;
@@ -388,14 +388,14 @@ export interface PlaybackTitle {
   indexEnd: number | null;
 }
 
-/** Server state of an item once its playback stopped and was reported (ADR 0008). */
+/** Server state of an item once its playback stopped and was reported. */
 export interface PlaybackStopped {
   itemId: string;
   played: boolean;
   resume: ResumePoint | null;
 }
 
-/** The artwork disk cache (ADR 0019); `hits` and `misses` since the app started. */
+/** The artwork disk cache; `hits` and `misses` since the app started. */
 export interface ArtworkCacheStats {
   entries: number;
   bytes: number;
@@ -404,20 +404,20 @@ export interface ArtworkCacheStats {
   misses: number;
 }
 
-/** What emptying the artwork cache removed (ADR 0021). */
+/** What emptying the artwork cache removed. */
 export interface ArtworkCacheCleared {
   entries: number;
   bytes: number;
 }
 
-/** A chapter of the file, from Emby's `Chapters` (ADR 0034). */
+/** A chapter of the file, from Emby's `Chapters`. */
 export interface Chapter {
   /** Seconds from the start of the file. */
   start: number;
   name: string;
 }
 
-/** A range the player offers to skip, in seconds of the file (ADR 0030). */
+/** A range the player offers to skip, in seconds of the file. */
 export interface Segment {
   kind: "intro" | "credits";
   start: number;
@@ -426,13 +426,13 @@ export interface Segment {
   source: "emby" | "introDb" | "theIntroDb";
 }
 
-/** A playlist of the user, offered by the card menu (ADR 0100). */
+/** A playlist of the user, offered by the card menu. */
 export interface Playlist {
   id: string;
   name: string;
 }
 
-/** A video playlist of the home row « Playlists » (ADR 0122). */
+/** A video playlist of the home row « Playlists ». */
 export interface PlaylistCard {
   id: string;
   name: string;

@@ -4,7 +4,7 @@ import io.github.quentinpn.viewer.tv.emby.Segment
 import io.github.quentinpn.viewer.tv.emby.SegmentKind
 import kotlin.math.ceil
 
-// "Minuterie" of the track menu (ADR 0073): times are passed in, milliseconds of the wall clock.
+// "Minuterie" of the track menu: times are passed in, milliseconds of the wall clock.
 
 /** Minutes offered, after « Désactivée ». */
 val SLEEP_MINUTES: List<Int> = listOf(15, 30, 45, 60, 90)

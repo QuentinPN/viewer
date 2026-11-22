@@ -1,8 +1,8 @@
 package io.github.quentinpn.viewer.tv.emby
 
 /**
- * The episode after [episodeId] in an `AdjacentTo` answer, other series left out
- * (ADR 0016). Null when the episode is not in it or is the last one.
+ * The episode after [episodeId] in an `AdjacentTo` answer, other series left out.
+ * Null when the episode is not in it or is the last one.
  */
 fun nextEpisode(episodes: List<BaseItemDto>, episodeId: String, seriesId: String): BaseItemDto? {
     val series = episodes.filter { it.seriesId == null || it.seriesId == seriesId }

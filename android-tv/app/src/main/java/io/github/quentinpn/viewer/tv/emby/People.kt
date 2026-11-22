@@ -1,6 +1,6 @@
 package io.github.quentinpn.viewer.tv.emby
 
-// The titles of one person in the user's library (ADR 0068).
+// The titles of one person in the user's library.
 
 /** Titles read for a person page: one request, enough for any filmography in a home library. */
 internal const val PERSON_TITLES_LIMIT = 100

@@ -24,7 +24,7 @@ import okhttp3.HttpUrl
 
 /**
  * Posters and backdrops of Request: the [loader] adds the Bearer to [origin] only, and a
- * path that is not a plain TMDB image gives no URL (ADR 0125). Image URLs never carry the token.
+ * path that is not a plain TMDB image gives no URL. Image URLs never carry the token.
  */
 internal class RequestArt(val loader: ImageLoader, private val origin: HttpUrl?) {
     fun url(size: String, path: String?): String? = origin?.let { imageUrl(it, size, path)?.toString() }

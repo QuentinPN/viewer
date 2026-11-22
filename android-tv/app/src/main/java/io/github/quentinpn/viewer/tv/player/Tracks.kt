@@ -9,8 +9,8 @@ enum class TrackType(val mpv: String, val property: String) {
 
 /**
  * One audio or subtitle track of the playing file, as mpv numbers it; [lang] and [title] as the file gives them.
- * [ffIndex] is the stream's number in its file: for the media's own streams, Emby's `Index` (ADR 0035, 0055).
- * [isDefault], [forced] and [hearingImpaired] are the file's flags, read for the account's preferences (ADR 0065).
+ * [ffIndex] is the stream's number in its file: for the media's own streams, Emby's `Index`.
+ * [isDefault], [forced] and [hearingImpaired] are the file's flags, read for the account's preferences.
  */
 data class Track(
     val id: Int,
@@ -58,7 +58,7 @@ fun readTracks(get: (String) -> String?): List<Track> {
 
 /**
  * mpv titles an external file it was given no title for by its file name ("Stream.ass"
- * for a transcode's subtitles, ADR 0084): that names nothing, the language says more.
+ * for a transcode's subtitles): that names nothing, the language says more.
  */
 internal fun isFileName(title: String, externalFilename: String?): Boolean {
     val name = externalFilename?.substringBefore('?')?.substringAfterLast('/') ?: return false

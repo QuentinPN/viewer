@@ -1,4 +1,4 @@
-// "Passer l'intro" and "Passer le générique" (ADR 0030).
+// "Passer l'intro" and "Passer le générique".
 import type { Segment } from "../emby/types";
 
 /** Credits ending this close to the end of the file run to the end. */
@@ -113,7 +113,7 @@ export function offersNextToo(
 export const segmentKey = (segment: Segment) =>
   `${segment.kind}@${segment.start}`;
 
-/** How long the button shows on its own once its segment starts (ADR 0089). */
+/** How long the button shows on its own once its segment starts. */
 export const SKIP_SHOWN_MS = 10_000;
 
 /**

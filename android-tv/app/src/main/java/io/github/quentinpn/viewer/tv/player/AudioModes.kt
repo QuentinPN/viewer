@@ -3,7 +3,7 @@ package io.github.quentinpn.viewer.tv.player
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-// "Vitesse" and "Mode nuit" of the track menu (ADR 0072).
+// "Vitesse" and "Mode nuit" of the track menu.
 
 /** mpv's playback speed, a factor; pitch stays put through `audio-pitch-correction` (scaletempo2). */
 const val SPEED_PROPERTY = "speed"

@@ -1,4 +1,4 @@
-// Gate 3 home hero (ADR 0015) on the real Emby test account, driven over CDP:
+// Gate 3 home hero on the real Emby test account, driven over CDP:
 // - the hero shows `emby_hero`'s titles in order, one at a time, with its dots;
 // - nothing changes on its own; arrows, dots, ← and → change the title, the focus
 //   follows on the dots and on the buttons;

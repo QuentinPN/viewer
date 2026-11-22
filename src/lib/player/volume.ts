@@ -1,5 +1,5 @@
 /**
- * Volume of the player, kept on this PC (ADR 0017): not tied to an account and
+ * Volume of the player, kept on this PC: not tied to an account and
  * never sent to Emby. The engine has no mute command: mute plays at 0 and keeps
  * the level to restore.
  */

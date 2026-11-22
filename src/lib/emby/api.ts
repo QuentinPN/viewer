@@ -1,5 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { invoke, listen, type Unlisten } from "../native";
 import { preferenceStorage, readPreferences } from "../player/subtitles";
 import type {
   ArtworkCacheCleared,
@@ -34,7 +33,7 @@ import type {
 // Thin typed wrapper over the Emby commands of src-tauri/src/commands.rs.
 
 export const PLAYBACK_STOPPED_EVENT = "emby://playback-stopped";
-/** Titles added, changed or removed on the server (ADR 0110). */
+/** Titles added, changed or removed on the server. */
 export const LIBRARY_CHANGED_EVENT = "emby://library-changed";
 
 export const embyApi = {
@@ -43,11 +42,11 @@ export const embyApi = {
   serverInfo: () => invoke<ServerSummary>("emby_server_info"),
   signIn: (url: string, username: string, password: string) =>
     invoke<SignedInUser>("emby_sign_in", { url, username, password }),
-  /** Validates the saved session (ADR 0012); `cancelled` if superseded. */
+  /** Validates the saved session; `cancelled` if superseded. */
   restore: () => invoke<SessionStatus>("emby_restore"),
   /** Sets the session aside without revoking it, to come back to it later. */
   changeServer: () => invoke<void>("emby_change_server"),
-  /** Tiles of the pre-connection shelf (ADR 0103). */
+  /** Tiles of the pre-connection shelf. */
   shelf: () => invoke<ShelfServer[]>("emby_shelf"),
   /** Forgets a server on this device; nothing is deleted on the server. */
   forgetServer: (serverId: string, userId: string) =>
@@ -64,62 +63,62 @@ export const embyApi = {
     options?: ItemsOptions,
   ) =>
     invoke<ItemPage>("emby_items", { libraryId, startIndex, limit, options }),
-  /** Every title of the grid in its order, with its sort name (ADR 0101). */
+  /** Every title of the grid in its order, with its sort name. */
   sortNames: (libraryId: string, options: ItemsOptions) =>
     invoke<SortNameEntry[]>("emby_sort_names", { libraryId, options }),
-  /** One title drawn by the server among those the grid shows (ADR 0101). */
+  /** One title drawn by the server among those the grid shows. */
   randomItem: (libraryId: string, options: ItemsOptions) =>
     invoke<MediaItem | null>("emby_random_item", { libraryId, options }),
-  /** Production years of a library, newest first (ADR 0101). */
+  /** Production years of a library, newest first. */
   productionYears: (libraryId: string) =>
     invoke<number[]>("emby_production_years", { libraryId }),
-  /** Genre names of a library, usable as a filter (ADR 0013). */
+  /** Genre names of a library, usable as a filter. */
   genres: (libraryId: string) => invoke<string[]>("emby_genres", { libraryId }),
   continueWatching: () => invoke<WatchItem[]>("emby_continue_watching"),
   nextUp: () => invoke<WatchItem[]>("emby_next_up"),
   latest: (libraryId: string) =>
     invoke<MediaItem[]>("emby_latest", { libraryId }),
-  /** Home row "Favoris" (ADR 0014): favorite films and series, by title. */
+  /** Home row "Favoris": favorite films and series, by title. */
   favorites: () => invoke<MediaItem[]>("emby_favorites"),
-  /** Home hero (ADR 0015): up to five titles, the ones to resume first. */
+  /** Home hero: up to five titles, the ones to resume first. */
   hero: () => invoke<HeroItem[]>("emby_hero"),
   /** Returns the favorite state the server reports after the change. */
   setFavorite: (itemId: string, favorite: boolean) =>
     invoke<boolean>("emby_set_favorite", { itemId, favorite }),
   /**
-   * Marks a film, episode, season or series played or unplayed (ADR 0096). The
+   * Marks a film, episode, season or series played or unplayed. The
    * new state is returned and also sent on the playback-stopped event, so every
    * view showing the item follows.
    */
   setPlayed: (itemId: string, played: boolean) =>
     invoke<PlaybackStopped>("emby_set_played", { itemId, played }),
-  /** Takes a film or episode out of "Reprendre" (ADR 0096); announced the same way. */
+  /** Takes a film or episode out of "Reprendre"; announced the same way. */
   hideFromResume: (itemId: string) =>
     invoke<PlaybackStopped>("emby_hide_from_resume", { itemId }),
-  /** First episode of a series not watched yet, as the hero plays it (ADR 0100). */
+  /** First episode of a series not watched yet, as the hero plays it. */
   seriesNextEpisode: (seriesId: string) =>
     invoke<WatchItem | null>("emby_series_next_episode", { seriesId }),
-  /** Playlists of the user, by name (ADR 0100). */
+  /** Playlists of the user, by name. */
   playlists: () => invoke<Playlist[]>("emby_playlists"),
-  /** Home row « Playlists »: video playlists, A → Z (ADR 0122). */
+  /** Home row « Playlists »: video playlists, A → Z. */
   homePlaylists: () => invoke<PlaylistCard[]>("emby_home_playlists"),
-  /** Films and episodes of a playlist, in its order (ADR 0122). */
+  /** Films and episodes of a playlist, in its order. */
   playlistItems: (playlistId: string) =>
     invoke<WatchItem[]>("emby_playlist_items", { playlistId }),
   /** Returns how many items the server says it added. */
   addToPlaylist: (playlistId: string, itemId: string) =>
     invoke<number>("emby_add_to_playlist", { playlistId, itemId }),
-  /** Creates a video playlist holding the item (ADR 0100). */
+  /** Creates a video playlist holding the item. */
   createPlaylist: (name: string, itemId: string) =>
     invoke<PlaylistCreated>("emby_create_playlist", { name, itemId }),
   search: (query: string) => invoke<SearchResults>("emby_search", { query }),
   itemDetail: (itemId: string) =>
     invoke<ItemDetail>("emby_item_detail", { itemId }),
   seasons: (seriesId: string) => invoke<Season[]>("emby_seasons", { seriesId }),
-  /** Titles of a person, collection, genre or studio (ADR 0121). */
+  /** Titles of a person, collection, genre or studio. */
   titles: (source: TitlesSource) =>
     invoke<MediaItem[]>("emby_titles", { source }),
-  /** Id of the first trailer file of a film or series, to play (ADR 0121). */
+  /** Id of the first trailer file of a film or series, to play. */
   localTrailer: (itemId: string) =>
     invoke<string | null>("emby_local_trailer", { itemId }),
   episodes: (
@@ -135,13 +134,13 @@ export const embyApi = {
       limit,
     }),
   /**
-   * Negotiates with the server and starts the player (ADR 0007). With `resume`,
-   * starts where the server says the user stopped (ADR 0008). With
+   * Negotiates with the server and starts the player. With `resume`,
+   * starts where the server says the user stopped. With
    * `transcodeFallback`, direct play is refused to the server, which then
-   * transcodes: the way out when the player could not open the direct source
-   * (ADR 0023). `mediaSourceId` plays one version of an item with several; null
-   * lets the server pick (ADR 0036). The audio and subtitle preferences of
-   * Réglages go along (ADR 0035).
+   * transcodes: the way out when the player could not open the direct source.
+   * `mediaSourceId` plays one version of an item with several; null
+   * lets the server pick. The audio and subtitle preferences of
+   * Réglages go along.
    */
   play: (
     itemId: string,
@@ -157,7 +156,7 @@ export const embyApi = {
       preferences: readPreferences(preferenceStorage()),
     }),
   /**
-   * Another bitrate cap for the playback in progress (ADR 0117), from `position`
+   * Another bitrate cap for the playback in progress, from `position`
    * seconds; `null` is « Maximale ». Réglages is left as it is.
    */
   changeQuality: (
@@ -174,29 +173,29 @@ export const embyApi = {
       preferences: readPreferences(preferenceStorage()),
     }),
   /**
-   * Intro and credits to offer skipping (ADR 0030). `external: false` asks the
+   * Intro and credits to offer skipping. `external: false` asks the
    * Emby server only. Never fails for an unreachable external source.
    */
   segments: (itemId: string, external: boolean) =>
     invoke<Segment[]>("emby_segments", { itemId, external }),
-  /** Chapters of a film or episode, none when it has fewer than two (ADR 0034). */
+  /** Chapters of a film or episode, none when it has fewer than two. */
   chapters: (itemId: string) => invoke<Chapter[]>("emby_chapters", { itemId }),
   /** `null` when the app has no artwork cache directory. */
   artworkStats: () => invoke<ArtworkCacheStats | null>("artwork_cache_stats"),
-  /** Empties the artwork cache of every server (ADR 0021). */
+  /** Empties the artwork cache of every server. */
   clearArtwork: () => invoke<ArtworkCacheCleared | null>("artwork_cache_clear"),
-  /** Bitrate caps of the current server (ADR 0037). */
+  /** Bitrate caps of the current server. */
   playbackQuality: () => invoke<PlaybackQuality>("emby_playback_quality"),
   /** Keeps both caps; a value not offered is refused. */
   setPlaybackQuality: (local: number | null, remote: number | null) =>
     invoke<PlaybackQuality>("emby_set_playback_quality", { local, remote }),
   /**
    * The item's new state, once a playback stopped and was reported, or once it
-   * was marked played or unplayed or taken out of "Reprendre" (ADR 0096).
+   * was marked played or unplayed or taken out of "Reprendre".
    */
   /**
    * Calls `handler` each time titles were added, changed or removed on the
-   * server (ADR 0110), while the returned function has not been called.
+   * server, while the returned function has not been called.
    */
   watchLibrary: async (handler: () => void): Promise<() => void> => {
     const unlisten = await listen(LIBRARY_CHANGED_EVENT, () => handler());
@@ -213,8 +212,8 @@ export const embyApi = {
   },
   onPlaybackStopped: (
     handler: (state: PlaybackStopped) => void,
-  ): Promise<UnlistenFn> =>
-    listen<PlaybackStopped>(PLAYBACK_STOPPED_EVENT, (e) => handler(e.payload)),
+  ): Promise<Unlisten> =>
+    listen<PlaybackStopped>(PLAYBACK_STOPPED_EVENT, handler),
 };
 
 /** Normalizes a rejected command into an `EmbyError`, whatever was thrown. */

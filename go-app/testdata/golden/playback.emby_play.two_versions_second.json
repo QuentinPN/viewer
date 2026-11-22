@@ -1,0 +1,17 @@
+{
+  "itemId": "30500",
+  "mediaSourceId": "30501",
+  "resume": false,
+  "method": "directPlay",
+  "container": "mkv",
+  "transcodeReasons": null,
+  "title": {
+    "name": "Deux Versions",
+    "seriesName": null,
+    "seasonIndex": null,
+    "index": null,
+    "indexEnd": null
+  },
+  "bitrateCap": null,
+  "localAddress": true
+}

@@ -4,7 +4,7 @@ import java.net.URI
 
 /**
  * A source the player may open: an absolute local path or an http(s) URL.
- * Mirrors `MediaSource::parse` on Windows (ADR 0002): mpv protocols such as
+ * Mirrors `MediaSource::parse` on Windows: mpv protocols such as
  * `av://`, `edl://` or `file://` are refused so callers cannot reach them.
  */
 sealed class MediaSource {

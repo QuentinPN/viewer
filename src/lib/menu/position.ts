@@ -1,4 +1,4 @@
-// Where the card menu opens (ADR 0100): next to what opened it, flipped or
+// Where the card menu opens: next to what opened it, flipped or
 // shifted so it stays inside the window.
 
 export interface Box {

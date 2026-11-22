@@ -73,10 +73,10 @@ export const signInHeading = (page) => page.locator("#signin-title");
 export const libraryNav = (page) =>
   page.getByRole("navigation", { name: "Bibliothèques" });
 export const cards = (page) => page.locator("ul.grid button.card");
-/** Home page, the default view once signed in (ADR 0010). */
+/** Home page, the default view once signed in. */
 export const homeHeading = (page) => page.locator(".home h1");
 export const detailTitle = (page) => page.locator("#detail-title");
-/** Episode page nested over a series page (ADR 0016). */
+/** Episode page nested over a series page. */
 export const episodeTitle = (page) => page.locator("#episode-title");
 
 /** Waits for the first screen: `"signedIn"` or `"signedOut"`. */
@@ -88,7 +88,7 @@ export async function startScreen(page) {
   return (await libraryNav(page).count()) > 0 ? "signedIn" : "signedOut";
 }
 
-/** Account actions sit in the menu of the navigation pill (ADR 0031). */
+/** Account actions sit in the menu of the navigation pill. */
 export async function accountAction(page, name) {
   const account = page.getByRole("button", { name: /^Compte : / });
   // The navigation is hidden on detail pages: Escape closes them.
@@ -135,7 +135,7 @@ export const waitForPosition = (page, seconds, timeoutMs) =>
   waitForDiagnostics(page, (d) => (d.timePos ?? 0) > seconds, timeoutMs);
 
 /**
- * From the pre-connection shelf (ADR 0103), opens « Connexion manuelle »; does
+ * From the pre-connection shelf, opens « Connexion manuelle »; does
  * nothing when a sign-in card (manual or password) is already open.
  */
 export async function openManualForm(page) {
@@ -164,7 +164,7 @@ export async function signIn(page, { url, user }, password) {
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
 }
 
-/** Tile of a saved server on the shelf, by its server name (ADR 0103). */
+/** Tile of a saved server on the shelf, by its server name. */
 export const shelfTile = (page, name) =>
   page.getByRole("button", {
     name: new RegExp(

@@ -63,7 +63,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 
-/** Where the pre-connection screen stands (ADR 0104); the cards open over the shelf. */
+/** Where the pre-connection screen stands; the cards open over the shelf. */
 internal sealed interface ShelfStep {
     data object Shelf : ShelfStep
 
@@ -123,7 +123,7 @@ private val Danger = Color(0xFFFF6961)
 private val Line = Color(0x1FFFFFFF)
 
 /**
- * The signed-out screen, variant B « L'étagère » (ADR 0104): the logo, one 16:10 tile per saved
+ * The signed-out screen, variant B « L'étagère »: the logo, one 16:10 tile per saved
  * server, then « Se connecter manuellement » and « Gérer ». OK on a tile checks its saved token;
  * a refused one opens « Session expirée ». Forgetting asks first, « Annuler » focused.
  */

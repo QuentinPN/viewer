@@ -1,4 +1,4 @@
-// Watched actions (ADR 0096): mark played or unplayed, take out of "Reprendre".
+// Watched actions: mark played or unplayed, take out of "Reprendre".
 import type { PlaybackStopped } from "../emby/types";
 
 /**

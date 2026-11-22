@@ -9,7 +9,7 @@ import android.os.Build
 import android.view.Display
 
 /**
- * What the app and the device say about themselves, for « À propos » (ADR 0076). Read
+ * What the app and the device say about themselves, for « À propos ». Read
  * only: nothing is created or opened, libmpv included.
  */
 object DeviceReport {

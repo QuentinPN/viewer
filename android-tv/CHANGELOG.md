@@ -1,6 +1,6 @@
 # Journal des versions — Android TV
 
-Chaque version livrée sur la Shield augmente `versionName` et `versionCode` dans `app/build.gradle.kts` et ajoute sa section ici.
+Chaque section est écrite par Gitea Actions au merge dans `main`, avec `versionName` et `versionCode` (ADR 0126).
 
 ## 1.4.0 — 2026-11-19
 

@@ -1,0 +1,75 @@
+[
+  {
+    "inputIds": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "1"
+    ],
+    "orderedIds": [
+      "5",
+      "2",
+      "1",
+      "3"
+    ],
+    "source": "person"
+  },
+  {
+    "inputIds": [
+      "d",
+      "a",
+      "b",
+      "c"
+    ],
+    "orderedIds": [
+      "c",
+      "b",
+      "a",
+      "d"
+    ],
+    "source": "collection"
+  },
+  {
+    "inputIds": [
+      "a",
+      "b",
+      "x0",
+      "x1",
+      "x2",
+      "x3",
+      "x4",
+      "x5",
+      "x6",
+      "x7",
+      "x8",
+      "x9",
+      "x10",
+      "x11",
+      "x12",
+      "x13",
+      "x14",
+      "x15",
+      "x16",
+      "x17",
+      "x18",
+      "x19"
+    ],
+    "orderedIds": [
+      "b",
+      "x0",
+      "x1",
+      "x2",
+      "x3",
+      "x4",
+      "x5",
+      "x6",
+      "x7",
+      "x8",
+      "x9",
+      "x10"
+    ],
+    "source": "similar (title a left out, 12 kept)"
+  }
+]

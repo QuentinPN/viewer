@@ -1,0 +1,6 @@
+{
+  "error": {
+    "kind": "playbackRefused",
+    "message": "lecture refusée : trop de lectures en cours sur le serveur"
+  }
+}

@@ -92,7 +92,7 @@ class SkipTest {
         assertNull(SkipPlan(emptyList()).at(1400.0, duration, hasNext = true))
     }
 
-    // ADR 0089: the button hides 10 s after it appears, as on Windows
+    // The button hides 10 s after it appears, as on Windows
     private val introButton = SkipPrompt.Button("Passer l'intro", 80.0)
     private val creditsButton = SkipPrompt.Button("Passer le générique", 1435.1)
 
@@ -152,7 +152,7 @@ class SkipTest {
         // Entered by ◀ ▶, the controls up: OK plays or pauses
         assertFalse(SkipArm.appeared(controls = true))
         assertEquals(SkipOk.PlayPause, SkipArm.onOk(visible = true, armed = false))
-        // Hidden after its 10 s: OK only brings it back (ADR 0089)
+        // Hidden after its 10 s: OK only brings it back
         assertEquals(SkipOk.Reveal, SkipArm.onOk(visible = false, armed = false))
         assertEquals(SkipOk.Reveal, SkipArm.onOk(visible = false, armed = true))
     }

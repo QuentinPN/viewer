@@ -1,0 +1,6 @@
+# Build outputs (go build -o bin/...). Never commit binaries or generated media.
+/bin/
+*.exe
+*.dll
+*.mkv
+*.mka

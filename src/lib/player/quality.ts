@@ -1,4 +1,4 @@
-// « Qualité » of the player's options (ADR 0117): another bitrate cap for this
+// « Qualité » of the player's options: another bitrate cap for this
 // playback only, applied by an explicit « Appliquer ». Caps and their validation
 // live in Rust; this only orders the choices and words the state.
 import { capLabel } from "../settings/quality";

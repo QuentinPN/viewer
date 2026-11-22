@@ -6,7 +6,7 @@
   scenario enabled (src-tauri/src/spike.rs), takes real screen captures of the app
   window at each checkpoint, sends a real Space key press for the keyboard check,
   and verifies the process exits by itself. Output goes to artifacts/gate1/<run>/
-  (git-ignored; curate what you keep in docs/evidence/).
+  (git-ignored; note results in TESTING.md or the PR).
   Prerequisite: `scripts/with-msvc.ps1 cargo build --manifest-path src-tauri/Cargo.toml`.
 .EXAMPLE
   ./scripts/spike/run-gate1.ps1 -Media 'D:\Vidéos\sample.mkv' -Mode child

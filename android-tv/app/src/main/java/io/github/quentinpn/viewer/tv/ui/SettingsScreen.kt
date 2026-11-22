@@ -81,11 +81,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Réglages (ADR 0051): the Windows playback settings that make sense on a TV, kept
+ * Réglages: the Windows playback settings that make sense on a TV, kept
  * on the device for this Emby user. Each row changes on OK and is saved at once.
- * « Accueil » shows or hides each home row (ADR 0094); a long OK moves one (ADR 0114).
- * « Mises à jour » checks for an update on demand and installs it (ADR 0112). « Stockage » shows and clears the
- * image cache (ADR 0080); « À propos » ends it with read-only diagnostics (ADR 0076).
+ * « Accueil » shows or hides each home row; a long OK moves one.
+ * « Mises à jour » checks for an update on demand and installs it. « Stockage » shows and clears the
+ * image cache; « À propos » ends it with read-only diagnostics.
  */
 @Composable
 fun SettingsScreen(
@@ -99,7 +99,7 @@ fun SettingsScreen(
     var settings by remember { mutableStateOf(store.load()) }
     var rows by remember { mutableStateOf(rowStore.load()) }
     var order by remember { mutableStateOf(rowStore.loadOrder()) }
-    // The row being moved with ▲ ▼ (ADR 0114); null when none is
+    // The row being moved with ▲ ▼; null when none is
     var moving by remember { mutableStateOf<String?>(null) }
     val still = reducedMotion()
     val update by Updater.state.collectAsState()
@@ -145,7 +145,7 @@ fun SettingsScreen(
         store.save(next)
     }
     fun change(next: SubtitleStyle) = change(settings.copy(subtitles = next))
-    // What the Emby account says, shown next to « Comme le compte Emby » (ADR 0120)
+    // What the Emby account says, shown next to « Comme le compte Emby »
     val account by produceState<AccountTracks?>(null, client, userId) { value = AppServices.accountTracks(client, userId) }
     val trackMemory = remember(userId) { TrackPreferenceStore(context, userId) }
     val languages = settings.languages

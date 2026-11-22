@@ -1,6 +1,6 @@
 package io.github.quentinpn.viewer.tv.player
 
-// Seek thumbnails (ADR 0069): Emby's `GET /Videos/{Id}/index.bif` answers a Roku BIF
+// Seek thumbnails: Emby's `GET /Videos/{Id}/index.bif` answers a Roku BIF
 // file. Layout, little-endian (Roku, "BIF file specification"): bytes 0-7 the magic
 // number, 8-11 the version (0), 12-15 the image count N, 16-19 the timestamp multiplier
 // in ms (0 means 1000), 20-63 reserved, then from byte 64 N + 1 entries of two u32,
@@ -75,7 +75,7 @@ fun parseBif(bytes: ByteArray): Bif? {
 
 /**
  * A well-formed BIF of version 0 holding no image: what Emby 4.10 answers, 72 bytes, for an
- * item whose thumbnails were never extracted (seen on the Shield, ADR 0069).
+ * item whose thumbnails were never extracted (seen on the Shield).
  */
 fun isEmptyBif(bytes: ByteArray): Boolean =
     bytes.size >= HEADER_BYTES && MAGIC.indices.all { bytes[it] == MAGIC[it] } && u32(bytes, 8) == 0L && u32(bytes, 12) == 0L

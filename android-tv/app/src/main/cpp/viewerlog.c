@@ -1,7 +1,7 @@
 // libplayer.so (mpv-android) asks libmpv for its log at "v" level and copies each
 // line to logcat at VERBOSE priority, before the Kotlin observer can redact it.
 // lavf prints the http headers it did not use at that level, the Emby token
-// among them, when it opens an HLS transcode (ADR 0052).
+// among them, when it opens an HLS transcode.
 #include <android/log.h>
 #include <dlfcn.h>
 #include <jni.h>

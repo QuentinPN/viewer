@@ -1,6 +1,6 @@
 <script lang="ts">
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { onMount } from "svelte";
+import { window as appWindow } from "../native";
 
 interface Props {
   /** Over the video: no background, the player's own gradient shows behind it. */
@@ -9,7 +9,6 @@ interface Props {
 
 let { overVideo = false }: Props = $props();
 
-const appWindow = getCurrentWindow();
 let maximized = $state(false);
 
 onMount(() => {
@@ -24,8 +23,10 @@ onMount(() => {
 });
 </script>
 
-<!-- Replaces the Windows title bar (ADR 0029). The empty area drags the window and
-     double-clicking it maximizes; the buttons keep Windows' order and glyphs. -->
+<!-- Replaces the Windows title bar. The empty area drags the window and
+     double-clicking it maximizes; the buttons keep Windows' order and glyphs.
+     data-tauri-drag-region is Tauri-specific: Wails reads the CSS
+     `--wails-draggable` instead (see .titlebar and button). -->
 <div class="titlebar" class:over-video={overVideo} data-tauri-drag-region>
   <div class="controls">
     <button
@@ -69,6 +70,7 @@ onMount(() => {
     justify-content: flex-end;
     background: var(--color-bg);
     user-select: none;
+    --wails-draggable: drag;
   }
   .titlebar.over-video {
     background: transparent;
@@ -88,6 +90,7 @@ onMount(() => {
     font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets";
     font-size: 10px;
     transition: background-color var(--motion-fast) ease;
+    --wails-draggable: no-drag;
   }
   button:hover {
     background: rgb(255 255 255 / 10%);

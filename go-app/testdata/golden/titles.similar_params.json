@@ -1,0 +1,80 @@
+[
+  {
+    "id": "a",
+    "params": [
+      [
+        "UserId",
+        "u1"
+      ],
+      [
+        "Limit",
+        "12"
+      ],
+      [
+        "IncludeItemTypes",
+        "Movie,Series"
+      ],
+      [
+        "Fields",
+        "PrimaryImageAspectRatio,ProductionYear"
+      ],
+      [
+        "EnableUserData",
+        "true"
+      ],
+      [
+        "ImageTypeLimit",
+        "1"
+      ],
+      [
+        "EnableImageTypes",
+        "Primary"
+      ]
+    ],
+    "userId": "u1"
+  },
+  {
+    "id": "30207",
+    "params": [
+      [
+        "UserId",
+        "4a1f"
+      ],
+      [
+        "Limit",
+        "12"
+      ],
+      [
+        "IncludeItemTypes",
+        "Movie,Series"
+      ],
+      [
+        "Fields",
+        "PrimaryImageAspectRatio,ProductionYear"
+      ],
+      [
+        "EnableUserData",
+        "true"
+      ],
+      [
+        "ImageTypeLimit",
+        "1"
+      ],
+      [
+        "EnableImageTypes",
+        "Primary"
+      ]
+    ],
+    "userId": "4a1f"
+  },
+  {
+    "id": "../x",
+    "params": null,
+    "userId": "u1"
+  },
+  {
+    "id": "",
+    "params": null,
+    "userId": "u1"
+  }
+]

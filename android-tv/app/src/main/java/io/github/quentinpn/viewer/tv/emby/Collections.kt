@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-// The collections (Emby BoxSets) of a film and their titles (ADR 0071).
+// The collections (Emby BoxSets) of a film and their titles.
 
 /** Collection rows on one film page: a film in more would push « Titres similaires » far down. */
 internal const val COLLECTIONS_LIMIT = 3

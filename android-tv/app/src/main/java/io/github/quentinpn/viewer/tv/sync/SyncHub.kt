@@ -45,7 +45,7 @@ data class LinkView(val phase: Phase = Phase.Idle, val device: String? = null, v
 }
 
 /**
- * The session-wide Emby socket and the follower (ADR 0123, 0124). Held by each started
+ * The session-wide Emby socket and the follower. Held by each started
  * activity, so it stays open from the home to the player; closed when nobody holds it,
  * which also happens at sign-out. Runs on the main thread. Logs keep only a kind, a seq
  * or a reject reason: never an envelope, never the token.
@@ -56,7 +56,7 @@ class SyncHub(private val app: Context) {
 
     private val _frames = MutableSharedFlow<String>(extraBufferCapacity = 64)
 
-    /** Every frame the server pushes; the home picks `LibraryChanged` among them (ADR 0110). */
+    /** Every frame the server pushes; the home picks `LibraryChanged` among them. */
     val frames: SharedFlow<String> = _frames
 
     private val _view = MutableStateFlow(LinkView())

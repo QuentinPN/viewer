@@ -1,4 +1,4 @@
-// Labels of the streaming quality setting (ADR 0037). The caps and their
+// Labels of the streaming quality setting. The caps and their
 // validation live in Rust (`emby::quality`); this only formats them.
 
 const MBITS = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });

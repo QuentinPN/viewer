@@ -1,4 +1,4 @@
-// Gate 3 chapters (ADR 0034) on the real Emby test account, driven over CDP:
+// Gate 3 chapters on the real Emby test account, driven over CDP:
 // - a film without resume point among the first cards, with at least four chapters
 //   from Emby (emby_chapters);
 // - played, the seek bar shows one mark per chapter start but the file's, and the

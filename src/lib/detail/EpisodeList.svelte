@@ -15,12 +15,12 @@ import { changePlayed, playedAction } from "./watched";
 
 interface Props {
   seriesId: string;
-  /** Bumped when the connection comes back (ADR 0012): failures are retried. */
+  /** Bumped when the connection comes back: failures are retried. */
   refresh: number;
   onError: (error: EmbyError) => EmbyError;
   /** `resume`: start where the server says the episode was left. */
   onPlay: (episodeId: string, resume: boolean) => void;
-  /** The title opens the episode page (ADR 0016); the thumbnail plays. */
+  /** The title opens the episode page; the thumbnail plays. */
   onOpen: (episode: Episode) => void;
   /** Episode being opened by the server, if any. */
   starting: string | null;
@@ -38,7 +38,7 @@ let pager = $state(emptyPager<Episode>());
 let loading = $state(false);
 let pageError = $state<EmbyError | null>(null);
 let root = $state<HTMLElement | null>(null);
-/** Episodes and seasons whose watched change waits for the server (ADR 0096). */
+/** Episodes and seasons whose watched change waits for the server. */
 let saving = $state<Record<string, true>>({});
 let playedError = $state<{ name: string; error: EmbyError } | null>(null);
 // Bumped on every season switch: answers for a previous season are dropped.
@@ -107,7 +107,7 @@ async function settled() {
 }
 
 /**
- * Back from an episode page (ADR 0016): shows the episode's season and focuses
+ * Back from an episode page: shows the episode's season and focuses
  * its title. Not in the loaded pages: the focus goes to its season button.
  */
 export async function reveal(episodeId: string, seasonId: string | null) {
@@ -173,9 +173,9 @@ async function refreshEpisodes() {
   }
 }
 
-/** New state of a played episode (ADR 0008), patched in place: the list, its
+/** New state of a played episode, patched in place: the list, its
  * scroll position and the focused episode stay as they are. A whole season or
- * the series marked (ADR 0096): its episodes are read again. */
+ * the series marked: its episodes are read again. */
 function onStopped(state: PlaybackStopped) {
   const episode = pager.items.find((e) => e.id === state.itemId);
   if (episode) {
@@ -192,7 +192,7 @@ function onStopped(state: PlaybackStopped) {
   }
 }
 
-/** Marks an episode played or unplayed (ADR 0096); its thumbnail does not play. */
+/** Marks an episode played or unplayed; its thumbnail does not play. */
 async function toggleEpisode(e: Episode) {
   if (saving[e.id]) return;
   saving[e.id] = true;

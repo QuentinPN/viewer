@@ -1,0 +1,29 @@
+[
+  {
+    "id": "30207",
+    "name": "2 Coeurs",
+    "itemType": "Movie",
+    "year": 2020,
+    "runtimeMinutes": null,
+    "poster": {
+      "src": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Primary?tag=7b213eb5_6379&maxWidth=240",
+      "srcset": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Primary?tag=7b213eb5_6379&maxWidth=240 240w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Primary?tag=7b213eb5_6379&maxWidth=360 360w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Primary?tag=7b213eb5_6379&maxWidth=480 480w"
+    },
+    "aspectRatio": null,
+    "played": false,
+    "unplayedCount": null,
+    "favorite": true
+  },
+  {
+    "id": "80473",
+    "name": "Arcane",
+    "itemType": "Series",
+    "year": 2021,
+    "runtimeMinutes": null,
+    "poster": null,
+    "aspectRatio": null,
+    "played": false,
+    "unplayedCount": 18,
+    "favorite": true
+  }
+]

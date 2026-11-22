@@ -1,5 +1,5 @@
 <script lang="ts">
-// The card menu of the library screen (ADR 0100), as in the official Emby apps:
+// The card menu of the library screen, as in the official Emby apps:
 // a translucent panel next to the card, headed by its artwork, title and year,
 // one row per action. "Ajouter à une playlist" swaps the rows for the user's
 // playlists and a field naming a new one. A short notice confirms what was done.
@@ -222,7 +222,7 @@ function run(action: MenuAction) {
   }
   const { target: t } = current;
   // The card gets the focus back first: a card taken out of its row then
-  // hands it to its neighbour (ADR 0096).
+  // hands it to its neighbour.
   close(true);
   switch (action.id) {
     case "play":

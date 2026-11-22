@@ -8,7 +8,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-// Messages of the linked playback (ADR 0124), carried by Emby's SendString relay (ADR 0123).
+// Messages of the linked playback, carried by Emby's SendString relay.
 // Same contract as the desktop; both test suites read docs/sync/vectors.json.
 
 /** Longest envelope accepted or sent, in UTF-8 bytes. */
@@ -81,7 +81,7 @@ data class Envelope(val from: String, val link: String, val seq: Long, val body:
 /** The kind, with the reason of a `bye`: what the logs keep of a message. */
 val Body.label: String get() = if (this is Body.Bye) "bye ${reason.wire}" else kind.wire
 
-/** Why an envelope was dropped; the only thing ever logged about it (ADR 0124 § Sécurité). */
+/** Why an envelope was dropped; the only thing ever logged about it. */
 enum class Reject(val code: String) { Json("json"), Size("size"), Version("version"), Field("field"), Kind("kind") }
 
 sealed interface Parsed {
@@ -159,7 +159,7 @@ private fun JsonObject.body(kind: Kind): Body = when (kind) {
     Kind.Bye -> Body.Bye(choice("reason", ByeReason.entries) { it.wire })
 }
 
-/** Reads one envelope; anything outside ADR 0124 is rejected with its reason. Unknown fields are ignored. */
+/** Reads one envelope; anything invalid is rejected with its reason. Unknown fields are ignored. */
 fun parseEnvelope(raw: String): Parsed = try {
     if (raw.toByteArray(Charsets.UTF_8).size > MAX_ENVELOPE_BYTES) throw Invalid(Reject.Size)
     val root = runCatching { envelopeJson.parseToJsonElement(raw) }.getOrNull() as? JsonObject ?: throw Invalid(Reject.Json)
@@ -224,7 +224,7 @@ data class LinkCursor(val peer: String, val link: String, val lastSeq: Long?)
 enum class Acceptance { Accept, Ignore, Busy }
 
 /**
- * The ADR's filter. Out of a link, only `join` and `load` are read: they open one. In a
+ * The filter. Out of a link, only `join` and `load` are read: they open one. In a
  * link, only the peer's messages of that link, with a seq above the last one; a `join`
  * or `load` of another session gets `bye busy`.
  */

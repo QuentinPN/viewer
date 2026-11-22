@@ -1,11 +1,11 @@
 // Gate 4 network cuts during an HLS transcode, on the real Emby test account, driven
-// over CDP (ADR 0022). The debug build caps the bitrate (VIEWER_E2E_MAX_BITRATE) so the
+// over CDP. The debug build caps the bitrate (VIEWER_E2E_MAX_BITRATE) so the
 // server transcodes; the app goes through the local proxy (net-proxy.mjs), the PC's
 // network and the server are not touched.
 // - a short cut (8 s): the playback goes on past what mpv had read ahead, and no part
 //   of the film is skipped (a lost HLS segment would show as a jump in the position);
 // - a long cut: "Lecture interrompue", no false "watched", the position played reaches
-//   the server once it is back (ADR 0024), and "Reprendre" starts a new transcode there.
+//   the server once it is back, and "Reprendre" starts a new transcode there.
 // Short transcodes; writes then clears one resume position. Starts in any state, ends
 // signed out with the direct server address as last server.
 import { launch } from "./app.mjs";
@@ -198,7 +198,7 @@ try {
     );
     await page.locator("#lost-title").waitFor({ timeout: 25000 });
     await shot(page, "long-cut");
-    // The cut lasts on: the stop report waits in memory (ADR 0024).
+    // The cut lasts on: the stop report waits in memory.
     await page.waitForTimeout(HOLD_MS);
     await proxy.set("up");
     await page.locator("#lost-title").waitFor({

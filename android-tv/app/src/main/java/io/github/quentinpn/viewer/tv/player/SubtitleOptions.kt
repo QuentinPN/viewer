@@ -8,8 +8,8 @@ import io.github.quentinpn.viewer.tv.settings.SubtitleStyle
 import kotlin.math.roundToInt
 
 /**
- * mpv properties for [style] (ADR 0053), the values of `subtitle_options` on Windows
- * (src-tauri/src/player/mpv.rs, ADR 0035). ASS and SSA keep their own styles unless
+ * mpv properties for [style], the values of `subtitle_options` on Windows
+ * (src-tauri/src/player/mpv.rs). ASS and SSA keep their own styles unless
  * the user overrides them: `yes` rather than Windows' `no`, which would also pin them
  * under the TV controls (`sub-pos` is ignored with `no`; seen on the Shield).
  * `sub-pos` is left out: [subtitlePosition] gives it, as it also follows the controls.

@@ -1,5 +1,5 @@
 // Gate 2 reporting and resume scenario on the real Emby test account, driven over
-// CDP (ADR 0008). Writes playback positions to the server and clears them again:
+// CDP. Writes playback positions to the server and clears them again:
 // - film: play, seek to ~20 %, Escape → the detail page offers "Reprendre" and
 //   "Lire depuis le début"; Enter on "Reprendre" starts near the saved position;
 //   "Lire depuis le début" from 0 then Escape → the resume point is gone;
@@ -197,7 +197,7 @@ try {
   await page.keyboard.press("Enter");
   await checkResumed(page, "episode", episodeTarget);
   await rewind(page, "episode");
-  // The controls fade after 3 s (ADR 0017): move the mouse first, as a user would.
+  // The controls fade after 3 s: move the mouse first, as a user would.
   await page.mouse.move(400, 300);
   await page.mouse.move(420, 320);
   await page.getByRole("button", { name: "Revenir", exact: true }).click();

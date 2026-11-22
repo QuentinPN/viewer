@@ -1,14 +1,14 @@
 <script lang="ts">
-// Home page (DESIGN.md, Home; ADR 0010): the hero (ADR 0015), then "Reprendre"
-// and "À suivre" play at once, then favorites (ADR 0014) and the latest additions
+// Home page (DESIGN.md, Home): the hero, then "Reprendre"
+// and "À suivre" play at once, then favorites and the latest additions
 // of each library open their detail page. Rows load in parallel; every row is read
 // again in place after a playback (played marks, episode counts), "Favoris" also
 // after every favorite change. A "Reprendre" card can be taken out of the row, or
-// marked played (ADR 0096), from its menu (ADR 0100). Every row is also read again
-// in place after 5 min shown, or 30 s away from the app, so new titles show (ADR 0109),
-// and at once when the server announces a library change (ADR 0110).
-// Rows follow the order and visibility of Réglages › Accueil (ADR 0113), read when
-// the home opens; a hidden row is never requested. « Playlists » (ADR 0122)
+// marked played, from its menu. Every row is also read again
+// in place after 5 min shown, or 30 s away from the app, so new titles show,
+// and at once when the server announces a library change.
+// Rows follow the order and visibility of Réglages › Accueil, read when
+// the home opens; a hidden row is never requested. « Playlists »
 // lists the user's video playlists, each opening its page.
 import { onMount, tick, untrack } from "svelte";
 import { patchPlayed, restoreItem, withoutItem } from "../detail/watched";
@@ -52,13 +52,13 @@ interface Props {
   onShowLibrary: (library: Library) => void;
   onOpenPlaylist: (playlist: PlaylistCard) => void;
   onPlay: (start: PlaybackStart) => void;
-  /** Bumped when the connection comes back (ADR 0012). */
+  /** Bumped when the connection comes back. */
   refresh: number;
   /** Bumped when a favorite changed on a detail page: "Favoris" is read again. */
   favoritesVersion: number;
   /** Reports the error upward (a lost server or a 401 changes the screen) and returns it. */
   onError: (e: unknown) => EmbyError;
-  /** Order and hidden rows, read once when the home opens (ADR 0113). */
+  /** Order and hidden rows, read once when the home opens. */
   rowPrefs: HomeRowPrefs;
 }
 
@@ -105,7 +105,7 @@ let playlists = $state<RowState<PlaylistCard>>(loadingRow());
 let playlistsGeneration = 0;
 let starting = $state<string | null>(null);
 let playError = $state<{ title: string; error: EmbyError } | null>(null);
-/** "Reprendre" card being taken out: one at a time (ADR 0096). */
+/** "Reprendre" card being taken out: one at a time. */
 let removing = $state<string | null>(null);
 let removeError = $state<{
   title: string;
@@ -117,7 +117,7 @@ let resumeList = $state<HTMLElement | null>(null);
 let watchGeneration = 0;
 let favoritesGeneration = 0;
 const latestGeneration: Record<string, number> = {};
-/** When every row was last asked for (ADR 0109). */
+/** When every row was last asked for. */
 let loadedAt = Date.now();
 
 const nextUpShown = $derived(
@@ -322,7 +322,7 @@ $effect(() => {
   untrack(loadFavorites);
 });
 
-/** New titles on the server: rows read again in place while the app is shown (ADR 0109). */
+/** New titles on the server: rows read again in place while the app is shown. */
 function reloadIfStale(after: number) {
   if (document.visibilityState !== "visible") return;
   if (isStale(loadedAt, Date.now(), after)) afterPlayback();
@@ -372,7 +372,7 @@ onMount(() => {
 {/snippet}
 
 <div class="home" aria-busy={watchLoading}>
-  <!-- The hero opens the page (ADR 0031): the heading is for screen readers. -->
+  <!-- The hero opens the page: the heading is for screen readers. -->
   <header class="sr-only">
     <h1>Accueil</h1>
     <p>Bonjour {userName}</p>
