@@ -1,93 +1,148 @@
-# Viewer — Testing and verification
+# Tests
 
-## Quality commands
+Ce fichier dit comment vérifier le code, ce qui ne s'automatise pas, ce qui a réellement été testé et ce qui ne l'est pas. Rien n'y est affirmé sans résultat enregistré.
 
-- All gates: `npm run verify` (= `verify:web` + `verify:rust`).
-- Frontend (`verify:web`): `biome check .`, `svelte-check --fail-on-warnings`, `vitest run`, `vite build`.
-- Rust (`verify:rust`): `cargo fmt --all -- --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (manifest `src-tauri/Cargo.toml`). The libmpv engine test runs against `vendor/mpv/libmpv-2.dll` (or `VIEWER_LIBMPV`); set `VIEWER_REQUIRE_LIBMPV=1` to fail instead of skipping when it is missing (CI does).
-- Local MSVC workaround if `LNK1104 msvcrt.lib`: prefix with `scripts/with-msvc.ps1` (ADR 0001).
-- Request (ADR 0125): `contracts/request/fixtures/*.json` are shared by all three stacks. The Vitest contract test (`src/lib/requests/contract.test.ts`) validates them strictly against `contracts/request/openapi.json`; the Rust tests (`src-tauri/src/request/tests.rs`) and the Kotlin tests (`request/`, `ui/requests/`) deserialize the same files. The ignored test `real_server_probe` reads the real server: `./scripts/with-test-account.ps1 cargo test … real_server_probe -- --ignored --nocapture`. `node scripts/e2e/requests-ui.mjs` (over CDP, never sends a request) captures the Demander screens into `docs/evidence/request/`. Both read the Request address from `VIEWER_UR_URL` (environment, else the key `VIEWER_UR_URL=` of the gitignored `debug.env` at the root of the main checkout) and fail when it is missing; the scenario masks that address and the Emby one in every screenshot. Opt-in `--real-request` (`./scripts/with-test-account.ps1 node scripts/e2e/requests-ui.mjs --real-request`, **creates then cancels one real request** of the film TMDB 1153576): stops before sending when the account auto-approves films or the film already has a status; otherwise dialog with quota, send, « Mes demandes », history, « Annuler la demande », and checks through the API that the request is `cancelled` and the quota back (screenshots 11–15). Run on 2026-11-19: request #590, cancelled, quota 10/10 back.
-- `scripts/with-msvc.ps1` skips Visual Studio installs without `vcvars64.bat` or the C++ headers (VS 18 here) and uses the next complete one (VS 2019 BuildTools); `vendor/mpv/libmpv-2.dll` must exist.
-- Windows packaging (ADR 0028): `./scripts/with-msvc.ps1 npx tauri build` builds the release app and the per-user NSIS installer `src-tauri/target/release/bundle/nsis/Viewer_<version>_x64-setup.exe`, with `libmpv-2.dll` beside the executable. The first build downloads NSIS and its Tauri plugin from GitHub, hash-checked by the Tauri CLI. `@tauri-apps/api` must stay on the `tauri` crate's minor, or the build stops. Build it after `npm run release -- <patch|minor|major|X.Y.Z>` (ADR 0032), so the installer carries the tagged version; `src/release/version.test.ts` fails when `package.json`, `package-lock.json`, `Cargo.toml` and `Cargo.lock` disagree.
+## Commandes
 
-## UI scenarios without taking the desktop (ADR 0006)
+Deux piles coexistent. `npm run verify` et tout le harnais E2E visent encore Tauri/Rust (`src-tauri`). La porte Go (`go-app`) n'existe que sous forme de commandes manuelles : aucun script `npm` ne la lance.
 
-Preferred for UI checks: they drive the debug build over WebView2's DevTools protocol, with the window off-screen and never activated, so the user can keep working. Screenshots show the HTML UI only (never mpv video).
+### Frontend (racine)
 
-- Prerequisites: `cargo build` (debug), Vite dev server (`npm run dev`), and once, the Emby test account in the Windows Credential Manager: `cmdkey /generic:viewer-e2e-emby /user:<test user> /pass` (password prompted, hidden). Optional `VIEWER_EMBY_URL`, otherwise the last server the debug app signed in to (`%APPDATA%\io.github.quentinpn.viewer.debug\session.json`), else the installed app's. The debug build has its own data folders and vault entries (`.Viewer-debug`, ADR 0105): scenarios never touch the installed app's session.
-- Every scenario on the debug build first checks that the Vite dev server serves the current CSS of each component (`scripts/e2e/dev-styles.mjs`: each one-line declaration of a `<style>` block must be in the style module the page fetches). It stops with "the Vite dev server serves old CSS (restart npm run dev)" and the components concerned: seen twice, the markup was current and the CSS old, so a scenario tested the old layout. Not reproduced on demand (single edits and five quick writes were picked up); the cause is unknown.
-- `./scripts/with-test-account.ps1 <command…>` runs any command with `VIEWER_EMBY_URL` / `VIEWER_EMBY_USER` / `VIEWER_EMBY_PASSWORD` set for it only (real-server cargo tests below, scenarios). The app is started with `VIEWER_E2E_SILENT` (debug only): mpv uses `ao=null`, no sound on the speakers.
-- `./scripts/e2e/run.ps1` (default scenario `gate2-ui`): wrong password, sign-in, restore after restart, keyboard library switch, grid paging, series detail with season switch, Escape back with focus kept, film detail, narrow real window without horizontal overflow, scroll kept, sign-out, no app credential left. Asserted checks plus screenshots in `artifacts/e2e/gate2-ui-<run>/` (`report.json`). Starts in any state, ends signed out.
-- `./scripts/e2e/run.ps1 gate2-play`: film played from its detail page by keyboard, episode from its series; checks the server's decision shown in the player, playback advancing (engine diagnostics: codec, hwdec, position), Escape / ✕ back to the detail page with focus on the play control, player closed. Ends signed out.
-- `./scripts/e2e/run.ps1 gate2-resume` (**writes positions on the test account, then clears them**): film seeked to 20 % then stopped → "Reprendre" and "Lire depuis le début" offered, resume starts at the saved position, from-start run clears it; episode seeked to 20 % then the window closed during playback → after relaunch the episode offers "Reprendre", resumes at the position, rewound and stopped → "Lire" again. Ends signed out.
-- `./scripts/e2e/run.ps1 gate2-transcode` (**short transcode on the test account**, needs the debug build: `VIEWER_E2E_MAX_BITRATE=3000000`): first film plays transcoded with the badge "Transcodage · débit trop élevé", playback advances, external subtitles listed with the server's default selected, seek to 600 s lands there, rewound and Escape → back on the detail page with no resume point. Ends signed out. The env cap still wins over the « Qualité de lecture » setting (ADR 0037).
-- `./scripts/e2e/run.ps1 gate3-quality` (ADR 0037; **short transcode on the test account**, no `VIEWER_E2E_MAX_BITRATE`; playbacks rewound to 0): Réglages › « Qualité de lecture » starts at « Maximale », lists the offered choices, « Réseau local » set to 1,5 Mbit/s with the keyboard is stored and kept after a restart; the first film then plays transcoded with "Transcodage · débit trop élevé" and the info panel shows « 1,5 Mbit/s · réseau local »; back to « Maximale » it plays without transcoding and shows « Automatique · réseau local »; no resume point left. The setting is put back to « Maximale » even on failure. Ends signed out.
-- `./scripts/e2e/run.ps1 gate3-home` (**writes one position on the test account, then clears it**): home is the default view with one "Ajoutés récemment" row per library, Left/Right between cards, scroll arrows, "Tout voir" opens the library and "Accueil" comes back, a latest film opens its detail page; played to 20 % then stopped → it heads "Reprendre" with its progress bar and artwork, the card resumes at the saved position, rewound and stopped → it leaves the row. Ends signed out.
-- `./scripts/e2e/run.ps1 gate3-player` (ADR 0017; short playbacks rewound to 0): film without resume point — title, server decision, remaining time; controls fade after 3 s (cursor hidden) and come back on pointer and key, stay while paused; ±10 s; volume 100 by default, M, ↑/↓, slider, kept on the next playback; audio panel, subtitles panel (switch and back), info panel (decoding, video, output, engine); F fullscreen covering the whole screen, from a restored and from a maximized window, maximized again after it; Escape closes the panel then goes back; an episode shows "Série · S1 · É1" and its title; no resume point left; the volume stored before the run is restored. Ends signed out.
-- `./scripts/e2e/run.ps1 gate4-watched` (ADR 0008; **marks one film watched, then unwatched again** through `real_server_mark_unplayed`): an unwatched film without a resume point, played to its natural end, is marked watched by the server from the stop report alone, keeps no resume point, and its detail page shows « Déjà vu ». Ends signed out.
-- `./scripts/e2e/run.ps1 gate3-upnext` (ADR 0018; **marks the first episode of the first series played, then unplayed again** through the ignored test `real_server_mark_unplayed` with `VIEWER_UNPLAY_IDS`): episode seeked to 4 s before its end → card "Épisode suivant" with the next episode of `emby_item_detail` (code, title, same as the series list), countdown going down, focus on "Lire maintenant", opaque background, bottom bar replaced; Escape cancels back to the series; left alone in fullscreen the next episode starts after the countdown and stays fullscreen; "Lire maintenant" starts it at once; the next episode keeps its state (rewound to 0, no resume point). Ends signed out.
-- `./scripts/e2e/run.ps1 gate3-chapters` (ADR 0034; one playback rewound to 0): the first film card without resume point that has at least four chapters from `emby_chapters`; Emby's and mpv's chapter counts reported; one seek bar mark per chapter start but the file's; the chapter's name in the seek bar's `aria-valuetext`; the « Chapitres » panel lists every chapter, the playing one marked and focused; ↓ ↓ Entrée seeks to the third chapter, closes the panel and leaves the volume alone; the name shows under the bar; Page Down goes to the next chapter and Page Up right after back; Échap closes the panel and the player stays; no resume point left. Ends signed out.
-- `./scripts/e2e/run.ps1 gate3-skip` (ADR 0030; **read-only calls to IntroDB and TheIntroDB** with the looked up series' ids; playbacks rewound to 0): the first episodes of the first 12 series are looked up until one has segments, an intro preferred; nothing with the external sources off; « Passer l'intro » shown in the intro, kept when the controls fade, Enter jumps to its end and the button goes; the credits show « Passer le générique » or « Épisode suivant » (not pressed: it would mark the episode played); with auto-skip in `viewer.player.skip` the intro is skipped without a key, once. The saved setting is restored. Ends signed out.
-- `./scripts/e2e/run.ps1 gate3-subtitles` (ADR 0035; two short playbacks of film 30207 « 2 Coeurs », rewound to 0, which must not have a resume point): Réglages › « Audio et sous-titres » — the subtitle language list hidden by default, English audio, subtitles « Toujours » in French, very large yellow text on a dark box, raised, kept in `viewer.player.subtitles`; the film then plays with the English audio and the full (non-default) French subtitles, and mpv reports the `sub-*` options; with the defaults, the server's French audio and default subtitle and mpv's default look. The stored preferences are restored. Ends signed out.
-- `./scripts/e2e/run.ps1 gate3-artwork` (ADR 0019; read only on the server, cache in a temporary folder through `VIEWER_E2E_ARTWORK_DIR`): two launches on the same empty folder — the first downloads the first 12 film posters and keeps them (`artwork_cache_stats`, files on disk, no server address in the paths); the second shows the same posters from the disk (hits, load time compared). Ends signed out.
-- `./scripts/e2e/run.ps1 measure-startup` (read only; a measurement, not a gate): three launches with the saved session timing page load, home heading, home rows and hero image from the process start, then five calls of each home and grid command. Baseline in `docs/evidence/mesure-demarrage-2026-11-01.md`.
-- `measure-gate4`: short plays and 2 × 60 s sessions on the test account, which go back to 0; a measurement, not a gate, except for a film that does not start or a changed "continue watching". Whole films grid on empty then full artwork cache, navigation, start and stop of 12 films across the grid with the server's decision, dropped frames, seeks and memory, in Direct Play and transcoded. Baseline in `docs/evidence/gate4-performance-2026-11-06.md`.
-- `./scripts/e2e/run.ps1 gate3-settings` (ADR 0021; read only on the server, cache in a temporary folder through `VIEWER_E2E_ARTWORK_DIR`): the home fills the cache; « Réglages » (keyboard) shows size, quota and image count, and « À propos » the version of `package.json` (ADR 0032); « Vider le cache des images » announces what was freed, leaves no `.img` file but keeps a foreign file, keeps the focus on the button; narrow window without horizontal scroll; a search takes over and Escape gives the settings back; home and a library close them. Ends signed out.
-- `./scripts/e2e/run.ps1 gate3-scaling` (ADR 0031; read only on the server): Windows display scaling reproduced without touching the system setting, by resizing the real window to the CSS size and setting the device scale factor over CDP: 1024 × 576 at 1.25 and 853 × 480 at 1.5 (a 1280 × 720 window at 125 % and 150 %), 1280 × 720 at 1.5 (a 1080p screen at 150 %). Home, film library, film detail, series detail and episodes, settings, the player with its subtitles panel (one short playback per size, rewound to 0 before stopping, so no resume point is kept), the connection-lost overlay (network cut through the local proxy `net-proxy.mjs`, then restored), then sign-in after signing out; no horizontal page overflow, the subtitles panel below the 32 px title bar, the connection-lost actions on screen. **Review the screenshots.** Layout equivalent only: font rasterization and the native frame differ from a real scaled screen.
-- `./scripts/e2e/run.ps1 gate3-nav-many` (ADR 0031; read only on the server): the navigation pill with many libraries at 853 × 480 at 1.5 and 1024 × 576 at 1.25. The local proxy `net-proxy.mjs` ("many-views") answers the library list with each library four times under numbered names; the made-up libraries are never opened. Checks: all listed, pill in the window, search, "Réglages" and the account hittable, the end fades, the last library reachable with the mouse wheel without scrolling the content, the focused search covering the pill under 900 px. **Review the screenshots.**
-- `./scripts/e2e/run.ps1 gate3-hero` (ADR 0015): hero against `emby_hero` (order, one title, dots, carousel semantics, logo alt or title, main button label), no rotation over 7 s, arrows, wrap-around, dots, ← → with the focus kept, "Plus d'infos" opens the detail, reduced motion removes the fade, the main button plays (stopped after ~1 s: hero and resume unchanged, title kept). Ends signed out.
-- `./scripts/e2e/run.ps1 gate3-favorites` (ADR 0014; signs in through the local proxy): read only by default — home row "Favoris" against `emby_favorites` (hidden when empty), film and series toggles with the server state, server cut while toggling (rolled back, "Favori non modifié", nothing reaches the server, server state back online). With `VIEWER_E2E_FAVORITE_WRITES=1` (only with the account owner's permission): add a film, home row shows it, kept after a restart, opens from the row, Space removes it, server list as before. Ends signed out. It leaves the proxy as the app's last server: set `VIEWER_EMBY_URL` for the scenarios run after it.
-- `./scripts/e2e/run.ps1 gate3-episode` (ADR 0016): in a series with two seasons, the thumbnail plays and the title opens the episode page (keyboard); series logo or name, "Saison N · Épisode M", image, play button, no favorite, no premiere fact, technical info; series page hidden and inert; unique ids; previous in the season and next in the following season, focus on the button used; a short play from the page (rewound to 0, engine stopped after Escape, page kept); Escape from the next season's episode focuses its title in its season; the thumbnail still plays without opening the page; no resume point left. Ends signed out.
-- `./scripts/e2e/run.ps1 gate3-sort-filter` (read only, ADR 0013): defaults; year sort in both directions checked on the cards; a filter without match shows its empty state and its reset keeps the sort and focuses it; unwatched + watched = total; a genre narrows the count; favorites toggle; series libraries without "En cours" and with their own choices; choices kept after switching library and after a restart; quick successive changes show the last one; arrow key on a select; next page with the same options; cleanup to defaults with nothing stored. Ends signed out.
-- `./scripts/e2e/run.ps1 gate3-search` (read only): `/` and Ctrl+F focus the sidebar search field, one request after typing, the same results with other case and accents, a result opens its detail page and Escape comes back with focus on the card, episodes whose own title matches open the episode page (next episode in place, Escape back to the card; ADR 0020), one letter sends nothing, empty state, Escape back home and back to a scrolled library at the same scroll, narrow window without overflow. Ends signed out.
-- `./scripts/e2e/run.ps1 gate21-session` (ADR 0012; **writes and clears one position on the test account**; `VIEWER_EMBY_URL` must be the server, never a loopback address): the app signs in **through the local proxy `scripts/e2e/net-proxy.mjs`**, which simulates the outages (port closed, connection held without answer, 401 on authenticated requests) without touching the server. Steps: restart without the form; server off at startup → recovery screen, token kept, manual and automatic return; server hanging → splash captured, then the screen after the 15 s timeout; outage mid-session → overlay, automatic return, view and scroll kept; revoked token → a single reauthentication screen, token deleted, return after the password; change server → return without password; playback cut → "Lecture interrompue." once the buffer is read and the position stayed frozen 30 s (ADR 0022), no "watched", resume at the server's position, cleared afterwards. Ends signed out with no leftover credential. Recovers from an interrupted previous run.
-- `./scripts/e2e/run.ps1 gate4-network` (ADR 0022; **writes and clears one position on the test account**; `VIEWER_EMBY_URL` must be the server): through the same local proxy, an 8 s cut during a film. The playback must go on past what mpv had read ahead (≈ 90 s).
-- `./scripts/e2e/run.ps1 gate4-hls-cut` (ADR 0022 and 0024; **short transcodes on the server, writes and clears one position on the test account**; up to about 10 min; `VIEWER_EMBY_URL` must be the server): through the same local proxy, an 8 s cut then a long cut during a transcode. Nothing may be skipped after the short cut; the long cut must end in "Lecture interrompue", no false "watched", the position played must reach the server once the network is back (the cut lasts 60 s more, `HOLD_S` to change it), and "Reprendre" must start a new transcode there.
-- `./scripts/e2e/run.ps1 gate4-pause` (**short transcode on the server, writes and clears one position on the test account**; about 15 min with the default 5 min pause, `PAUSE_S` to change it; `VIEWER_EMBY_URL` must be the server): through the local proxy in `log-segments` mode, a long pause during a transcode. No error may show and the position must hold; on resume, playback must go past what mpv had read ahead with nothing skipped and every new segment served; after a second pause, a seek outside the cache must land there. A second device notes the encoder in `/Sessions`.
-- `./scripts/e2e/run.ps1 gate5-release` (ADR 0028; **installed release build**, `VIEWER_RELEASE_EXE` to change it; short direct play on the test account, clears its position; about 1 min, the window shows on screen and the sound is turned down through the player): bundled frontend, window not off-screen, Gate 1 prototype refused, bitrate cap ignored, playback, seek, no resume left, clean exit.
-- `./scripts/e2e/run.ps1 gate4-fallback` (ADR 0023; **short transcodes on the server, writes and clears one position on the test account**; `VIEWER_EMBY_URL` must be the server): the same local proxy answers direct file requests with unreadable bytes. The server must transcode with the badge "Transcodage · échec de la lecture directe", "Reprendre" and "Lire depuis le début" must keep their position; if the transcode fails too, an explanation, "Retour", no retry loop. Since ADR 0027 it also holds a direct source unanswered until the 45 s limit, then the transcode, and answers HTTP 500 to the file and its HLS segments, with the real server's delay of about 140 ms: the message at the limit, then no more requests. These two steps add about 90 s.
-- Reusable launcher: `scripts/e2e/app.mjs` (`launch()`, `runDir()`); checks, screenshots, report, sign-in and `resizeWindow` (real window, never activated): `scripts/e2e/scenario.mjs`.
-- Ask the user before any check that needs real OS input or screen capture (Gate 1 scripts below).
+| Commande | Effet |
+|---|---|
+| `npm run lint` | `biome check .` (`npm run lint:fix` corrige) |
+| `npm run check` | `svelte-check` avec `--fail-on-warnings` |
+| `npm run test` | `vitest run` (`npm run test:watch` en continu) |
+| `npm run build` | `vite build` (produit `dist/`) |
+| `npm run verify:web` | lint, check, test, build |
+| `npm run verify` | `verify:web` puis `verify:rust` |
 
-## Gate 1 playback scenario
+La CI (`.github/workflows/ci.yml`) lance `npx biome ci .`, `npm run check`, `npm run test`, `npm run build`, puis un job Rust avec `VIEWER_REQUIRE_LIBMPV=1`. Les releases passent par `.gitea/workflows/release.yml`.
 
-`scripts/spike/close-probe.ps1 [-Media <file>]` posts WM_CLOSE (Windows close button) idle or during playback and reports close latency, exit code, leftover processes and the WebView2 exit error.
+### Rust (Tauri)
 
-`scripts/spike/run-gate1.ps1 -Media <file|http URL> [-Mode parent|child|separate] [-HttpToken <test token>]` drives the debug build: playback, tracks, seek, fullscreen, resize, real Space key, teardown, open/close cycles. It writes `report.json`, `driver.json` and screenshots to `artifacts/gate1/<run>/`. For HTTP, `scripts/spike/serve-file.mjs` serves one file on 127.0.0.1 with Range support and can require an `X-Emby-Token` header. **Review the screenshots**: property checks alone passed for a mode whose video was invisible.
+`npm run verify:rust` enchaîne trois commandes, à lancer à la main si besoin :
 
-## Playback matrix
+```
+cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+cargo test --manifest-path src-tauri/Cargo.toml
+```
 
-Record for each test: Windows build, GPU/driver, libmpv build, Emby version, file codec/container, bitrate, subtitle type, audio format, direct/transcode decision, observed result, logs sanitized.
+- Sur un checkout propre, lancer d'abord `npm run build` (Tauri attend `dist/`) et `scripts/fetch-libmpv.ps1` (libmpv).
+- Erreur de lien `LNK1104 msvcrt.lib` : préfixer la commande par `scripts/with-msvc.ps1`.
+- Sous PowerShell, passer le séparateur entre guillemets : `'--'`.
+- Tests réels contre le serveur Emby, ignorés par défaut, un par un : `./scripts/with-test-account.ps1 ./scripts/with-msvc.ps1 cargo test --manifest-path src-tauri/Cargo.toml real_server_search '--' --ignored --nocapture`. Le préfixe prend `VIEWER_EMBY_URL`, `VIEWER_EMBY_USER`, `VIEWER_EMBY_PASSWORD` dans le Gestionnaire d'identifiants. Autres noms : `cargo test ... '--' --ignored --list` ; `real_server_playback_reporting_and_resume`, `real_server_home_rows`, `real_server_next_up` et `real_server_transcoding` écrivent sur le compte de test.
+- Avant une release : `cargo audit` depuis `src-tauri`.
 
-Cases: H.264 MP4, HEVC MKV, AV1 if supported, 4K sample, multiple audio tracks, SRT, ASS, PGS, seek, pause/resume, fullscreen, DPI scaling, app exit during playback, disconnect/reconnect, unsupported codec and fallback. Test HDR/passthrough only on suitable hardware.
+### Go (Wails v3), depuis `go-app/`
 
-## Contract and integration
+```
+gofmt -l .                  # ne doit rien afficher
+go vet ./...
+staticcheck ./...           # outil non installé sur le poste : non vérifié
+go test ./...
+CGO_ENABLED=0 go build ./...   # PowerShell : $env:CGO_ENABLED='0'; go build ./...
+```
 
-Mock Emby API for auth failures, pagination, permissions, missing fields, playback selection and session lifecycle. With user approval, verify progress and watched state on a real test account and test media.
+Le frontend Wails se construit avec `npm run build:wails`, l'exécutable avec `npm run build:wails:exe` (`go-app/bin/viewer.exe`).
 
-- `src-tauri/src/emby/tests.rs` runs `EmbyService` against a local fake Emby server (one request per connection) and an in-memory credential store. Fake responses mirror real server responses recorded in `docs/evidence/`.
-- Several versions of one item (ADR 0036): fake server only, because the test server has none (11 954 films and episodes scanned on 2026-11-07). `playback_of_one_version_names_it_to_the_server_and_in_reports` (item 30500, two versions and one unsafe id): `MediaSourceId` sent in the PlaybackInfo body only when a version is chosen, reports and the transcode fallback on that version, unknown id → `NoCompatibleStream`, unsafe id never sent; `src/lib/detail/versions.test.ts` for labels and memory. No e2e scenario until a real multi-version item exists.
-- Real server, opt-in: credentials only through environment variables, never as arguments or in files: `VIEWER_EMBY_URL`, `VIEWER_EMBY_USER`, `VIEWER_EMBY_PASSWORD`. Prefix the commands below with `./scripts/with-test-account.ps1` to take them from the Windows Credential Manager.
-  - `./scripts/with-msvc.ps1 cargo test --manifest-path src-tauri/Cargo.toml real_server_sign_in_restore_sign_out '--' --ignored`: sign-in, restore, sign-out, revoked token refused. It reuses the fixed device id `viewer-real-server-test`.
-  - `… cargo test … real_server_libraries_and_pages '--' --ignored --nocapture`: lists libraries, reads the first and last page of each, fetches one poster, signs out.
-  - `… cargo test … real_server_details_seasons_episodes '--' --ignored --nocapture` (optional `VIEWER_DETAIL_SAMPLE`, default 40 items per library): detail of each sampled item, seasons and first page of episodes of each series, one backdrop.
-  - `… cargo test … real_server_playback_reporting_and_resume '--' --ignored --nocapture` (**writes on the test account**): first unwatched film with no resume point, start / pause / unpause / seek / stopped reports, resume point read back and used as the start position, then cleared by a stop at 0.
-  - `… cargo test … real_server_transcoding '--' --ignored --nocapture` (**short transcode on the test account**): 3 Mbit/s cap, first unwatched film → `Transcode` plan without `api_key`, master playlist and first segment fetched with the header, every external subtitle 200, then the stop report ends the encoding (no `TranscodingInfo` left in `/Sessions`) and leaves no resume point.
-  - `… cargo test … real_server_encoder_without_stop_report '--' --ignored --nocapture` (**short transcode on the test account, 2 to 4 min**): a transcode abandoned with no stop report, watched from a second device until `TranscodingInfo` stays gone for 120 s (at most `VIEWER_ENCODER_WATCH_MINUTES`, 20 by default), then stopped at 0.
-  - `… cargo test … real_server_playback_negotiation '--' --ignored --nocapture` (optional `VIEWER_PLAYBACK_SAMPLE`, default 20 items per library): PlaybackInfo for films and first episodes, method per item, no `api_key` in stream URLs, one 1 KiB stream read with the token header (206) and without it (401).
-  - `… cargo test … real_server_home_rows '--' --ignored --nocapture` (**writes one position on the test account, then clears it**): Continue Watching before and after a stop at 600 s on a film not in progress (it comes first, at 600 s), Next Up, latest row of each library (library kind, posters), then the position is cleared.
-  - `… cargo test … real_server_next_up '--' --ignored --nocapture` (**marks one episode watched on the test account, then unwatched**): first series of "Séries TV" whose first two episodes are unwatched, episode 1 marked watched → episode 2 is in Next Up with its still, then episode 1 is unmarked and Next Up is back to its state before.
-  - `… cargo test … real_server_search '--' --ignored --nocapture` (read only): same results with or without case and accents, word-prefix matching, more than 24 results flagged on a common word, one letter sends nothing.
-- Windows Credential Manager, opt-in: `cargo test … windows_store_round_trip '--' --ignored`, then check `cmdkey /list` shows no `Viewer-debug` entry (debug builds use their own vault service, ADR 0105).
+### Android TV, depuis `android-tv/`
 
-## Security
+`./gradlew testDebugUnitTest assembleDebug` (commande enregistrée le 2026-11-09, AGP 9.5.1, Gradle 9.9.0, SDK 37, minSdk 28). Libmpv Android : `scripts/fetch-libmpv-android.ps1`.
 
-- `cargo test player::mpv`: against real libmpv and a local server, a redirect does not carry the token to another host, and an HLS playlist does not open a local file (ADR 0025).
-- `cargo test tls_roots` and `cargo test https_sources`: the Windows root export, and what the player does with it, including a failed export (ADR 0026). Refusals by the TLS layer were probed by hand: `docs/evidence/gate4-https-2026-11-06.md`.
-- `cargo audit` is not part of `npm run verify`: run it from `src-tauri` before a release. Last result: `docs/evidence/gate4-audit-dependances-2026-11-06.md`.
-- Review results: `docs/evidence/gate4-securite-2026-11-06.md`.
-- `cargo test diagnostics` (ADR 0033): redaction of query, header, JSON and URL credentials, ordinary text left alone, record cut, levels, UTC dates, size rotation over 3 files, append to an existing file. `./scripts/e2e/run.ps1 gate3-settings` also checks Réglages › « Diagnostics » and the log of the run (`VIEWER_E2E_LOG_DIR`): start line, a panic raised on purpose (`VIEWER_E2E_PANIC`, debug builds only) with location and backtrace, no unredacted secret and not the test password. The button that opens the explorer is not clicked.
+### E2E (CDP, `scripts/e2e/`)
 
-## Release gate
+`./scripts/e2e/run.ps1 <scénario>` lance `scripts/e2e/<scénario>.mjs` avec le compte de test. Prérequis : `cargo build --manifest-path src-tauri/Cargo.toml` et `npm run dev` ; la fenêtre s'ouvre hors écran. Le harnais pilote `src-tauri/target/debug/viewer.exe`.
 
-No release claims without: reproducible build, successful tests, Windows player smoke test, clean-machine installer test, dependency/license audit and documented known limitations.
+- Il attaque le vrai serveur Emby ; `gate3-upnext` marque un épisode vu puis non vu.
+- Il ne voit ni l'image vidéo ni le son.
+- Scénarios flaky : `gate2-transcode` et `gate2-resume` ont chacun échoué une fois au premier passage, puis réussi.
+- Scénarios : `ls scripts/e2e/*.mjs` (gate2 à gate7, `measure-*`, `requests-ui`, hors fichiers de support `app`, `scenario`, `net-proxy`, `dev-styles`).
+
+### Bancs de lecture (`scripts/spike/`)
+
+`run-gate1.ps1` et `close-probe.ps1` (Tauri), `run-gate1-go.ps1` (Go/Wails, à lancer avec `pwsh`), `run-gate-tv1.ps1` (Shield), `serve-file.mjs` (fichier local en HTTP), `emby-remote-control-probe.mjs` (relais de commandes Emby).
+
+## Ce qu'il faut tester à la main
+
+Les points ci-dessous ne s'automatisent pas : image et son réels, matériel, humain devant l'écran.
+
+### Image
+
+- Un flux 4K HDR10 fait basculer la TV en HDR ; les couleurs sont justes.
+- Dolby Vision : couleurs correctes (ou repli propre, la Shield 2017 n'en a pas).
+- Un film entier sans saccade ni surchauffe, sur le PC puis sur la Shield.
+- Modes d'aspect, redimensionnement, plein écran, changement d'écran.
+- Windows en mise à l'échelle 125 % et 150 %, multi-écrans, DPI mixtes.
+
+### Son
+
+- AC3 5.1 et AAC stéréo, y compris AAC 44,1 kHz sur la Shield (repli OpenSL ES).
+- DTS et DTS-HD en bitstream vers l'ampli ; sortie multicanale.
+- Décalage audio, mode nuit, changement de piste audio en cours de lecture.
+
+### Sous-titres
+
+- SRT, PGS et ASS : apparence et position, pendant et hors affichage des contrôles.
+- Sous-titre externe conservé, décalage de sous-titre, passage SRT sur un flux 4K (attente de cache connue).
+
+### Télécommande et clavier
+
+- Appui maintenu sur les flèches (pas de 10, 30, 60 s), touches média, recherche vocale, Accueil puis reprise.
+- Build Wails : focus visible, Espace (pause) et Échap, au vrai clavier.
+
+### Réseau réel
+
+- Couper puis rétablir le réseau (câble, Wi-Fi) pendant une lecture ; forcer l'arrêt de l'app ; reprise à la bonne position, y compris des heures après.
+- États d'erreur de la grille et de la recherche ; serveur Emby passé en HTTPS.
+
+### Parcours
+
+- Enchaînement d'épisodes : carte « épisode suivant », saut du générique, minuterie.
+- Plusieurs versions d'un même média et plafond de qualité.
+- Installeur sur machine Windows propre (Wails ou NSIS) : SmartScreen, WebView2 absent, installation, lancement, connexion, lecture, désinstallation.
+- HEVC 10 bits et HDR sur le bureau.
+
+## Combinaisons testées
+
+Résultats réellement enregistrés. Tauri en build debug sauf mention. « Image non vue » : mesure par journaux, sans contrôle visuel.
+
+| Date | Plateforme / matériel | Codec, conteneur, sortie | Résultat |
+|---|---|---|---|
+| 2026-10-27 | Win10 22H2, libmpv | MKV multipiste AAC | Son audible, souris et clavier OK (rapporté par le propriétaire) ; fermeture 154–189 ms, 4/4 sans erreur 1412 |
+| 2026-10-28 | RTX 3080 | Direct Play MKV H.264 1920x800 et 1920x1080, d3d11va | Position qui avance ; image non vue |
+| 2026-10-28 | RTX 3080 | Transcodage HLS (plafond 3 Mbit/s) H.264 1280x532, ac3, SRT externe | E2E 10/10 |
+| 2026-11-06 | Ryzen 5 5600X / RTX 3080, fenêtre hors écran, son coupé | MKV direct H.264 et HEVC jusqu'à 3840x1606 (11 films), audio eac3/dts/ac3/opus | Démarrage médian 1184 ms (965–2144 ms), 0 image perdue sur 60 s ; ne prouve pas la fluidité |
+| 2026-11-06 | libmpv réel | HTTPS dans le lecteur | Nom invalide, certificat expiré et auto-signé refusés ; certificat public accepté ; chemin complet dans l'app jamais exécuté |
+| 2026-11-06 | relais réseau local | Coupures pendant lecture | Coupure de 8 s survécue ; coupure longue annoncée après 51,6 s (direct) ou 173,9 s (HLS) ; HLS avec renvoi du rapport d'arrêt 11/11, annoncée après 236,0 s, position gardée, aucun « vu » envoyé, reprise proposée |
+| 2026-11-06 | build debug, proxy local `log-segments`, plafond 3 Mbit/s, serveur Emby réel | Pause 5 min pendant un transcodage | Reprise sans erreur (pause 30 min abandonnée) |
+| 2026-11-06 | build debug, relais local `net-proxy.mjs` servant des octets illisibles (pas de vrai fichier corrompu) | Repli en transcodage si le fichier direct est illisible | 14/14 |
+| 2026-11-06 | serveur Emby réel 4.10.2.0, compte de test, second appareil relevant `/Sessions` toutes les 10 s | Transcodage abandonné sans rapport d'arrêt | Session de transcodage disparue après 50 à 70 s, sur 4 essais |
+| 2026-11-06 | libmpv v0.41.0 | Revue de sécurité du lecteur | Liste blanche de protocoles, `max_redirects=0`, `player_open` refusé hors dev |
+| 2026-11-07 | Win10 du propriétaire | Installeur NSIS Tauri 35,6 Mio, H.264 1920x800 | Installation, lancement, connexion, lecture (première image 5,1 s, seek à 600 s en 1,3 s, sortie 0), désinstallation propre ; son coupé, image non vue, pas de machine propre, WebView2 déjà présent, installation virtualisée MSIX |
+| 2026-11-07 | serveur Emby | Chapitres, marqueurs | 16 chapitres lus sur un MKV direct ; 0 marqueur intro/générique sur 400 films et 400 épisodes |
+| 2026-11-09 | Shield TV 2017 (Android 11, arm64, 3 Go, 4K 59,94 Hz, HDR10), libmpv, mediacodec, audiotrack | HEVC 1080p 10 bits, AAC stéréo, ASS | Moteur prêt 65–114 ms, fichier chargé en 1,3–1,9 s, 0 image perdue, ASS visible, fermeture 130–292 ms |
+| 2026-11-09 | idem | HEVC Main10 4K HDR10, AC3 5.1 | gamma pq, bt.2020, 0 image perdue sur 2 min, seek +60 s sans attente de cache, pause et changement de piste audio OK, fermeture 309 ms ; passage en SRT : attente de cache 4 à 8 s, 5 images perdues |
+| 2026-11-09 | idem | Surcouche du lecteur TV (pause, seek, menu pistes, ASS, retour) | OK ; aucun jeton Emby dans logcat |
+| 2026-11-14 | Bureau debug + Shield liée par le relais Emby `SendString` (Emby 4.10.2.0) | Synchronisation de lecture | Liaison en 5,3 s ; dérive en régime établi n=118, médiane 49 ms, p95 230 ms, max 250 ms (échec face à la cible p95 < 150 ms) ; retour sous 60 ms après +10 s en 1,7 s, après pause/reprise en 7,8 s ; commandes TV vers bureau 3–404 ms |
+| 2026-11-22 | Win10 22H2, RTX 3080, WebView2 157, Go 1.27.4, Wails v3.1.0, `CGO_ENABLED=0` ; spike, pas l'app complète | H.264 720p30 + AAC synthétiques (fichier local et HTTP local), gpu-next/d3d11, d3d11va | Chargement et lecture 1,35 s (local) et 1,37 s (HTTP), 0 image perdue, vidéo visible sous la surcouche HTML (captures revues), piste audio 2 vers 1 OK, ASS OK, redimensionnement et plein écran OK, seek 30 s OK, arrêt 54–60 ms, sortie < 0,6 s code 0, fermeture par la croix 3/3 en 112–153 ms sans erreur 1412 ; touche Espace non vérifiée |
+
+La dérive de la ligne du 2026-11-14 est l'estimation de la TV elle-même (`time-pos` de mpv), sans horloge partagée ni caméra.
+
+## Limites connues
+
+- Synchro TV : p95 de dérive d'environ 230 ms pour une cible de 150 ms ; à la vitesse 1 exacte, mpv retire `scaletempo2` et `time-pos` saute d'environ 300 ms ; après un changement de vitesse, `time-pos` est faussé un moment.
+- Shield : AudioTrack refuse l'AAC stéréo 44,1 kHz (repli OpenSL ES) ; attente de cache de 4 à 8 s au changement de sous-titre en 4K ; pas de Dolby Vision ; DTS, bitstream, PGS et AV1 non couverts ; transcodage, drapeau HDR et sortie multicanale non vérifiés sur la TV.
+- TV : les sous-titres mpv passent sous la couche Compose et chevauchent la barre quand les contrôles sont affichés ; la touche INFO n'existe pas sur la télécommande.
+- Le renvoi du rapport d'arrêt après coupure réseau n'a jamais été vérifié à la main sur la Shield (tests unitaires seulement).
+- Aucun résultat de lecture pour l'application Wails complète : la ligne Go est un spike. Clavier, focus, Espace et Échap non vérifiés ; la zone cliente fait 1 px de plus ; le rendu ASS « Forced » n'est pas vérifié. Installeur Wails et pipeline de release non exécutés.
+- Bureau : aucun rendu HEVC 10 bits, HDR ou Dolby Vision enregistré ; pas de machine Windows propre ; SmartScreen non testé ; mise à l'échelle 125 et 150 %, multi-écrans et DPI mixtes non testés.
+- Coupures réseau : seul le relais local a servi, jamais de vrai débranchement.
+- Le premier transcodage d'un film peut prendre environ 1 min (extraction des sous-titres). Un film sur un partage NAS périmé donnait un transcodage qui ne s'ouvrait jamais, corrigé depuis par un délai d'ouverture. Après une longue coupure HLS, la reprise revient à la position de la coupure.
+- Prévisualisation de seek non testée (miniatures Emby désactivées). Le relais Emby répond 204 pour une session disparue, et `/Command/SendString` perd `Arguments` dans le corps.
+- E2E : Tauri uniquement, sans image ni son, scénarios parfois instables.
+- Licence : la build libmpv est GPL v3 (x264/x265, rubberband), déduite de la recette et confirmée seulement en partie par les chaînes des DLL ; usage personnel uniquement, ce n'est pas un avis juridique.
+- `staticcheck` absent du poste ; la porte Go n'est pas dans `npm run verify`.
+
+Les nouvelles preuves (captures, journaux) vont dans la description de la PR ou un dossier temporaire, pas dans le dépôt ; ne consigner ici que le résultat, en une ligne de tableau.

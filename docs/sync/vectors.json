@@ -1,5 +1,5 @@
 {
-  "comment": "Shared test vectors for ADR 0124. Desktop (Rust) and Android TV (Kotlin) tests read this file.",
+  "comment": "Shared test vectors (PC/TV linked playback sync). Desktop (Rust) and Android TV (Kotlin) tests read this file.",
   "maxBytes": 1024,
   "valid": [
     {

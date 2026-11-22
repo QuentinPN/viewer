@@ -4,7 +4,7 @@ Le code Rust (`src-tauri/src/emby/credentials.rs`) range le jeton avec `keyring:
 
 ## Format d'une entrée
 - API : `CredWriteW`, `CredReadW`, `CredDeleteW` et `CredFree` d'advapi32, type `CRED_TYPE_GENERIC` (1), drapeaux 0.
-- Nom de cible (`TargetName`) : `"{user}.{service}"`, soit `"{serverId}/{userId}.Viewer"` (ou `.Viewer-debug` pour un build de debug, ADR 0105). C'est la seule clé de recherche de Windows.
+- Nom de cible (`TargetName`) : `"{user}.{service}"`, soit `"{serverId}/{userId}.Viewer"` (ou `.Viewer-debug` pour un build de debug). C'est la seule clé de recherche de Windows.
 - `UserName` : le compte (`{serverId}/{userId}`). `TargetAlias` : vide. `Comment` : `keyring v3.6.3`. `Persist` : `CRED_PERSIST_ENTERPRISE` (3). Aucun attribut.
 - Blob : le mot de passe en UTF-16 petit-boutiste, sans zéro final (`encode_utf16` puis `write_u16_into`).
 - Lecture : un blob de longueur impaire, ou un UTF-16 invalide (surrogate isolé), donne `BadEncoding` (« Data is not UTF-8 encoded »). Un blob vide donne une chaîne vide.

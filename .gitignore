@@ -22,7 +22,7 @@ android-tv/app/build/
 android-tv/app/.cxx/
 android-tv/local.properties
 
-# Local evidence produced by spike runs (may contain local paths); curated copies go to docs/evidence/
+# Local evidence produced by spike runs (may contain local paths); results worth keeping go in TESTING.md or the PR
 artifacts/
 
 # Secrets and local config

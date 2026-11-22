@@ -1,7 +1,7 @@
 # Racines TLS de Windows pour mpv (unité tls-roots)
 
 ## Besoin
-`player/tls_roots.rs` exporte les certificats racine de Windows dans un fichier PEM, passé à mpv par `tls-ca-file` : l'OpenSSL de FFmpeg n'a pas de magasin de certificats (ADR 0026). `mpv.rs` appelle `tls_roots::refresh(path)` avant de charger un flux en HTTPS, et traduit l'échec en `PlayerError::CertificateStore`. Il lui faut donc la **liste** des racines, pas une vérification de chaîne.
+`player/tls_roots.rs` exporte les certificats racine de Windows dans un fichier PEM, passé à mpv par `tls-ca-file` : l'OpenSSL de FFmpeg n'a pas de magasin de certificats. `mpv.rs` appelle `tls_roots::refresh(path)` avant de charger un flux en HTTPS, et traduit l'échec en `PlayerError::CertificateStore`. Il lui faut donc la **liste** des racines, pas une vérification de chaîne.
 
 ## Pourquoi pas `crypto/x509`
 `x509.SystemCertPool()` sous Windows ne contient pas les certificats : il délègue la vérification à CryptoAPI (`CertGetCertificateChain`) et le pool renvoyé est vide. Il est impossible d'en tirer les racines. Le paquet utilise donc `golang.org/x/sys/windows` (déjà dans go.mod, sans cgo), comme le crate `schannel` côté Rust :
