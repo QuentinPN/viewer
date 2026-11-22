@@ -4,7 +4,7 @@ Ce fichier dit comment vérifier le code, ce qui ne s'automatise pas, ce qui a r
 
 ## Commandes
 
-Deux piles coexistent. `npm run verify` et tout le harnais E2E visent encore Tauri/Rust (`src-tauri`). La porte Go (`go-app`) n'existe que sous forme de commandes manuelles : aucun script `npm` ne la lance.
+Deux piles coexistent. `npm run verify` et le harnais E2E `run.ps1` visent encore Tauri/Rust (`src-tauri`). La porte Go (`go-app`) se lance à la main, avec un seul scénario E2E : `wails-smoke.mjs`.
 
 ### Frontend (racine)
 
@@ -59,6 +59,7 @@ Le frontend Wails se construit avec `npm run build:wails`, l'exécutable avec `n
 - Il ne voit ni l'image vidéo ni le son.
 - Scénarios flaky : `gate2-transcode` et `gate2-resume` ont chacun échoué une fois au premier passage, puis réussi.
 - Scénarios : `ls scripts/e2e/*.mjs` (gate2 à gate7, `measure-*`, `requests-ui`, hors fichiers de support `app`, `scenario`, `net-proxy`, `dev-styles`).
+- Version Go : `node scripts/e2e/wails-smoke.mjs [--build] [--offline]` pilote le build **debug** Wails avec le compte de `debug.env`. Il écrit puis efface une position sur le compte de test. Il couvre la connexion, les illustrations `/emby-img/` et `/requestimg/`, la lecture (`player://event`, hwdec, pistes), une capture PrintWindow de la seule fenêtre de l'app, Espace et → envoyés par CDP, le point de reprise, Demander en lecture seule, la fermeture pendant la lecture et la déconnexion. Wails efface `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` : en debug seulement, `VIEWER_E2E_BROWSER_ARGS` le remplace. Dernier passage le 2026-11-22 : 33/33 sur le vrai serveur.
 
 ### Bancs de lecture (`scripts/spike/`)
 

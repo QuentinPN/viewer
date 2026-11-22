@@ -100,6 +100,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Debug builds only: the DevTools port of the scripted UI tests (scripted UI tests never take over the desktop),
+	// from VIEWER_E2E_BROWSER_ARGS (Wails blanks WebView2's own variable).
+	browserArgs := app.BrowserArgsFor(debug, os.Getenv(app.BrowserArgsEnv))
+
 	reg := bridge.NewRegistry()
 	wails := application.New(application.Options{
 		Name: app.Title,
@@ -117,7 +121,9 @@ func main() {
 		Windows: application.WindowsOptions{
 			// Tauri's WebView2 user data folder (app_local_data_dir): WebView2 keeps
 			// its profile in EBWebView under it, like the Tauri build.
-			WebviewUserDataPath: paths.LocalData,
+			WebviewUserDataPath:   paths.LocalData,
+			DisabledFeatures:      browserArgs.DisabledFeatures,
+			AdditionalBrowserArgs: browserArgs.Args,
 		},
 		// No single instance: the Tauri build has no single-instance plugin.
 	})
