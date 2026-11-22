@@ -22,6 +22,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"viewer/internal/formenc"
 )
 
 // ClientName is the `Client` of the authorization header.
@@ -342,18 +344,13 @@ func segments(ids ...string) error {
 }
 
 // encodeQuery is `form_urlencoded::Serializer` as `Url::parse_with_params` uses it:
-// pairs in order, `byte_serialize` (formEncode, playback.go) on keys and values.
+// pairs in order, `byte_serialize` (formenc) on keys and values.
 func encodeQuery(query []Param) string {
-	var b strings.Builder
+	pairs := make([][2]string, len(query))
 	for i, p := range query {
-		if i > 0 {
-			b.WriteByte('&')
-		}
-		formEncode(&b, p.Key)
-		b.WriteByte('=')
-		formEncode(&b, p.Value)
+		pairs[i] = [2]string{p.Key, p.Value}
 	}
-	return b.String()
+	return formenc.Serialize(pairs)
 }
 
 // ------------------------------------------------------------------ endpoints

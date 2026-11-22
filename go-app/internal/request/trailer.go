@@ -10,9 +10,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
-	"os"
 	"os/exec"
-	"path/filepath"
+
+	"viewer/internal/diagnostics"
 )
 
 // trailerKeyMax is the longest key accepted; YouTube ids are 11 characters.
@@ -54,20 +54,9 @@ func TrailerPage(key string) (string, bool) {
 // Opener hands a checked web address to the Windows shell.
 type Opener func(page string) error
 
-// OpenInExplorer is `diagnostics::open_in_explorer`: `explorer.exe {target}` by its
-// full path (no lookup in the current directory or PATH). explorer.exe exits with 1
-// even on success: only the launch is checked.
-func OpenInExplorer(target string) error {
-	windows := os.Getenv("SystemRoot")
-	if windows == "" {
-		windows = `C:\Windows`
-	}
-	cmd := exec.Command(filepath.Join(windows, "explorer.exe"), target)
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	return cmd.Process.Release()
-}
+// OpenInExplorer is `diagnostics::open_in_explorer`, the launcher shared with the
+// log folder (cmd wires it as is).
+var OpenInExplorer = diagnostics.OpenInExplorer
 
 // ioKind is the Display of the io::ErrorKind Rust would report for err.
 func ioKind(err error) string {

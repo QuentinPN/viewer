@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -220,6 +221,18 @@ func saveQualityFile(file qualityFile, path string) error {
 		return ioErr(err)
 	}
 	return nil
+}
+
+// ioKindText is the Display of the io::ErrorKind Rust logs for err: never the OS text.
+func ioKindText(err error) string {
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return "entity not found"
+	case errors.Is(err, fs.ErrPermission):
+		return "permission denied"
+	default:
+		return "other error"
+	}
 }
 
 // osErrorText is the OS text of an I/O error, without Go's "op path:" prefix (Rust

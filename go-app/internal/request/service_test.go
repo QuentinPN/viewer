@@ -304,10 +304,6 @@ func Test_token_is_scoped_to_emby_account(t *testing.T) {
 	}
 }
 
-func Test_emby_forget_drops_request_token(t *testing.T) {
-	t.Skip("différé à la vague 4 : passe par EmbyService.forget_server et sign_out (session.rs), non porté")
-}
-
 func Test_status_not_configured(t *testing.T) {
 	store := &emby.MemoryCredentialStore{}
 	ur := newTestService(t, store, "")

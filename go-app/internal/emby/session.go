@@ -1461,7 +1461,7 @@ func (s *EmbyService) Image(ctx context.Context, req ImageRequest) (string, []by
 	}
 	if s.artwork != nil {
 		if _, err := s.artwork.Put(req, data); err != nil {
-			s.log.Debug("artwork not cached", "item", req.ItemID, "error", osErrorText(err))
+			s.log.Debug("artwork not cached", "item", req.ItemID, "kind", ioKindText(err))
 		}
 	}
 	return ct, data, nil
@@ -1773,7 +1773,7 @@ func (s *EmbyService) ForgetServer(serverID, userID string) (*Revocation, error)
 	if err != nil {
 		return nil, nil
 	}
-	return &Revocation{client: client, serverID: record.ServerID, token: *token}, nil
+	return &Revocation{client: client, serverID: record.ServerID, token: *token, log: s.log}, nil
 }
 
 func recordPtrs(list []SessionRecord) []*SessionRecord {
@@ -1884,6 +1884,7 @@ type Revocation struct {
 	client   *Client
 	serverID string
 	token    AccessToken
+	log      *slog.Logger
 }
 
 // Send is `send`; a failure is only logged.
@@ -1897,7 +1898,7 @@ func (r *Revocation) Send(ctx context.Context) {
 		err = ErrServerMismatch
 	}
 	if err != nil {
-		slog.Default().Info("forgotten session not revoked on the server", "kind", kindText(err))
+		r.log.Info("forgotten session not revoked on the server", "kind", kindText(err))
 	}
 }
 

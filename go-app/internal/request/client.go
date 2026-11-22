@@ -23,6 +23,7 @@ import (
 	"unicode"
 
 	"viewer/internal/emby"
+	"viewer/internal/formenc"
 )
 
 const (
@@ -320,34 +321,11 @@ func parseRustU64(v string) (uint64, bool) {
 	return n, err == nil
 }
 
-// encodeQuery is `Url::parse_with_params`: `form_urlencoded`, in order. Local copy
-// of the unexported formEncode of internal/emby (playback.go).
-// TODO(dry): use emby.FormEncode once exported.
+// encodeQuery is `Url::parse_with_params`: `form_urlencoded`, in order.
 func encodeQuery(query []Param) string {
-	var b strings.Builder
-	enc := func(s string) {
-		for i := 0; i < len(s); i++ {
-			c := s[i]
-			switch {
-			case (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-				c == '*' || c == '-' || c == '.' || c == '_':
-				b.WriteByte(c)
-			case c == ' ':
-				b.WriteByte('+')
-			default:
-				b.WriteByte('%')
-				b.WriteByte(hexDigits[c>>4])
-				b.WriteByte(hexDigits[c&0xf])
-			}
-		}
-	}
+	pairs := make([][2]string, len(query))
 	for i, p := range query {
-		if i > 0 {
-			b.WriteByte('&')
-		}
-		enc(p.Key)
-		b.WriteByte('=')
-		enc(p.Value)
+		pairs[i] = [2]string{p.Key, p.Value}
 	}
-	return b.String()
+	return formenc.Serialize(pairs)
 }

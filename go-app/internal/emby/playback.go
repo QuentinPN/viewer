@@ -17,6 +17,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"viewer/internal/formenc"
 	"viewer/internal/player"
 )
 
@@ -268,7 +269,7 @@ func StreamURL(server ServerURL, raw string) (string, error) {
 	b.WriteString(u.path)
 	if len(kept) > 0 {
 		b.WriteByte('?')
-		b.WriteString(formSerialize(kept))
+		b.WriteString(formenc.Serialize(kept))
 	}
 	return b.String(), nil
 }
@@ -327,40 +328,6 @@ func formDecode(s string) string {
 		return string(b)
 	}
 	return strings.ToValidUTF8(string(b), "�")
-}
-
-// formSerialize is `form_urlencoded::Serializer`: `name=value` joined by `&`, in order.
-func formSerialize(pairs [][2]string) string {
-	var b strings.Builder
-	for i, pair := range pairs {
-		if i > 0 {
-			b.WriteByte('&')
-		}
-		formEncode(&b, pair[0])
-		b.WriteByte('=')
-		formEncode(&b, pair[1])
-	}
-	return b.String()
-}
-
-// formEncode is `form_urlencoded::byte_serialize`: ASCII alphanumerics and `*-._`
-// kept, space as `+`, every other byte as uppercase %XX.
-func formEncode(b *strings.Builder, s string) {
-	const hexDigits = "0123456789ABCDEF"
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch {
-		case (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-			c == '*' || c == '-' || c == '.' || c == '_':
-			b.WriteByte(c)
-		case c == ' ':
-			b.WriteByte('+')
-		default:
-			b.WriteByte('%')
-			b.WriteByte(hexDigits[c>>4])
-			b.WriteByte(hexDigits[c&0xf])
-		}
-	}
 }
 
 // asciiLower is `to_ascii_lowercase`: only A-Z change.

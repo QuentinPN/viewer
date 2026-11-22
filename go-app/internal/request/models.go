@@ -22,6 +22,7 @@ import (
 	"log/slog"
 
 	"viewer/internal/emby"
+	"viewer/internal/strictjson"
 )
 
 // ------------------------------------------------------------------ enums
@@ -157,7 +158,7 @@ func (t SessionToken) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON is `#[serde(transparent)]` over a String.
 func (t *SessionToken) UnmarshalJSON(b []byte) error {
-	if isNull(bytes.TrimSpace(b)) {
+	if strictjson.IsNull(bytes.TrimSpace(b)) {
 		return errors.New("invalid type: null, expected a string")
 	}
 	var s string
@@ -531,7 +532,7 @@ func (s SeasonsChoice) MarshalJSON() ([]byte, error) {
 // `"all"` or a non-empty list.
 func (s *SeasonsChoice) UnmarshalJSON(b []byte) error {
 	var word string
-	if err := json.Unmarshal(b, &word); err == nil && !isNull(bytes.TrimSpace(b)) {
+	if err := json.Unmarshal(b, &word); err == nil && !strictjson.IsNull(bytes.TrimSpace(b)) {
 		if word == "all" {
 			*s = SeasonsAll
 			return nil

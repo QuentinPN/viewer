@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"viewer/internal/formenc"
 )
 
 // maxBodyBytes: larger answers are refused; a real one is under 1 KiB.
@@ -89,38 +91,13 @@ func (p Provider) URL(q *Query) (string, bool) {
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return "", false
 	}
-	var b strings.Builder
+	pairs := make([][2]string, len(params))
 	for i, kv := range params {
-		if i > 0 {
-			b.WriteByte('&')
-		}
-		formEncode(&b, kv.name)
-		b.WriteByte('=')
-		formEncode(&b, kv.value)
+		pairs[i] = [2]string{kv.name, kv.value}
 	}
-	u.RawQuery = b.String()
+	u.RawQuery = formenc.Serialize(pairs)
 	u.Fragment = ""
 	return u.String(), true
-}
-
-// formEncode is the `application/x-www-form-urlencoded` byte serializer of the url
-// crate: ASCII alphanumerics and `*-._` kept, space as `+`, the rest percent-encoded.
-func formEncode(b *strings.Builder, s string) {
-	const hex = "0123456789ABCDEF"
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch {
-		case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9',
-			c == '*', c == '-', c == '.', c == '_':
-			b.WriteByte(c)
-		case c == ' ':
-			b.WriteByte('+')
-		default:
-			b.WriteByte('%')
-			b.WriteByte(hex[c>>4])
-			b.WriteByte(hex[c&15])
-		}
-	}
 }
 
 // Fetch is `fetch`. An item without an id this source takes, a missing item or a
