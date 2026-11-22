@@ -40,6 +40,9 @@ type MemoryCredentialStore struct {
 // AccessToken.String on the values of an unexported map.
 func (m *MemoryCredentialStore) String() string { return "MemoryCredentialStore(<redacted>)" }
 
+// GoString does the same for %#v.
+func (m *MemoryCredentialStore) GoString() string { return m.String() }
+
 func (m *MemoryCredentialStore) Save(account string, token AccessToken) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

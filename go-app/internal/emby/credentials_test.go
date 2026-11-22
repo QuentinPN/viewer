@@ -1,6 +1,10 @@
 package emby
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 func TestCredentialAccountIsServerSlashUser(t *testing.T) {
 	if got := CredentialAccount(fakeServerID, fakeUserID); got != fakeServerID+"/"+fakeUserID {
@@ -31,5 +35,18 @@ func TestMemoryCredentialStore(t *testing.T) {
 	}
 	if got, _ := store.Load("a"); got != nil {
 		t.Fatal(got)
+	}
+}
+
+// Reported by wave 6: %#v printed the tokens of a MemoryCredentialStore.
+func TestMemoryCredentialStoreNeverPrintsItsTokens(t *testing.T) {
+	store := &MemoryCredentialStore{}
+	if err := store.Save("a", NewAccessToken("secret-token")); err != nil {
+		t.Fatal(err)
+	}
+	for _, format := range []string{"%v", "%+v", "%#v", "%s"} {
+		if got := fmt.Sprintf(format, store); strings.Contains(got, "secret-token") {
+			t.Fatalf("%s : %s", format, got)
+		}
 	}
 }

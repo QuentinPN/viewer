@@ -149,65 +149,15 @@ func TestIPCZeroValuesKeepEveryKeyAndEmptyLists(t *testing.T) {
 	}
 }
 
-// Typed results of the commands, shape only: the golden is decoded into the Go type
-// (unknown keys refused) and must serialize back identically. The values themselves
-// are built by session.rs (wave 2+), with the fake server of emby/tests.rs.
+// Typed values no Go code produces yet, shape only: the golden is decoded into the Go
+// type (unknown keys refused) and must serialize back identically. The models.*,
+// titles.emby_* and playback.emby_play.* goldens are produced through EmbyService
+// since wave 4 (golden_session_test.go, playback_test.go).
 func TestGolden_models_shapes(t *testing.T) {
 	cases := map[string]func() any{
-		"models.emby_add_to_playlist.json":                  func() any { return new(uint32) },
-		"models.emby_continue_watching.json":                func() any { return new(List[WatchItem]) },
-		"models.emby_create_playlist.json":                  func() any { return new(PlaylistCreated) },
-		"models.emby_episodes.json":                         func() any { return new(EpisodePage) },
-		"models.emby_favorites.json":                        func() any { return new(List[MediaItem]) },
-		"models.emby_genres.json":                           func() any { return new(List[string]) },
-		"models.emby_hero.json":                             func() any { return new(List[HeroItem]) },
-		"models.emby_hide_from_resume.json":                 func() any { return new(PlaybackStopped) },
-		"models.emby_home_playlists.json":                   func() any { return new(List[PlaylistCard]) },
-		"models.emby_item_detail.bare_episode.json":         func() any { return new(ItemDetail) },
-		"models.emby_item_detail.episode.json":              func() any { return new(ItemDetail) },
-		"models.emby_item_detail.movie.json":                func() any { return new(ItemDetail) },
-		"models.emby_item_detail.series.json":               func() any { return new(ItemDetail) },
-		"models.emby_item_detail.two_versions.json":         func() any { return new(ItemDetail) },
-		"models.emby_items.movies_page.json":                func() any { return new(ItemPage) },
-		"models.emby_last_server.json":                      func() any { return new(*string) },
-		"models.emby_latest.json":                           func() any { return new(List[MediaItem]) },
-		"models.emby_libraries.json":                        func() any { return new(List[Library]) },
-		"models.emby_next_up.json":                          func() any { return new(List[WatchItem]) },
-		"models.emby_playback_state.episode.json":           func() any { return new(PlaybackStopped) },
-		"models.emby_playback_state.with_resume.json":       func() any { return new(PlaybackStopped) },
-		"models.emby_playlist_items.json":                   func() any { return new(List[WatchItem]) },
-		"models.emby_playlists.json":                        func() any { return new(List[Playlist]) },
-		"models.emby_probe.json":                            func() any { return new(ServerSummary) },
-		"models.emby_production_years.json":                 func() any { return new(List[int32]) },
-		"models.emby_random_item.found.json":                func() any { return new(*MediaItem) },
-		"models.emby_random_item.none.json":                 func() any { return new(*MediaItem) },
-		"models.emby_search.json":                           func() any { return new(SearchResults) },
-		"models.emby_seasons.json":                          func() any { return new(List[Season]) },
-		"models.emby_series_next_episode.none.json":         func() any { return new(*WatchItem) },
-		"models.emby_series_next_episode.some.json":         func() any { return new(*WatchItem) },
-		"models.emby_server_info.json":                      func() any { return new(ServerSummary) },
-		"models.emby_set_favorite.cleared.json":             func() any { return new(bool) },
-		"models.emby_set_favorite.set.json":                 func() any { return new(bool) },
-		"models.emby_set_played.played.json":                func() any { return new(PlaybackStopped) },
-		"models.emby_set_played.unplayed.json":              func() any { return new(PlaybackStopped) },
-		"models.emby_shelf.json":                            func() any { return new(List[ShelfServer]) },
-		"models.emby_sign_in.json":                          func() any { return new(SignedInUser) },
-		"models.emby_sort_names.json":                       func() any { return new(List[SortNameEntry]) },
-		"titles.emby_titles.collection.json":                func() any { return new(List[MediaItem]) },
-		"titles.emby_titles.person.json":                    func() any { return new(List[MediaItem]) },
-		"titles.emby_titles.similar.json":                   func() any { return new(List[MediaItem]) },
-		"titles.emby_local_trailer.json":                    func() any { return new(*string) },
-		"playback.emby_play.direct_play.json":               func() any { return new(PlaybackStart) },
-		"playback.emby_play.direct_play_resume.json":        func() any { return new(PlaybackStart) },
-		"playback.emby_play.direct_play_subtitles_off.json": func() any { return new(PlaybackStart) },
-		"playback.emby_play.episode_direct_play.json":       func() any { return new(PlaybackStart) },
-		"playback.emby_play.fallback_transcode.json":        func() any { return new(PlaybackStart) },
-		"playback.emby_play.transcode_english.json":         func() any { return new(PlaybackStart) },
-		"playback.emby_play.transcode_no_title.json":        func() any { return new(PlaybackStart) },
-		"playback.emby_play.two_versions_second.json":       func() any { return new(PlaybackStart) },
-		"playback.device_profile.json":                      func() any { return new(DeviceProfile) },
-		"events.playback_stopped.watched.json":              func() any { return new(PlaybackStopped) },
-		"events.playback_stopped.with_resume.json":          func() any { return new(PlaybackStopped) },
+		"playback.device_profile.json":             func() any { return new(DeviceProfile) },
+		"events.playback_stopped.watched.json":     func() any { return new(PlaybackStopped) },
+		"events.playback_stopped.with_resume.json": func() any { return new(PlaybackStopped) },
 	}
 	for name, mk := range cases {
 		t.Run(name, func(t *testing.T) { roundTripGolden(t, name, mk()) })
@@ -236,20 +186,15 @@ func TestPlaybackReportBodySkipsUnsetFields(t *testing.T) {
 	}
 }
 
-// SessionStatus is internally tagged (`state`) with camelCase fields.
-func TestGolden_models_emby_restore(t *testing.T) {
-	server := summaryOfFixture()
-	user := SignedInUser{Server: server, UserID: fixtureUserID, UserName: "testeur", IsAdministrator: false}
-	saved := SavedServer{
-		URL: "http://emby.test", ID: fixtureServerID, Name: "ServeurTest", Version: "4.10.1.0",
-		Encrypted: false, UserID: fixtureUserID, UserName: "testeur",
-	}
-	assertTypedGolden(t, "models.emby_restore.signed_out.json", StatusSignedOut())
-	assertTypedGolden(t, "models.emby_restore.authenticated.json", StatusAuthenticated(user))
-	assertTypedGolden(t, "models.emby_restore.authentication_required.json", StatusAuthenticationRequired(saved, ErrSessionExpired))
-	assertTypedGolden(t, "models.emby_restore.server_unreachable.json", StatusServerUnreachable(saved, ErrTimeout))
+// SessionStatus is internally tagged (`state`) with camelCase fields; its four
+// goldens are produced by Restore (TestGolden_session_cases). A status without its
+// fields never serializes.
+func TestSessionStatusNeedsItsFields(t *testing.T) {
 	if _, err := json.Marshal(SessionStatus{State: StateAuthenticated}); err == nil {
 		t.Fatal("authenticated without a user must not serialize")
+	}
+	if _, err := json.Marshal(SessionStatus{State: StateServerUnreachable}); err == nil {
+		t.Fatal("serverUnreachable without a server must not serialize")
 	}
 }
 
@@ -257,8 +202,3 @@ const (
 	fixtureServerID = "d969e3d9465b49ec8f73a5f1eab2e86f"
 	fixtureUserID   = "4a1f0e2b9c8d4e7fa6b5c4d3e2f1a0b9"
 )
-
-// summaryOfFixture is the ServerSummary of the emby_like() fake server.
-func summaryOfFixture() ServerSummary {
-	return ServerSummary{URL: "http://emby.test", Name: "ServeurTest", Version: "4.10.1.0", ID: fixtureServerID, Encrypted: false}
-}

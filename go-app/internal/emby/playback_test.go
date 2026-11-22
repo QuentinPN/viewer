@@ -544,77 +544,42 @@ func Test_golden_playback_stream_url(t *testing.T) {
 	assertTableGolden(t, "playback.stream_url.json", rows)
 }
 
-// The browse_like() fake-server cases of golden.rs. The plan comes from Plan and Apply
-// on the PlaybackInfo answer the fake server gives for the case (fixtures copied
-// from tests.rs). The fields session.rs prepare_with sets (title, bitrateLimit,
-// startTicks, the forced reason of a fallback, the X-Emby-Token header) are taken from
-// the golden plan, since the session is wave 4: what is checked is the server
-// decision, the URLs, subtitle files and track picks, then the two emby_play mirrors.
+// The browse_like() fake-server cases of golden.rs (`playback_cases`), through
+// EmbyService.PrepareSource on signed_in_browser: the session fields (title,
+// bitrateLimit, startTicks, the forced reason of a fallback, the X-Emby-Token header)
+// come from prepareWith. The fake server address is written http://emby.test and the
+// token TOKEN_PLACEHOLDER, as golden.rs does.
 func Test_golden_playback_fake_server_plans(t *testing.T) {
-	const origin = "http://127.0.0.1:8096"
-	server, err := ParseServerURL(origin)
-	if err != nil {
-		t.Fatal(err)
-	}
+	server, fx, _ := signedInBrowser(t)
+	fix := goldenFix(t, server.URL)
 	english := TrackPreferences{AudioLanguage: ptr("eng"), SubtitleLanguage: ptr("eng"), SubtitleMode: SubtitleAlways}
 	off := TrackPreferences{SubtitleMode: SubtitleOff}
 	cases := []struct {
-		name, item, fixture string
-		resume, forced      bool
-		version             *string
-		prefs               TrackPreferences
+		name, item     string
+		resume, forced bool
+		version        *string
+		prefs          TrackPreferences
 	}{
-		{"direct_play", "30207", "playback_direct.json", false, false, nil, TrackPreferences{}},
-		{"direct_play_resume", "30207", "playback_direct.json", true, false, nil, TrackPreferences{}},
-		{"direct_play_subtitles_off", "30207", "playback_direct.json", false, false, nil, off},
-		{"episode_direct_play", "80475", "playback_direct.json", false, false, nil, TrackPreferences{}},
-		{"fallback_transcode", "30207", "playback_transcode.json", false, true, nil, TrackPreferences{}},
-		// The answer of the second negotiation, with AudioStreamIndex=2 (session.rs).
-		{"transcode_english", "40001", "playback_transcode_audio_2.json", false, false, nil, english},
-		{"two_versions_second", "30500", "playback_two_versions_30501.json", false, false, ptr("30501"), TrackPreferences{}},
-		{"transcode_no_title", "40000", "playback_transcode.json", false, false, nil, TrackPreferences{}},
+		{"direct_play", "30207", false, false, nil, TrackPreferences{}},
+		{"direct_play_resume", "30207", true, false, nil, TrackPreferences{}},
+		{"direct_play_subtitles_off", "30207", false, false, nil, off},
+		{"episode_direct_play", "80475", false, false, nil, TrackPreferences{}},
+		{"fallback_transcode", "30207", false, true, nil, TrackPreferences{}},
+		{"transcode_english", "40001", false, false, nil, english},
+		{"two_versions_second", "30500", false, false, ptr("30501"), TrackPreferences{}},
+		{"transcode_no_title", "40000", false, false, nil, TrackPreferences{}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			var session struct {
-				Title        *PlaybackTitle
-				BitrateLimit *struct {
-					Bitrate      uint64
-					Cap          *uint64
-					LocalAddress bool
-				}
-				StartTicks       int64
-				TranscodeReasons *string
-				Headers          [][2]string
-			}
-			if err := json.Unmarshal(readGolden(t, "playback.plan."+c.name+".json"), &session); err != nil {
-				t.Fatal(err)
-			}
-			plan, err := Plan(server, pbSource(t, string(readFixture(t, c.fixture))), c.version)
+			res, err := fx.service.PrepareSource(bg, c.item, c.version, c.resume, c.forced, c.prefs)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if c.forced && plan.Method != MethodTranscode {
-				t.Fatal("fallback without transcode")
-			}
-			Apply(&plan, &c.prefs)
-			if c.forced {
-				plan.TranscodeReasons = ptr("échec de la lecture directe")
-			}
-			plan.Title = session.Title
-			if l := session.BitrateLimit; l != nil {
-				plan.BitrateLimit = &StreamingLimit{Bitrate: l.Bitrate, Cap: l.Cap, LocalAddress: l.LocalAddress}
-			}
-			plan.StartTicks = session.StartTicks
-			headers := append(slices.Clone(plan.Headers), player.Header{"X-Emby-Token", "TOKEN_PLACEHOLDER"})
-			if !slices.Equal(headers, session.Headers) {
-				t.Fatalf("headers %v, golden %v", headers, session.Headers)
-			}
-			fix := func(b []byte) []byte { return []byte(strings.ReplaceAll(string(b), origin, "http://emby.test")) }
+			plan, headers := res.Plan, res.Headers
 			name := "playback.plan." + c.name + ".json"
 			assertSameJSON(t, name, readGolden(t, name), fix(marshal(t, planProjection(&plan, headers))))
 			name = "playback.emby_play." + c.name + ".json"
-			if err := orderedEqual(readGolden(t, name), marshal(t, NewPlaybackStart(c.item, c.resume, &plan))); err != nil {
+			if err := orderedEqual(readGolden(t, name), fix(marshal(t, NewPlaybackStart(c.item, c.resume, &plan)))); err != nil {
 				t.Errorf("%s: %v", name, err)
 			}
 			name = "playback.engine_request." + c.name + ".json"
@@ -623,6 +588,19 @@ func Test_golden_playback_fake_server_plans(t *testing.T) {
 				t.Errorf("%s: %v\ngo: %s", name, err, req)
 			}
 		})
+	}
+
+	// Plans refused by the server's answer.
+	refused := []struct {
+		name string
+		call func() error
+	}{
+		{"unknown_item", func() error { _, err := fx.service.PreparePlayback(bg, "99999", false); return err }},
+		{"fallback_still_offers_the_file", func() error { _, err := fx.service.PrepareTranscode(bg, "80475", false); return err }},
+		{"resume_without_item", func() error { _, err := fx.service.PreparePlayback(bg, "40000", true); return err }},
+	}
+	for _, c := range refused {
+		goldenErr(t, fix, "errors.playback."+c.name+".json", c.call())
 	}
 }
 
