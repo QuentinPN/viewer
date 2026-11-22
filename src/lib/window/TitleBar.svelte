@@ -25,8 +25,8 @@ onMount(() => {
 
 <!-- Replaces the Windows title bar (ADR 0029). The empty area drags the window and
      double-clicking it maximizes; the buttons keep Windows' order and glyphs.
-     data-tauri-drag-region is Tauri-specific: the Wails port uses the CSS
-     `--wails-draggable: drag` instead. -->
+     data-tauri-drag-region is Tauri-specific: Wails reads the CSS
+     `--wails-draggable` instead (see .titlebar and button). -->
 <div class="titlebar" class:over-video={overVideo} data-tauri-drag-region>
   <div class="controls">
     <button
@@ -70,6 +70,7 @@ onMount(() => {
     justify-content: flex-end;
     background: var(--color-bg);
     user-select: none;
+    --wails-draggable: drag;
   }
   .titlebar.over-video {
     background: transparent;
@@ -89,6 +90,7 @@ onMount(() => {
     font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets";
     font-size: 10px;
     transition: background-color var(--motion-fast) ease;
+    --wails-draggable: no-drag;
   }
   button:hover {
     background: rgb(255 255 255 / 10%);
