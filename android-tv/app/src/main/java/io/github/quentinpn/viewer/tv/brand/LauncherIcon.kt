@@ -3,6 +3,7 @@ package io.github.quentinpn.viewer.tv.brand
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.util.Log
 import io.github.quentinpn.viewer.tv.BuildConfig
@@ -123,6 +124,16 @@ class SeasonalIconStore(context: Context) {
     var enabled: Boolean
         get() = prefs.getBoolean(KEY, true)
         set(value) = prefs.edit().putBoolean(KEY, value).apply()
+
+    /** Calls [block] whenever the setting is written; hand the result back to [stopObserving] to stop. */
+    fun onChange(block: () -> Unit): SharedPreferences.OnSharedPreferenceChangeListener {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key -> if (key == KEY) block() }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        return listener
+    }
+
+    fun stopObserving(listener: SharedPreferences.OnSharedPreferenceChangeListener) =
+        prefs.unregisterOnSharedPreferenceChangeListener(listener)
 
     private companion object {
         const val KEY = "brand.seasonalIcons"
