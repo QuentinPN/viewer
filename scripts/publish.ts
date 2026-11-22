@@ -34,7 +34,10 @@ powershell("verify:rust", "with-msvc.ps1", "npm", "run", "verify:rust");
 powershell("installateur", "with-msvc.ps1", "npx", "tauri", "build");
 
 const name = `Viewer_${version}_x64-setup.exe`;
-const installer = join(root, "src-tauri/target/release/bundle/nsis", name);
+// The desktop job keeps CARGO_TARGET_DIR outside the per-run work folder (ADR 0126).
+const targetDir =
+  process.env.CARGO_TARGET_DIR ?? join(root, "src-tauri/target");
+const installer = join(targetDir, "release/bundle/nsis", name);
 const hash = sha256(installer);
 const signature = readFileSync(`${installer}.sig`, "utf8");
 const notes = releaseNotes(version, section, {
