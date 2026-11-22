@@ -418,8 +418,8 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
   - `ArtworkCache()` renvoie le cache, et `CurrentUser`, `Client` et `LastServerURL` sont exportés.
   - `emby_forget_drops_request_token` est porté ici sous son nom. Le stub `t.Skip` d'`internal/request/service_test.go`, non modifié, est à retirer par son unité.
 - **Relevé par la vague 6, corrigé** : `MemoryCredentialStore` affichait ses jetons avec `%#v`. Un `GoString` est ajouté ; le test a échoué avant le correctif.
-- **Demande de la vague 6 restée ouverte** : exporter un décodeur strict commun et l'encodeur `form_urlencoded`. C'est hors du périmètre ; request garde ses copies.
-- **Commandes non portées : inchangé** (79 / 80). Aucune commande n'est branchée ; c'est l'app-shell qui le fera.
+- **Demande de la vague 6** : exporter un décodeur strict commun et l'encodeur `form_urlencoded`. Fait depuis : `internal/strictjson` et `internal/formenc`.
+- **Commandes** : aucune n'était branchée par cette vague ; l'app-shell les a toutes branchées depuis (0 / 80).
 
 ## Unité app-shell : devoirs de la couche commandes (commands.rs) — faits, voir la section suivante
 - Ce que les services Go ne font pas et que l'app-shell doit reproduire depuis `src-tauri/src/commands.rs` :

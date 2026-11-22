@@ -10,7 +10,7 @@ Surface à porter :
 - 311 tests, 80 commandes et 7 événements ;
 - l'intégration libmpv par le HWND de la fenêtre principale (ADR 0003, mode `parent`).
 
-## Décision proposée
+## Décision
 - Natif en **Go**, avec **Wails v3** (v3.1.0, stable depuis le 2026-11-01), compilé **sans cgo** (`CGO_ENABLED=0`).
 - libmpv-2.dll est chargée par `syscall`. La boucle d'événements mpv tourne dans une goroutine.
 - Composition vidéo identique à l'ADR 0003 : fenêtre sans bordure et transparente, HWND principal passé à mpv par `wid`, clavier gardé dans la WebView.
@@ -27,7 +27,7 @@ Le spike `go-app/cmd/spike` doit reproduire sous Wails les contrôles de l'ADR 0
 Comme en 2026-10, des captures d'écran font foi, et pas seulement les contrôles automatiques. Si le spike échoue sur la composition ou la fermeture, cet ADR passe à « Rejeté » et Tauri reste en place.
 
 ## Conséquences
-- Si l'ADR est accepté, il remplacera les ADR 0001 (socle), 0004 (client Emby en Rust), 0112 (mises à jour), 0028 (installateur) et 0029 (barre de titre), ainsi que la base technique du CLAUDE.md. Il le fera vague par vague, au fil du portage.
+- Au basculement, cet ADR remplacera les ADR 0001 (socle), 0004 (client Emby en Rust), 0112 (mises à jour), 0028 (installateur) et 0029 (barre de titre), ainsi que la base technique du CLAUDE.md. Il le fera vague par vague, au fil du portage.
 - Mises à jour : le système de mise à jour de Wails vérifie les signatures ed25519, et non minisign. Il faudra soit une dernière release Tauri qui installe la version Wails, soit une réinstallation manuelle unique, acceptée par le propriétaire.
 - Jeton : si Go ne relit pas l'entrée du Gestionnaire d'identification écrite par le crate `keyring`, il faudra une reconnexion unique, acceptée.
 - Jusqu'au basculement, les commits sont de type `refactor`/`chore` et ne déclenchent aucune release.
