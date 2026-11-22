@@ -46,10 +46,7 @@ const settingsFile = join(
 const backup = `${settingsFile}.e2e-backup`;
 
 const invoke = (page, cmd, args = {}) =>
-  page.evaluate(
-    ([c, a]) => window.__TAURI_INTERNALS__.invoke(c, a),
-    [cmd, args],
-  );
+  page.evaluate(([c, a]) => window.__viewer.invoke(c, a), [cmd, args]);
 /** Screenshot with the server addresses masked, then put back. */
 const shot = async (page, name) => {
   await page.evaluate((hosts) => {

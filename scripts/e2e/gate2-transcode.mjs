@@ -28,7 +28,7 @@ const { check, shot, finish } = createReport("gate2-transcode");
 
 const command = (page, cmd) =>
   page.evaluate(
-    (c) => window.__TAURI_INTERNALS__.invoke("player_command", { command: c }),
+    (c) => window.__viewer.invoke("player_command", { command: c }),
     cmd,
   );
 

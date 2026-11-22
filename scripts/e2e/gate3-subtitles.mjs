@@ -34,10 +34,7 @@ const KEY = "viewer.player.subtitles";
 const FRENCH = ["fr", "fre", "fra"];
 
 const invoke = (page, cmd, args) =>
-  page.evaluate(
-    ([c, a]) => window.__TAURI_INTERNALS__.invoke(c, a),
-    [cmd, args],
-  );
+  page.evaluate(([c, a]) => window.__viewer.invoke(c, a), [cmd, args]);
 const section = (page) =>
   page.locator("section[aria-labelledby=settings-subtitles]");
 /** The list under `label`; its accessible name also holds the chosen option. */

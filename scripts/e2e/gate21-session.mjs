@@ -43,7 +43,7 @@ const lostTitle = (page) => page.locator("#lost-title");
 const invoke = (page, cmd, args = {}) =>
   page.evaluate(
     ([c, a]) =>
-      window.__TAURI_INTERNALS__
+      window.__viewer
         .invoke(c, a)
         .then((value) => ({ ok: true, value }))
         .catch((error) => ({ ok: false, error })),
@@ -351,7 +351,7 @@ try {
   const target = Math.round((started?.duration ?? 0) * 0.2);
   await page.evaluate(
     (s) =>
-      window.__TAURI_INTERNALS__.invoke("player_command", {
+      window.__viewer.invoke("player_command", {
         command: { type: "seekAbsolute", seconds: s },
       }),
     target,
@@ -368,7 +368,7 @@ try {
     forced = true;
     await page.evaluate(
       (s) =>
-        window.__TAURI_INTERNALS__.invoke("player_command", {
+        window.__viewer.invoke("player_command", {
           command: { type: "seekAbsolute", seconds: s },
         }),
       Math.round((started?.duration ?? 0) * 0.8),
@@ -414,7 +414,7 @@ try {
   );
   // Cleanup: back to 0 so the stop report clears the resume point.
   await page.evaluate(() =>
-    window.__TAURI_INTERNALS__.invoke("player_command", {
+    window.__viewer.invoke("player_command", {
       command: { type: "seekAbsolute", seconds: 0 },
     }),
   );

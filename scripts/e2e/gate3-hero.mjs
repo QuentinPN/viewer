@@ -25,7 +25,7 @@ const { check, shot, finish } = createReport("gate3-hero");
 
 const serverHero = async (page) => {
   const r = await page.evaluate(() =>
-    window.__TAURI_INTERNALS__
+    window.__viewer
       .invoke("emby_hero")
       .then((items) => ({ items }))
       .catch((e) => ({ error: JSON.stringify(e) })),
