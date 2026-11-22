@@ -36,7 +36,7 @@ const timeCommand = (page, command, args) =>
       const out = [];
       for (let i = 0; i < calls; i += 1) {
         const t = performance.now();
-        await window.__TAURI_INTERNALS__.invoke(command, args);
+        await window.__viewer.invoke(command, args);
         out.push(Math.round(performance.now() - t));
       }
       return out;
@@ -80,7 +80,7 @@ try {
 
     if (run === LAUNCHES) {
       const libraries = await page.evaluate(() =>
-        window.__TAURI_INTERNALS__.invoke("emby_libraries"),
+        window.__viewer.invoke("emby_libraries"),
       );
       const films = libraries.find((l) => l.kind === "movies");
       const commands = [

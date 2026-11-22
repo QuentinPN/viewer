@@ -2,9 +2,9 @@
 // « Icônes saisonnières » is off. The debug build always wears the hard hat
 // ("debug"): the setting and the date do not apply. Re-evaluated at startup, at
 // each local midnight and when the setting changes. Each change of logo also becomes the icon
-// of the window (title bar, taskbar button), on the Wails build only: the pinned
-// taskbar icon and the shortcuts stay the exe's resource, the default logo.
-import { backend, invoke } from "../native";
+// of the window (title bar, taskbar button): the pinned taskbar icon and the
+// shortcuts stay the exe's resource, the default logo.
+import { invoke } from "../native";
 import type { LogoId } from "./logos";
 import { seasonForDate } from "./season";
 
@@ -131,11 +131,6 @@ function localStorageOrNull(): Storage | null {
 export const logo = new LogoState({
   now: () => new Date(),
   storage: localStorageOrNull(),
-  applyIcon: (id) =>
-    backend === "wails" ? invoke("window_set_icon", { id }) : Promise.resolve(),
-  // Wails only (Go command app_is_debug): the Tauri build keeps the season.
-  isDebug: () =>
-    backend === "wails"
-      ? invoke<boolean>("app_is_debug")
-      : Promise.resolve(false),
+  applyIcon: (id) => invoke("window_set_icon", { id }),
+  isDebug: () => invoke<boolean>("app_is_debug"),
 });

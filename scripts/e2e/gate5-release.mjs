@@ -1,7 +1,10 @@
 // Gate 5 smoke test of the installed release build, on the real Emby test
 // account, driven over CDP. The release build ignores every VIEWER_* variable, so its
-// window shows on screen and its sound is only turned down through the player:
-// - the bundled frontend loads, not the Vite server, and the window is not moved off-screen;
+// window shows on screen and its sound is only turned down through the player.
+// UNVERIFIED with the Go + Wails release: it ignores VIEWER_E2E_BROWSER_ARGS too and
+// Wails blanks WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS, so no DevTools port opens and
+// launch() times out; the checks below need a build that can be attached.
+// - the embedded frontend loads (http://wails.localhost), and the window is not moved off-screen;
 // - the Gate 1 prototype is refused;
 // - the bitrate cap of the scenarios is ignored: no "débit trop élevé" transcode;
 // - a film plays, a seek lands, back to 0 then Escape leaves no resume point.
@@ -33,10 +36,7 @@ const exe =
 const SEEK_TARGET = 600;
 
 const invoke = (page, cmd, args) =>
-  page.evaluate(
-    ([c, a]) => window.__TAURI_INTERNALS__.invoke(c, a),
-    [cmd, args],
-  );
+  page.evaluate(([c, a]) => window.__viewer.invoke(c, a), [cmd, args]);
 const command = (page, c) => invoke(page, "player_command", { command: c });
 
 let app = await launch({
@@ -47,7 +47,7 @@ let app = await launch({
 try {
   const page = app.page;
   const origin = new URL(page.url()).origin;
-  check("bundled_frontend", !origin.includes(":1420"), origin);
+  check("bundled_frontend", origin === "http://wails.localhost", origin);
   const screenX = await page.evaluate(() => window.screenX);
   check("window_on_screen", screenX > -10000, `x = ${screenX}`);
 

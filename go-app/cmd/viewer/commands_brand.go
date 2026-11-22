@@ -8,11 +8,6 @@ import (
 	"viewer/internal/bridge"
 )
 
-// goOnlyCommands are the commands the Rust invoke_handler does not have: the
-// Tauri build never calls them (the frontend only does on the Wails backend).
-// TestRegisteredCommandsAreTheRustInvokeHandler allows exactly these.
-var goOnlyCommands = []string{"window_set_icon", "app_is_debug"}
-
 // registerBrand wires `window_set_icon`: the logo (a LogoId of
 // src/lib/brand/logos.ts: a SeasonId or "debug", checked against the embedded
 // icons) becomes the icon of the main window, in the title bar and on its

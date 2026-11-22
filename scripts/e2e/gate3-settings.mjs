@@ -39,7 +39,7 @@ const logDir = mkdtempSync(join(tmpdir(), "viewer-e2e-logs-"));
 const FOREIGN = "notes.txt";
 
 const stats = (page) =>
-  page.evaluate(() => window.__TAURI_INTERNALS__.invoke("artwork_cache_stats"));
+  page.evaluate(() => window.__viewer.invoke("artwork_cache_stats"));
 const images = () =>
   readdirSync(cacheDir, { recursive: true }).filter((f) =>
     String(f).endsWith(".img"),

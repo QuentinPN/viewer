@@ -28,10 +28,7 @@ const { check, shot, finish } = createReport("gate3-quality");
 const LOW = 1_500_000;
 
 const invoke = (page, cmd, args) =>
-  page.evaluate(
-    ([c, a]) => window.__TAURI_INTERNALS__.invoke(c, a),
-    [cmd, args ?? {}],
-  );
+  page.evaluate(([c, a]) => window.__viewer.invoke(c, a), [cmd, args ?? {}]);
 const command = (page, cmd) => invoke(page, "player_command", { command: cmd });
 const settingsButton = (page) =>
   libraryNav(page).getByRole("button", { name: "Réglages", exact: true });
@@ -127,7 +124,7 @@ try {
   await page.keyboard.press("End");
   await page.waitForFunction(
     () =>
-      window.__TAURI_INTERNALS__
+      window.__viewer
         .invoke("emby_playback_quality")
         .then((q) => q.local !== null),
     null,
@@ -166,7 +163,7 @@ try {
   await page.keyboard.press("Home");
   await page.waitForFunction(
     () =>
-      window.__TAURI_INTERNALS__
+      window.__viewer
         .invoke("emby_playback_quality")
         .then((q) => q.local === null),
     null,

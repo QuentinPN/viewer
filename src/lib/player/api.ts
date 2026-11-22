@@ -8,7 +8,7 @@ import type {
   Track,
 } from "./types";
 
-// Thin typed wrapper over the Tauri commands declared in src-tauri/src/commands.rs.
+// Thin typed wrapper over the player commands of go-app/cmd/viewer.
 
 export const PLAYER_EVENT = "player://event";
 

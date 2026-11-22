@@ -64,7 +64,7 @@ describe("wails native", () => {
     );
   });
 
-  it("rejects with the Go error value, as Tauri does", async () => {
+  it("rejects with the Go error value itself", async () => {
     const { rt } = fakeRuntime();
     const native = createWailsNative(async () => rt);
     const cases: [Error, unknown][] = [

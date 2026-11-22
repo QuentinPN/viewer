@@ -33,7 +33,7 @@ const VOLUME_KEY = "viewer.player.volume";
 const call = async (page, cmd, args) => {
   const r = await page.evaluate(
     ([c, a]) =>
-      window.__TAURI_INTERNALS__
+      window.__viewer
         .invoke(c, a)
         .then((value) => ({ value }))
         .catch((e) => ({ error: JSON.stringify(e) })),
@@ -340,14 +340,9 @@ try {
         size: `${innerWidth}x${innerHeight} / ${screen.width}x${screen.height}`,
       };
     });
-  const windowCall = (cmd) =>
-    page.evaluate(
-      (cmd) =>
-        window.__TAURI_INTERNALS__.invoke(`plugin:window|${cmd}`, {
-          label: "main",
-        }),
-      cmd,
-    );
+  /** A method of the Wails runtime's Window (ToggleMaximise, IsMaximised…). */
+  const windowCall = (method) =>
+    page.evaluate((method) => window.__viewer.window(method), method);
   await page.keyboard.press("f");
   await button(page, "Quitter le plein écran").waitFor({ timeout: 5000 });
   const restoredFull = await coversScreen();
@@ -355,7 +350,7 @@ try {
   await page.keyboard.press("f");
   await button(page, "Plein écran").waitFor({ timeout: 5000 });
   check("fullscreen_toggles", true);
-  await windowCall("toggle_maximize");
+  await windowCall("ToggleMaximise");
   await page.waitForTimeout(800);
   await page.keyboard.press("f");
   await button(page, "Quitter le plein écran").waitFor({ timeout: 5000 });
@@ -368,8 +363,8 @@ try {
   await page.keyboard.press("f");
   await button(page, "Plein écran").waitFor({ timeout: 5000 });
   await page.waitForTimeout(800);
-  check("maximized_after_fullscreen", await windowCall("is_maximized"));
-  await windowCall("toggle_maximize");
+  check("maximized_after_fullscreen", await windowCall("IsMaximised"));
+  await windowCall("ToggleMaximise");
   await page.waitForTimeout(800);
 
   // 8. Escape closes an open panel, then leaves; back on the film page.

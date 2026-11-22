@@ -34,10 +34,7 @@ console.log(
 );
 
 const invoke = (page, cmd, args = {}) =>
-  page.evaluate(
-    ([c, a]) => window.__TAURI_INTERNALS__.invoke(c, a),
-    [cmd, args],
-  );
+  page.evaluate(([c, a]) => window.__viewer.invoke(c, a), [cmd, args]);
 const serverFavorites = async (page) =>
   (await invoke(page, "emby_favorites")).map((i) => i.id);
 

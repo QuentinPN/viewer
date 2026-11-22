@@ -3,15 +3,14 @@
 // to its end, is marked watched by the server from the stop report alone (the app
 // never calls PlayedItems), keeps no resume point, and its detail page shows it.
 // Server side effects: the film is marked played; the scenario marks it unplayed
-// again at the end (cargo test real_server_mark_unplayed).
-import { spawnSync } from "node:child_process";
-import { join } from "node:path";
+// again at the end, through the app's emby_set_played while it is still signed in.
 import { launch } from "./app.mjs";
 import {
   cards,
   createReport,
   detailTitle,
   libraryNav,
+  markUnplayed,
   playerBadge,
   signIn,
   signOut,
@@ -22,12 +21,11 @@ import {
 
 const account = testAccount();
 const { check, shot, finish } = createReport("gate4-watched");
-const root = join(import.meta.dirname, "..", "..");
 
 const call = async (page, cmd, args) => {
   const r = await page.evaluate(
     ([c, a]) =>
-      window.__TAURI_INTERNALS__
+      window.__viewer
         .invoke(c, a)
         .then((value) => ({ value }))
         .catch((e) => ({ error: JSON.stringify(e) })),
@@ -40,6 +38,18 @@ const detailOf = (page, id) => call(page, "emby_item_detail", { itemId: id });
 
 let app = await launch();
 let film = null;
+let restored = false;
+/** Marks the film unplayed again, once. */
+async function restore(page) {
+  if (restored || !film) return;
+  restored = true;
+  const played = await markUnplayed(page, film.id).catch((e) => e);
+  check(
+    "film_unplayed_again",
+    played === false,
+    played instanceof Error ? played.message : film.id,
+  );
+}
 try {
   const page = app.page;
   if ((await startScreen(page)) === "signedOut") {
@@ -99,6 +109,7 @@ try {
   const shown = (await pill.count()) ? await pill.textContent() : "";
   check("detail_shows_watched", shown?.trim() === "Déjà vu", shown);
   await shot(page, "detail-watched");
+  await restore(page);
 
   await page.keyboard.press("Escape");
   await signOut(page);
@@ -112,34 +123,7 @@ try {
   );
   if (app) await shot(app.page, "error").catch(() => {});
 } finally {
+  if (app) await restore(app.page);
   if (app) await app.close().catch(() => {});
-  if (film) {
-    const r = spawnSync(
-      "powershell",
-      [
-        "-NoProfile",
-        "-File",
-        join(root, "scripts", "with-msvc.ps1"),
-        "cargo",
-        "test",
-        "--manifest-path",
-        join(root, "src-tauri", "Cargo.toml"),
-        "real_server_mark_unplayed",
-        "--",
-        "--ignored",
-        "--nocapture",
-      ],
-      {
-        cwd: root,
-        encoding: "utf8",
-        env: { ...process.env, VIEWER_UNPLAY_IDS: film.id },
-      },
-    );
-    check(
-      "film_unplayed_again",
-      r.status === 0 && r.stdout.includes(`${film.id} unplayed`),
-      r.status === 0 ? film.id : (r.stdout + r.stderr).slice(-300),
-    );
-  }
   finish();
 }

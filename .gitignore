@@ -5,10 +5,6 @@ coverage/
 *.tsbuildinfo
 vite.config.ts.timestamp-*
 
-# Rust / Tauri
-src-tauri/target/
-src-tauri/gen/schemas/
-
 # Native third-party binaries are fetched by scripts/fetch-libmpv.ps1, never committed
 vendor/
 # Same for the Android TV app (scripts/fetch-libmpv-android.ps1)

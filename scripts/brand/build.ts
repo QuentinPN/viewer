@@ -6,8 +6,8 @@
 //
 //   src/lib/brand/<id>.svg                      desktop UI (Logo.svelte shows default.svg)
 //   go-app/internal/brand/icons/<id>.png        256 px window icons
-//   src-tauri/icons/icon.ico, source/logo.svg   default logo, .ico of 16..256 px; the
-//                                               NSIS installer takes it as its icon
+//   go-app/build/windows/icon.ico, go-app/build/logo.svg   default logo, .ico of 16..256 px;
+//                                               the NSIS installer takes it as its icon
 //   android-tv/app/src/main/res/drawable-nodpi/icon.png (432), banner.png (640x360): default;
 //   ... icon_<id>.png / banner_<id>.png for the other seasons (<id> with _ for -),
 //   ... and android-tv/app/src/debug/res/drawable-nodpi/icon.png, banner.png (hard hat; banner + orange band)
@@ -223,9 +223,9 @@ try {
       continue;
     }
     // The default logo is also what the app and the installer use.
-    put("src-tauri/icons/source/logo.svg", svg);
+    put("go-app/build/logo.svg", svg);
     put(
-      "src-tauri/icons/icon.ico",
+      "go-app/build/windows/icon.ico",
       ico(ICO_SIZES.map((size) => ({ size, png: icon(size) }))),
     );
     put(`${androidRes}/icon.png`, androidIcon);
@@ -254,7 +254,7 @@ try {
       "github.com/tc-hib/go-winres@v0.3.3",
       "simply",
       "--icon",
-      "../src-tauri/icons/icon.ico",
+      "build/windows/icon.ico",
       "--arch",
       "amd64",
       "--manifest",

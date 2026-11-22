@@ -1,5 +1,11 @@
 # Journal des versions
 
+## 1.7.0 — 2026-11-22
+
+### Nouveautés
+
+- ship the Go + Wails app instead of Tauri (desktop)
+
 ## 1.6.0 — 2026-11-22
 
 ### Nouveautés

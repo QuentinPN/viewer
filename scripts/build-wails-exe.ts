@@ -1,5 +1,5 @@
 // node scripts/build-wails-exe.ts: the release exe go-app/bin/viewer.exe,
-// run by `npm run build:wails:exe` after the Wails frontend build. The one place
+// run by `npm run build:wails:exe` after the frontend build. The one place
 // that holds the release link flags: no console, release mode, the version of
 // package.json and the pinned public key of the update signatures
 // (go-app/build/updater-ed25519.pub). Without the key the updater fails closed,

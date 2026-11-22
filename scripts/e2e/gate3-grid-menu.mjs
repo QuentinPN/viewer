@@ -40,10 +40,7 @@ const countOf = async (page) =>
     ),
   ) || 0;
 const invoke = (page, cmd, args = {}) =>
-  page.evaluate(
-    ([c, a]) => window.__TAURI_INTERNALS__.invoke(c, a),
-    [cmd, args],
-  );
+  page.evaluate(([c, a]) => window.__viewer.invoke(c, a), [cmd, args]);
 
 async function settled(page) {
   await page.waitForFunction(

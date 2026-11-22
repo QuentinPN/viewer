@@ -58,13 +58,12 @@ async function observerSignIn() {
 
 const command = (page, cmd) =>
   page.evaluate(
-    (c) => window.__TAURI_INTERNALS__.invoke("player_command", { command: c }),
+    (c) => window.__viewer.invoke("player_command", { command: c }),
     cmd,
   );
 const itemDetail = (page, itemId) =>
   page.evaluate(
-    (id) =>
-      window.__TAURI_INTERNALS__.invoke("emby_item_detail", { itemId: id }),
+    (id) => window.__viewer.invoke("emby_item_detail", { itemId: id }),
     itemId,
   );
 const interrupted = async (page) =>
