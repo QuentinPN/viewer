@@ -9,6 +9,8 @@ Un client Emby personnel, rapide et soigné, en deux applications :
 
 Le serveur Emby tourne sur un mini-PC ; les fichiers média sont sur un NAS QNAP. Les applications ne parlent qu'à Emby, jamais au NAS. Emby reste la source de vérité : utilisateurs, bibliothèques, progression et états « vu » restent ceux du serveur. Aucun backend supplémentaire.
 
+Sur Android TV, l'icône et la bannière du lanceur, comme le logo affiché dans l'app, changent de tenue aux fêtes (calendrier de `contracts/seasons`). Le réglage « Icônes saisonnières » (activé par défaut, par appareil) les coupe ; le changement se fait à chaque lancement de l'app et tout de suite quand on bascule le réglage, sans redémarrer l'app.
+
 ## Pour qui
 
 Un seul utilisateur : le propriétaire, sur son propre serveur. Pas de distribution, pas de public. Interface en français d'abord. Accès en réseau local et en HTTPS à distance.
@@ -24,6 +26,10 @@ Plusieurs comptes et plusieurs serveurs sont possibles, mais jamais au prix de l
 5. **Honnêteté.** Les limites (codecs, HDR, passthrough audio) sont documentées et diagnostiquées, pas masquées. Une fonction n'est « finie » que vérifiée pour de vrai.
 6. **Accessibilité.** Clavier complet, focus visible, mouvement réduit respecté, états de chargement, de vide et d'erreur toujours prévus.
 7. **Maintenabilité.** Petites tranches verticales, peu de dépendances, aucune ajoutée sans nécessité.
+
+## Logo saisonnier
+
+Le raton laveur change de tenue selon la date (Noël, Halloween, Pâques, 14 juillet…). Sur le bureau, le logo de l'interface et l'icône de la fenêtre (barre de titre, bouton de la barre des tâches, Alt+Tab) suivent le calendrier local, à l'ouverture puis à chaque minuit, sans redémarrer. Réglages › Apparence › « Icônes saisonnières », activé par défaut : désactivé, le logo reste le logo par défaut. L'icône épinglée dans la barre des tâches et celle des raccourcis sont celles de l'exe (logo par défaut) : elles ne changent jamais.
 
 ## Hors périmètre
 
