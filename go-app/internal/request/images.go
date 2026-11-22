@@ -8,6 +8,7 @@ package request
 import (
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"viewer/internal/emby"
 )
@@ -16,7 +17,26 @@ import (
 // `http://requestimg.localhost/`.
 const Scheme = "requestimg"
 
-const origin = "http://requestimg.localhost"
+// TauriOrigin is where WebView2 serves the `requestimg` protocol of the Tauri build,
+// and the default origin of every URL built here.
+const TauriOrigin = "http://requestimg.localhost"
+
+// imageOrigin is the origin of the URLs imageRef writes. Tauri keeps the default; the
+// Wails build, whose WebView only routes `http://wails.localhost` to Go, sets its own
+// once with SetImageOrigin.
+var imageOrigin atomic.Pointer[string]
+
+// SetImageOrigin changes the origin (scheme and host, optionally a path prefix, no
+// trailing slash) of every artwork URL built afterwards. Call it once at startup,
+// before any service runs: URLs already handed to the UI keep their origin.
+func SetImageOrigin(o string) { imageOrigin.Store(&o) }
+
+func currentOrigin() string {
+	if o := imageOrigin.Load(); o != nil {
+		return *o
+	}
+	return TauriOrigin
+}
 
 // sizes the protocol accepts (`original` is never asked: unbounded size).
 var sizes = [...]string{"w185", "w342", "w500", "w780", "w1280"}
@@ -109,6 +129,11 @@ func isFile(file string) bool {
 // imageRef is `image_ref`: `src`/`srcset` for a TMDB path such as `/abc.jpg`, or nil
 // when the path is missing or not a plain image file name.
 func imageRef(path *string, sizes []string) *emby.ImageRef {
+	return imageRefAt(currentOrigin(), path, sizes)
+}
+
+// imageRefAt is imageRef on an explicit origin.
+func imageRefAt(origin string, path *string, sizes []string) *emby.ImageRef {
 	if path == nil || len(sizes) == 0 {
 		return nil
 	}

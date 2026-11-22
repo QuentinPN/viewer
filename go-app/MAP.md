@@ -2,7 +2,7 @@
 
 Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul agent à la fois.
 
-**Commandes non portées : 79 / 80**
+**Commandes non portées : 0 / 80** (vérifié par `TestRegisteredCommandsAreTheRustInvokeHandler`, qui lit `generate_handler!` dans lib.rs)
 
 ## Vagues
 | Vague | Unité | Fichiers Rust | Statut |
@@ -15,13 +15,13 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
 | 2 | emby-playback | emby/playback.rs | porté (`internal/emby/playback.go`, types de `internal/player`, sans commande), wave2B |
 | 2 | artwork-cache | emby/artwork_cache.rs | porté (`internal/artworkcache`, sans commande : voir « Unité artwork-cache et tls-roots »), wave2C |
 | 2 | tls-roots | player/tls_roots.rs (sorti d'emby-client) | porté (`internal/tlsroots`, sans commande), wave2C |
-| 2 | library-events | emby/library_events.rs | à faire |
+| 2 | library-events | emby/library_events.rs | porté (`internal/libraryevents`, hors `internal/emby` : voir « Unité app-shell »), app-shell |
 | 3 | player | player/mpv.rs, mod.rs, ffi.rs, video_surface.rs (mode parent seul) | porté (`internal/player`, binding `internal/mpv` étendu, sans commande : voir « Unité player »), wave3-player |
-| 3 | app-shell | lib.rs, commands.rs (commandes des vagues 1-3), fenêtre / barre de titre | à faire |
+| 3 | app-shell | lib.rs, commands.rs (commandes des vagues 1-3), fenêtre / barre de titre | porté (`internal/app`, `cmd/viewer`, 80 commandes ; illustrations servies sur `wails.localhost` : voir « Unité app-shell »), app-shell |
 | 4 | session | emby/session.rs, reporting.rs | porté (`internal/emby/session*.go`, `reporting.go`, sans commande : voir « Unité session et segments »), wave4 |
 | 4 | segments | segments/* | porté (`internal/segments`, sans commande), wave4 |
 | 5 | sync-core | sync/envelope.rs, leader.rs, mod.rs (parties pures : SyncDevice, tv_devices, own_session_id) | porté (`internal/devsync`, sans commande : voir « Unité sync-core »), wave5-sync-core |
-| 5 | sync-service | sync/service.rs (attend session et player) | à faire |
+| 5 | sync-service | sync/service.rs (attend session et player) | porté (`internal/devsync/service.go`), app-shell |
 | 6 | request | request/* (mod, models, client, service, images, trailer, commands) | porté (`internal/request`, 1 commande branchée sur 17 : voir « Unité request »), wave6-request |
 | 7 | diagnostics | diagnostics.rs, system_info.rs (`redact` et ses 5 tests : déjà dans `internal/redact`, vague 3) | porté (`internal/diagnostics`, `internal/sysinfo`, 2 commandes non branchées : voir « Unité diagnostics et system-info »), wave7-diag |
 | 7 | updater | updater.rs | porté (`internal/updater`, 3 commandes non branchées : voir « Unité updater »), wave7-updater |
@@ -421,10 +421,90 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
 - **Demande de la vague 6 restée ouverte** : exporter un décodeur strict commun et l'encodeur `form_urlencoded`. C'est hors du périmètre ; request garde ses copies.
 - **Commandes non portées : inchangé** (79 / 80). Aucune commande n'est branchée ; c'est l'app-shell qui le fera.
 
+## Unité app-shell : devoirs de la couche commandes (commands.rs) — faits, voir la section suivante
+- Ce que les services Go ne font pas et que l'app-shell doit reproduire depuis `src-tauri/src/commands.rs` :
+  - **Échec de chargement** (`commands.rs:671`) : `Shutdown` est envoyé au reporter seul, sans démantèlement du moteur.
+  - **« Bye » à la TV** : avant `emby_sign_out` et avant un changement de serveur, la TV reçoit « bye ».
+  - **Reprise d'un arrêt** : `resend_stop` avant `prepare`, `begin` après.
+  - **Bascule de session** : `switch` avant `load`.
+
+## Unité app-shell, sync-service et library-events (vagues 2, 3 et 5, app-shell)
+- **Fichiers.**
+  - `internal/app` : `AppState` et le `setup` de lib.rs. On y trouve les services (Emby, Request, segments, reporter, sync, socket, updater, cache d'illustrations) et la case du moteur, un `atomic.Pointer` : les lecteurs n'attendent jamais, comme le `try_lock` du sync, et la création est sérialisée par un mutex. S'y ajoutent `ClosePlayer` (sort le moteur, puis `Shutdown` ; le puits diffuse `Shutdown`, rien n'est réémis), `Close` (fin du processus, faute de Drop) et `Identity` pour Request. `New` ne touche pas le réseau ; `Start` lance le socket et, en release, l'updater.
+  - `internal/libraryevents` : library_events.rs, hors de `internal/emby` (devsync importe emby). `Supervisor` ouvre une socket par session, reconnecte après 2, 5, 15 puis 30 s, envoie un KeepAlive à la connexion puis toutes les 30 s, contrôle la session chaque seconde et annonce un changement après 2 s de calme. S'y ajoutent `IsLibraryChange`, `SendStringOf` et `Events`.
+  - `internal/devsync/service.go` : service.rs. `Service` est le `SyncHandle`. Une goroutine possède l'automate, une seconde envoie les enveloppes dans l'ordre. Les files sont sans limite (`mailbox`), car le puits du lecteur ne doit jamais bloquer. Dépendances injectées : session, moteur (sans attente), émetteur, id de lien. `Devices` est `sync::devices`.
+  - `cmd/viewer` : `main.go` (lib.rs `run`), `commands*.go` (commands.rs, un fichier par domaine), `args.go` (lecture des arguments à la manière de Tauri, sur `strictjson`, avec les mêmes textes d'erreur), `protocols.go` (`emby_image`, `request_image`).
+  - `internal/bridge` : `Registry.Names()`, ajouté pour le test du jeu de commandes.
+- **Commandes : 80 / 80 enregistrées**, avec les mêmes noms, les mêmes clés camelCase (relevées dans les appels `invoke` de `src/`) et les mêmes résultats. `TestRegisteredCommandsAreTheRustInvokeHandler` lit `generate_handler!` dans lib.rs et compare les deux ensembles.
+- **Devoirs de la couche commandes, reproduits.**
+  - `emby_play` : `ResendStop` avant la négociation, `Begin` et `sync.Playing` après. Un échec après l'annonce envoie `Shutdown` au reporter seul, sans démantèlement (commands.rs:671).
+  - `emby_change_quality` : `Switch` après l'analyse de la source et l'obtention du moteur, avant `Load`, sans `Shutdown`.
+  - La TV est prévenue (`bye stopped`, 3 s au plus) avant `emby_sign_out` et `emby_change_server`.
+  - `RevocationFor` est lu avant `ForgetServer` / `SignOut` ; les révocations partent en tâche détachée, sur le contexte de l'app.
+  - `emby_set_played` et `emby_hide_from_resume` émettent `emby://playback-stopped`.
+- **Fermeture pendant la lecture.** Le crochet `WindowClosing` annule la fermeture si un moteur est ouvert. Ensuite, hors du fil de l'UI : `ClosePlayer`, `Sync.StopBlocking(2 s)`, `Reporter.Flush(3 s)`, puis `win.Close()`. Jamais `app.Quit` (erreur 1412, voir gate1-go). Après `Run` : `Close(3 s)`.
+- **Paniques.**
+  - Les goroutines de l'app diffèrent `Options.Recover` (`logger.RecoverAndRepanic`) : la panique va au journal avec sa pile, puis le crash continue, comme le hook de panique de Rust.
+  - C'est le cas de `App.Go` (superviseur du socket, updater, fermeture, révocations), des goroutines de `devsync` (`ServiceConfig.Recover`) et de celles de `libraryevents` (`Supervisor.Recover`).
+  - Une commande qui panique est journalisée par `bridge.runHandler` (cible `panic`, avec la pile) et rejette son seul appel.
+  - Restent hors de cette unité : les goroutines de `internal/emby` (`reporting.go`, `session.go`) et la boucle d'événements de `internal/player`.
+- **Événements.** `player://event`, `emby://library-changed` (charge `null`), `emby://playback-stopped`, `sync://status|notice|action` et `app://update-ready` passent par `app.Event.Emit(nom, charge)`. Une donnée unique n'est pas enveloppée (vérifié dans `event_manager.go`). Les noms sont ceux des `listen` de `src/`.
+- **Build.**
+  - Drapeaux `-ldflags -X` : `viewer/internal/app.buildMode=release` et `viewer/internal/app.version=X.Y.Z`.
+  - Sans drapeau (`go build`, `go test`), c'est une build debug : identifiant `io.github.quentinpn.viewer.debug`, coffre `Viewer-debug`, titre « (debug) », `player_open` permis, pas d'updater.
+  - `npm run build:wails:exe` passe les deux drapeaux. La version vient de `%npm_package_version%` : le script npm tourne sous cmd.
+  - `updater.PublicKey` reste à injecter pour une release (sous-partie release-pipeline).
+- **Dossiers** (tauri 2.12.5, `path/desktop.rs` et `manager/webview.rs`).
+  - Configuration : `%APPDATA%\{id}` (`session.json`, `playback-quality.json`, `request.json`).
+  - Cache : `%LOCALAPPDATA%\{id}` (`artwork`, `tls-roots.pem`). Journaux : `%LOCALAPPDATA%\{id}\logs`.
+  - Profil WebView2 : `WebviewUserDataPath` = `%LOCALAPPDATA%\{id}`. Tauri passe `app_local_data_dir` à WebView2, qui y ajoute `EBWebView` ; observé à l'exécution.
+  - Les variables `VIEWER_E2E_*` et `VIEWER_LIBMPV` sont reprises, en debug seulement.
+- **Tests.** Les 8 tests Rust de library_events.rs sont portés sous le même nom ; service.rs n'en a pas. Tests `Test_go_*` ajoutés :
+  - socket, contre un vrai WebSocket local : KeepAlive, capacités, session propre, relais, annonce après le calme, fermeture en fin de session, accueil non affiché, catégories d'erreur ;
+  - service sync : refus d'invitation, `load` puis `bye` dans l'ordre avec l'accusé de `Stop` (le service invite encore après, comme après une déconnexion), index de flux en lecture directe seulement, `join` nommé par le serveur, changement de session, service arrêté, ids de lien ;
+  - app : noms, dossiers, libmpv, état sans lecteur ;
+  - `cmd/viewer` : jeu de commandes, réponses du premier lancement, arguments à la Tauri, `player_open` réservé au debug, plein écran, statuts des protocoles.
+  - ordre d'`emby_play` et d'`emby_change_quality` (`commands_play_test.go`, faux qui enregistre les appels) : succès, URL refusée, moteur absent, échec de `Load`. Deux mutations ont été vérifiées en rouge : sans `Shutdown` au reporter, et sans `Switch`.
+  - panique : `App.Go` appelle `Recover`, et le pont journalise la panique d'une commande.
+  - `-count=10` est vert sur devsync et cmd.
+- **Preuve de bout en bout (2026-11-22).**
+  - `npm run build:wails:exe` : exe de 21,2 Mo, sous-système GUI ; `go version -m` lit `-X …buildMode=release -X …version=1.5.0`.
+  - Lancé avec `APPDATA` / `LOCALAPPDATA` pointés vers un dossier jetable : aucune session, donc ni restauration ni socket. Fermé avant la première vérification de l'updater (15 s).
+  - Capture PrintWindow de sa seule fenêtre (2560x1400) : écran de premier lancement « Bienvenue. Ajoute ton premier serveur Emby. », sans « commande non portée ».
+  - `WM_CLOSE` : sortie en 31 ms, code 0, pas d'erreur 1412 dans le journal. L'exe a été supprimé ensuite.
+  - Relancé sur le code final (gardes de panique, `state.Go` dans le crochet de fermeture) : fenêtre après 572 ms, même écran, sortie 15 ms après `WM_CLOSE`, code 0. Le journal tient en trois lignes (démarrage en release, WebView2 créé, sortie), sans erreur ni adresse 192.0.2.
+  - **Limite :** la fenêtre était au repos. La fermeture pendant une lecture (annulation, démantèlement, `bye`, envoi du rapport d'arrêt, puis `win.Close`) n'a pas été exécutée, seulement relue (voir la checklist smoke).
+- **Écarts assumés.**
+  - Pas d'instance unique : le squelette avait `SingleInstance`, retiré parce que l'app Tauri n'a pas ce plugin.
+  - Les dossiers sont lus dans `%APPDATA%` / `%LOCALAPPDATA%` (`os.UserConfigDir`, `os.UserCacheDir`) au lieu des dossiers connus du shell. Ce sont les mêmes dans une session normale, et un processus lancé avec d'autres variables reste hors des données du propriétaire.
+  - `app_info.spike` vaut toujours `false` : le scénario Gate 1 de la build debug Rust (spike.rs) n'est pas dans l'app Go.
+  - `VIEWER_E2E_OFFSCREEN` place la fenêtre en -20000,-20000 **sans la maximiser** (maximisée, elle reviendrait sur l'écran le plus proche). Wails n'a pas d'option « sans activation ».
+  - libmpv en debug : `vendor/mpv/libmpv-2.dll` est cherché en remontant depuis l'exe (Go n'a pas `CARGO_MANIFEST_DIR`).
+  - Socket : le `Close(None)` de Rust devient une trame de fermeture 1000. La taille maximale d'un message reste 64 Mio (défaut de tungstenite).
+- **Points ouverts (décision de l'orchestrateur ou du propriétaire).**
+  - **Réglé côté Go (2026-11-22), à confirmer à l'écran : les illustrations visent l'origine de l'app.** Aucune image n'a encore été vue dans un vrai WebView2 : la preuve s'arrête au gestionnaire Go.
+    - Wails v3.1.0 ne route vers Go que l'hôte `wails.localhost` (`webview_window_windows.go`, `processRequest`). Les origines Tauri `http://emby-img.localhost` et `http://requestimg.localhost` n'y arrivaient donc jamais.
+    - L'origine des URL est devenue un paramètre : `imageRefAt(origin, …)` dans `internal/emby/images.go` et `internal/request/images.go`. `ImageRefFor` et `imageRef` lisent l'origine du paquet, Tauri par défaut (`TauriImageOrigin`, `TauriOrigin`), donc les goldens ne changent pas.
+    - Pas de point d'injection propre : les constructeurs sont des fonctions libres, appelées par les fonctions de conversion et par les `decorate()`, sans service. D'où un réglage de paquet, `SetImageOrigin` (un `atomic.Pointer`), appelé une seule fois par `main` avant `app.New` via `useAppImageOrigins` (`protocols.go`) : `http://wails.localhost/emby-img` et `http://wails.localhost/requestimg`. Les tests d'`internal/emby` et d'`internal/request` ne le changent jamais.
+    - Préfixes gardés : `/emby-img/` et `/requestimg/`. Ils ne croisent ni `dist` (`index.html`, `assets/`) ni un routeur (`src/` n'en a pas), et `src/` ne construit aucune URL d'image (seuls des commentaires les citent).
+    - CSP Wails : `img-src 'self' data: blob:`, sans les deux hôtes Tauri. `'self'` couvre les illustrations. `csp_test.go` compare chaque directive à `tauri.conf.json`, aux deux écarts près. La CSP Tauri ne change pas.
+    - Preuve, sans vrai serveur : `Test_go_library_artwork_is_served_on_the_app_origin` connecte l'app à un faux Emby local, prend le `src` et le `srcset` renvoyés par `emby_libraries`, et les envoie à `withCSP(withProtocols(…))`, comme `main.go`. Résultat : 200, `image/jpeg`, `Cache-Control` immuable, CSP et octets du faux. Le `src` répété vient du cache d'illustrations, et un autre id de serveur reçoit 403. Côté Request, `Test_go_set_image_origin_reaches_decorated_models` vérifie que le réglage atteint les modèles, et le routage est prouvé (401 hors session). Le 200 n'a pas tourné, faute de faux serveur Request dans `cmd/viewer`. L'appel `request.SetImageOrigin` de `useAppImageOrigins` n'est vérifié qu'à la relecture.
+  - **Le localStorage ne suit pas la bascule.**
+    - Le dossier WebView2 est le même, mais le stockage est rangé par origine : `http://tauri.localhost` (vu dans `EBWebView\Default\Local Storage\leveldb` de l'app installée) contre `http://wails.localhost`.
+    - Les réglages de l'UI (préférences de lecture, etc.) repartent donc des valeurs par défaut. Aucune migration n'est faite ici.
+    - **Décision (2026-11-22), à faire au basculement.** La release Tauri de transition exporte les clés localStorage de l'app dans `%APPDATA%\io.github.quentinpn.viewer\ui-settings.json` : une commande dédiée, appelée au démarrage. Au premier lancement, l'app Wails lit ce fichier par une commande, remplit le localStorage s'il est vide, puis renomme le fichier. Clés concernées : `ItemDetail`, `LibraryBrowser`, `PlayerView` (volume), `subtitles`, `HomeRowsSettings`, `Settings`.
+- **Pour d'autres unités.**
+  - installer : un `go build` sans drapeau donne un exe **debug** (identifiant `io.github.quentinpn.viewer.debug`, coffre `Viewer-debug`). Un build direct, hors de `npm run build:wails:exe`, doit passer `-X viewer/internal/app.buildMode=release`. L'icône et la ressource de version restent à faire. La note sur le dossier WebView2 est réglée : il est `%LOCALAPPDATA%\{id}\EBWebView`, comme sous Tauri.
+  - release-pipeline : la commande décrite dans « Unité updater » écrit `-X main.version=…`. La variable est maintenant `viewer/internal/app.version`, avec `viewer/internal/app.buildMode=release` en plus.
+- **Notes de recherche** : `research/websocket.md` et `research/wails-shell.md`.
+- **Dépendance.** `github.com/coder/websocket` v1.8.14 passe d'indirecte à directe. La bibliothèque standard n'a pas de client WebSocket, et Wails embarque déjà celui-ci : aucun téléchargement.
+- **Bugs Rust relevés** : aucun.
+
 ## Bugs relevés
 - emby/server_url.rs (Rust, non corrigé, porté tel quel) : seul le premier `/web` du chemin est examiné. `http://h/website/web` garde donc `/website/web`, au lieu de s'arrêter au `/web` final. Impact faible : cela ne vise que des adresses copiées depuis le navigateur.
 - emby/artwork_cache.rs (Rust, non corrigé, porté tel quel) : l'éviction (`remove_empty_dirs`) peut supprimer le dossier qu'un `put` vient de créer, entre `create_dir_all` et l'écriture : ce `put` échoue (`NotFound`) sans autre effet. Les lecteurs d'une image servie depuis le réseau ignorent l'erreur. Impact faible ; une relance unique dans `put` le corrigerait.
 - emby/client.rs (Rust, non corrigé, porté tel quel) : `image()` ne demande pas de jeton (pas de `require_token`). Seul le service vérifie la session avant l'appel. Sans effet aujourd'hui : un client sans jeton envoie l'en-tête sans `Token` et Emby répond 401.
+- emby/session.rs:495 (Rust, non corrigé, porté tel quel) : la réponse à `/Views` est écrite dans la session ouverte au moment où elle arrive, quelle qu'elle soit, et non dans celle qui a posé la question. Un changement de compte pendant l'appel peut donc y mettre les vues de l'autre compte. Impact faible.
 
 ## Décisions
 - 2026-11-22 : Wails v3.1.0, sans cgo, chargement de libmpv par syscall (spike validé).
@@ -470,3 +550,11 @@ Règles : `.claude/skills/go-wails-anything/`. Une unité est prise par un seul 
 - Coffre : après une connexion faite avec l'app Tauri, la build Go doit rouvrir la session sans redemander le mot de passe (même entrée `{serverId}/{userId}.Viewer`).
 - Mise à jour : une build Go signée (clé injectée) trouve une version plus récente sur un `latest.json` de test, affiche la pastille, puis « Redémarrer maintenant » lance l'installateur en silence et l'app revient à jour. Un installateur à la signature altérée est refusé (Réglages › Mises à jour : erreur `signature`).
 - Installateur Wails (`pwsh scripts/build-wails-installer.ps1 -Build`, jamais exécuté jusqu'ici) : l'installer par-dessus une installation Tauri 1.5.0 (même dossier `%LOCALAPPDATA%\Viewer`, une seule entrée « Viewer » dans Paramètres › Applications, raccourcis conservés). Lancer l'app (elle charge `libmpv-2.dll` à côté de l'exe), vérifier l'icône des raccourcis, puis tester `Viewer_x.y.z_x64-setup.exe /S /UPDATE /R` app ouverte (elle se ferme, l'installateur écrase, l'app revient). Enfin désinstaller depuis Paramètres : exe, dll, raccourcis et clé disparaissent, les données restent sauf case cochée. Vérifier aussi que les accents français de l'installateur sont lisibles (l'encodage n'a pas été observé).
+- Coquille Wails (unité app-shell, rien de cela n'a tourné) :
+  - fermer avec ✕ pendant une lecture : le lecteur s'arrête, la TV liée reçoit `bye`, Emby enregistre la position, puis l'app quitte en moins de 6 s ;
+  - plein écran depuis une fenêtre maximisée, puis retour : la fenêtre redevient maximisée ;
+  - les événements arrivent à l'UI : progression du lecteur, nouveau titre sur l'accueil (`emby://library-changed`), pastille de mise à jour ;
+  - lecture liée avec une TV (invitation, `load`, pause, déliaison) ;
+  - une deuxième instance s'ouvre comme sous Tauri (pas d'instance unique) ;
+  - les illustrations s'affichent dans la build Wails : accueil, fiche détaillée, demandes Request (URL `http://wails.localhost/emby-img/…` et `/requestimg/…`) ;
+  - après la bascule, les réglages de l'UI repartent des valeurs par défaut (localStorage rangé par origine, voir `research/wails-shell.md`).

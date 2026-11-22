@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -245,9 +247,17 @@ func TestThroughWailsBindings(t *testing.T) {
 func TestHandlerPanicIsStructured(t *testing.T) {
 	reg := newRegistry()
 	reg.Register("boom", func(context.Context, json.RawMessage) (any, error) { panic("oups") })
+	var logged bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logged, nil)))
+	defer slog.SetDefault(prev)
 	_, err := bridge.New(reg).Invoke(context.Background(), "boom", nil)
 	want := `{"kind":"panic","message":"oups"}`
 	if err == nil || string(bridge.MarshalError(err)) != want {
 		t.Fatalf("got %v, want %s", err, want)
+	}
+	// The stack reaches the log; the UI only gets the rejected call.
+	if !strings.Contains(logged.String(), "command panicked: oups") || !strings.Contains(logged.String(), "target=panic") {
+		t.Fatalf("panique non journalisée : %s", logged.String())
 	}
 }

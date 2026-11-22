@@ -7,16 +7,36 @@ package emby
 import (
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
 
 // ImageScheme is the protocol name; WebView2 on Windows serves it as `http://emby-img.localhost/`.
 const ImageScheme = "emby-img"
 
 const (
-	imageOrigin   = "http://emby-img.localhost"
-	minImageWidth = 32
-	maxImageWidth = 1920
+	// TauriImageOrigin is where WebView2 serves the `emby-img` protocol of the Tauri
+	// build, and the default origin of every URL built here (goldens included).
+	TauriImageOrigin = "http://emby-img.localhost"
+	minImageWidth    = 32
+	maxImageWidth    = 1920
 )
+
+// imageOrigin is the origin of the URLs ImageRefFor writes. Tauri keeps the default;
+// the Wails build, whose WebView only routes `http://wails.localhost` to Go, sets
+// its own once with SetImageOrigin.
+var imageOrigin atomic.Pointer[string]
+
+// SetImageOrigin changes the origin (scheme and host, optionally a path prefix, no
+// trailing slash) of every artwork URL built afterwards. Call it once at startup,
+// before any service runs: URLs already handed to the UI keep their origin.
+func SetImageOrigin(origin string) { imageOrigin.Store(&origin) }
+
+func currentImageOrigin() string {
+	if o := imageOrigin.Load(); o != nil {
+		return *o
+	}
+	return TauriImageOrigin
+}
 
 // MaxImageBytes: larger answers are refused; Emby resizes to `maxWidth`, so this is never legit.
 const MaxImageBytes = 10 * 1024 * 1024
@@ -143,6 +163,11 @@ func (r ImageRequest) APIPath() string {
 // so `ImageTags` decides). The server id scopes the WebView's HTTP cache to one
 // server (ADR 0012).
 func ImageRefFor(serverID, itemID string, imageType ImageType, tag *string, widths []uint32) (ImageRef, bool) {
+	return imageRefAt(currentImageOrigin(), serverID, itemID, imageType, tag, widths)
+}
+
+// imageRefAt is ImageRefFor on an explicit origin.
+func imageRefAt(origin, serverID, itemID string, imageType ImageType, tag *string, widths []uint32) (ImageRef, bool) {
 	if tag == nil || !isImageTag(*tag) {
 		return ImageRef{}, false
 	}
@@ -150,7 +175,7 @@ func ImageRefFor(serverID, itemID string, imageType ImageType, tag *string, widt
 		return ImageRef{}, false
 	}
 	url := func(w uint32) string {
-		return imageOrigin + "/" + serverID + "/" + itemID + "/" + imageType.String() +
+		return origin + "/" + serverID + "/" + itemID + "/" + imageType.String() +
 			"?tag=" + *tag + "&maxWidth=" + strconv.FormatUint(uint64(w), 10)
 	}
 	set := make([]string, len(widths))

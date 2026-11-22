@@ -1,6 +1,9 @@
 package emby
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // emby/images.rs builds_srcset_from_image_tags
 func Test_builds_srcset_from_image_tags(t *testing.T) {
@@ -181,4 +184,29 @@ func TestGolden_images_request_parse(t *testing.T) {
 		rows = append(rows, out)
 	}
 	assertTableGolden(t, "images.request_parse.json", rows)
+}
+
+// The origin is a parameter: the default is Tauri's, the Wails build serves the same
+// paths under its own origin.
+func Test_go_image_ref_on_another_origin(t *testing.T) {
+	if got := currentImageOrigin(); got != TauriImageOrigin {
+		t.Fatal(got)
+	}
+	r, ok := imageRefAt("http://wails.localhost/emby-img", "srv1", "74668", ImageLogo, ptr("ab12"), []uint32{320, 640})
+	if !ok {
+		t.Fatal("no image")
+	}
+	if r.Src != "http://wails.localhost/emby-img/srv1/74668/Logo?tag=ab12&maxWidth=320" {
+		t.Fatal(r.Src)
+	}
+	want := "http://wails.localhost/emby-img/srv1/74668/Logo?tag=ab12&maxWidth=320 320w, " +
+		"http://wails.localhost/emby-img/srv1/74668/Logo?tag=ab12&maxWidth=640 640w"
+	if r.Srcset != want {
+		t.Fatal(r.Srcset)
+	}
+	// What the protocol strips before parsing is exactly the origin.
+	path, query, _ := strings.Cut(strings.TrimPrefix(r.Src, "http://wails.localhost/emby-img"), "?")
+	if req, ok := ParseImageRequest(path, &query); !ok || req.ItemID != "74668" || req.MaxWidth != 320 {
+		t.Fatalf("%+v %v", req, ok)
+	}
 }

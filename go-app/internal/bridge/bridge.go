@@ -9,6 +9,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"runtime/debug"
+	"slices"
 	"sync"
 )
 
@@ -49,6 +52,18 @@ func (r *Registry) Register(name string, h Handler) {
 		panic("bridge: command registered twice: " + name)
 	}
 	r.handlers[name] = h
+}
+
+// Names lists the registered command names, sorted.
+func (r *Registry) Names() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	names := make([]string, 0, len(r.handlers))
+	for name := range r.handlers {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	return names
 }
 
 func (r *Registry) lookup(name string) (Handler, bool) {
@@ -99,6 +114,8 @@ func (b *Bridge) Invoke(ctx context.Context, cmd string, args json.RawMessage) (
 func runHandler(ctx context.Context, h Handler, args json.RawMessage) (res any, err error) {
 	defer func() {
 		if p := recover(); p != nil {
+			// Logged with its stack: the UI only sees the rejected call.
+			slog.Error(fmt.Sprintf("command panicked: %v\n%s", p, debug.Stack()), "target", "panic")
 			res, err = nil, &CommandError{Kind: "panic", Message: fmt.Sprint(p)}
 		}
 	}()

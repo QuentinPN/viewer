@@ -11,7 +11,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:wails": "vite build --mode wails --outDir go-app/cmd/viewer/frontend/dist",
-    "build:wails:exe": "npm run build:wails && cd go-app && set CGO_ENABLED=0&& go build -ldflags \"-H=windowsgui\" -o bin/viewer.exe ./cmd/viewer",
+    "build:wails:exe": "npm run build:wails && cd go-app && set CGO_ENABLED=0&& go build -ldflags \"-H=windowsgui -X viewer/internal/app.buildMode=release -X viewer/internal/app.version=%npm_package_version%\" -o bin/viewer.exe ./cmd/viewer",
     "preview": "vite preview",
     "tauri": "tauri",
     "lint": "biome check .",
