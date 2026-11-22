@@ -1,0 +1,6 @@
+{
+  "error": {
+    "kind": "invalidResponse",
+    "message": "réponse inattendue du serveur : adresse de flux inattendue"
+  }
+}

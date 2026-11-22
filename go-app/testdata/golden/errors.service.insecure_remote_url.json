@@ -1,0 +1,4 @@
+{
+  "kind": "insecureRemoteUrl",
+  "message": "connexion non chiffrée refusée : une adresse hors réseau local doit utiliser https://"
+}

@@ -1,0 +1,205 @@
+[
+  {
+    "api": "http://192.168.1.10:8096/emby/System/Info/Public",
+    "https": false,
+    "input": "http://192.168.1.10:8096",
+    "local": true,
+    "url": "http://192.168.1.10:8096"
+  },
+  {
+    "api": "http://192.168.1.10:8096/emby/System/Info/Public",
+    "https": false,
+    "input": "192.168.1.10:8096",
+    "local": true,
+    "url": "http://192.168.1.10:8096"
+  },
+  {
+    "api": "http://192.168.1.10:8096/emby/System/Info/Public",
+    "https": false,
+    "input": " http://192.168.1.10:8096/ ",
+    "local": true,
+    "url": "http://192.168.1.10:8096"
+  },
+  {
+    "api": "http://emby.local:8096/emby/System/Info/Public",
+    "https": false,
+    "input": "http://emby.local:8096/emby",
+    "local": true,
+    "url": "http://emby.local:8096"
+  },
+  {
+    "api": "http://192.168.1.10:8096/emby/System/Info/Public",
+    "https": false,
+    "input": "http://192.168.1.10:8096/web/index.html",
+    "local": true,
+    "url": "http://192.168.1.10:8096"
+  },
+  {
+    "api": "http://192.168.1.10:8096/proxy/emby/System/Info/Public",
+    "https": false,
+    "input": "http://192.168.1.10:8096/proxy/web",
+    "local": true,
+    "url": "http://192.168.1.10:8096/proxy"
+  },
+  {
+    "api": "https://media.example.com/proxy/emby/System/Info/Public",
+    "https": true,
+    "input": "https://media.example.com/proxy/",
+    "local": false,
+    "url": "https://media.example.com/proxy"
+  },
+  {
+    "api": "https://media.example.com/emby/System/Info/Public",
+    "https": true,
+    "input": "https://media.example.com/emby/",
+    "local": false,
+    "url": "https://media.example.com"
+  },
+  {
+    "api": "https://8.8.8.8/emby/System/Info/Public",
+    "https": true,
+    "input": "https://8.8.8.8",
+    "local": false,
+    "url": "https://8.8.8.8"
+  },
+  {
+    "api": "http://127.0.0.1:8096/emby/System/Info/Public",
+    "https": false,
+    "input": "http://127.0.0.1:8096",
+    "local": true,
+    "url": "http://127.0.0.1:8096"
+  },
+  {
+    "api": "http://10.1.2.3/emby/System/Info/Public",
+    "https": false,
+    "input": "http://10.1.2.3",
+    "local": true,
+    "url": "http://10.1.2.3"
+  },
+  {
+    "api": "http://172.16.0.1/emby/System/Info/Public",
+    "https": false,
+    "input": "http://172.16.0.1",
+    "local": true,
+    "url": "http://172.16.0.1"
+  },
+  {
+    "api": "http://169.254.1.1/emby/System/Info/Public",
+    "https": false,
+    "input": "http://169.254.1.1",
+    "local": true,
+    "url": "http://169.254.1.1"
+  },
+  {
+    "api": "http://[::1]:8096/emby/System/Info/Public",
+    "https": false,
+    "input": "http://[::1]:8096",
+    "local": true,
+    "url": "http://[::1]:8096"
+  },
+  {
+    "api": "http://[fd12::1]/emby/System/Info/Public",
+    "https": false,
+    "input": "http://[fd12::1]",
+    "local": true,
+    "url": "http://[fd12::1]"
+  },
+  {
+    "api": "http://localhost:8096/emby/System/Info/Public",
+    "https": false,
+    "input": "http://localhost:8096",
+    "local": true,
+    "url": "http://localhost:8096"
+  },
+  {
+    "api": "http://emby.home.arpa/emby/System/Info/Public",
+    "https": false,
+    "input": "http://emby.home.arpa",
+    "local": true,
+    "url": "http://emby.home.arpa"
+  },
+  {
+    "api": "http://emby.lan/emby/System/Info/Public",
+    "https": false,
+    "input": "http://emby.lan",
+    "local": true,
+    "url": "http://emby.lan"
+  },
+  {
+    "error": {
+      "kind": "insecureRemoteUrl",
+      "message": "connexion non chiffrée refusée : une adresse hors réseau local doit utiliser https://"
+    },
+    "input": "http://8.8.8.8:8096"
+  },
+  {
+    "error": {
+      "kind": "insecureRemoteUrl",
+      "message": "connexion non chiffrée refusée : une adresse hors réseau local doit utiliser https://"
+    },
+    "input": "http://media.example.com"
+  },
+  {
+    "error": {
+      "kind": "insecureRemoteUrl",
+      "message": "connexion non chiffrée refusée : une adresse hors réseau local doit utiliser https://"
+    },
+    "input": "http://172.32.0.1"
+  },
+  {
+    "error": {
+      "kind": "invalidUrl",
+      "message": "adresse du serveur invalide : adresse vide"
+    },
+    "input": ""
+  },
+  {
+    "error": {
+      "kind": "invalidUrl",
+      "message": "adresse du serveur invalide : adresse vide"
+    },
+    "input": "   "
+  },
+  {
+    "error": {
+      "kind": "invalidUrl",
+      "message": "adresse du serveur invalide : schéma « ftp » non pris en charge"
+    },
+    "input": "ftp://192.168.1.10"
+  },
+  {
+    "error": {
+      "kind": "invalidUrl",
+      "message": "adresse du serveur invalide : schéma « file » non pris en charge"
+    },
+    "input": "file:///C:/x"
+  },
+  {
+    "error": {
+      "kind": "invalidUrl",
+      "message": "adresse du serveur invalide : l'adresse ne doit pas contenir d'identifiants"
+    },
+    "input": "http://user:pw@192.168.1.10"
+  },
+  {
+    "error": {
+      "kind": "invalidUrl",
+      "message": "adresse du serveur invalide : l'adresse ne doit contenir ni « ? » ni « # »"
+    },
+    "input": "http://192.168.1.10/?api_key=x"
+  },
+  {
+    "error": {
+      "kind": "invalidUrl",
+      "message": "adresse du serveur invalide : l'adresse ne doit contenir ni « ? » ni « # »"
+    },
+    "input": "http://192.168.1.10/#x"
+  },
+  {
+    "error": {
+      "kind": "invalidUrl",
+      "message": "adresse du serveur invalide : empty host"
+    },
+    "input": "http://"
+  }
+]

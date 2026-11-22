@@ -1,0 +1,182 @@
+[
+  {
+    "case": "real_film_answer",
+    "chapterDtos": [
+      {
+        "MarkerType": "Chapter",
+        "Name": "Opening Credits",
+        "StartPositionTicks": 0
+      },
+      {
+        "MarkerType": "Chapter",
+        "Name": "Horn Island 1977",
+        "StartPositionTicks": 2421170000
+      },
+      {
+        "MarkerType": "Chapter",
+        "Name": "Someone to Take the Fall",
+        "StartPositionTicks": 5489650000
+      },
+      {
+        "MarkerType": "Chapter",
+        "Name": "Secret of Fly Fishing",
+        "StartPositionTicks": 7002000000
+      }
+    ],
+    "chapters": [
+      {
+        "name": "Opening Credits",
+        "start": 0.0
+      },
+      {
+        "name": "Horn Island 1977",
+        "start": 242.117
+      },
+      {
+        "name": "Someone to Take the Fall",
+        "start": 548.965
+      },
+      {
+        "name": "Secret of Fly Fishing",
+        "start": 700.2
+      }
+    ],
+    "runTimeTicks": 61154010000,
+    "unitTest": "chapters_maps_the_real_answer_of_a_film"
+  },
+  {
+    "case": "regular_only_sorted_named",
+    "chapterDtos": [
+      {
+        "StartPositionTicks": 6000000000
+      },
+      {
+        "MarkerType": "Chapter",
+        "Name": "  Début\n du film ",
+        "StartPositionTicks": 0
+      },
+      {
+        "MarkerType": "IntroStart",
+        "StartPositionTicks": 300000000
+      },
+      {
+        "MarkerType": "IntroEnd",
+        "StartPositionTicks": 900000000
+      },
+      {
+        "MarkerType": "Chapter",
+        "Name": "",
+        "StartPositionTicks": 3000000000
+      },
+      {
+        "MarkerType": "CreditsStart",
+        "StartPositionTicks": 24000000000
+      }
+    ],
+    "chapters": [
+      {
+        "name": "Début du film",
+        "start": 0.0
+      },
+      {
+        "name": "Chapitre 2",
+        "start": 300.0
+      },
+      {
+        "name": "Chapitre 3",
+        "start": 600.0
+      }
+    ],
+    "runTimeTicks": null,
+    "unitTest": "keeps_regular_chapters_only_sorted_and_named"
+  },
+  {
+    "case": "drops_negative_duplicate_past_end",
+    "chapterDtos": [
+      {
+        "Name": "Avant",
+        "StartPositionTicks": -10
+      },
+      {
+        "Name": "A",
+        "StartPositionTicks": 0
+      },
+      {
+        "Name": "Doublon",
+        "StartPositionTicks": 5000000
+      },
+      {
+        "Name": "B",
+        "StartPositionTicks": 1200000000
+      },
+      {
+        "Name": "Après la fin",
+        "StartPositionTicks": 2000000000
+      }
+    ],
+    "chapters": [
+      {
+        "name": "A",
+        "start": 0.0
+      },
+      {
+        "name": "B",
+        "start": 120.0
+      }
+    ],
+    "runTimeTicks": 1800000000,
+    "unitTest": "drops_what_cannot_be_navigated"
+  },
+  {
+    "case": "single_chapter",
+    "chapterDtos": [
+      {
+        "Name": "Seul",
+        "StartPositionTicks": 0
+      }
+    ],
+    "chapters": [],
+    "runTimeTicks": null,
+    "unitTest": "drops_what_cannot_be_navigated"
+  },
+  {
+    "case": "markers_only",
+    "chapterDtos": [
+      {
+        "MarkerType": "IntroStart",
+        "StartPositionTicks": 0
+      },
+      {
+        "MarkerType": "IntroEnd",
+        "StartPositionTicks": 1
+      }
+    ],
+    "chapters": [],
+    "runTimeTicks": null,
+    "unitTest": "drops_what_cannot_be_navigated"
+  },
+  {
+    "case": "name_of_500_chars_is_cut",
+    "chapterDtos": [
+      {
+        "Name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "StartPositionTicks": 0
+      },
+      {
+        "StartPositionTicks": 600000000
+      }
+    ],
+    "chapters": [
+      {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "start": 0.0
+      },
+      {
+        "name": "Chapitre 2",
+        "start": 60.0
+      }
+    ],
+    "runTimeTicks": null,
+    "unitTest": "long_names_are_cut"
+  }
+]

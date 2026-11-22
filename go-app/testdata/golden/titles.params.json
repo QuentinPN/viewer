@@ -1,0 +1,240 @@
+[
+  {
+    "params": [
+      [
+        "PersonIds",
+        "30209"
+      ],
+      [
+        "Recursive",
+        "true"
+      ],
+      [
+        "IncludeItemTypes",
+        "Movie,Series"
+      ],
+      [
+        "SortBy",
+        "ProductionYear,SortName"
+      ],
+      [
+        "SortOrder",
+        "Descending"
+      ],
+      [
+        "Limit",
+        "100"
+      ],
+      [
+        "Fields",
+        "PrimaryImageAspectRatio,ProductionYear"
+      ],
+      [
+        "EnableUserData",
+        "true"
+      ],
+      [
+        "ImageTypeLimit",
+        "1"
+      ],
+      [
+        "EnableImageTypes",
+        "Primary"
+      ]
+    ],
+    "source": {
+      "id": "30209",
+      "kind": "person"
+    }
+  },
+  {
+    "error": {
+      "kind": "invalidResponse",
+      "message": "réponse inattendue du serveur : identifiant invalide"
+    },
+    "source": {
+      "id": "../Users",
+      "kind": "person"
+    }
+  },
+  {
+    "error": {
+      "kind": "invalidResponse",
+      "message": "réponse inattendue du serveur : identifiant invalide"
+    },
+    "source": {
+      "id": "12 34",
+      "kind": "person"
+    }
+  },
+  {
+    "params": [
+      [
+        "Genres",
+        "Science-Fiction"
+      ],
+      [
+        "Recursive",
+        "true"
+      ],
+      [
+        "IncludeItemTypes",
+        "Movie"
+      ],
+      [
+        "SortBy",
+        "SortName"
+      ],
+      [
+        "SortOrder",
+        "Ascending"
+      ],
+      [
+        "Limit",
+        "200"
+      ],
+      [
+        "Fields",
+        "PrimaryImageAspectRatio,ProductionYear"
+      ],
+      [
+        "EnableUserData",
+        "true"
+      ],
+      [
+        "ImageTypeLimit",
+        "1"
+      ],
+      [
+        "EnableImageTypes",
+        "Primary"
+      ]
+    ],
+    "source": {
+      "itemType": "Movie",
+      "kind": "genre",
+      "name": " Science-Fiction "
+    }
+  },
+  {
+    "error": {
+      "kind": "invalidResponse",
+      "message": "réponse inattendue du serveur : filtre invalide"
+    },
+    "source": {
+      "itemType": "Movie",
+      "kind": "genre",
+      "name": "Drame|Comédie"
+    }
+  },
+  {
+    "error": {
+      "kind": "invalidResponse",
+      "message": "réponse inattendue du serveur : filtre invalide"
+    },
+    "source": {
+      "itemType": "Episode",
+      "kind": "genre",
+      "name": "Drame"
+    }
+  },
+  {
+    "params": [
+      [
+        "Studios",
+        "HBO"
+      ],
+      [
+        "Recursive",
+        "true"
+      ],
+      [
+        "IncludeItemTypes",
+        "Series"
+      ],
+      [
+        "SortBy",
+        "SortName"
+      ],
+      [
+        "SortOrder",
+        "Ascending"
+      ],
+      [
+        "Limit",
+        "200"
+      ],
+      [
+        "Fields",
+        "PrimaryImageAspectRatio,ProductionYear"
+      ],
+      [
+        "EnableUserData",
+        "true"
+      ],
+      [
+        "ImageTypeLimit",
+        "1"
+      ],
+      [
+        "EnableImageTypes",
+        "Primary"
+      ]
+    ],
+    "source": {
+      "itemType": "Series",
+      "kind": "studio",
+      "name": "HBO"
+    }
+  },
+  {
+    "params": [
+      [
+        "ParentId",
+        "120034"
+      ],
+      [
+        "SortBy",
+        "PremiereDate,ProductionYear,SortName"
+      ],
+      [
+        "SortOrder",
+        "Ascending"
+      ],
+      [
+        "Limit",
+        "100"
+      ],
+      [
+        "Fields",
+        "PrimaryImageAspectRatio,ProductionYear"
+      ],
+      [
+        "EnableUserData",
+        "true"
+      ],
+      [
+        "ImageTypeLimit",
+        "1"
+      ],
+      [
+        "EnableImageTypes",
+        "Primary"
+      ]
+    ],
+    "source": {
+      "id": "120034",
+      "kind": "collection"
+    }
+  },
+  {
+    "error": {
+      "kind": "invalidResponse",
+      "message": "réponse inattendue du serveur : identifiant invalide"
+    },
+    "source": {
+      "id": "30207",
+      "kind": "similar"
+    }
+  }
+]

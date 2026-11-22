@@ -1,0 +1,86 @@
+{
+  "AutoOpenLiveStream": false,
+  "DeviceProfile": {
+    "DirectPlayProfiles": [
+      {
+        "AudioCodec": "aac,ac3,eac3,dts,truehd,mlp,flac,opus,vorbis,mp3,mp2,alac,pcm_s16le,pcm_s24le,pcm_bluray,pcm_dvd,wmav2,wmapro",
+        "Container": "mkv,webm,mp4,m4v,mov,avi,ts,m2ts,mpegts,mpg,mpeg,wmv,asf,flv,3gp,ogv",
+        "Type": "Video",
+        "VideoCodec": "h264,hevc,av1,vp8,vp9,mpeg4,mpeg2video,mpeg1video,vc1,wmv3,msmpeg4v3,h263,theora"
+      }
+    ],
+    "MaxStreamingBitrate": 400000000,
+    "Name": "Viewer (libmpv)",
+    "SubtitleProfiles": [
+      {
+        "Format": "ass",
+        "Method": "Embed"
+      },
+      {
+        "Format": "ssa",
+        "Method": "Embed"
+      },
+      {
+        "Format": "subrip",
+        "Method": "Embed"
+      },
+      {
+        "Format": "srt",
+        "Method": "Embed"
+      },
+      {
+        "Format": "pgssub",
+        "Method": "Embed"
+      },
+      {
+        "Format": "dvdsub",
+        "Method": "Embed"
+      },
+      {
+        "Format": "vtt",
+        "Method": "Embed"
+      },
+      {
+        "Format": "mov_text",
+        "Method": "Embed"
+      },
+      {
+        "Format": "ass",
+        "Method": "External"
+      },
+      {
+        "Format": "ssa",
+        "Method": "External"
+      },
+      {
+        "Format": "subrip",
+        "Method": "External"
+      },
+      {
+        "Format": "srt",
+        "Method": "External"
+      },
+      {
+        "Format": "vtt",
+        "Method": "External"
+      }
+    ],
+    "TranscodingProfiles": [
+      {
+        "AudioCodec": "aac,ac3,eac3",
+        "BreakOnNonKeyFrames": true,
+        "Container": "ts",
+        "Context": "Streaming",
+        "MaxAudioChannels": "8",
+        "Protocol": "hls",
+        "Type": "Video",
+        "VideoCodec": "h264"
+      }
+    ]
+  },
+  "EnableDirectPlay": true,
+  "EnableDirectStream": true,
+  "IsPlayback": true,
+  "MaxStreamingBitrate": 400000000,
+  "UserId": "4a1f0e2b9c8d4e7fa6b5c4d3e2f1a0b9"
+}

@@ -1,0 +1,34 @@
+{
+  "items": [
+    {
+      "id": "101",
+      "name": "2 Coeurs",
+      "itemType": "Movie",
+      "year": 2020,
+      "runtimeMinutes": 101,
+      "poster": {
+        "src": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/101/Primary?tag=7b213eb5_6379&maxWidth=240",
+        "srcset": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/101/Primary?tag=7b213eb5_6379&maxWidth=240 240w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/101/Primary?tag=7b213eb5_6379&maxWidth=360 360w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/101/Primary?tag=7b213eb5_6379&maxWidth=480 480w"
+      },
+      "aspectRatio": 0.6666666666666666,
+      "played": true,
+      "unplayedCount": null,
+      "favorite": false
+    },
+    {
+      "id": "102",
+      "name": "Sans affiche",
+      "itemType": "Movie",
+      "year": null,
+      "runtimeMinutes": null,
+      "poster": null,
+      "aspectRatio": null,
+      "played": false,
+      "unplayedCount": null,
+      "favorite": false
+    }
+  ],
+  "startIndex": 50,
+  "nextIndex": 53,
+  "total": 707
+}

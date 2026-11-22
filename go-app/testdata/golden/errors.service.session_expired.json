@@ -1,0 +1,4 @@
+{
+  "kind": "sessionExpired",
+  "message": "session expirée ou révoquée : reconnecte-toi"
+}

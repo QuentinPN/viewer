@@ -1,0 +1,31 @@
+[
+  {
+    "id": "70229",
+    "name": "Épisode 4",
+    "kind": "episode",
+    "seriesName": "La casa de papel",
+    "seasonIndex": 5,
+    "index": 4,
+    "image": null,
+    "runtimeMinutes": 50,
+    "resume": null,
+    "played": true,
+    "favorite": false
+  },
+  {
+    "id": "30207",
+    "name": "Dune",
+    "kind": "movie",
+    "seriesName": null,
+    "seasonIndex": null,
+    "index": null,
+    "image": null,
+    "runtimeMinutes": 156,
+    "resume": {
+      "positionSeconds": 1800,
+      "fraction": 0.19230769230769232
+    },
+    "played": false,
+    "favorite": false
+  }
+]

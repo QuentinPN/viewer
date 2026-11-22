@@ -1,0 +1,82 @@
+[
+  {
+    "kind": "invalidUrl",
+    "message": "adresse du serveur invalide : adresse vide"
+  },
+  {
+    "kind": "insecureRemoteUrl",
+    "message": "connexion non chiffrée refusée : une adresse hors réseau local doit utiliser https://"
+  },
+  {
+    "kind": "unreachable",
+    "message": "serveur injoignable : connexion refusée"
+  },
+  {
+    "kind": "timeout",
+    "message": "le serveur ne répond pas (délai dépassé)"
+  },
+  {
+    "kind": "invalidCredentials",
+    "message": "nom d'utilisateur ou mot de passe incorrect"
+  },
+  {
+    "kind": "forbidden",
+    "message": "accès refusé par le serveur"
+  },
+  {
+    "kind": "server",
+    "message": "erreur du serveur (HTTP 503)"
+  },
+  {
+    "kind": "invalidResponse",
+    "message": "réponse inattendue du serveur : JSON illisible"
+  },
+  {
+    "kind": "notFound",
+    "message": "élément introuvable sur le serveur"
+  },
+  {
+    "kind": "notSignedIn",
+    "message": "aucune session ouverte"
+  },
+  {
+    "kind": "sessionExpired",
+    "message": "session expirée ou révoquée : reconnecte-toi"
+  },
+  {
+    "kind": "accountUnavailable",
+    "message": "compte désactivé ou supprimé sur le serveur"
+  },
+  {
+    "kind": "serverMismatch",
+    "message": "un autre serveur Emby répond à cette adresse"
+  },
+  {
+    "kind": "cancelled",
+    "message": "opération annulée"
+  },
+  {
+    "kind": "credentialStore",
+    "message": "coffre d'identification Windows indisponible : accès refusé"
+  },
+  {
+    "kind": "playbackRefused",
+    "message": "lecture refusée : lecture non autorisée pour ce compte"
+  },
+  {
+    "kind": "noCompatibleStream",
+    "message": "aucune version de ce média n'est lisible par cette application"
+  },
+  {
+    "kind": "player",
+    "message": "lecteur indisponible : source invalide"
+  },
+  {
+    "kind": "settings",
+    "message": "réglage non enregistré : débit de lecture non proposé"
+  },
+  {
+    "kind": "sync",
+    "message": "lecture liée impossible : TV introuvable"
+  }
+]

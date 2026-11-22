@@ -1,0 +1,62 @@
+{
+  "input": [
+    {
+      "Id": 120034,
+      "Name": "Dune - Saga"
+    },
+    {
+      "Id": "120034",
+      "Name": "Dune - Saga"
+    },
+    {
+      "Id": "5",
+      "Name": "  "
+    },
+    {
+      "Name": "Sans id"
+    },
+    {
+      "Id": "../x",
+      "Name": "Mauvais"
+    },
+    {
+      "Id": "2",
+      "Name": "B"
+    },
+    {
+      "Id": "3",
+      "Name": "C"
+    },
+    {
+      "Id": "4",
+      "Name": "D"
+    }
+  ],
+  "rows": [
+    {
+      "case": "list",
+      "collections": [
+        {
+          "id": "120034",
+          "name": "Dune - Saga"
+        },
+        {
+          "id": "2",
+          "name": "B"
+        },
+        {
+          "id": "3",
+          "name": "C"
+        }
+      ]
+    },
+    {
+      "case": "none",
+      "collections": []
+    },
+    {
+      "case": "not_a_list",
+      "collections": []
+    }
+  ]
+}

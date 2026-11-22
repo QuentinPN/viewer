@@ -1,0 +1,306 @@
+[
+  {
+    "imageType": "Primary",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=240",
+      "srcset": "http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=240 240w, http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=360 360w, http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=480 480w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "poster"
+  },
+  {
+    "imageType": "Backdrop",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=240",
+      "srcset": "http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=240 240w, http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=360 360w, http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=480 480w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "poster"
+  },
+  {
+    "imageType": "Thumb",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=240",
+      "srcset": "http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=240 240w, http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=360 360w, http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=480 480w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "poster"
+  },
+  {
+    "imageType": "Logo",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=240",
+      "srcset": "http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=240 240w, http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=360 360w, http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=480 480w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "poster"
+  },
+  {
+    "imageType": "Primary",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=400",
+      "srcset": "http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=400 400w, http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=640 640w, http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=800 800w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "library"
+  },
+  {
+    "imageType": "Backdrop",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=400",
+      "srcset": "http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=400 400w, http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=640 640w, http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=800 800w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "library"
+  },
+  {
+    "imageType": "Thumb",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=400",
+      "srcset": "http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=400 400w, http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=640 640w, http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=800 800w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "library"
+  },
+  {
+    "imageType": "Logo",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=400",
+      "srcset": "http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=400 400w, http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=640 640w, http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=800 800w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "library"
+  },
+  {
+    "imageType": "Primary",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=960",
+      "srcset": "http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=960 960w, http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=1440 1440w, http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=1920 1920w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "backdrop"
+  },
+  {
+    "imageType": "Backdrop",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=960",
+      "srcset": "http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=960 960w, http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=1440 1440w, http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=1920 1920w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "backdrop"
+  },
+  {
+    "imageType": "Thumb",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=960",
+      "srcset": "http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=960 960w, http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=1440 1440w, http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=1920 1920w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "backdrop"
+  },
+  {
+    "imageType": "Logo",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=960",
+      "srcset": "http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=960 960w, http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=1440 1440w, http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=1920 1920w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "backdrop"
+  },
+  {
+    "imageType": "Primary",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=320",
+      "srcset": "http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=320 320w, http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=640 640w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "logo"
+  },
+  {
+    "imageType": "Backdrop",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=320",
+      "srcset": "http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=320 320w, http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=640 640w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "logo"
+  },
+  {
+    "imageType": "Thumb",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=320",
+      "srcset": "http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=320 320w, http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=640 640w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "logo"
+  },
+  {
+    "imageType": "Logo",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=320",
+      "srcset": "http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=320 320w, http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=640 640w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "logo"
+  },
+  {
+    "imageType": "Primary",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=320",
+      "srcset": "http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=320 320w, http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=480 480w, http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=640 640w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "thumb"
+  },
+  {
+    "imageType": "Backdrop",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=320",
+      "srcset": "http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=320 320w, http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=480 480w, http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=640 640w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "thumb"
+  },
+  {
+    "imageType": "Thumb",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=320",
+      "srcset": "http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=320 320w, http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=480 480w, http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=640 640w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "thumb"
+  },
+  {
+    "imageType": "Logo",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=320",
+      "srcset": "http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=320 320w, http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=480 480w, http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=640 640w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "thumb"
+  },
+  {
+    "imageType": "Primary",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=120",
+      "srcset": "http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=120 120w, http://emby-img.localhost/srv1/74668/Primary?tag=ab12_6384&maxWidth=240 240w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "photo"
+  },
+  {
+    "imageType": "Backdrop",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=120",
+      "srcset": "http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=120 120w, http://emby-img.localhost/srv1/74668/Backdrop?tag=ab12_6384&maxWidth=240 240w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "photo"
+  },
+  {
+    "imageType": "Thumb",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=120",
+      "srcset": "http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=120 120w, http://emby-img.localhost/srv1/74668/Thumb?tag=ab12_6384&maxWidth=240 240w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "photo"
+  },
+  {
+    "imageType": "Logo",
+    "itemId": "74668",
+    "result": {
+      "src": "http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=120",
+      "srcset": "http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=120 120w, http://emby-img.localhost/srv1/74668/Logo?tag=ab12_6384&maxWidth=240 240w"
+    },
+    "serverId": "srv1",
+    "tag": "ab12_6384",
+    "widths": "photo"
+  },
+  {
+    "case": "no_tag",
+    "imageType": "Primary",
+    "itemId": "1",
+    "result": null,
+    "serverId": "srv1",
+    "tag": null
+  },
+  {
+    "case": "tag_with_quote",
+    "imageType": "Primary",
+    "itemId": "1",
+    "result": null,
+    "serverId": "srv1",
+    "tag": "a\"b"
+  },
+  {
+    "case": "unsafe_item_id",
+    "imageType": "Primary",
+    "itemId": "../x",
+    "result": null,
+    "serverId": "srv1",
+    "tag": "t"
+  },
+  {
+    "case": "unsafe_server_id",
+    "imageType": "Primary",
+    "itemId": "1",
+    "result": null,
+    "serverId": "a/b",
+    "tag": "t"
+  },
+  {
+    "case": "no_widths",
+    "imageType": "Primary",
+    "itemId": "1",
+    "result": null,
+    "serverId": "srv1",
+    "tag": "t"
+  }
+]

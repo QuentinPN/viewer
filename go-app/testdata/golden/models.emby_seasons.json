@@ -1,0 +1,16 @@
+[
+  {
+    "id": "80480",
+    "name": "Épisodes spéciaux",
+    "index": 0,
+    "unplayedCount": 2,
+    "played": false
+  },
+  {
+    "id": "80474",
+    "name": "Saison 1",
+    "index": 1,
+    "unplayedCount": 0,
+    "played": true
+  }
+]

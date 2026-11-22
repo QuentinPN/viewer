@@ -1,0 +1,23 @@
+{
+  "mpvVersion": null,
+  "ffmpegVersion": null,
+  "videoOutput": null,
+  "gpuApi": null,
+  "hwdecCurrent": null,
+  "videoCodec": null,
+  "videoWidth": null,
+  "videoHeight": null,
+  "audioCodec": null,
+  "audioOutput": null,
+  "container": null,
+  "osdWidth": null,
+  "osdHeight": null,
+  "timePos": null,
+  "duration": null,
+  "paused": null,
+  "volume": null,
+  "frameDropCount": null,
+  "decoderFrameDropCount": null,
+  "chapterCount": null,
+  "subtitleOptions": []
+}
