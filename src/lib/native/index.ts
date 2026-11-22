@@ -1,18 +1,9 @@
-// The single seam for every frontend <-> native call. The build picks the
-// backend: `npm run build:wails` (Vite mode "wails") sets VITE_NATIVE to
-// "wails", every other build uses Tauri. vite.config.ts defines the value as
-// a literal, so the unused backend is dropped from the bundle.
-import * as tauri from "./tauri";
+// The single seam for every frontend <-> native call: the Go + Wails app
+// (go-app/), through its runtime (./wails.ts).
 import type { Native } from "./types";
 import * as wails from "./wails";
 
-/** The native backend of this build. */
-export const backend: "tauri" | "wails" =
-  import.meta.env.VITE_NATIVE === "wails" ? "wails" : "tauri";
-
-const impl: Native = import.meta.env.VITE_NATIVE === "wails" ? wails : tauri;
-
-export const invoke: Native["invoke"] = impl.invoke;
-export const listen: Native["listen"] = impl.listen;
-export const window: Native["window"] = impl.window;
+export const invoke: Native["invoke"] = wails.invoke;
+export const listen: Native["listen"] = wails.listen;
+export const window: Native["window"] = wails.window;
 export type { Native, Unlisten } from "./types";

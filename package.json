@@ -10,8 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:wails": "vite build --mode wails --outDir go-app/cmd/viewer/frontend/dist",
-    "build:wails:exe": "npm run build:wails && node scripts/build-wails-exe.ts",
+    "build:wails:exe": "npm run build && node scripts/build-wails-exe.ts",
     "preview": "vite preview",
     "tauri": "tauri",
     "lint": "biome check .",
@@ -22,9 +21,6 @@
     "verify:web": "npm run lint && npm run check && npm run test && npm run build",
     "verify:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml",
     "verify": "npm run verify:web && npm run verify:rust"
-  },
-  "dependencies": {
-    "@tauri-apps/api": "2.12.5"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",

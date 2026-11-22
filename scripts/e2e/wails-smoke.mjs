@@ -24,7 +24,7 @@
 //
 //   node scripts/e2e/wails-smoke.mjs [--build] [--offline] [--out <dir>]
 //
-// --build    npm run build:wails, then a debug `go build` of go-app/cmd/viewer
+// --build    npm run build, then a debug `go build` of go-app/cmd/viewer
 // --offline  first-run screen and exit only: no server is contacted by the script
 // --out      evidence folder (default: <tmp>/viewer-wails-smoke-<timestamp>)
 // --film     id of the film to play (on the first page of the Films grid), even
@@ -347,8 +347,8 @@ function vaultEntries() {
 
 function buildApp() {
   const opts = { cwd: root, stdio: "inherit", shell: true, windowsHide: true };
-  if (spawnSync("npm", ["run", "build:wails"], opts).status !== 0)
-    throw new Error("npm run build:wails a échoué");
+  if (spawnSync("npm", ["run", "build"], opts).status !== 0)
+    throw new Error("npm run build a échoué");
   const go = spawnSync(
     "go",
     [

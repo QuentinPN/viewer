@@ -2,7 +2,7 @@
 export type Unlisten = () => void;
 
 /**
- * What every native backend (Tauri, Wails) implements. `invoke` rejects with
+ * What the native backend (Wails, ./wails.ts) implements. `invoke` rejects with
  * the command's error value itself (e.g. `{ kind, message }`), not a wrapper.
  */
 export interface Native {
