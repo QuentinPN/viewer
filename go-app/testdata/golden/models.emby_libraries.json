@@ -1,0 +1,17 @@
+[
+  {
+    "id": "10",
+    "name": "Anime",
+    "kind": "tvShows",
+    "image": {
+      "src": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/10/Primary?tag=56f6b8b2_6384&maxWidth=400",
+      "srcset": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/10/Primary?tag=56f6b8b2_6384&maxWidth=400 400w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/10/Primary?tag=56f6b8b2_6384&maxWidth=640 640w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/10/Primary?tag=56f6b8b2_6384&maxWidth=800 800w"
+    }
+  },
+  {
+    "id": "5",
+    "name": "Films",
+    "kind": "movies",
+    "image": null
+  }
+]

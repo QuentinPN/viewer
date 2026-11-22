@@ -1,0 +1,45 @@
+[
+  {
+    "decode": "ok",
+    "input": {
+      "audioLanguage": "fre",
+      "subtitleLanguage": "eng",
+      "subtitleMode": "always"
+    },
+    "validate": "ok"
+  },
+  {
+    "decode": "ok",
+    "input": {
+      "audioLanguage": "fra"
+    },
+    "validate": {
+      "kind": "invalidResponse",
+      "message": "réponse inattendue du serveur : langue inconnue : fra"
+    }
+  },
+  {
+    "decode": "ok",
+    "input": {
+      "subtitleLanguage": "xx\n"
+    },
+    "validate": {
+      "kind": "invalidResponse",
+      "message": "réponse inattendue du serveur : langue inconnue : xx\n"
+    }
+  },
+  {
+    "decode": "ok",
+    "input": {
+      "audioLanguage": "eng",
+      "subtitleMode": "forcedOnly"
+    },
+    "validate": "ok"
+  },
+  {
+    "decode": "refused",
+    "input": {
+      "subtitleMode": "smart"
+    }
+  }
+]

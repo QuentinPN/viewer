@@ -1,0 +1,33 @@
+{
+  "source": "http://emby.test/emby/videos/40000/master.m3u8?DeviceId=dev&MediaSourceId=mediasource_40000&PlaySessionId=ps2&VideoCodec=h264&TranscodeReasons=ContainerNotSupported",
+  "httpHeaders": [
+    [
+      "X-Emby-Token",
+      "TOKEN_PLACEHOLDER"
+    ]
+  ],
+  "startSeconds": null,
+  "subtitles": [
+    {
+      "source": "http://emby.test/emby/Videos/40000/mediasource_40000/Subtitles/2/0/Stream.subrip",
+      "title": null,
+      "lang": "fre",
+      "selected": true
+    }
+  ],
+  "tracks": {
+    "audio": {
+      "type": "auto"
+    },
+    "subtitle": {
+      "type": "auto"
+    }
+  },
+  "subtitleStyle": {
+    "size": "normal",
+    "color": "white",
+    "background": "outline",
+    "position": "bottom",
+    "overrideAss": false
+  }
+}

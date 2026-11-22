@@ -1,0 +1,10 @@
+{"Name":"Deux Versions","Id":"30500","Type":"Movie","RunTimeTicks":60000000000,
+        "UserData":{"PlaybackPositionTicks":0,"Played":false},
+        "MediaSources":[
+          {"Protocol":"File","Id":"mediasource_30500","Path":"/share/Films/Deux/Deux - 1080p.mkv",
+           "Name":"1080p","Container":"mkv","Size":4000000000,"Bitrate":8000000,
+           "MediaStreams":[{"Codec":"h264","Type":"Video","Width":1920,"Height":1080,"VideoRange":"SDR"}]},
+          {"Protocol":"File","Id":"30501","Path":"/share/Films/Deux/Deux - 2160p.mkv",
+           "Name":"2160p","Container":"mkv","Size":30000000000,"Bitrate":60000000,
+           "MediaStreams":[{"Codec":"hevc","Type":"Video","Width":3840,"Height":2160,"BitDepth":10,"VideoRange":"HDR 10"}]},
+          {"Protocol":"File","Id":"../bad","Name":"sans identifiant utilisable"}]}

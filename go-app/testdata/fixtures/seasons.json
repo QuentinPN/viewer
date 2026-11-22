@@ -1,0 +1,7 @@
+{"Items":[
+        {"Name":"Épisodes spéciaux","Id":"80480","IndexNumber":0,"Type":"Season","SeriesId":"80473",
+         "UserData":{"UnplayedItemCount":2,"Played":false}},
+        {"Name":"Saison 1","Id":"80474","IndexNumber":1,"Type":"Season","SeriesId":"80473",
+         "UserData":{"UnplayedItemCount":0,"Played":true},"ImageTags":{"Primary":"1cc83503_6385"}},
+        {"Name":"Saison d'un autre","Id":"67639","IndexNumber":1,"Type":"Season","SeriesId":"67638"}
+    ],"TotalRecordCount":3}

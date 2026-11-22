@@ -1,0 +1,19 @@
+[
+  {
+    "id": "60001",
+    "name": "À revoir",
+    "poster": {
+      "src": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/60001/Primary?tag=aa11&maxWidth=240",
+      "srcset": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/60001/Primary?tag=aa11&maxWidth=240 240w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/60001/Primary?tag=aa11&maxWidth=360 360w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/60001/Primary?tag=aa11&maxWidth=480 480w"
+    },
+    "aspectRatio": 1.0,
+    "count": 3
+  },
+  {
+    "id": "60002",
+    "name": "Sans titre",
+    "poster": null,
+    "aspectRatio": null,
+    "count": null
+  }
+]

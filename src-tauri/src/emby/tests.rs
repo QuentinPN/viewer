@@ -13,30 +13,30 @@ use super::credentials::{CredentialStore, MemoryCredentialStore, account};
 use super::models::{SessionStatus, ShelfAccess, SignedInUser};
 use super::session::{EmbyService, SessionFile};
 
-const SERVER_ID: &str = "d969e3d9465b49ec8f73a5f1eab2e86f";
-const USER_ID: &str = "4a1f0e2b9c8d4e7fa6b5c4d3e2f1a0b9";
-const TOKEN: &str = "0123456789abcdef0123456789abcdef";
-const PASSWORD: &str = "s3cret-pw";
+pub(crate) const SERVER_ID: &str = "d969e3d9465b49ec8f73a5f1eab2e86f";
+pub(crate) const USER_ID: &str = "4a1f0e2b9c8d4e7fa6b5c4d3e2f1a0b9";
+pub(crate) const TOKEN: &str = "0123456789abcdef0123456789abcdef";
+pub(crate) const PASSWORD: &str = "s3cret-pw";
 const REAL_DEVICE_ID: &str = "viewer-real-server-test";
 
 #[derive(Debug, Clone)]
-struct Recorded {
-    method: String,
-    path: String,
-    auth: Option<String>,
-    body: String,
+pub(crate) struct Recorded {
+    pub(crate) method: String,
+    pub(crate) path: String,
+    pub(crate) auth: Option<String>,
+    pub(crate) body: String,
 }
 
 type Route = Box<dyn Fn(&Recorded) -> (u16, String) + Send + Sync>;
 
 /// One-request-per-connection HTTP server on 127.0.0.1 recording every request.
-struct FakeEmby {
-    url: String,
+pub(crate) struct FakeEmby {
+    pub(crate) url: String,
     requests: Arc<Mutex<Vec<Recorded>>>,
 }
 
 impl FakeEmby {
-    fn start(route: Route) -> Self {
+    pub(crate) fn start(route: Route) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
         let requests = Arc::new(Mutex::new(Vec::new()));
@@ -103,7 +103,7 @@ impl FakeEmby {
         Self { url, requests }
     }
 
-    fn requests(&self) -> Vec<Recorded> {
+    pub(crate) fn requests(&self) -> Vec<Recorded> {
         self.requests.lock().unwrap().clone()
     }
 }
@@ -125,7 +125,7 @@ fn user() -> String {
 }
 
 /// Fake server behaving like Emby 4.10: correct password, token checks, logout.
-fn emby_like(logout_status: u16) -> Route {
+pub(crate) fn emby_like(logout_status: u16) -> Route {
     Box::new(move |r| {
         let has_token = r
             .auth
@@ -209,7 +209,7 @@ fn years_answer() -> String {
 }
 
 /// `emby_like` plus library browsing. `revoked` makes every token call answer 401.
-fn browse_like(revoked: Arc<AtomicBool>) -> Route {
+pub(crate) fn browse_like(revoked: Arc<AtomicBool>) -> Route {
     let base = emby_like(204);
     Box::new(move |r| {
         let token_ok = !revoked.load(Ordering::SeqCst)
@@ -838,7 +838,7 @@ fn latest_movies() -> String {
     .into()
 }
 
-fn signed_in_browser() -> (FakeEmby, Fixture, Arc<AtomicBool>) {
+pub(crate) fn signed_in_browser() -> (FakeEmby, Fixture, Arc<AtomicBool>) {
     let revoked = Arc::new(AtomicBool::new(false));
     let server = FakeEmby::start(browse_like(Arc::clone(&revoked)));
     let fx = fixture();
@@ -846,8 +846,8 @@ fn signed_in_browser() -> (FakeEmby, Fixture, Arc<AtomicBool>) {
     (server, fx, revoked)
 }
 
-struct Fixture {
-    service: EmbyService,
+pub(crate) struct Fixture {
+    pub(crate) service: EmbyService,
     store: Arc<MemoryCredentialStore>,
     path: PathBuf,
 }
@@ -866,7 +866,7 @@ impl CredentialStore for SharedStore {
     }
 }
 
-fn fixture() -> Fixture {
+pub(crate) fn fixture() -> Fixture {
     let dir = std::env::temp_dir().join(format!("viewer-emby-test-{}", uuid::Uuid::new_v4()));
     reopen(
         Arc::new(MemoryCredentialStore::default()),
@@ -889,7 +889,7 @@ fn reopen(store: Arc<MemoryCredentialStore>, path: PathBuf) -> Fixture {
     }
 }
 
-fn run<T>(f: impl std::future::Future<Output = T>) -> T {
+pub(crate) fn run<T>(f: impl std::future::Future<Output = T>) -> T {
     tauri::async_runtime::block_on(f)
 }
 

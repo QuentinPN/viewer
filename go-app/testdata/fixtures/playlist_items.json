@@ -1,0 +1,9 @@
+{"Items":[
+        {"Name":"Épisode 4","Id":"70229","Type":"Episode","IndexNumber":4,"ParentIndexNumber":5,
+         "SeriesName":"La casa de papel","SeriesId":"70185","RunTimeTicks":30000000000,
+         "UserData":{"PlaybackPositionTicks":0,"Played":true}},
+        {"Name":"Dune","Id":"30207","Type":"Movie","RunTimeTicks":93600000000,
+         "UserData":{"PlaybackPositionTicks":18000000000,"Played":false}},
+        {"Name":"Chanson","Id":"90001","Type":"Audio"},
+        {"Name":"Dune","Id":"30207","Type":"Movie","RunTimeTicks":93600000000}
+    ],"TotalRecordCount":4}

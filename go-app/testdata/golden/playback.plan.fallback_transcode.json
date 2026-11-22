@@ -1,0 +1,47 @@
+{
+  "bitrateLimit": {
+    "bitrate": 400000000,
+    "cap": null,
+    "localAddress": true
+  },
+  "container": "ts",
+  "defaultAudioStreamIndex": null,
+  "defaultSubtitleStreamIndex": 2,
+  "headers": [
+    [
+      "X-Emby-Token",
+      "TOKEN_PLACEHOLDER"
+    ]
+  ],
+  "mediaSourceId": "mediasource_40000",
+  "method": "transcode",
+  "playSessionId": "ps2",
+  "runTimeTicks": null,
+  "startTicks": 0,
+  "streamCount": 2,
+  "subtitles": [
+    {
+      "lang": "fre",
+      "selected": true,
+      "source": "http://emby.test/emby/Videos/40000/mediasource_40000/Subtitles/2/0/Stream.subrip",
+      "title": null
+    }
+  ],
+  "title": {
+    "index": null,
+    "indexEnd": null,
+    "name": "2 Coeurs",
+    "seasonIndex": null,
+    "seriesName": null
+  },
+  "tracks": {
+    "audio": {
+      "type": "auto"
+    },
+    "subtitle": {
+      "type": "auto"
+    }
+  },
+  "transcodeReasons": "échec de la lecture directe",
+  "url": "http://emby.test/emby/videos/40000/master.m3u8?DeviceId=dev&MediaSourceId=mediasource_40000&PlaySessionId=ps2&VideoCodec=h264&TranscodeReasons=ContainerNotSupported"
+}

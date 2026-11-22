@@ -1,0 +1,27 @@
+{
+  "plan": {
+    "bitrateLimit": null,
+    "container": "mkv",
+    "defaultAudioStreamIndex": 1,
+    "defaultSubtitleStreamIndex": null,
+    "headers": [],
+    "mediaSourceId": "mediasource_30207",
+    "method": "directStream",
+    "playSessionId": "abc",
+    "runTimeTicks": null,
+    "startTicks": 0,
+    "streamCount": 0,
+    "subtitles": [],
+    "title": null,
+    "tracks": {
+      "audio": {
+        "type": "auto"
+      },
+      "subtitle": {
+        "type": "auto"
+      }
+    },
+    "transcodeReasons": null,
+    "url": "https://emby.test/emby/videos/30207/original.mkv?DeviceId=dev&MediaSourceId=mediasource_30207&PlaySessionId=abc"
+  }
+}

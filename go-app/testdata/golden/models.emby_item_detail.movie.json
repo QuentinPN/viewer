@@ -1,0 +1,123 @@
+{
+  "id": "30207",
+  "kind": "movie",
+  "name": "2 Coeurs",
+  "originalTitle": "2 Hearts",
+  "year": 2020,
+  "endYear": null,
+  "continuing": null,
+  "overview": "Lorsque la maladie frappe deux personnes opposées…",
+  "tagline": "Découvrez le mystère qui les relie tous.",
+  "genres": [
+    "Romance",
+    "Drame"
+  ],
+  "studios": [
+    "Silver Lion Films"
+  ],
+  "directors": [
+    "Lance Hool"
+  ],
+  "writers": [
+    "Scénariste"
+  ],
+  "cast": [
+    {
+      "name": "Jacob Elordi",
+      "role": "Chris",
+      "id": "30209",
+      "photo": {
+        "src": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30209/Primary?tag=4b8a&maxWidth=120",
+        "srcset": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30209/Primary?tag=4b8a&maxWidth=120 120w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30209/Primary?tag=4b8a&maxWidth=240 240w"
+      }
+    }
+  ],
+  "officialRating": "PG-13",
+  "communityRating": 6.2,
+  "criticRating": 17,
+  "runtimeMinutes": 101,
+  "premiereDate": "2020-10-15T22:00:00.0000000Z",
+  "poster": {
+    "src": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Primary?tag=7b213eb5_6379&maxWidth=240",
+    "srcset": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Primary?tag=7b213eb5_6379&maxWidth=240 240w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Primary?tag=7b213eb5_6379&maxWidth=360 360w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Primary?tag=7b213eb5_6379&maxWidth=480 480w"
+  },
+  "backdrop": {
+    "src": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Backdrop?tag=2edd4b0e_6379&maxWidth=960",
+    "srcset": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Backdrop?tag=2edd4b0e_6379&maxWidth=960 960w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Backdrop?tag=2edd4b0e_6379&maxWidth=1440 1440w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Backdrop?tag=2edd4b0e_6379&maxWidth=1920 1920w"
+  },
+  "logo": {
+    "src": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Logo?tag=028272e6_6379&maxWidth=320",
+    "srcset": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Logo?tag=028272e6_6379&maxWidth=320 320w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Logo?tag=028272e6_6379&maxWidth=640 640w"
+  },
+  "played": false,
+  "favorite": true,
+  "resume": {
+    "positionSeconds": 1831,
+    "fraction": 0.3
+  },
+  "unplayedCount": null,
+  "media": [
+    {
+      "id": "mediasource_30207",
+      "name": "2 Hearts (2020)",
+      "container": "mkv",
+      "sizeBytes": 3760231036,
+      "bitrate": 4928712,
+      "video": {
+        "codec": "hevc",
+        "width": 1920,
+        "height": 1038,
+        "bitDepth": 10,
+        "range": "HDR 10"
+      },
+      "audio": [
+        {
+          "language": "fre",
+          "codec": "ac3",
+          "title": null,
+          "channels": 6,
+          "isDefault": true,
+          "isForced": false,
+          "isExternal": false
+        },
+        {
+          "language": "eng",
+          "codec": "eac3",
+          "title": null,
+          "channels": 6,
+          "isDefault": false,
+          "isForced": false,
+          "isExternal": false
+        }
+      ],
+      "subtitles": [
+        {
+          "language": "fre",
+          "codec": "subrip",
+          "title": "Forcés",
+          "channels": null,
+          "isDefault": true,
+          "isForced": true,
+          "isExternal": false
+        },
+        {
+          "language": "eng",
+          "codec": "PGSSUB",
+          "title": null,
+          "channels": null,
+          "isDefault": false,
+          "isForced": false,
+          "isExternal": false
+        }
+      ]
+    }
+  ],
+  "episode": null,
+  "collections": [
+    {
+      "id": "120034",
+      "name": "Saga 2 Coeurs"
+    }
+  ],
+  "hasLocalTrailer": true
+}

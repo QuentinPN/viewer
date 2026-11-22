@@ -1,0 +1,7 @@
+{"Items":[
+        {"Name":"2 Coeurs","Id":"101","Type":"Movie","ProductionYear":2020,"RunTimeTicks":61033890000,
+         "ImageTags":{"Primary":"7b213eb5_6379"},"PrimaryImageAspectRatio":0.6666666666666666,
+         "UserData":{"PlaybackPositionTicks":0,"PlayCount":1,"IsFavorite":false,"Played":true}},
+        {"Name":"Sans affiche","Id":"102","Type":"Movie","ImageTags":{}},
+        {"Name":"Id douteux","Id":"../x","Type":"Movie"}
+    ],"TotalRecordCount":707}

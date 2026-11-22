@@ -1,0 +1,47 @@
+{
+  "bitrateLimit": {
+    "bitrate": 400000000,
+    "cap": null,
+    "localAddress": true
+  },
+  "container": "ts",
+  "defaultAudioStreamIndex": 2,
+  "defaultSubtitleStreamIndex": 3,
+  "headers": [
+    [
+      "X-Emby-Token",
+      "TOKEN_PLACEHOLDER"
+    ]
+  ],
+  "mediaSourceId": "mediasource_40001",
+  "method": "transcode",
+  "playSessionId": "ps2",
+  "runTimeTicks": null,
+  "startTicks": 0,
+  "streamCount": 5,
+  "subtitles": [
+    {
+      "lang": "fre",
+      "selected": false,
+      "source": "http://emby.test/emby/Videos/40001/mediasource_40001/Subtitles/3/0/Stream.subrip",
+      "title": null
+    },
+    {
+      "lang": "eng",
+      "selected": true,
+      "source": "http://emby.test/emby/Videos/40001/mediasource_40001/Subtitles/4/0/Stream.subrip",
+      "title": null
+    }
+  ],
+  "title": null,
+  "tracks": {
+    "audio": {
+      "type": "auto"
+    },
+    "subtitle": {
+      "type": "auto"
+    }
+  },
+  "transcodeReasons": "raison non précisée",
+  "url": "http://emby.test/emby/videos/40001/master.m3u8?MediaSourceId=mediasource_40001&PlaySessionId=ps2&AudioStreamIndex=2"
+}

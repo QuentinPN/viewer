@@ -1,0 +1,322 @@
+[
+  {
+    "audio": 1,
+    "method": "DirectPlay",
+    "preferences": {},
+    "selection": {
+      "audio": {
+        "index": 1,
+        "type": "stream"
+      },
+      "subtitle": {
+        "index": 4,
+        "type": "stream"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": 4,
+    "streams": "film",
+    "subtitle": {
+      "stream": 4
+    }
+  },
+  {
+    "audio": 1,
+    "method": "DirectPlay",
+    "preferences": {},
+    "selection": {
+      "audio": {
+        "index": 1,
+        "type": "stream"
+      },
+      "subtitle": {
+        "type": "auto"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": null,
+    "streams": "film",
+    "subtitle": "player"
+  },
+  {
+    "audio": 2,
+    "method": "DirectPlay",
+    "preferences": {
+      "audioLanguage": "eng"
+    },
+    "selection": {
+      "audio": {
+        "index": 2,
+        "type": "stream"
+      },
+      "subtitle": {
+        "index": 4,
+        "type": "stream"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": 4,
+    "streams": "film",
+    "subtitle": {
+      "stream": 4
+    }
+  },
+  {
+    "audio": 1,
+    "method": "DirectPlay",
+    "preferences": {
+      "audioLanguage": "jpn"
+    },
+    "selection": {
+      "audio": {
+        "index": 1,
+        "type": "stream"
+      },
+      "subtitle": {
+        "index": 4,
+        "type": "stream"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": 4,
+    "streams": "film",
+    "subtitle": {
+      "stream": 4
+    }
+  },
+  {
+    "audio": 1,
+    "method": "DirectPlay",
+    "preferences": {
+      "subtitleMode": "off"
+    },
+    "selection": {
+      "audio": {
+        "index": 1,
+        "type": "stream"
+      },
+      "subtitle": {
+        "type": "off"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": 4,
+    "streams": "film",
+    "subtitle": "off"
+  },
+  {
+    "audio": 1,
+    "method": "DirectPlay",
+    "preferences": {
+      "subtitleMode": "forcedOnly"
+    },
+    "selection": {
+      "audio": {
+        "index": 1,
+        "type": "stream"
+      },
+      "subtitle": {
+        "index": 4,
+        "type": "stream"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": 4,
+    "streams": "film",
+    "subtitle": {
+      "stream": 4
+    }
+  },
+  {
+    "audio": 2,
+    "method": "DirectPlay",
+    "preferences": {
+      "audioLanguage": "eng",
+      "subtitleMode": "forcedOnly"
+    },
+    "selection": {
+      "audio": {
+        "index": 2,
+        "type": "stream"
+      },
+      "subtitle": {
+        "type": "off"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": 4,
+    "streams": "film",
+    "subtitle": "off"
+  },
+  {
+    "audio": 1,
+    "method": "DirectPlay",
+    "preferences": {
+      "subtitleLanguage": "fre",
+      "subtitleMode": "always"
+    },
+    "selection": {
+      "audio": {
+        "index": 1,
+        "type": "stream"
+      },
+      "subtitle": {
+        "index": 5,
+        "type": "stream"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": 4,
+    "streams": "film",
+    "subtitle": {
+      "stream": 5
+    }
+  },
+  {
+    "audio": 2,
+    "method": "DirectPlay",
+    "preferences": {
+      "audioLanguage": "eng",
+      "subtitleLanguage": "eng",
+      "subtitleMode": "always"
+    },
+    "selection": {
+      "audio": {
+        "index": 2,
+        "type": "stream"
+      },
+      "subtitle": {
+        "index": 6,
+        "type": "stream"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": 4,
+    "streams": "film",
+    "subtitle": {
+      "stream": 6
+    }
+  },
+  {
+    "audio": 1,
+    "method": "DirectPlay",
+    "preferences": {
+      "subtitleLanguage": "spa",
+      "subtitleMode": "always"
+    },
+    "selection": {
+      "audio": {
+        "index": 1,
+        "type": "stream"
+      },
+      "subtitle": {
+        "type": "off"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": 4,
+    "streams": "film",
+    "subtitle": "off"
+  },
+  {
+    "audio": 1,
+    "method": "DirectPlay",
+    "preferences": {
+      "subtitleMode": "always"
+    },
+    "selection": {
+      "audio": {
+        "index": 1,
+        "type": "stream"
+      },
+      "subtitle": {
+        "index": 5,
+        "type": "stream"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": 4,
+    "streams": "film",
+    "subtitle": {
+      "stream": 5
+    }
+  },
+  {
+    "audio": 1,
+    "method": "DirectStream",
+    "preferences": {},
+    "selection": {
+      "audio": {
+        "index": 1,
+        "type": "stream"
+      },
+      "subtitle": {
+        "index": 4,
+        "type": "stream"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": 4,
+    "streams": "film",
+    "subtitle": {
+      "stream": 4
+    }
+  },
+  {
+    "audio": 2,
+    "method": "Transcode",
+    "preferences": {
+      "audioLanguage": "eng",
+      "subtitleLanguage": "eng",
+      "subtitleMode": "always"
+    },
+    "selection": {
+      "audio": {
+        "type": "auto"
+      },
+      "subtitle": {
+        "type": "off"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": 3,
+    "streams": "transcode",
+    "subtitle": "off"
+  },
+  {
+    "audio": 1,
+    "method": "Transcode",
+    "preferences": {},
+    "selection": {
+      "audio": {
+        "type": "auto"
+      },
+      "subtitle": {
+        "type": "auto"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": 4,
+    "streams": "transcode",
+    "subtitle": "player"
+  },
+  {
+    "audio": 1,
+    "method": "Transcode",
+    "preferences": {},
+    "selection": {
+      "audio": {
+        "type": "auto"
+      },
+      "subtitle": {
+        "type": "auto"
+      }
+    },
+    "serverAudio": 1,
+    "serverSubtitle": 3,
+    "streams": "transcode",
+    "subtitle": {
+      "stream": 3
+    }
+  }
+]

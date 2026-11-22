@@ -1,0 +1,59 @@
+[
+  {
+    "id": "30207",
+    "name": "2 Coeurs",
+    "kind": "movie",
+    "seriesName": null,
+    "seasonIndex": null,
+    "index": null,
+    "image": {
+      "src": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Thumb?tag=bbcac8ec_6379&maxWidth=320",
+      "srcset": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Thumb?tag=bbcac8ec_6379&maxWidth=320 320w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Thumb?tag=bbcac8ec_6379&maxWidth=480 480w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/30207/Thumb?tag=bbcac8ec_6379&maxWidth=640 640w"
+    },
+    "runtimeMinutes": 101,
+    "resume": {
+      "positionSeconds": 1831,
+      "fraction": 0.29999726381523445
+    },
+    "played": false,
+    "favorite": false
+  },
+  {
+    "id": "70227",
+    "name": "Le Professeur",
+    "kind": "episode",
+    "seriesName": "La casa de papel",
+    "seasonIndex": 5,
+    "index": 2,
+    "image": {
+      "src": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/70227/Primary?tag=b31c7276_6384&maxWidth=320",
+      "srcset": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/70227/Primary?tag=b31c7276_6384&maxWidth=320 320w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/70227/Primary?tag=b31c7276_6384&maxWidth=480 480w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/70227/Primary?tag=b31c7276_6384&maxWidth=640 640w"
+    },
+    "runtimeMinutes": 50,
+    "resume": {
+      "positionSeconds": 600,
+      "fraction": 0.2
+    },
+    "played": false,
+    "favorite": false
+  },
+  {
+    "id": "70228",
+    "name": "Sans image",
+    "kind": "episode",
+    "seriesName": "La casa de papel",
+    "seasonIndex": 5,
+    "index": 3,
+    "image": {
+      "src": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/70185/Thumb?tag=724ef532_6384&maxWidth=320",
+      "srcset": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/70185/Thumb?tag=724ef532_6384&maxWidth=320 320w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/70185/Thumb?tag=724ef532_6384&maxWidth=480 480w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/70185/Thumb?tag=724ef532_6384&maxWidth=640 640w"
+    },
+    "runtimeMinutes": null,
+    "resume": {
+      "positionSeconds": 60,
+      "fraction": null
+    },
+    "played": false,
+    "favorite": false
+  }
+]

@@ -1,0 +1,52 @@
+{
+  "items": [
+    {
+      "id": "80475",
+      "name": "La Nouvelle Recrue",
+      "index": 1,
+      "indexEnd": null,
+      "seasonIndex": 1,
+      "overview": "Seul membre du club…",
+      "runtimeMinutes": 24,
+      "premiereDate": "2024-07-04T22:00:00.0000000Z",
+      "thumb": {
+        "src": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/80475/Primary?tag=9e617fa1_6385&maxWidth=320",
+        "srcset": "http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/80475/Primary?tag=9e617fa1_6385&maxWidth=320 320w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/80475/Primary?tag=9e617fa1_6385&maxWidth=480 480w, http://emby-img.localhost/d969e3d9465b49ec8f73a5f1eab2e86f/80475/Primary?tag=9e617fa1_6385&maxWidth=640 640w"
+      },
+      "played": false,
+      "resume": {
+        "positionSeconds": 720,
+        "fraction": 0.5
+      }
+    },
+    {
+      "id": "80476",
+      "name": "Double",
+      "index": 2,
+      "indexEnd": 3,
+      "seasonIndex": 1,
+      "overview": null,
+      "runtimeMinutes": null,
+      "premiereDate": null,
+      "thumb": null,
+      "played": true,
+      "resume": null
+    },
+    {
+      "id": "80490",
+      "name": "Date to Date",
+      "index": 1,
+      "indexEnd": null,
+      "seasonIndex": 0,
+      "overview": null,
+      "runtimeMinutes": null,
+      "premiereDate": null,
+      "thumb": null,
+      "played": false,
+      "resume": null
+    }
+  ],
+  "startIndex": 0,
+  "nextIndex": 3,
+  "total": 24
+}

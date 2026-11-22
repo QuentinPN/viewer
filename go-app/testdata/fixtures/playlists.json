@@ -1,0 +1,6 @@
+{"Items":[
+        {"Name":"À revoir","Id":"60001","Type":"Playlist","MediaType":"Video"},
+        {"Name":"  ","Id":"60002","Type":"Playlist","MediaType":"Video"},
+        {"Name":"Id douteux","Id":"../x","Type":"Playlist"},
+        {"Name":"Pas une playlist","Id":"30207","Type":"Movie"}
+    ],"TotalRecordCount":4}

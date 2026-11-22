@@ -1,5 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { invoke, listen, type Unlisten } from "../native";
 import type {
   AppInfo,
   PlaybackRequest,
@@ -23,6 +22,6 @@ export const playerApi = {
   setFullscreen: (fullscreen: boolean) =>
     invoke<boolean>("window_set_fullscreen", { fullscreen }),
   appInfo: () => invoke<AppInfo>("app_info"),
-  onEvent: (handler: (event: PlayerEvent) => void): Promise<UnlistenFn> =>
-    listen<PlayerEvent>(PLAYER_EVENT, (e) => handler(e.payload)),
+  onEvent: (handler: (event: PlayerEvent) => void): Promise<Unlisten> =>
+    listen<PlayerEvent>(PLAYER_EVENT, handler),
 };
