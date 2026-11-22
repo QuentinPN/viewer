@@ -1,6 +1,6 @@
 # Viewer
 
-Client Windows 10/11 natif pour un serveur Emby (hébergé sur un mini-PC, médias sur un NAS QNAP). Stack : Tauri 2, Svelte 5 + TypeScript, Rust, libmpv.
+Client Windows 10/11 natif pour un serveur Emby (hébergé sur un mini-PC, médias sur un NAS QNAP). Stack : Go + Wails v3, Svelte 5 + TypeScript, libmpv. Depuis la v1.7.0, l'installateur publié est l'app Go (`go-app/`) ; l'ancienne app Tauri 2 + Rust (`src-tauri/`) reste dans le dépôt jusqu'au ménage de la bascule.
 
 **État actuel** :
 - Gate 0 (outillage) : validée localement ; la CI n'a encore jamais tourné sur GitHub.

@@ -122,7 +122,7 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **Dépôt public `Viewer-releases` (lecture anonyme) avec manifestes `desktop/latest.json` (format updater Tauri) et `android/latest.json` (versionCode, versionName, notes, url, sha256, taille)** — l'app peut vérifier sans identifiants, alors que le code reste privé.
 - **Updater Tauri appelé uniquement depuis Rust, sans permission JS ; installation NSIS silencieuse** — la webview ne déclenche pas d'installation.
 - **Clé minisign hors du dépôt, l'app n'accepte que la clé publique embarquée** — seule la signature garantit l'intégrité.
-- **`dangerousInsecureTransportProtocol` activé** — le Gitea est en HTTP sur le LAN ; c'est la signature, pas le transport, qui protège. La version du manifeste n'est pas signée : risque accepté sur le LAN.
+- **`dangerousInsecureTransportProtocol` activé** — le Gitea est en HTTP sur le LAN ; c'est la signature, pas le transport, qui protège. La version est signée (`version:` du commentaire de confiance minisign, message ed25519), donc un ancien installateur ne se rejoue pas sous un numéro plus récent.
 - **Pastille de mise à jour jamais affichée pendant la lecture ; builds debug vérifient mais ne téléchargent jamais** — pas d'interruption, pas d'écrasement d'un build de travail.
 - **TV : SHA-256 de l'APK et comparaison du certificat de signature avant de proposer l'installation (lecture par `GET_SIGNATURES` sous API 33), installation via PackageInstaller** — un APK altéré ou signé par un autre ne s'installe pas.
 - **Release Android signée avec le keystore debug de la machine (`~/.android/debug.keystore`)** — le perdre bloque les mises à jour (désinstallation requise), donc le sauvegarder.
@@ -133,10 +133,10 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **NSIS par utilisateur sans droits admin, `libmpv-2.dll` à côté de l'exe, pas de signature de code** — avertissement SmartScreen accepté, usage personnel.
 - **Releases automatiques (Gitea Actions, `release.yml`) : merge commit dans `main` avec Conventional Commits** — les commits `feat` et `fix` publient, `ci`, `docs`, `refactor` et `chore` non. La PR vers `main` lance le mode check ; `workflow_dispatch` en dry-run sur `dev` construit sans publier, à faire avant une release risquée.
 - **Action partagée `QuentinPN/claude-boilerplate/release@v2` sur le runner `homeserver` pour version, changelog, tag et back-merge dans `dev`** — logique de release unique pour tous les dépôts.
-- **Build et publication sur le runner Windows `viewer-pc`** — la clé de l'updater et le keystore Android n'existent que sur ce PC.
+- **Build et publication sur le runner Windows `viewer-pc`** — les clés de l'updater et le keystore Android n'existent que sur ce PC.
 - **Deux pistes : desktop `vX.Y.Z` (tout sauf `android-tv/**`) et Android `android-vX.Y.Z` (seulement `android-tv/**`)** — tags distincts pour que le changelog desktop ignore ceux d'Android. Elles tournent à la suite dans le même job pour qu'Android voie le commit desktop.
 - **Publication idempotente, `workflow_dispatch` avec `publish` republie depuis le tag** — une publication interrompue se rattrape sans nouvelle version.
-- **`CARGO_TARGET_DIR` conservé entre les builds et LTO fine** — le build est bien plus court, le binaire un peu plus gros.
+- **Release desktop = installateur Go/Wails signé deux fois pendant la transition : minisign (clé Tauri) dans `signature`, ed25519 sur `SignedMessage` dans `ed25519` ; clé privée ed25519 dans `~/.viewer/updater-ed25519.key` sur le PC de release comme la clé minisign, clé publique versionnée dans `go-app/build/updater-ed25519.pub`** — l'app Tauri installée passe à l'app Go sans geste du propriétaire ; la minisign tombera quand plus aucune app Tauri ne sera installée.
 - **Versions et changelogs jamais édités à la main sauf bump délibéré** — les messages de commit doivent donc rester lisibles.
 - **Secret `RELEASE_TOKEN` passé en `GITEA_TOKEN`** — Gitea refuse les secrets nommés `GITEA_*`.
 - **Dépôt sur le Gitea du propriétaire (code privé), GitHub gardé comme remote de sauvegarde sans push automatique** — pas de dépendance à un service externe pour livrer.
@@ -151,4 +151,4 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **Bug Rust trouvé pendant le port : petit et visible par l'utilisateur, corrigé dans Rust tout de suite ; sinon noté dans `go-app/MAP.md`, porté tel quel, corrigé ensuite en Go** — évite de faire diverger les deux bases.
 - **Smoke E2E Wails : `VIEWER_E2E_BROWSER_ARGS` lu en debug seulement** — Wails efface `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`.
 - **Réglages de l'UI passés par `ui-settings.json` (dossier de config) : la release Tauri l'exporte à chaque lancement, l'app Wails l'importe quand son localStorage n'a aucune clé de l'app** — le localStorage est rangé par origine, et l'origine change à la bascule (`tauri.localhost` → `wails.localhost`).
-- **Conséquences ouvertes : updater ed25519 de Wails contre minisign (une dernière release Tauri ou une réinstallation manuelle), et peut-être une reconnexion unique si Go ne relit pas l'entrée du coffre** — à trancher à la bascule.
+- **Conséquence ouverte : peut-être une reconnexion unique si Go ne relit pas l'entrée du coffre** — à trancher à la bascule (l'updater est réglé par la double signature, voir « Installateur, release et CI »).
