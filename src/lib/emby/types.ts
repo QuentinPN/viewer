@@ -1,4 +1,4 @@
-// Mirrors src-tauri/src/emby/models.rs and EmbyError. No type here
+// Mirrors go-app/internal/emby/models.go and errors.go. No type here
 // ever carries the access token.
 
 export interface ServerSummary {

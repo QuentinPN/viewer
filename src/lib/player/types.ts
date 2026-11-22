@@ -1,4 +1,4 @@
-// Mirrors src-tauri/src/player/mod.rs (serde camelCase, tagged by "type").
+// Mirrors go-app/internal/player/types.go (camelCase, tagged by "type").
 
 export type TrackKind = "video" | "audio" | "sub";
 

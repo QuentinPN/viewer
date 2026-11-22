@@ -18,7 +18,7 @@ import type {
 } from "./types";
 
 // Thin typed wrapper over the Request commands of
-// src-tauri/src/request/commands.rs. Every call goes through Rust.
+// go-app/internal/request/commands.go. Every call goes through Go.
 export const requestsApi = {
   status: () => invoke<UrStatus>("ur_status"),
   setAddress: (address: string) =>
