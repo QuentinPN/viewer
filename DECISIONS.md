@@ -150,4 +150,5 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **Commits `refactor` ou `chore` jusqu'à la bascule (aucune release)** — l'app livrée reste celle de Tauri.
 - **Bug Rust trouvé pendant le port : petit et visible par l'utilisateur, corrigé dans Rust tout de suite ; sinon noté dans `go-app/MAP.md`, porté tel quel, corrigé ensuite en Go** — évite de faire diverger les deux bases.
 - **Smoke E2E Wails : `VIEWER_E2E_BROWSER_ARGS` lu en debug seulement** — Wails efface `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`.
+- **Réglages de l'UI passés par `ui-settings.json` (dossier de config) : la release Tauri l'exporte à chaque lancement, l'app Wails l'importe quand son localStorage n'a aucune clé de l'app** — le localStorage est rangé par origine, et l'origine change à la bascule (`tauri.localhost` → `wails.localhost`).
 - **Conséquence ouverte : peut-être une reconnexion unique si Go ne relit pas l'entrée du coffre** — à trancher à la bascule (l'updater est réglé par la double signature, voir « Installateur, release et CI »).

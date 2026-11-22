@@ -6,6 +6,10 @@ import * as tauri from "./tauri";
 import type { Native } from "./types";
 import * as wails from "./wails";
 
+/** The native backend of this build. */
+export const backend: "tauri" | "wails" =
+  import.meta.env.VITE_NATIVE === "wails" ? "wails" : "tauri";
+
 const impl: Native = import.meta.env.VITE_NATIVE === "wails" ? wails : tauri;
 
 export const invoke: Native["invoke"] = impl.invoke;

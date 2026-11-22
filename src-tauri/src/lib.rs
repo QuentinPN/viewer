@@ -9,6 +9,7 @@ pub mod segments;
 mod spike;
 mod sync;
 mod system_info;
+mod ui_settings;
 mod updater;
 pub mod request;
 mod video_surface;
@@ -519,6 +520,8 @@ pub fn run() {
             updater::app_update_pending,
             updater::app_update_install,
             updater::app_update_check,
+            ui_settings::ui_settings_export,
+            ui_settings::ui_settings_import,
         ])
         .build(context())
         .expect("error while building Viewer");

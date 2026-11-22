@@ -1,5 +1,35 @@
 # Journal des versions
 
+## 1.6.0 — 2026-11-22
+
+### Nouveautés
+
+- keep UI preferences across the switch to the Go app (settings)
+- bouton « Bande-annonce » sur les fiches, ordinateur et TV (demander)
+
+### Corrections
+
+- export an empty set so a removed key does not come back (settings)
+- wire all 80 commands, sync service, library events and Wails image routes (go)
+- one io::ErrorKind text helper (go)
+- share the strict JSON decoder and the form encoder (go)
+- port the Emby session, playback reporting and segments (wave 4) (go)
+- port the updater with a version-bound ed25519 signature (wave 7) (go)
+- port Request and wire ur_open_trailer (wave 6) (go)
+- port the redacted logger and the DXGI system report (wave 7) (go)
+- port the player engine on libmpv (wave 3) (go)
+- port the sync envelope and leader state machine (wave 5) (go)
+- port the Emby HTTP client, credentials, playback and tracks (wave 2) (go)
+- port the artwork cache and Windows TLS roots (wave 2) (go)
+- port Emby errors, models, titles, quality, chapters, images and server URL (wave 1) (go)
+- silence deliberate staticcheck findings in the mpv binding (go)
+- Wails app shell, command bridge and Wails frontend backend (go)
+- route every frontend-native call through src/lib/native (native)
+- Wails v3 + libmpv playback spike, ADR 0128 and go-wails-anything skill (go)
+- la recherche de Demander garde le focus au retour (tv)
+- idempotent publish to the releases repository (release)
+- run the publish scripts in CI, drop the manual release (release)
+
 ## 1.5.0 — 2026-11-19
 
 - Nouvel onglet « Demander » : parcours « Découvrir », « Films » et « Séries », fiche d'un titre, puis « Demander » un film ou choisis les saisons d'une série. Rien ne part sans ta confirmation (ADR 0125).
