@@ -3,8 +3,8 @@
 //
 // Wave 2 ports only the types the Emby playback negotiation and the goldens need
 // (PlaybackRequest, TrackSelection, TrackPick, ExternalSubtitle, SubtitleStyle, Track,
-// PlayerDiagnostics). The engine (StallWatch, MediaSource, PlayerCommand, PlayerEvent,
-// PlayerError, libmpv) is wave 3, which extends this package.
+// PlayerDiagnostics). Wave 3 adds the engine in the other files: StallWatch, MediaSource,
+// PlayerCommand, PlayerEvent, PlayerError, PlayerEngine and MpvEngine (libmpv).
 //
 // Serde mapping, as in internal/emby: struct field order is the Rust order; an
 // `Option` is a pointer written null; a `Vec` is a List, written [] when nil; a type

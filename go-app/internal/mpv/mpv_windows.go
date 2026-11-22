@@ -28,12 +28,22 @@ const (
 	EventNone            = 0
 	EventShutdown        = 1
 	EventLogMessage      = 2
+	EventCommandReply    = 5
 	EventStartFile       = 6
 	EventEndFile         = 7
 	EventFileLoaded      = 8
 	EventVideoReconfig   = 17
 	EventPlaybackRestart = 21
 	EventPropertyChange  = 22
+)
+
+// End-of-file reasons (mpv_end_file_reason).
+const (
+	EndFileEOF      = 0
+	EndFileStop     = 2
+	EndFileQuit     = 3
+	EndFileError    = 4
+	EndFileRedirect = 5
 )
 
 // requiredAPIMajor is the client API major this binding was written against.
@@ -50,6 +60,7 @@ type API struct {
 	terminateDestroy   *windows.LazyProc
 	setOptionString    *windows.LazyProc
 	command            *windows.LazyProc
+	commandAsync       *windows.LazyProc
 	setPropertyString  *windows.LazyProc
 	getPropertyString  *windows.LazyProc
 	observeProperty    *windows.LazyProc
@@ -78,6 +89,7 @@ func Load(path string) (*API, error) {
 		{&a.terminateDestroy, "mpv_terminate_destroy"},
 		{&a.setOptionString, "mpv_set_option_string"},
 		{&a.command, "mpv_command"},
+		{&a.commandAsync, "mpv_command_async"},
 		{&a.setPropertyString, "mpv_set_property_string"},
 		{&a.getPropertyString, "mpv_get_property_string"},
 		{&a.observeProperty, "mpv_observe_property"},
@@ -94,9 +106,19 @@ func Load(path string) (*API, error) {
 	r, _, _ := a.clientAPIVersion.Call()
 	v := uint32(r) // the C return is a 32-bit unsigned; drop any upper register bits
 	if v>>16 != requiredAPIMajor {
-		return nil, fmt.Errorf("unsupported mpv client API %d.%d", v>>16, v&0xffff)
+		return nil, &UnsupportedAPIError{Major: v >> 16, Minor: v & 0xffff}
 	}
 	return a, nil
+}
+
+// UnsupportedAPIError is returned by Load when the library's client API major is
+// not the one this binding was written against.
+type UnsupportedAPIError struct {
+	Major, Minor uint32
+}
+
+func (e *UnsupportedAPIError) Error() string {
+	return fmt.Sprintf("unsupported mpv client API %d.%d", e.Major, e.Minor)
 }
 
 // Version returns the client API version as "major.minor".
@@ -252,6 +274,33 @@ func (h *Handle) Command(args ...string) error {
 	return h.check(r, "command")
 }
 
+// CommandAsync runs mpv_command_async: the command runs on mpv's threads and its
+// outcome comes back as an EventCommandReply carrying reply in Userdata. An error
+// here means mpv could not parse or queue it, and then no reply follows.
+func (h *Handle) CommandAsync(reply uint64, args ...string) error {
+	if !h.begin() {
+		return ErrDestroyed
+	}
+	defer h.mu.RUnlock()
+	ptrs := make([]*byte, len(args)+1)
+	for i, a := range args {
+		p, err := cstr(a)
+		if err != nil {
+			return err
+		}
+		ptrs[i] = p
+	}
+	// uint64_t reply_userdata fits the 64-bit integer register on Windows x64.
+	r, _, _ := h.api.commandAsync.Call(h.h, uintptr(reply), uintptr(unsafe.Pointer(&ptrs[0])))
+	// mpv copies the arguments before returning: the Go argv only has to live
+	// until the call returns.
+	runtime.KeepAlive(ptrs)
+	if len(args) > 0 {
+		return h.check(r, "command_async "+args[0])
+	}
+	return h.check(r, "command_async")
+}
+
 // SetProperty calls mpv_set_property_string.
 func (h *Handle) SetProperty(name, value string) error {
 	if !h.begin() {
@@ -319,6 +368,13 @@ type Event struct {
 	EndReason int32  // MPV_EVENT_END_FILE
 	LogLevel  string // MPV_EVENT_LOG_MESSAGE
 	LogText   string
+	// MPV_EVENT_PROPERTY_CHANGE: the format mpv delivered (FormatNone when the
+	// property is unavailable), and the value for FormatFlag and FormatDouble.
+	// HasValue is true whenever a string, flag or double value was decoded.
+	Format    int32
+	Flag      bool
+	Double    float64
+	LogPrefix string // MPV_EVENT_LOG_MESSAGE
 }
 
 // Layouts from mpv/client.h (x64: int is 32 bits, pointers 64).
@@ -342,7 +398,6 @@ type rawEventEndFile struct {
 }
 
 type rawEventLogMessage struct {
-	//lint:ignore U1000 mirrors the C mpv_event_log_message layout
 	prefix uintptr
 	level  uintptr
 	text   uintptr
@@ -378,10 +433,24 @@ func (h *Handle) WaitEvent(timeout float64) Event {
 		// SAFETY: for MPV_EVENT_PROPERTY_CHANGE, data points to mpv_event_property.
 		p := *(**rawEventProperty)(unsafe.Pointer(&ev.data))
 		out.Property = goString(p.name)
-		if p.format == FormatString && p.data != 0 {
-			// SAFETY: with MPV_FORMAT_STRING, data points to a char*.
-			out.Value = goString(**(**uintptr)(unsafe.Pointer(&p.data)))
-			out.HasValue = true
+		out.Format = p.format
+		if p.data != 0 {
+			switch p.format {
+			case FormatString:
+				// SAFETY: with MPV_FORMAT_STRING, data points to a char*.
+				out.Value = goString(**(**uintptr)(unsafe.Pointer(&p.data)))
+				out.HasValue = true
+			case FormatFlag:
+				// SAFETY: with MPV_FORMAT_FLAG, data points to a C int (32 bits)
+				// in libmpv's memory, valid until the next wait; read once here.
+				out.Flag = **(**int32)(unsafe.Pointer(&p.data)) != 0
+				out.HasValue = true
+			case FormatDouble:
+				// SAFETY: with MPV_FORMAT_DOUBLE, data points to a C double in
+				// libmpv's memory, valid until the next wait; read once here.
+				out.Double = **(**float64)(unsafe.Pointer(&p.data))
+				out.HasValue = true
+			}
 		}
 	case EventEndFile:
 		// SAFETY: for MPV_EVENT_END_FILE, data points to mpv_event_end_file.
@@ -391,6 +460,7 @@ func (h *Handle) WaitEvent(timeout float64) Event {
 	case EventLogMessage:
 		// SAFETY: for MPV_EVENT_LOG_MESSAGE, data points to mpv_event_log_message.
 		m := *(**rawEventLogMessage)(unsafe.Pointer(&ev.data))
+		out.LogPrefix = goString(m.prefix)
 		out.LogLevel = goString(m.level)
 		out.LogText = goString(m.text)
 	}
