@@ -342,9 +342,11 @@ type rawEventEndFile struct {
 }
 
 type rawEventLogMessage struct {
-	prefix   uintptr
-	level    uintptr
-	text     uintptr
+	//lint:ignore U1000 mirrors the C mpv_event_log_message layout
+	prefix uintptr
+	level  uintptr
+	text   uintptr
+	//lint:ignore U1000 mirrors the C mpv_event_log_message layout
 	logLevel int32
 }
 
@@ -410,6 +412,7 @@ func (h *Handle) Wakeup() {
 func (h *Handle) TerminateDestroy() {
 	if h.closing.Swap(true) {
 		h.mu.Lock() // another destroy is running: wait for it
+		//lint:ignore SA2001 deliberate barrier: waits for the running destroy to finish
 		h.mu.Unlock()
 		return
 	}
