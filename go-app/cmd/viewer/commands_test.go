@@ -24,8 +24,9 @@ type fakeWindow struct {
 	calls                 []string
 }
 
-func (w *fakeWindow) IsFullscreen() bool { return w.fullscreen }
-func (w *fakeWindow) IsMaximised() bool  { return w.maximized }
+func (w *fakeWindow) IsFullscreen() bool    { return w.fullscreen }
+func (w *fakeWindow) IsMaximised() bool     { return w.maximized }
+func (w *fakeWindow) NativeWindow() uintptr { return 0 }
 func (w *fakeWindow) SetFullscreen(on bool) {
 	w.calls = append(w.calls, "fullscreen")
 	w.fullscreen = on
@@ -109,7 +110,8 @@ func rustCommands(t *testing.T) []string {
 	return names
 }
 
-// Every command of the Rust invoke_handler is registered, and nothing else.
+// Every command of the Rust invoke_handler is registered, and nothing else but
+// goOnlyCommands.
 func TestRegisteredCommandsAreTheRustInvokeHandler(t *testing.T) {
 	want := rustCommands(t)
 	if len(want) != 82 {
@@ -118,7 +120,7 @@ func TestRegisteredCommandsAreTheRustInvokeHandler(t *testing.T) {
 	reg := bridge.NewRegistry()
 	a, _, win, _ := testApp(t, true)
 	registerCommands(reg, a, win)
-	got := reg.Names()
+	got := slices.DeleteFunc(reg.Names(), func(n string) bool { return slices.Contains(goOnlyCommands, n) })
 	if !slices.Equal(got, want) {
 		for _, n := range want {
 			if !slices.Contains(got, n) {
@@ -347,5 +349,25 @@ func TestUISettingsHandover(t *testing.T) {
 	}
 	if out, err := invoke(t, b, "ui_settings_import", `{}`); out != `{"viewer.player.volume":"7"}` || err != "" {
 		t.Fatal(out, err)
+	}
+}
+
+// window_set_icon refuses an id that is not an embedded logo, and a window that
+// does not exist yet; it never reaches WM_SETICON with either.
+func Test_go_window_set_icon_validates(t *testing.T) {
+	_, b, _, _ := testApp(t, true)
+	if !slices.Contains(goOnlyCommands, "window_set_icon") {
+		t.Fatal("window_set_icon absent de goOnlyCommands")
+	}
+	for _, id := range []string{"", "debug", "../default", "default.png"} {
+		if _, err := invoke(t, b, "window_set_icon", `{"id":"`+id+`"}`); err != `"logo inconnu"` {
+			t.Errorf("%q : %s", id, err)
+		}
+	}
+	if _, err := invoke(t, b, "window_set_icon", `{"id":"christmas"}`); err != `"fenêtre indisponible"` {
+		t.Errorf("fenêtre sans HWND : %s", err)
+	}
+	if _, err := invoke(t, b, "window_set_icon", `{}`); err == "" {
+		t.Error("sans id")
 	}
 }

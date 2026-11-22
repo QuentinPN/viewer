@@ -193,10 +193,11 @@ func main() {
 // wailsWindow is the Window of window_set_fullscreen.
 type wailsWindow struct{ w *application.WebviewWindow }
 
-func (w wailsWindow) IsFullscreen() bool { return w.w.IsFullscreen() }
-func (w wailsWindow) IsMaximised() bool  { return w.w.IsMaximised() }
-func (w wailsWindow) Maximise()          { w.w.Maximise() }
-func (w wailsWindow) UnMaximise()        { w.w.UnMaximise() }
+func (w wailsWindow) IsFullscreen() bool    { return w.w.IsFullscreen() }
+func (w wailsWindow) IsMaximised() bool     { return w.w.IsMaximised() }
+func (w wailsWindow) Maximise()             { w.w.Maximise() }
+func (w wailsWindow) UnMaximise()           { w.w.UnMaximise() }
+func (w wailsWindow) NativeWindow() uintptr { return uintptr(w.w.NativeWindow()) }
 func (w wailsWindow) SetFullscreen(on bool) {
 	if on {
 		w.w.Fullscreen()

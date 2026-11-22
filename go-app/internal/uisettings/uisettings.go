@@ -31,6 +31,7 @@ var Keys = []string{
 	"viewer.player.skip",
 	"viewer.player.subtitles",
 	"viewer.player.nightMode",
+	"viewer.ui.seasonalLogo",
 }
 
 // Prefixes are the prefixes of the app's per server / user keys.

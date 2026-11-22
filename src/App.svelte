@@ -1,5 +1,6 @@
 <script lang="ts">
 import { onMount, tick } from "svelte";
+import { logo } from "./lib/brand/logo.svelte";
 import ConnectionLost from "./lib/connection/ConnectionLost.svelte";
 import { ConnectionCoordinator } from "./lib/connection/coordinator";
 import { appOf, type ConnectionState } from "./lib/connection/machine";
@@ -177,6 +178,7 @@ async function resumeInterrupted() {
 }
 
 onMount(() => {
+  const stopLogo = logo.start();
   void (async () => {
     // The Gate 1 scenario drives the player from Rust: go straight to it.
     if ((await playerApi.appInfo().catch(() => null))?.spike) {
@@ -185,7 +187,10 @@ onMount(() => {
     }
     await coordinator.start();
   })();
-  return () => coordinator.dispose();
+  return () => {
+    stopLogo();
+    coordinator.dispose();
+  };
 });
 
 async function signOut() {

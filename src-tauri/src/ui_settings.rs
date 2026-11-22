@@ -16,11 +16,12 @@ use tauri::{AppHandle, Manager};
 /// The file in the app config folder.
 pub const FILE_NAME: &str = "ui-settings.json";
 /// The app's localStorage keys with a fixed name (src/lib/native/uiSettings.ts).
-pub const KEYS: [&str; 4] = [
+pub const KEYS: [&str; 5] = [
     "viewer.player.volume",
     "viewer.player.skip",
     "viewer.player.subtitles",
     "viewer.player.nightMode",
+    "viewer.ui.seasonalLogo",
 ];
 /// The prefixes of the app's per server / user keys (src/lib/native/uiSettings.ts).
 pub const PREFIXES: [&str; 4] = [
@@ -189,6 +190,7 @@ mod tests {
         for key in [
             "viewer.player.volume",
             "viewer.player.nightMode",
+            "viewer.ui.seasonalLogo",
             "viewer.home-rows.v1:s:u",
             "viewer.library-options.v1:s:u:l",
         ] {

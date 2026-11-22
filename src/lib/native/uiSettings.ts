@@ -12,6 +12,7 @@ export const UI_SETTING_KEYS: readonly string[] = [
   "viewer.player.skip", // player/segments.ts SKIP_KEY
   "viewer.player.subtitles", // player/subtitles.ts SUBTITLES_KEY
   "viewer.player.nightMode", // player/audiomodes.ts NIGHT_KEY
+  "viewer.ui.seasonalLogo", // brand/logo.svelte.ts SEASONAL_KEY
 ];
 
 /**

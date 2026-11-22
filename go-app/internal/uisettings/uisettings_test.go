@@ -53,7 +53,7 @@ func Test_import_without_export_is_none(t *testing.T) {
 }
 
 func Test_allowed_keys(t *testing.T) {
-	for _, k := range []string{"viewer.player.volume", "viewer.player.nightMode", "viewer.home-rows.v1:s:u", "viewer.library-options.v1:s:u:l"} {
+	for _, k := range []string{"viewer.player.volume", "viewer.player.nightMode", "viewer.ui.seasonalLogo", "viewer.home-rows.v1:s:u", "viewer.library-options.v1:s:u:l"} {
 		if !IsAllowedKey(k) {
 			t.Error(k)
 		}

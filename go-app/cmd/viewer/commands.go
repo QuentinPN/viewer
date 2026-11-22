@@ -14,12 +14,13 @@ import (
 
 // registerCommands wires every command of the Rust invoke_handler
 // (src-tauri/src/lib.rs) under its Tauri name, with the same arguments and
-// results; commands_test.go checks the set against lib.rs. An invoke of any other
+// results (plus goOnlyCommands); commands_test.go checks the set against lib.rs. An invoke of any other
 // name rejects with unknownCommand.
 func registerCommands(reg *bridge.Registry, a *app.App, win Window) {
 	registerPlayer(reg, a, win)
 	registerEmby(reg, a)
 	registerSync(reg, a)
+	registerBrand(reg, win)
 
 	// Request: the 16 ur_* commands bound to the Emby session.
 	handlers := request.Handlers(a.Request, a.Identity)

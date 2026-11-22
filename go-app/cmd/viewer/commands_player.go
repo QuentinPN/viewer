@@ -17,6 +17,8 @@ type Window interface {
 	SetFullscreen(on bool)
 	Maximise()
 	UnMaximise()
+	// NativeWindow is the HWND, 0 before the window exists.
+	NativeWindow() uintptr
 }
 
 // appInfo is `AppInfo` (camelCase).

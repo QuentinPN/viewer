@@ -6,6 +6,7 @@ import { playerApi } from "../player/api";
 import { readSkip, type SkipSetting, saveSkip } from "../player/segments";
 import RequestsSettings from "../requests/RequestsSettings.svelte";
 import About from "./About.svelte";
+import AppearanceSettings from "./AppearanceSettings.svelte";
 import Diagnostics from "./Diagnostics.svelte";
 import {
   cacheUsage,
@@ -146,10 +147,12 @@ onMount(() => {
 </div>
 
 <header class="group">
-  <h2>Informations et maintenance</h2>
-  <p>Rarement utile au quotidien : mises à jour, cache, journaux et détails techniques.</p>
+  <h2>Apparence et maintenance</h2>
+  <p>Rarement utile au quotidien : apparence, mises à jour, cache, journaux et détails techniques.</p>
 </header>
 <div class="columns quiet">
+  <AppearanceSettings />
+
   <UpdateSettings {version} />
 
   <section class="panel" aria-labelledby="settings-artwork">

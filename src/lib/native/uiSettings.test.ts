@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { SEASONAL_KEY } from "../brand/logo.svelte";
 import { versionKey } from "../detail/versions";
 import { prefsKey } from "../home/rows";
 import { storageKey } from "../library/options";
@@ -43,6 +44,7 @@ describe("UI settings keys", () => {
       SKIP_KEY,
       SUBTITLES_KEY,
       NIGHT_KEY,
+      SEASONAL_KEY,
       versionKey("srv:user", "item"),
       prefsKey("srv", "user"),
       storageKey("srv", "user", "lib"),
