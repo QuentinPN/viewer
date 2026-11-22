@@ -1,5 +1,5 @@
 <script lang="ts">
-// App logo, drawn from src-tauri/icons/source/logo.svg (ADR 0031).
+// App logo, drawn from src-tauri/icons/source/logo.svg.
 let { size = 72 }: { size?: number } = $props();
 // Gradient ids must stay unique when several logos are on the page.
 const id = $props.id();

@@ -1,5 +1,5 @@
-// Command spike is the Go + Wails v3 playback spike for ADR 0128: it replays
-// the Gate 1 checks of ADR 0003 (libmpv embedded in the main window HWND under
+// Command spike is the Go + Wails v3 playback spike: it replays
+// the Gate 1 checks (libmpv embedded in the main window HWND under
 // a transparent WebView) without cgo.
 //
 //	spike -gen <dir>                            generate synthetic test media with libmpv
@@ -109,7 +109,7 @@ func main() {
 		}
 	}()
 	// Window close with an active player: cancel it, tear mpv down off the UI
-	// thread (ADR 0003), then close the window again (the hook lets it through
+	// thread, then close the window again (the hook lets it through
 	// once the player is gone) so Wails quits on the last window closed:
 	// app.Quit() made WebView2 log "Error = 1412" in the self-test.
 	win.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {

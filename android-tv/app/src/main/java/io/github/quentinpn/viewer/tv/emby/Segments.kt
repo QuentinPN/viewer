@@ -12,7 +12,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
 
-// Intro and credits segments (ADR 0030, 0048), ported from the Windows client
+// Intro and credits segments, ported from the Windows client
 // (src-tauri/src/segments): Emby's chapter markers first, then IntroDB, then
 // TheIntroDB. Only the film's or series' provider ids leave the app, never a
 // token, a server address or a title.

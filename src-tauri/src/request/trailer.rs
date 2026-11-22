@@ -1,4 +1,4 @@
-//! « Bande-annonce » of a title page of Demander (ADR 0127): the `trailerKey`
+//! « Bande-annonce » of a title page of Demander: the `trailerKey`
 //! of Request is a YouTube video id, opened in the default browser. The
 //! WebView passes the key only; the address is built and checked here.
 

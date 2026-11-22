@@ -18,7 +18,7 @@ private const val TAG = "ViewerMpv"
 private const val VO = "gpu"
 
 /**
- * libmpv through mpv-android's JNI bridge (ADR 0038). libplayer.so keeps a
+ * libmpv through mpv-android's JNI bridge. libplayer.so keeps a
  * single global mpv handle and aborts the process on a second create, so only
  * one engine may be alive at a time.
  *
@@ -113,20 +113,20 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         // `aid` and `sid` are options too: a track selected in the last file would carry over (as on Windows)
         MPVLib.setPropertyString("aid", "auto")
         MPVLib.setPropertyString("sid", "auto")
-        // So are the delays: each file starts in sync, the next episode too (ADR 0062)
+        // So are the delays: each file starts in sync, the next episode too
         for (kind in DelayKind.entries) MPVLib.setPropertyDouble(kind.property, 0.0)
-        // And the speed: each file starts at 1x (ADR 0072)
+        // And the speed: each file starts at 1x
         MPVLib.setPropertyDouble(SPEED_PROPERTY, NORMAL_SPEED)
-        // And the picture format: each file starts at « Original » (ADR 0078)
+        // And the picture format: each file starts at « Original »
         for ((name, value) in fitProperties(VideoFit.Original)) MPVLib.setPropertyString(name, value)
         MPVLib.command(arrayOf("loadfile", file.source.uri, "replace", "-1", file.options))
     }
 
-    /** Blocks until mpv has read the whole file: called off the UI and event threads (ADR 0085). */
+    /** Blocks until mpv has read the whole file: called off the UI and event threads. */
     override fun addSubtitle(source: MediaSource, select: Boolean, title: String?, lang: String?) = calls.read {
         if (released.get()) return@read
-        // `auto` adds the track without selecting it, as on Windows (ADR 0009); title and
-        // language as Windows passes them, else mpv only knows the file name (ADR 0084)
+        // `auto` adds the track without selecting it, as on Windows; title and
+        // language as Windows passes them, else mpv only knows the file name
         MPVLib.command(arrayOf("sub-add", source.uri, if (select) "select" else "auto", title.orEmpty(), lang.orEmpty()))
     }
 
@@ -204,7 +204,7 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
     /**
      * `stop` ends a subtitle still loading (mpv aborts `sub-add` when playback ends); if
      * one does not return in time, mpv is destroyed on its own thread once it has, so the
-     * UI thread never waits on the server (ADR 0085).
+     * UI thread never waits on the server.
      */
     override fun release() {
         if (!released.compareAndSet(false, true)) return
@@ -283,7 +283,7 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
         // Seconds of stream mpv buffers before playing on after an underrun (default 1)
         const val CACHE_PAUSE_WAIT_SECONDS = 4
 
-        // Same hardening as Windows (ADR 0002, 0025); render/decode settings from mpv-android.
+        // Same hardening as Windows; render/decode settings from mpv-android.
         val OPTIONS = listOf(
             "config" to "no",
             "load-scripts" to "no",
@@ -302,11 +302,11 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
             "hwdec-codecs" to "h264,hevc,mpeg4,mpeg2video,vp8,vp9,av1",
             "ao" to "audiotrack,opensles",
             "audio-set-media-role" to "yes",
-            // mpv's default, stated: at another speed, scaletempo2 keeps voices at their pitch (ADR 0072)
+            // mpv's default, stated: at another speed, scaletempo2 keeps voices at their pitch
             "audio-pitch-correction" to "yes",
-            // French subtitles when neither the track menu (ADR 0042) nor the server (ADR 0055) picks one
+            // French subtitles when neither the track menu nor the server picks one
             "slang" to "fr,fre,fra",
-            // The Shield has 3 GB of RAM: a bounded demuxer cache, mpv's own default ahead (ADR 0108).
+            // The Shield has 3 GB of RAM: a bounded demuxer cache, mpv's own default ahead.
             // 64 MiB held 8 s of a 60 Mb/s file: too little over Wi-Fi
             "demuxer-max-bytes" to "${150 * 1024 * 1024}",
             "demuxer-max-back-bytes" to "${32 * 1024 * 1024}",

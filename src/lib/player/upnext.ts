@@ -1,4 +1,4 @@
-// Next episode offered at the end of an episode (ADR 0018).
+// Next episode offered at the end of an episode.
 import type { EpisodeLink, PlaybackTitle } from "../emby/types";
 
 /** Seconds before the next episode starts on its own. */

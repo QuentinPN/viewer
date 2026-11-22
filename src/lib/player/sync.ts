@@ -1,6 +1,6 @@
 import { invoke, listen, type Unlisten } from "../native";
 
-// Linked playback with a TV (ADR 0124). Rust leads the link; the view shows its
+// Linked playback with a TV. Rust leads the link; the view shows its
 // status and notices and carries out the few actions it asks for. Only session
 // ids and device names reach the UI.
 

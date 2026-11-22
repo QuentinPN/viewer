@@ -26,7 +26,7 @@ func userDataOf(u *UserItemData) UserItemData {
 func runeCount(s string) int { return utf8.RuneCountInString(s) }
 
 // videoPlaylists: video playlists, once each, in the server's order; one without
-// `MediaType` is kept, audio ones are dropped (ADR 0122).
+// `MediaType` is kept, audio ones are dropped.
 func videoPlaylists(items []BaseItemDto, server string) List[PlaylistCard] {
 	cards := List[PlaylistCard]{}
 	for _, dto := range items {
@@ -53,7 +53,7 @@ func videoPlaylists(items []BaseItemDto, server string) List[PlaylistCard] {
 }
 
 // playlistEntries: films and episodes of a playlist in its order; anything else has
-// no page to open. An item listed twice shows once, where it comes first (ADR 0122).
+// no page to open. An item listed twice shows once, where it comes first.
 func playlistEntries(items []BaseItemDto, server string) List[WatchItem] {
 	entries := List[WatchItem]{}
 	for _, d := range items {
@@ -250,8 +250,8 @@ func CleanSearch(query string) string {
 }
 
 // TitleMatches is `title_matches`: whether query starts a word of title, ignoring
-// case and accents, as Emby matches titles (ADR 0011). Used on episodes, which the
-// server also finds by their series name (ADR 0020).
+// case and accents, as Emby matches titles. Used on episodes, which the
+// server also finds by their series name.
 func TitleMatches(title, query string) bool {
 	t, q := fold(title), fold(query)
 	if len(q) == 0 {
@@ -318,7 +318,7 @@ func isID(id string) bool {
 }
 
 // isSourceID: media source ids seen: `mediasource_30207` for an item's own file, an
-// item id for a merged version (ADR 0036).
+// item id for a merged version.
 func isSourceID(id string) bool {
 	if id == "" || len(id) > 128 {
 		return false
@@ -363,7 +363,7 @@ func resume(u UserItemData, runtimeTicks *int64) *ResumePoint {
 	return point
 }
 
-// playbackTitle is `playback_title`: title of a film or episode for the player (ADR 0017).
+// playbackTitle is `playback_title`: title of a film or episode for the player.
 func playbackTitle(dto *BaseItemDto) *PlaybackTitle {
 	name := text(&dto.Name)
 	if name == nil {

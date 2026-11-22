@@ -1,5 +1,5 @@
 <script lang="ts">
-// The « Demander » tab (ADR 0125): its state first, then Découvrir, Films,
+// The « Demander » tab: its state first, then Découvrir, Films,
 // Séries and Mes demandes once Request is ready, with a search field; the
 // setup in place otherwise.
 import { onMount, tick } from "svelte";

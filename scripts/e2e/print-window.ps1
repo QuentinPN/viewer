@@ -4,7 +4,7 @@
 .DESCRIPTION
   Used by scripts/e2e/wails-smoke.mjs to see the mpv video under the WebView2
   overlay, which a CDP screenshot (Page.captureScreenshot) does not contain
-  (ADR 0006). PrintWindow(PW_RENDERFULLCONTENT) asks the window to paint itself:
+  (scripted UI tests never take over the desktop). PrintWindow(PW_RENDERFULLCONTENT) asks the window to paint itself:
   nothing else on the screen can end up in the image, and the window is neither
   moved nor activated. Pattern of scripts/spike/run-gate1-go.ps1.
   Prints one JSON line: size, and a coarse 64x36 sample of the client area

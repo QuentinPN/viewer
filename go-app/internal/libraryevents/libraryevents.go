@@ -1,4 +1,4 @@
-// Package libraryevents is the session socket (ADR 0110, 0124), port of
+// Package libraryevents is the session socket, port of
 // src-tauri/src/emby/library_events.rs. While signed in, one WebSocket to the Emby
 // server: it declares the session's capabilities on each connect, carries the
 // linked playback's `SendString` messages and, while the home is shown,

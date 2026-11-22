@@ -7,7 +7,7 @@ import (
 
 // Wails blanks WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS in a package init
 // (webviewloader preventEnvAndRegistryOverrides), so the scripted UI tests
-// (scripts/e2e, ADR 0006) get their DevTools port through VIEWER_E2E_BROWSER_ARGS
+// (scripts/e2e, which never take over the desktop) get their DevTools port through VIEWER_E2E_BROWSER_ARGS
 // and the Wails options, in debug builds only. --disable-features joins Wails' own list: Chromium keeps
 // only the last --disable-features switch.
 func Test_go_debug_build_forwards_the_webview2_arguments(t *testing.T) {

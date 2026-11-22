@@ -1,58 +1,83 @@
-# Viewer — Design and UX specification
+# Viewer — Design et UX
 
-## Experience
+Règles durables pour tout nouvel écran, sur Windows et sur Android TV. Le détail d'un écran existant se lit dans son code, pas ici.
 
-Cinematic desktop media browser in the spirit of the Apple TV app (ADR 0031; it replaces the earlier Infuse inspiration): black canvas, large artwork, translucent floating materials, focus shown by lifting the item, calm spring motion. Original Viewer identity, no Apple assets or fonts. Windows keyboard shortcuts only (Ctrl, Alt, Maj, Win; never ⌘ or ⌥). French copy. Mockups: the design canvas « Viewer — redesign Apple TV » (7 screens at 1440×900).
+## Direction visuelle
 
-## Design tokens (`src/app.css`)
+Navigateur de médias cinématographique, dans l'esprit de l'application Apple TV : fond noir, grandes images, matériaux translucides pour ce qui flotte, focus montré par l'élévation de l'élément, mouvement calme. Identité propre à Viewer : aucun asset ni police d'Apple.
 
-- Background `#000`; solid surfaces `#1C1C1E` / `#2C2C2E` (skeletons, cards without artwork).
-- Text `#F5F5F7`, secondary `rgb(235 235 245 / 0.7)`, muted `rgb(235 235 245 / 0.55)` (≥ 4.5:1 on black).
-- Materials for floating UI (navigation, panels, secondary buttons): `rgb(40 40 46 / 0.6)` with `blur(20px) saturate(180%)`, thin `rgb(255 255 255 / 0.08)` border. Keep blur off large scrolling areas.
-- Primary button: white `#F5F5F7` with black text. Secondary: glass `rgb(120 120 128 / 0.36)`. Accent `#8FD3F5` (from the logo) only for focus rings, links and small markers; success `#64C69A`; danger `#FF6961`.
-- Radius 10/14/22 px, pills for navigation; spacing on a 4 px scale.
-- Focus: cards lift (×1.06, shadow, light ring) on a 320 ms spring; the accent outline stays for the keyboard. Reduced motion: no scale and no transition, the ring stays.
-- Type: Segoe UI Variable Display for headings (−0.02em, line-height 1.05), Segoe UI Variable Text for the rest; no bundled fonts.
+- Les images (affiches, fonds) portent l'écran ; l'interface s'efface autour.
+- Un seul accent, bleu clair, réservé au focus, aux liens et aux petits repères. Jamais en grande surface.
+- Pas d'esthétique de tableau de bord d'administration : pas de cartes encadrées partout, pas de dégradés décoratifs.
+- Raccourcis Windows uniquement (Ctrl, Alt, Maj, Win), jamais ⌘ ni ⌥.
 
-## Main screens
+## Jetons
 
-- Window (ADR 0029): no Windows title bar. A 32 px bar of the app's background holds Windows' three caption buttons on the right (close turns red on hover); its empty area drags the window, double-click maximizes. In the player it sits in the top gradient with no background and fades with the controls; none in fullscreen.
-- Icon: a white "U" holding a blue play triangle on a dark rounded tile, source `src-tauri/icons/source/logo.svg`.
+Ne jamais coder une couleur, un rayon, une durée ou une police en dur : utiliser un jeton, ou en ajouter un.
 
-- Navigation (ADR 0031): a translucent pill floats at the top center over the content, which scrolls under it: search field (icon, widens on focus), "Accueil", one entry per library, "Réglages" (gear) and the account (initial). The current entry is a white pill with black text. Ctrl+1 opens Accueil, Ctrl+2… the libraries in order (shown in the tooltips); Ctrl+F or / focus the search, also from a detail page, which closes. The account opens a menu (user, server, "non chiffré" over HTTP, "Changer de serveur", "Se déconnecter"). Hidden on detail pages. Under 900 px the search shrinks to its icon and covers the pill while focused; an unfocused query tints the icon. With more libraries than fit, only their list scrolls (mouse wheel or keyboard focus), so the search, "Accueil", "Réglages" and the account stay in place; its edges fade where libraries are hidden, and the current library is scrolled into view.
-- « Demander » (ADR 0125): an entry of the navigation pill after the libraries and before « Réglages ». Header « Demander » with a segmented control « Découvrir · Films · Séries · Mes demandes · N » (N = open requests, once known) and a search field. States before it is ready: first setup (« Demander des films et des séries », address field), « Se connecter » after a sign-out (never automatic), « trop ancien », connection refused, unreachable. Découvrir: « Mes demandes en cours » strip (3 at most, « Toutes mes demandes (N) »), quota, poster rows. Films and Séries: filtered poster grid. Title page: backdrop, status, « Demander » when something is left, synopsis, cast. « Demander « Titre » ? » dialog: a film asks at once; a series lists its seasons (« Demander N saisons »), « Envoi… » while sending. Mes demandes: status segments with totals, paged list, timeline. The library search adds « À demander · Request » under the Emby results (« Lire » when on Emby, « Demander » otherwise). Réglages › Demandes: address, connection state, sign-out. Android TV has the same tab, driven by the remote (`ui/requests/`). Captures: `docs/evidence/request/`.
-- Pre-connection shelf « L'étagère » (ADR 0103): 96 px app logo, "Viewer" and a subtitle over the dark radial backdrop; one 230 px tile per saved server and user, newest first: a 16:10 gradient art (hue from the server id) with the server initial, then the name and "user · host"; a « Mot de passe requis » pill only after a rejection; focus ring plus lift (×1.06, `--ease-spring`, `--shadow-lift`); arrow keys move between tiles. With no server: a dashed ghost tile « Aucun serveur pour l'instant » and « Se connecter manuellement » as the white primary button. Below: « Se connecter manuellement » and « Gérer » only (« Terminer » in Gérer mode, red « Oublier » over the tiles, then an « Oublier « X » ? » confirmation with « Annuler » focused and a red « Oublier ce serveur »).
-- Manual sign-in: a frosted 440 px card (ADR 0031) over the shelf behind a blurred scrim: logo, « Connexion manuelle », address, user name and password on one form, « Retour » and « Se connecter », informative errors, a plain-HTTP warning and a note that only the token is kept; compact spacing below 860 px of height so it fits a 720 px window.
-- Home: cinematic hero, Continue Watching, Next Up, Recently Added, Favorites. The heading stays for screen readers only; the hero runs edge to edge under the navigation and the rows scroll to the window edges, aligned on the page margin (`--gutter`, 16 to 80 px). Cards lift on hover and keyboard focus (×1.06, shadow, accent ring), with no scale under reduced motion; white progress bars.
-- Home hero (ADR 0015, 0031): above the rows, one title at a time over its backdrop (left and bottom black scrim), 68 % of the window height (420 to 760 px), logo or title (the logo also bounded by the height), episode or year, overview on three lines, "Lecture"/"Reprendre" (white) and "Plus d'infos" (glass), white progress bar when started. Arrows (on hover or focus, hidden under 800 px) and dots only with several titles; ← → inside the hero, the focus follows. No automatic rotation; 200 ms fade, none with reduced motion. Skeleton of the same height while loading, "Réessayer" on error, hidden when empty.
-- Home row "Favoris" (ADR 0014): between "À suivre" and "Ajoutés récemment", poster cards of favorite films and series by title; hidden when empty; "Réessayer" on error.
-- Films: poster grid, sort/filter/search, skeletons, pagination/virtualization.
-- Grid toolbar (ADR 0013, 0031): under the library title (44 px, count beside it), glass native selects, each with a small label above: "Trier par" (Titre, Date d'ajout, Année, Note), "Ordre" (labels follow the sort: A → Z, Plus récents, Mieux notés…), "Visionnage" (Tous, Non vus, Vus, En cours for films) and "Genre", a glass "Favoris" toggle (star, `aria-pressed`, white with black text when pressed) and "Réinitialiser" when something differs from the defaults. The count beside the title follows the filters (`aria-live`). No match: "Aucun film ne correspond à ces filtres" with "Réinitialiser les filtres", which keeps the sort and puts the focus back on "Trier par".
-- Series (ADR 0031): the film layout, then "Épisodes": season pills (selected white with black text, unwatched count in accent) and a grid of 16:9 episode cards (≥ 260 px) with "Épisode N · durée · date", title and three lines of overview; the thumbnail lifts on hover and focus, white progress bar, dark "vu" check. In an episode card the thumbnail plays and the title (its hit area covers the text) opens the episode page.
-- Episode page (ADR 0016): same layout as a film; above the title the series logo (or name) and "Saison 2 · Épisode 14" in accent caps; air date in the header line; "Réalisation", "Scénario", "Invités"; no favorite toggle; "Épisode précédent" / "Épisode suivant" cards at the bottom (code and title, one column when narrow), crossing seasons. Opened over the series page, which stays mounted and hidden; Escape goes back to the series on that episode, in its season, focused.
-- Film detail (ADR 0031): no navigation; round glass back button at the top left ("Retour", Échap). Backdrop over 72 % of the window height (420 to 760 px) with a left and bottom black scrim, logo or 64 px title, metadata line, glass genre pills, white "Lecture"/"Reprendre" (48 px) and glass secondary buttons; the poster only shows without a backdrop. Synopsis at 17 px beside the credits, then "Informations techniques" in a material panel.
-- Favorite toggle (ADR 0014), film and series detail: glass secondary button "Favori" beside "Lecture", outlined star that fills in yellow when pressed (`aria-pressed`, tooltip "Ajouter aux favoris" / "Retirer des favoris"). Changes at once; on failure it goes back and "Favori non modifié" shows at the bottom of the page.
-- Version chooser (ADR 0036), film and episode detail: only when the item has two versions or more, a glass native select « Version » under the play buttons. Each option gives the server's name (else « Version N »), then resolution, codec and bit depth, HDR (SDR omitted), size or else bitrate: « 2160p — 4K · HEVC 10 bits · HDR 10 · 27,9 Go ». « Lecture »/« Reprendre » play the chosen version; the choice is kept per item, user and server, and its block in « Informations techniques » is tagged « choisie ».
-- Player (ADR 0017, 0031): full-window over the video. Top: round glass back button, series kicker in accent caps ("Série · S1 · É12") and title; server decision small at the top right. Bottom, over a dark gradient, aligned on the page margin: white seek bar (thicker on hover) with elapsed and remaining time ("−1:41:42") below it; then mute and volume on the left, ±10 s around a 72 px white play/pause in the middle, "Chapitres" (only when the item has chapters), "Audio", "Sous-titres", "Informations de lecture" and fullscreen on the right. Chapters (ADR 0034): thin dark cuts on the seek bar at each chapter start, the playing chapter's name centered under it; the "Chapitres" panel lists name and start time, the playing row tinted and focused, ↑/↓/Home/End move between rows and Enter seeks and closes it. No chapter thumbnails (the server extracts none). Panels open above the bar in a dark frosted card (radio lists, the selected row tinted, subtitles start with "Désactivés"); a panel is at most `min(60vh, 420px, 100vh − 240px)` high, so it stays below the title bar in short windows. Controls fade after 3 s without input (opacity only, cursor hidden) and come back on mouse or key; never hidden while paused, buffering, scrubbing, over the bar or with a panel open. The info panel names the cap in effect: « Débit maximal · 4 Mbit/s · accès distant » or « Automatique · réseau local » (ADR 0037). Keys: Space/K, ←/→, F, M, ↑/↓, I, Page Up/Page Down (previous/next chapter; Page Up more than 3 s into a chapter goes back to its start); Escape closes a panel, then leaves fullscreen, then goes back. The volume slider is hidden under 640 px.
-- Next episode (ADR 0018): at the natural end of an episode that has a next one, the bottom bar gives way to a card at the bottom right over an opaque background (the top bar stays): "Épisode suivant", series kicker and code, title, "Lecture dans N s" with a gauge, "Lire maintenant" (white, focused) and "Annuler". The next episode starts after 10 s in the same player (fullscreen and volume kept). Escape, "Annuler" or back close the player. The countdown is not announced every second; no gauge transition with reduced motion. A film, the last episode or an early end close the player as before.
-- Skip intro and credits (ADR 0030): during a segment, a white button at the bottom right above the controls, still shown when they fade: « Passer l'intro », « Passer le générique », or « Épisode suivant » for credits that run to the end of an episode with a next one; credits followed by a scene add a dark « Épisode suivant » beside it. It never takes the focus; Entrée activates it (except in a text field), its tooltip says so. Hidden with a panel open, on the next-episode card, and in the last half second of the segment. « Passer automatiquement » (Réglages › Lecture) skips each segment once per playback; credits to the end then open the next-episode card. Réglages › Lecture credits IntroDB and TheIntroDB.
-- Audio and subtitles (ADR 0035), Réglages › « Audio et sous-titres »: lead text, then glass lists « Langue audio », « Sous-titres » and, for « Forcés uniquement » or « Toujours », « Langue des sous-titres » with a hint; sub-heading « Apparence des sous-titres texte » with « Taille », « Couleur », « Lisibilité », « Position »; a checkbox to restyle ASS too; « S'applique à la prochaine lecture. » Subtitle look: white or yellow (#FFE14D), outline or a 70 % black box, at the bottom, raised (85 %) or at the top.
-- Settings: connection, playback, UI, cache, diagnostics. Implemented: the artwork cache section (size, quota, « Vider le cache des images », ADR 0021); audio and subtitles (ADR 0035); « Qualité de lecture » (ADR 0037): two glass selects « Réseau local » and « Accès distant » (« Maximale (automatique) », 40 to 1,5 Mbit/s), a line saying which one this server's address uses, « S'applique à la prochaine lecture. »; the others come with their behavior.
-- Session opening (ADR 0012): 88 px app logo, "Viewer", "Ouverture de votre session…" and a white sweeping bar (static under reduced motion) on the dark radial backdrop, while the saved session is validated; never the sign-in form.
-- Connection lost ("Serveur injoignable"): a card with the server name, address and user, the error and its hint, "Votre session est conservée", a live status (countdown to the next attempt, check in progress, or attempts suspended) and two actions, "Réessayer" (focused) and "Changer de serveur". At startup it is a full screen; during a session it is a blurred overlay over the app, which stays in place underneath (inert). Same frosted card and logo as sign-in; "Réessayer" white, "Changer de serveur" glass, both full width. Below 600 px of height (a 720 px window at 150 %) the card compacts: no logo, smaller title and buttons (44 px), the two actions side by side.
-- Reauthentication: the sign-in card « Session expirée » with the server (read-only) and username prefilled, focus on the password; "Changer de serveur" as the secondary action over the app, « Retour » to the shelf otherwise. Shown only for a session the server rejected; a signed-out tile opens the same card titled « Connexion à {serveur} ».
-- Server shelf: a tile with a saved token comes back without a password, through the session opening screen.
-- Interrupted playback: a frosted banner "Lecture interrompue." with "Reprendre" (white pill, focused) and "Fermer" (glass pill), above the page the player was opened from.
+- **Windows** : variables CSS dans `src/app.css` (`:root`). Ce fichier est la référence : couleurs, matériaux, rayons, espacements, durées, ressort, ombre de focus, polices, hauteur de barre de titre. Une variable propre à un écran (comme `--gutter`, marge de page de 16 à 80 px, dans `src/lib/detail/ItemDetail.svelte`) reste locale ; si deux écrans la partagent, la remonter dans `src/app.css`.
+- **Android TV** : l'objet `Palette` et le thème dans `android-tv/app/src/main/java/io/github/quentinpn/viewer/tv/ui/Theme.kt`. Il reprend les mêmes valeurs ; un changement de couleur se fait des deux côtés.
 
-## Interaction rules
+Principes :
 
-- Avoid hover-only interactions; keyboard and screen-reader labels required.
-- Clearly distinguish resume, play from start and next episode.
-- Preserve scroll/focus on back navigation.
-- Artwork has placeholders, proper aspect ratios and responsive sizes.
-- Never block navigation while fetching metadata; show meaningful skeleton/empty/error states.
-- Native video overlays must be tested for fullscreen, window resize, focus and multi-monitor DPI.
+- Fond `#000`. Surfaces pleines `#1C1C1E` et `#2C2C2E`, seulement pour les squelettes et les cartes sans image.
+- Texte `#F5F5F7` ; secondaire et discret en blanc cassé translucide, contraste d'au moins 4,5:1 sur le noir.
+- Bouton principal : blanc, texte noir. Bouton secondaire : verre (gris translucide).
+- Matériaux (navigation, panneaux, menus) : gris translucide, flou et saturation, liseré fin. Le flou coûte du GPU : jamais sur une grande zone qui défile.
+- États : succès vert, avertissement ambre, danger rouge ; toujours doublés d'un texte ou d'une icône, jamais la couleur seule.
+- Rayons : 10, 14, 22 px ; pilules pour les commandes de navigation et les boutons de lecture.
 
-## Definition of done for UI
+## Typographie
 
-Visually consistent at 100%, 125%, 150% Windows scaling; keyboard usable; no layout overflow in supported window sizes; reduced motion respected; loading and error states demonstrated with screenshots or tests.
+- Windows : Segoe UI Variable Display pour les titres (interlettrage serré, interligne court), Segoe UI Variable Text pour le reste. Aucune police embarquée.
+- Android TV : police système du thème Material TV (pas de police embarquée non plus).
+- Une hiérarchie courte : titre, sous-titre, corps, légende. Pas de capitales espacées sauf les petits repères en accent (« Saison 2 · Épisode 14 »).
+- En TV, le texte doit rester lisible à plusieurs mètres.
+
+## Espacement et mise en page
+
+- Échelle de 4 px (`--space-*`) ; rester sur l'échelle.
+- Les rangées défilent jusqu'aux bords de la fenêtre et s'alignent sur la marge de page.
+- Respecter les proportions des images (affiche 2:3, vignette 16:9, fond large) et réserver leur place avant chargement.
+- Aucun débordement ni chevauchement à 100 %, 125 % et 150 % de mise à l'échelle Windows, ni dans une fenêtre de 720 px de haut. Compacter plutôt que déborder.
+- Android TV : marge de sécurité d'environ 48 dp sur les côtés.
+
+## Mouvement
+
+- Courts et calmes : 120 ms pour les retours d'état, 200 ms pour les fondus, 320 ms avec ressort pour l'élévation du focus. Durées et courbe viennent des jetons.
+- Le mouvement signale un changement d'état ; pas d'animation décorative.
+- **Mouvement réduit** (Windows : `prefers-reduced-motion` ; Android TV : échelle de durée d'animation à 0) : plus de mise à l'échelle, de transition ni de balayage ; le liseré de focus et les changements d'état restent. Les jetons de durée tombent à 0 dans `src/app.css`, donc une animation écrite avec eux suit la règle sans code en plus ; toute animation à durée en dur doit avoir son propre `@media`.
+
+## Focus, clavier et télécommande
+
+- Tout élément interactif est atteignable et activable au clavier (Windows) ou au D-pad (TV), dans un ordre prévisible. Pas d'interaction réservée au survol.
+- Focus visible partout : contour accent de 2 px (`:focus-visible` global). Sur les cartes, l'élément focalisé monte (×1,06, ombre, liseré clair) en plus du contour.
+- Android TV : le focus ne se perd jamais. Chaque écran a un élément focalisé à l'ouverture ; fermer un panneau ou revenir en arrière remet le focus là où il était ; Retour remonte d'un niveau. Cibles larges, pas de saisie de texte inutile.
+- Windows : Échap ferme le plus haut niveau (panneau, plein écran, page) ; Ctrl+F ou « / » mène à la recherche. Un raccourci est annoncé dans l'infobulle de son bouton.
+- Conserver défilement et focus au retour arrière.
+- Nom accessible sur chaque bouton-icône ; les changements dynamiques (compteurs, erreurs) sont annoncés sans l'être à chaque seconde.
+- Distinguer clairement « Lecture », « Reprendre » et « Épisode suivant ».
+
+## Chargement, vide, erreur
+
+Tout écran qui attend le réseau prévoit les quatre états, et aucun ne bloque la navigation.
+
+- **Chargement** : squelette de la même taille que le contenu final, pas de saut de mise en page.
+- **Vide** : une phrase qui dit pourquoi c'est vide, et l'action utile s'il y en a une (« Réinitialiser les filtres »). Une zone sans contenu utile se masque plutôt que d'afficher un vide.
+- **Erreur** : ce qui s'est passé en mots simples, ce que l'utilisateur peut faire, un bouton « Réessayer » ; le focus sur l'action principale. Une coupure du serveur garde la session et propose de réessayer ou de changer de serveur, sans renvoyer au formulaire de connexion.
+- **Échec d'une action** (favori, par exemple) : l'interface revient à l'état précédent et le dit en une ligne discrète.
+- Jamais de secret, de jeton ni d'adresse interne dans un message d'erreur.
+
+## Textes
+
+Français par défaut ; guillemets « » et espace avant `:` `?` `!`.
+
+- Sobre, direct, au vouvoiement ou à l'infinitif, jamais familier. Pas de point d'exclamation, pas d'émoji.
+- Verbes d'action courts pour les boutons : « Lecture », « Reprendre », « Réessayer », « Retour », « Annuler ».
+- Une action destructive se confirme, avec « Annuler » focalisé par défaut et le bouton dangereux nommé précisément (« Oublier ce serveur »).
+- Dire l'état réel, sans enjoliver (« Serveur injoignable », « Session expirée »). Une connexion non chiffrée est signalée.
+- Dates, durées et tailles au format français (« 27,9 Go », « 1 h 41 »).
+
+## Définition de « fini » pour un écran
+
+Cohérent avec les jetons, utilisable sans souris, quatre états visibles, mouvement réduit respecté, aucun débordement aux tailles et échelles prises en charge, vérifié par capture ou test, pas par supposition.

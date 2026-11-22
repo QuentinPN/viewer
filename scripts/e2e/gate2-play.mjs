@@ -1,5 +1,5 @@
-// Gate 2 playback scenario on the real Emby server, driven over CDP (ADR 0006,
-// ADR 0007): a film from its detail page by keyboard, then an episode from its
+// Gate 2 playback scenario on the real Emby server, driven over CDP:
+// a film from its detail page by keyboard, then an episode from its
 // series. For each: the server's decision shown in the player, playback advancing
 // (engine diagnostics), Escape or ✕ back to the detail page with focus on what
 // started it, player closed. Audio goes to `ao=null` (VIEWER_E2E_SILENT). Screenshots
@@ -100,7 +100,7 @@ try {
   await episode.focus();
   await page.keyboard.press("Enter");
   await checkPlaying(page, "episode");
-  // The controls fade after 3 s (ADR 0017): move the mouse first, as a user would.
+  // The controls fade after 3 s: move the mouse first, as a user would.
   await page.mouse.move(400, 300);
   await page.mouse.move(420, 320);
   await page.getByRole("button", { name: "Revenir", exact: true }).click();

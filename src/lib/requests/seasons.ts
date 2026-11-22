@@ -1,4 +1,4 @@
-// What a member may request (ADR 0125), copied from Request
+// What a member may request, copied from Request
 // (`src/shared/requests.ts:37-49`, `status.ts:97` at main@54cd791).
 import type { MediaItem } from "../emby/types";
 import type {

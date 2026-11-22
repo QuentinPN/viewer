@@ -8,10 +8,10 @@ import io.github.quentinpn.viewer.tv.player.LANGUAGE_CHOICES
 import io.github.quentinpn.viewer.tv.player.LanguageOverrides
 import io.github.quentinpn.viewer.tv.player.SubtitleMode
 
-// Réglages (ADR 0051), ported from the Windows client: the intro and credits options
-// of src/lib/player/segments.ts (ADR 0030) and the streaming caps of
-// src-tauri/src/emby/quality.rs (ADR 0037), then the subtitle look of
-// src/lib/player/subtitles.ts (ADR 0035, 0053), then night mode (ADR 0072, TV only).
+// Réglages, ported from the Windows client: the intro and credits options
+// of src/lib/player/segments.ts and the streaming caps of
+// src-tauri/src/emby/quality.rs, then the subtitle look of
+// src/lib/player/subtitles.ts, then night mode (TV only).
 // Kept on the device, never on the server.
 
 /** Caps offered, in bits per second, as `BITRATE_CHOICES` on Windows; null is "Maximale". */
@@ -29,11 +29,11 @@ data class PlaybackSettings(
     val remoteCap: Long? = null,
     /** Look of text subtitles. */
     val subtitles: SubtitleStyle = SubtitleStyle(),
-    /** Compress the audio's dynamic range, for dialogue at low volume (ADR 0072). */
+    /** Compress the audio's dynamic range, for dialogue at low volume. */
     val nightMode: Boolean = false,
-    /** Audio and subtitle languages set on this device (ADR 0120); all null follows the Emby account. */
+    /** Audio and subtitle languages set on this device; all null follows the Emby account. */
     val languages: LanguageOverrides = LanguageOverrides(),
-    /** « Décalage TV »: how far behind the desktop the TV plays, for its slower picture (ADR 0124). */
+    /** « Décalage TV »: how far behind the desktop the TV plays, for its slower picture. */
     val syncOffsetMs: Int = 0,
 ) {
     /** Drops caps and languages outside the lists, e.g. from an older version. */

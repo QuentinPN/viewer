@@ -1,10 +1,10 @@
 package emby
 
-// Emby API models, port of src-tauri/src/emby/models.rs (ADR 0004), limited to the
+// Emby API models, port of src-tauri/src/emby/models.rs, limited to the
 // fields this client uses. Shapes verified against the OpenAPI spec served by Emby
 // Server 4.10.1.0 and its actual responses.
 //
-// Serde mapping (ADR 0128):
+// Serde mapping:
 //   - field order is the Rust struct order: encoding/json keeps it, and the frontend
 //     sees the same keys in the same order;
 //   - `Option<T>` without skip is a pointer written as null; `skip_serializing_if =
@@ -72,8 +72,8 @@ type UserDto struct {
 	ID     string      `json:"Id" emby:"required"`
 	Name   string      `json:"Name" emby:"required"`
 	Policy *UserPolicy `json:"Policy"`
-	// Configuration is an object, or an array of one as the documentation types it
-	// (ADR 0065): read by the tracks unit, which keeps four fields only.
+	// Configuration is an object, or an array of one as the documentation types it:
+	// read by the tracks unit, which keeps four fields only.
 	Configuration json.RawMessage `json:"Configuration"`
 }
 
@@ -108,11 +108,11 @@ type BaseItemDto struct {
 	ItemType string `json:"Type"`
 	// CollectionType of a library view.
 	CollectionType *string `json:"CollectionType"`
-	// MediaType is `Video` or `Audio` on a playlist (ADR 0122).
+	// MediaType is `Video` or `Audio` on a playlist.
 	MediaType *string `json:"MediaType"`
-	// ChildCount only when asked in `Fields`: the entries of a playlist (ADR 0122).
+	// ChildCount only when asked in `Fields`: the entries of a playlist.
 	ChildCount *uint32 `json:"ChildCount"`
-	// SortName only when asked in `Fields` (letter index, ADR 0101).
+	// SortName only when asked in `Fields` (letter index).
 	SortName                *string           `json:"SortName"`
 	ProductionYear          *int32            `json:"ProductionYear"`
 	ImageTags               map[string]string `json:"ImageTags"`
@@ -128,9 +128,9 @@ type BaseItemDto struct {
 	// Studios: `Studios[].Id` is a number on Emby 4.10.1.0, unlike other ids: only names are read.
 	Studios []NameDto   `json:"Studios"`
 	People  []PersonDto `json:"People"`
-	// Collections: `[{Name, Id}]` of the collections holding the item (ADR 0121).
+	// Collections: `[{Name, Id}]` of the collections holding the item.
 	Collections json.RawMessage `json:"Collections"`
-	// LocalTrailerCount: trailer files stored with the item (ADR 0121).
+	// LocalTrailerCount: trailer files stored with the item.
 	LocalTrailerCount *uint32  `json:"LocalTrailerCount"`
 	OfficialRating    *string  `json:"OfficialRating"`
 	CommunityRating   *float64 `json:"CommunityRating"`
@@ -158,13 +158,13 @@ type BaseItemDto struct {
 	SeriesPrimaryImageTag *string          `json:"SeriesPrimaryImageTag"`
 	MediaSources          []MediaSourceDto `json:"MediaSources"`
 	// ProviderIDs: `Imdb`, `Tmdb`, `Tvdb`…; the key case varies (`IMDB` on a series,
-	// Emby 4.10.2.0). Sent to the intro services only (ADR 0030).
+	// Emby 4.10.2.0). Sent to the intro services only.
 	ProviderIDs map[string]string `json:"ProviderIds"`
 	Chapters    []ChapterDto      `json:"Chapters"`
 }
 
 // ChapterDto is `ChapterInfo`: `MarkerType` is `Chapter`, `IntroStart`, `IntroEnd` or
-// `CreditsStart` (ADR 0030). `Chapter` ones are the player's chapters (ADR 0034).
+// `CreditsStart`. `Chapter` ones are the player's chapters.
 type ChapterDto struct {
 	StartPositionTicks int64   `json:"StartPositionTicks"`
 	Name               *string `json:"Name"`
@@ -188,7 +188,7 @@ type PersonDto struct {
 	// PersonType: `Actor`, `Director`, `Writer`, `Producer`, `GuestStar`…
 	PersonType string `json:"Type"`
 	// ID is documented as a string; read as any value so that a number would not make
-	// the whole item unreadable, as `Studios[].Id` (ADR 0121). nil or null: no id.
+	// the whole item unreadable, as `Studios[].Id`. nil or null: no id.
 	ID json.RawMessage `json:"Id"`
 	// PrimaryImageTag: tag of the person's photo, the `Primary` image of the person item.
 	PrimaryImageTag *string `json:"PrimaryImageTag"`
@@ -196,7 +196,7 @@ type PersonDto struct {
 
 // MediaSourceDto is one file (version) of an item. `Path` is left out on purpose.
 type MediaSourceDto struct {
-	// ID is what PlaybackInfo's `MediaSourceId` names (ADR 0036).
+	// ID is what PlaybackInfo's `MediaSourceId` names.
 	ID           *string          `json:"Id"`
 	Name         *string          `json:"Name"`
 	Container    *string          `json:"Container"`
@@ -277,7 +277,7 @@ type PlaylistCreationResultDto struct {
 	ItemAddedCount uint32 `json:"ItemAddedCount"`
 }
 
-// SessionInfoDto is one entry of `GET /Sessions` (ADR 0124): the fields linked
+// SessionInfoDto is one entry of `GET /Sessions`: the fields linked
 // playback reads. Id is required.
 type SessionInfoDto struct {
 	ID                    string  `json:"Id" emby:"required"`
@@ -289,7 +289,7 @@ type SessionInfoDto struct {
 
 // ------------------------------------------------------- Emby request bodies
 
-// PlaybackInfoRequest is the `POST /Items/{Id}/PlaybackInfo` request body (ADR 0007).
+// PlaybackInfoRequest is the `POST /Items/{Id}/PlaybackInfo` request body.
 type PlaybackInfoRequest struct {
 	UserID              string         `json:"UserId"`
 	MaxStreamingBitrate uint64         `json:"MaxStreamingBitrate"`
@@ -298,10 +298,10 @@ type PlaybackInfoRequest struct {
 	IsPlayback         bool `json:"IsPlayback"`
 	AutoOpenLiveStream bool `json:"AutoOpenLiveStream"`
 	// EnableDirectPlay and EnableDirectStream both false ask for a transcode: the
-	// fallback when the player could not open what the server offered (ADR 0023).
+	// fallback when the player could not open what the server offered.
 	EnableDirectPlay   bool `json:"EnableDirectPlay"`
 	EnableDirectStream bool `json:"EnableDirectStream"`
-	// MediaSourceID and AudioStreamIndex: the audio a transcode must carry (ADR 0035).
+	// MediaSourceID and AudioStreamIndex: the audio a transcode must carry.
 	// Emby 4.10.1.0 ignores `AudioStreamIndex` without `MediaSourceId`.
 	MediaSourceID    *string `json:"MediaSourceId,omitzero"`
 	AudioStreamIndex *int32  `json:"AudioStreamIndex,omitzero"`
@@ -342,7 +342,7 @@ type SubtitleProfile struct {
 }
 
 // PlaybackReportBody is the body of `POST /Sessions/Playing`, `/Sessions/Playing/Progress`
-// and `/Sessions/Playing/Stopped` (ADR 0008). Fields a report does not use are omitted.
+// and `/Sessions/Playing/Stopped`. Fields a report does not use are omitted.
 type PlaybackReportBody struct {
 	ItemID        string  `json:"ItemId"`
 	MediaSourceID string  `json:"MediaSourceId"`
@@ -377,7 +377,7 @@ type SignedInUser struct {
 }
 
 // SavedServer is a session known from `session.json`, shown on the recovery,
-// reauthentication and server screens (ADR 0012). Contains no secret.
+// reauthentication and server screens. Contains no secret.
 type SavedServer struct {
 	URL       string `json:"url"`
 	ID        string `json:"id"`
@@ -388,7 +388,7 @@ type SavedServer struct {
 	UserName  string `json:"userName"`
 }
 
-// ShelfAccess is what a tile of the pre-connection shelf can do (ADR 0103).
+// ShelfAccess is what a tile of the pre-connection shelf can do.
 type ShelfAccess string
 
 const (
@@ -416,7 +416,7 @@ const (
 	StateAuthenticationRequired SessionState = "authenticationRequired"
 )
 
-// SessionStatus is the outcome of validating the saved session (ADR 0012). Network
+// SessionStatus is the outcome of validating the saved session. Network
 // failures keep the session; only a rejection by the server asks for the password
 // again. Serialized as serde's internally tagged enum: `state` first, then the
 // fields of the variant. Build it with the Status* functions.
@@ -501,7 +501,7 @@ func (k LibraryKind) ItemTypes() string {
 	return "Movie"
 }
 
-// SortKey is the order of a library grid (ADR 0013). The zero value is SortName,
+// SortKey is the order of a library grid. The zero value is SortName,
 // the serde default.
 type SortKey int
 
@@ -544,7 +544,7 @@ func (k SortKey) SortBy() string {
 	}
 }
 
-// WatchFilter is the watched state kept in a library grid (ADR 0013). The zero value
+// WatchFilter is the watched state kept in a library grid. The zero value
 // is WatchAll, the serde default.
 type WatchFilter int
 
@@ -590,15 +590,15 @@ func unitVariant(b []byte, names []string, typ string) (int, error) {
 	return 0, fmt.Errorf("%s : variante inconnue %q", typ, s)
 }
 
-// ItemsOptions holds the sort and filters of a library grid, as the UI chooses them
-// (ADR 0013). Every key is optional; the zero value is the default.
+// ItemsOptions holds the sort and filters of a library grid, as the UI chooses them.
+// Every key is optional; the zero value is the default.
 type ItemsOptions struct {
 	Sort       SortKey
 	Descending bool
 	Watch      WatchFilter
 	Favorites  bool
 	Genre      *string
-	// Decade is the first year of a decade (`1990`), or nil for every year (ADR 0101).
+	// Decade is the first year of a decade (`1990`), or nil for every year.
 	Decade *int32
 }
 
@@ -703,7 +703,7 @@ func IsUsableDecade(decade int32) bool {
 	return decade%10 == 0 && decade >= 1880 && decade <= 2190
 }
 
-// SortNameEntry is one title of a library in grid order, for the letter index (ADR 0101).
+// SortNameEntry is one title of a library in grid order, for the letter index.
 type SortNameEntry struct {
 	ID string `json:"id"`
 	// Name is `SortName`, or `Name` when the server sends none.
@@ -722,7 +722,7 @@ func IsUsableGenre(name string) bool {
 }
 
 // ImageRef is an image ready for `<img>`: URLs point at the local `emby-img`
-// protocol (ADR 0005).
+// protocol.
 type ImageRef struct {
 	Src    string `json:"src"`
 	Srcset string `json:"srcset"`
@@ -748,7 +748,7 @@ type MediaItem struct {
 	Played      bool     `json:"played"`
 	// UnplayedCount, series only: episodes not yet watched.
 	UnplayedCount *uint32 `json:"unplayedCount"`
-	// Favorite labels the card menu's favourite action (ADR 0100).
+	// Favorite labels the card menu's favourite action.
 	Favorite bool `json:"favorite"`
 }
 
@@ -760,8 +760,8 @@ const (
 	WatchEpisode WatchKind = "episode"
 )
 
-// WatchItem is a film or episode of the home rows "Reprendre" and "À suivre"
-// (ADR 0010): the card plays it, so it carries what the label needs and a 16:9 image.
+// WatchItem is a film or episode of the home rows "Reprendre" and "À suivre":
+// the card plays it, so it carries what the label needs and a 16:9 image.
 type WatchItem struct {
 	ID   string    `json:"id"`
 	Name string    `json:"name"`
@@ -774,12 +774,12 @@ type WatchItem struct {
 	Image          *ImageRef    `json:"image"`
 	RuntimeMinutes *uint32      `json:"runtimeMinutes"`
 	Resume         *ResumePoint `json:"resume"`
-	// Played and Favorite label the card menu's actions (ADR 0100).
+	// Played and Favorite label the card menu's actions.
 	Played   bool `json:"played"`
 	Favorite bool `json:"favorite"`
 }
 
-// SearchResults is the answer of a search (ADR 0011, 0020): films, series and
+// SearchResults is the answer of a search: films, series and
 // episodes whose title matches `query`.
 type SearchResults struct {
 	// Query is the query as sent to the server, after cleaning; empty when too short.
@@ -803,7 +803,7 @@ type ItemPage struct {
 	Total     uint32 `json:"total"`
 }
 
-// HeroItem is one title of the home hero (ADR 0015): a wide backdrop, what the main
+// HeroItem is one title of the home hero: a wide backdrop, what the main
 // button plays, and the film or series that "Plus d'infos" opens.
 type HeroItem struct {
 	// Detail is the film or series of the detail page; for a resumed episode, its series.
@@ -834,7 +834,7 @@ type HeroEpisode struct {
 	Index       *uint32 `json:"index"`
 }
 
-// DetailKind is a kind of item a detail page shows. Episodes open from their series (ADR 0016).
+// DetailKind is a kind of item a detail page shows. Episodes open from their series.
 type DetailKind string
 
 const (
@@ -843,7 +843,7 @@ const (
 	DetailEpisode DetailKind = "episode"
 )
 
-// EpisodeContext is where an episode sits in its series, and its neighbours (ADR 0016).
+// EpisodeContext is where an episode sits in its series, and its neighbours.
 type EpisodeContext struct {
 	SeriesID   string  `json:"seriesId"`
 	SeriesName string  `json:"seriesName"`
@@ -875,7 +875,7 @@ type ResumePoint struct {
 type CastMember struct {
 	Name string  `json:"name"`
 	Role *string `json:"role"`
-	// ID is the person item, for its page (ADR 0121); nil without a usable id.
+	// ID is the person item, for its page; nil without a usable id.
 	ID    *string   `json:"id"`
 	Photo *ImageRef `json:"photo"`
 }
@@ -905,7 +905,7 @@ type StreamInfo struct {
 // MediaInfo is one version of the item: technical information only. Whether it
 // plays directly is decided later from PlaybackInfo, never from these fields.
 type MediaInfo struct {
-	// ID is passed back to `emby_play` to play this version (ADR 0036); nil when the
+	// ID is passed back to `emby_play` to play this version; nil when the
 	// server gave no usable id.
 	ID        *string          `json:"id"`
 	Name      *string          `json:"name"`
@@ -951,7 +951,7 @@ type ItemDetail struct {
 	// Logo: the series logo for an episode.
 	Logo   *ImageRef `json:"logo"`
 	Played bool      `json:"played"`
-	// Favorite: in the user's favorites (ADR 0014).
+	// Favorite: in the user's favorites.
 	Favorite bool         `json:"favorite"`
 	Resume   *ResumePoint `json:"resume"`
 	// UnplayedCount: series only.
@@ -960,9 +960,9 @@ type ItemDetail struct {
 	Media List[MediaInfo] `json:"media"`
 	// Episode: episode only.
 	Episode *EpisodeContext `json:"episode"`
-	// Collections holding the film or series (ADR 0121), at most three.
+	// Collections holding the film or series, at most three.
 	Collections List[CollectionRef] `json:"collections"`
-	// HasLocalTrailer: a trailer file is stored with the item (ADR 0121).
+	// HasLocalTrailer: a trailer file is stored with the item.
 	HasLocalTrailer bool `json:"hasLocalTrailer"`
 }
 
@@ -1022,7 +1022,7 @@ func (m PlayMethod) AsEmby() string {
 // PlaybackStart is what the UI learns about a started playback: no URL, no token.
 type PlaybackStart struct {
 	ItemID string `json:"itemId"`
-	// MediaSourceID is the version played (ADR 0036): a fallback or a resume plays the same one.
+	// MediaSourceID is the version played: a fallback or a resume plays the same one.
 	MediaSourceID string `json:"mediaSourceId"`
 	// Resume is the start asked for: a fallback keeps "Reprendre" or "Lire depuis le début".
 	Resume    bool       `json:"resume"`
@@ -1030,16 +1030,16 @@ type PlaybackStart struct {
 	Container *string    `json:"container"`
 	// TranscodeReasons: why the server transcodes, in French.
 	TranscodeReasons *string `json:"transcodeReasons"`
-	// Title is what the player shows at the top (ADR 0017); nil when the item could not be read.
+	// Title is what the player shows at the top; nil when the item could not be read.
 	Title *PlaybackTitle `json:"title"`
-	// BitrateCap sent to the server (ADR 0037); nil for "Maximale".
+	// BitrateCap sent to the server; nil for "Maximale".
 	BitrateCap *uint64 `json:"bitrateCap"`
 	// LocalAddress: whether the session's address counts as local, so which cap applied.
 	LocalAddress bool `json:"localAddress"`
 }
 
 // PlaybackTitle is the name of what plays and, for an episode, where it sits in its
-// series (ADR 0017).
+// series.
 type PlaybackTitle struct {
 	Name       string  `json:"name"`
 	SeriesName *string `json:"seriesName"`
@@ -1058,13 +1058,13 @@ type PlaybackStopped struct {
 	Resume *ResumePoint `json:"resume"`
 }
 
-// Playlist is a playlist of the user, offered by the card menu (ADR 0100).
+// Playlist is a playlist of the user, offered by the card menu.
 type Playlist struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
-// PlaylistCard is a video playlist of the home row « Playlists » (ADR 0122).
+// PlaylistCard is a video playlist of the home row « Playlists ».
 type PlaylistCard struct {
 	ID     string    `json:"id"`
 	Name   string    `json:"name"`

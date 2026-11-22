@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Self-update through PackageInstaller (ADR 0112) -->
+    <!-- Self-update through PackageInstaller -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- TV-first, but also installable on a box that does not declare leanback -->

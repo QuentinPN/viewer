@@ -35,7 +35,7 @@ class TracksTest {
 
     @Test
     fun aTranscodeSubtitleIsNamedByTheServerNotByItsFileName() {
-        // The bug seen on the Shield (ADR 0084): mpv titles an untitled file "Stream.ass"
+        // The bug seen on the Shield: mpv titles an untitled file "Stream.ass"
         val url = "http://192.168.1.14:8096/emby/videos/1/m1/Subtitles/3/0/Stream.ass"
         fun sub(title: String?, lang: String?) = readTracks {
             mapOf(

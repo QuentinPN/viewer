@@ -7,7 +7,7 @@ package emby
 //
 // Concurrency, as in Rust: `mu` guards the open session (`current`), `epoch` is bumped
 // under it by every sign-in, sign-out, server change and resume, so a restore started
-// before commits nothing (ADR 0012). `fileMu` guards session.json. A lock is never
+// before commits nothing. `fileMu` guards session.json. A lock is never
 // held across a network call. `tokio::join!` sites run their calls in goroutines and
 // wait for all of them before handling the results in Rust's order.
 
@@ -36,7 +36,7 @@ type SessionFile struct {
 	// LastServerURL prefills the connection form after sign-out or an expired session.
 	LastServerURL *string        `json:"lastServerUrl"`
 	Session       *SessionRecord `json:"session"`
-	// Saved: sessions set aside by "Changer de serveur", newest first (ADR 0012).
+	// Saved: sessions set aside by "Changer de serveur", newest first.
 	// Their tokens stay in the credential store.
 	Saved List[SessionRecord] `json:"saved"`
 	// Reauth: non-secret hint of the last session the server rejected: prefills the
@@ -53,7 +53,7 @@ type SessionRecord struct {
 	UserID        string `json:"userId" emby:"required"`
 	UserName      string `json:"userName" emby:"required"`
 	// Rejected: the server rejected this session before it was put on the shelf: its
-	// tile says "Mot de passe requis" (ADR 0103). Left out when false.
+	// tile says "Mot de passe requis". Left out when false.
 	Rejected bool `json:"rejected,omitempty"`
 }
 
@@ -171,12 +171,12 @@ const (
 	MaxPage uint32 = 200
 	// homeRow: cards per home row, about two window widths.
 	homeRow uint32 = 16
-	// heroSize: most titles of the home hero (ADR 0015).
+	// heroSize: most titles of the home hero.
 	heroSize = 5
-	// SearchShown: search results shown per type (ADR 0011); one more is asked to
+	// SearchShown: search results shown per type; one more is asked to
 	// know if more exist.
 	SearchShown = 24
-	// SearchEpisodesAsked: episodes asked per search (ADR 0020): Emby also matches the
+	// SearchEpisodesAsked: episodes asked per search: Emby also matches the
 	// series name, so the episodes of a matching series come first and are dropped.
 	SearchEpisodesAsked uint32 = 100
 	// searchMinChars: shorter queries are not sent: the server answers nothing to one letter.
@@ -186,11 +186,11 @@ const (
 	imageConcurrent = 6
 	// MaxSaved: sessions kept aside by "Changer de serveur"; the oldest is forgotten beyond.
 	MaxSaved = 8
-	// playlistsMax: playlists the card menu offers (ADR 0100).
+	// playlistsMax: playlists the card menu offers.
 	playlistsMax uint32 = 200
-	// homePlaylists: playlists on the home row (ADR 0122).
+	// homePlaylists: playlists on the home row.
 	homePlaylists uint32 = 50
-	// playlistItemsMax: entries read for one playlist: one request, no paging (ADR 0122).
+	// playlistItemsMax: entries read for one playlist: one request, no paging.
 	playlistItemsMax uint32 = 300
 	// PlaylistNameMax is the longest playlist name accepted, in characters.
 	PlaylistNameMax = 200
@@ -203,7 +203,7 @@ type current struct {
 	libraries []Library
 }
 
-// ArtworkStore is the disk cache of artwork the service uses (ADR 0019), implemented
+// ArtworkStore is the disk cache of artwork the service uses, implemented
 // by *artworkcache.Cache. An interface because artworkcache imports this package.
 // Its Stats and Clear (`artwork_stats`, `clear_artwork` of session.rs) are called by
 // the app shell on the cache itself: see ArtworkCache.
@@ -227,11 +227,11 @@ type EmbyService struct {
 	mu      sync.Mutex
 	current *current
 
-	// imagePermits bounds concurrent artwork downloads to spare the server (ADR 0005).
+	// imagePermits bounds concurrent artwork downloads to spare the server.
 	imagePermits chan struct{}
-	// bitrateOverride: debug limit of the scenarios (ADR 0009); wins over the setting.
+	// bitrateOverride: debug limit of the scenarios; wins over the setting.
 	bitrateOverride *uint64
-	// quality: bitrate caps per server (ADR 0037).
+	// quality: bitrate caps per server.
 	quality *QualityStore
 	epoch   atomic.Uint64
 	// timeouts of new clients; nil keeps the client defaults.
@@ -242,7 +242,7 @@ type EmbyService struct {
 	expiredMu sync.Mutex
 	expired   *Client
 
-	// artwork kept on disk across launches (ADR 0019); nil fetches every time.
+	// artwork kept on disk across launches; nil fetches every time.
 	artwork ArtworkStore
 }
 
@@ -263,7 +263,7 @@ func (s *EmbyService) WithArtworkCache(cache ArtworkStore) *EmbyService {
 }
 
 // ArtworkCache is `artwork_cache`: the disk cache, shared with Request artwork
-// (one quota, ADR 0125); nil without one. `artwork_stats` and `clear_artwork` are
+// (one quota); nil without one. `artwork_stats` and `clear_artwork` are
 // its Stats and Clear (the app shell holds the *artworkcache.Cache).
 func (s *EmbyService) ArtworkCache() ArtworkStore { return s.artwork }
 
@@ -299,7 +299,7 @@ func (s *EmbyService) newClient(url string) (*Client, error) {
 	return NewClient(server, s.device())
 }
 
-// PlaybackQuality is `playback_quality`: bitrate caps of the current server (ADR 0037).
+// PlaybackQuality is `playback_quality`: bitrate caps of the current server.
 func (s *EmbyService) PlaybackQuality() (PlaybackQuality, error) {
 	serverID, local, err := s.qualityScope()
 	if err != nil {
@@ -330,7 +330,7 @@ func (s *EmbyService) qualityScope() (string, bool, error) {
 }
 
 // streamingLimit: the debug override, then the server's cap for the kind of address
-// of the session, then the default limit (ADR 0037).
+// of the session, then the default limit.
 func (s *EmbyService) streamingLimit(client *Client) StreamingLimit {
 	local := client.Server().IsLocal()
 	cap := s.bitrateOverride
@@ -379,7 +379,7 @@ func (s *EmbyService) setCurrent(c *current) {
 	s.mu.Unlock()
 }
 
-// scope is the server id of the open session, or empty: scopes image URLs (ADR 0012).
+// scope is the server id of the open session, or empty: scopes image URLs.
 func (s *EmbyService) scope() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -430,7 +430,7 @@ func (s *EmbyService) Client() (*Client, error) {
 }
 
 // ExchangeIdentity is `exchange_identity`: server id, user id and token of the open
-// session, traded for a Request session (ADR 0125). The only way the Emby token
+// session, traded for a Request session. The only way the Emby token
 // leaves this service; request.IdentitySource wraps it.
 func (s *EmbyService) ExchangeIdentity() (serverID, userID string, token AccessToken, err error) {
 	s.mu.Lock()
@@ -451,7 +451,7 @@ func RequestAccount(serverID, userID string) string {
 	return "request/" + CredentialAccount(serverID, userID)
 }
 
-// forgetRequest: the Request session of an Emby account ends with it (ADR 0125).
+// forgetRequest: the Request session of an Emby account ends with it.
 func (s *EmbyService) forgetRequest(serverID, userID string) {
 	if err := s.store.Delete(RequestAccount(serverID, userID)); err != nil {
 		s.log.Warn("Request token not deleted", "kind", kindText(err))
@@ -469,8 +469,8 @@ func (s *EmbyService) session() (*Client, string, error) {
 
 // expireOn401 is `expire_on_401` on an error: a token rejected while browsing is
 // forgotten like at startup, so the next launch does not retry it. Only the session
-// whose token was refused ends: a late 401 from a previous session answers Cancelled
-// (ADR 0012). Any other error, and nil, pass through.
+// whose token was refused ends: a late 401 from a previous session answers Cancelled.
+// Any other error, and nil, pass through.
 func (s *EmbyService) expireOn401(client *Client, err error) error {
 	if !errors.Is(err, ErrSessionExpired) {
 		return err
@@ -612,7 +612,7 @@ func checkOptions(o ItemsOptions) error {
 }
 
 // Items is `items`: one page of films or series of a library, sorted and filtered as
-// asked (ADR 0013). limit is clamped to 1..=MaxPage.
+// asked. limit is clamped to 1..=MaxPage.
 func (s *EmbyService) Items(ctx context.Context, libraryID string, startIndex, limit uint32, options ItemsOptions) (ItemPage, error) {
 	if err := checkOptions(options); err != nil {
 		return ItemPage{}, err
@@ -650,7 +650,7 @@ func saturatingAdd(a uint32, n int) uint32 {
 }
 
 // SortNames is `sort_names`: every title of a library grid in its order, with its
-// sort name: the letter rail jumps from it (ADR 0101). Unlike pages, nothing is
+// sort name: the letter rail jumps from it. Unlike pages, nothing is
 // dropped, so positions match the server's.
 func (s *EmbyService) SortNames(ctx context.Context, libraryID string, options ItemsOptions) (List[SortNameEntry], error) {
 	if err := checkOptions(options); err != nil {
@@ -682,7 +682,7 @@ func (s *EmbyService) SortNames(ctx context.Context, libraryID string, options I
 }
 
 // RandomItem is `random_item`: one title drawn by the server among those the grid
-// shows (ADR 0101), nil when none matches.
+// shows, nil when none matches.
 func (s *EmbyService) RandomItem(ctx context.Context, libraryID string, options ItemsOptions) (*MediaItem, error) {
 	if err := checkOptions(options); err != nil {
 		return nil, err
@@ -711,7 +711,7 @@ func (s *EmbyService) RandomItem(ctx context.Context, libraryID string, options 
 }
 
 // ProductionYears is `production_years`: production years of a library, newest
-// first, without repeats (decade filter, ADR 0101).
+// first, without repeats (decade filter).
 func (s *EmbyService) ProductionYears(ctx context.Context, libraryID string) (List[int32], error) {
 	kind, err := s.knownLibrary(ctx, libraryID)
 	if err != nil {
@@ -787,7 +787,7 @@ func watchItems(items []BaseItemDto, scope string) List[WatchItem] {
 	return out
 }
 
-// Hero is `hero`, the home hero (ADR 0015): up to five titles with a backdrop, the
+// Hero is `hero`, the home hero: up to five titles with a backdrop, the
 // ones to resume first, then films and series added recently and not watched; one
 // title per film or series. A series plays its first episode not watched yet.
 func (s *EmbyService) Hero(ctx context.Context) (List[HeroItem], error) {
@@ -862,7 +862,7 @@ func (s *EmbyService) NextUp(ctx context.Context) (List[WatchItem], error) {
 	}
 	scope := s.scope()
 	// Emby 4.10.1.0 answers an empty `/Shows/NextUp` once an episode is watched, and
-	// lists the next one in its "resume" home section instead (ADR 0010).
+	// lists the next one in its "resume" home section instead.
 	showsCh := async(func() (itemsPage, error) { return client.NextUp(ctx, userID, homeRow) })
 	sectionCh := async(func() ([]BaseItemDto, error) { return s.resumeSection(ctx, client, userID) })
 	sh, sec := <-showsCh, <-sectionCh
@@ -925,8 +925,8 @@ func (s *EmbyService) resumeSection(ctx context.Context, client *Client, userID 
 	return page.Items, nil
 }
 
-// Search is `search`: films, series and episodes whose title matches query (ADR
-// 0011, 0020), all searched at once. A query shorter than two characters once
+// Search is `search`: films, series and episodes whose title matches query,
+// all searched at once. A query shorter than two characters once
 // cleaned reaches no server.
 func (s *EmbyService) Search(ctx context.Context, query string) (SearchResults, error) {
 	query = CleanSearch(query)
@@ -1024,7 +1024,7 @@ func (s *EmbyService) Latest(ctx context.Context, libraryID string) (List[MediaI
 	return out, nil
 }
 
-// Favorites is `favorites`: home row "Favoris" (ADR 0014): favorite films and
+// Favorites is `favorites`: home row "Favoris": favorite films and
 // series, by title.
 func (s *EmbyService) Favorites(ctx context.Context) (List[MediaItem], error) {
 	client, userID, err := s.session()
@@ -1070,7 +1070,7 @@ func (s *EmbyService) SetFavorite(ctx context.Context, itemID string, favorite b
 }
 
 // SetPlayed is `set_played`: marks a film, episode, season or series played or
-// unplayed (ADR 0096), then reads back what the server holds.
+// unplayed, then reads back what the server holds.
 func (s *EmbyService) SetPlayed(ctx context.Context, itemID string, played bool) (PlaybackStopped, error) {
 	if !isID(itemID) {
 		return PlaybackStopped{}, errInvalidID
@@ -1092,8 +1092,8 @@ func (s *EmbyService) SetPlayed(ctx context.Context, itemID string, played bool)
 	return s.stateAfterChange(ctx, itemID, data), nil
 }
 
-// HideFromResume is `hide_from_resume`: takes a film or episode out of "Reprendre"
-// (ADR 0096), then reads back the state as SetPlayed.
+// HideFromResume is `hide_from_resume`: takes a film or episode out of "Reprendre",
+// then reads back the state as SetPlayed.
 func (s *EmbyService) HideFromResume(ctx context.Context, itemID string) (PlaybackStopped, error) {
 	if !isID(itemID) {
 		return PlaybackStopped{}, errInvalidID
@@ -1111,7 +1111,7 @@ func (s *EmbyService) HideFromResume(ctx context.Context, itemID string) (Playba
 }
 
 // SeriesNextEpisode is `series_next_episode`: next episode to play of a series, as
-// the home hero picks it (ADR 0100); nil when all are watched.
+// the home hero picks it; nil when all are watched.
 func (s *EmbyService) SeriesNextEpisode(ctx context.Context, seriesID string) (*WatchItem, error) {
 	if !isID(seriesID) {
 		return nil, errInvalidID
@@ -1137,7 +1137,7 @@ func (s *EmbyService) SeriesNextEpisode(ctx context.Context, seriesID string) (*
 	return nil, nil
 }
 
-// Playlists is `playlists`: playlists of the user, by name (ADR 0100).
+// Playlists is `playlists`: playlists of the user, by name.
 func (s *EmbyService) Playlists(ctx context.Context) (List[Playlist], error) {
 	client, userID, err := s.session()
 	if err != nil {
@@ -1158,7 +1158,7 @@ func (s *EmbyService) Playlists(ctx context.Context) (List[Playlist], error) {
 	return out, nil
 }
 
-// HomePlaylists is `home_playlists`: home row « Playlists » (ADR 0122): the user's
+// HomePlaylists is `home_playlists`: home row « Playlists »: the user's
 // video playlists, A → Z.
 func (s *EmbyService) HomePlaylists(ctx context.Context) (List[PlaylistCard], error) {
 	client, userID, err := s.session()
@@ -1174,7 +1174,7 @@ func (s *EmbyService) HomePlaylists(ctx context.Context) (List[PlaylistCard], er
 	return videoPlaylists(page.Items, scope), nil
 }
 
-// PlaylistItems is `playlist_items`: films and episodes of a playlist, in its order (ADR 0122).
+// PlaylistItems is `playlist_items`: films and episodes of a playlist, in its order.
 func (s *EmbyService) PlaylistItems(ctx context.Context, playlistID string) (List[WatchItem], error) {
 	if !isID(playlistID) {
 		return nil, errInvalidID
@@ -1193,7 +1193,7 @@ func (s *EmbyService) PlaylistItems(ctx context.Context, playlistID string) (Lis
 }
 
 // AddToPlaylist is `add_to_playlist`: appends a film or episode to one of the
-// user's playlists (ADR 0100); returns how many items the server says it added.
+// user's playlists; returns how many items the server says it added.
 func (s *EmbyService) AddToPlaylist(ctx context.Context, playlistID, itemID string) (uint32, error) {
 	if !isID(playlistID) || !isID(itemID) {
 		return 0, errInvalidID
@@ -1211,7 +1211,7 @@ func (s *EmbyService) AddToPlaylist(ctx context.Context, playlistID, itemID stri
 }
 
 // CreatePlaylist is `create_playlist`: creates a video playlist named name holding
-// the item (ADR 0100).
+// the item.
 func (s *EmbyService) CreatePlaylist(ctx context.Context, name, itemID string) (PlaylistCreated, error) {
 	name, ok := playlistName(name)
 	if !ok {
@@ -1249,7 +1249,7 @@ func (s *EmbyService) stateAfterChange(ctx context.Context, itemID string, data 
 var errOtherItem = NewInvalidResponse("le serveur a renvoyé un autre élément")
 
 // ItemDetail is `item_detail`: detail page of a film, series or episode. Other item
-// types are refused. An episode also gets its neighbours in the series (ADR 0016).
+// types are refused. An episode also gets its neighbours in the series.
 func (s *EmbyService) ItemDetail(ctx context.Context, itemID string) (ItemDetail, error) {
 	client, userID, err := s.session()
 	if err != nil {
@@ -1279,7 +1279,7 @@ func (s *EmbyService) ItemDetail(ctx context.Context, itemID string) (ItemDetail
 }
 
 // Titles is `titles`: titles of a person, collection, genre or studio opened from a
-// detail page (ADR 0121): films and series only, once each, in the source's order.
+// detail page: films and series only, once each, in the source's order.
 func (s *EmbyService) Titles(ctx context.Context, source TitlesSource) (List[MediaItem], error) {
 	client, userID, err := s.session()
 	if err != nil {
@@ -1312,8 +1312,8 @@ func (s *EmbyService) Titles(ctx context.Context, source TitlesSource) (List[Med
 	return out, nil
 }
 
-// LocalTrailer is `local_trailer`: id of the first trailer file of a film or series
-// (ADR 0121), played like any item; nil when the server lists none.
+// LocalTrailer is `local_trailer`: id of the first trailer file of a film or series,
+// played like any item; nil when the server lists none.
 func (s *EmbyService) LocalTrailer(ctx context.Context, itemID string) (*string, error) {
 	if !IsItemID(itemID) {
 		return nil, errInvalidID
@@ -1336,7 +1336,7 @@ func (s *EmbyService) LocalTrailer(ctx context.Context, itemID string) (*string,
 	return nil, nil
 }
 
-// Chapters is `chapters`: chapters of a film or episode for the player (ADR 0034),
+// Chapters is `chapters`: chapters of a film or episode for the player,
 // from the item's `Chapters`; none when it has fewer than two.
 func (s *EmbyService) Chapters(ctx context.Context, itemID string) (List[Chapter], error) {
 	client, userID, err := s.session()
@@ -1427,7 +1427,7 @@ func (s *EmbyService) Episodes(ctx context.Context, seriesID, seasonID string, s
 
 // Image is `image`: artwork of the open session's server for the `emby-img`
 // protocol, from the disk cache when it has it, else downloaded (at most six at
-// once) and kept (ADR 0019).
+// once) and kept.
 func (s *EmbyService) Image(ctx context.Context, req ImageRequest) (string, []byte, error) {
 	// Session and server first: the cache never answers for another session.
 	if _, _, err := s.session(); err != nil {
@@ -1471,7 +1471,7 @@ func (s *EmbyService) Image(ctx context.Context, req ImageRequest) (string, []by
 func (s *EmbyService) LastServerURL() *string { return s.fileCopy().LastServerURL }
 
 // AccountTracks is `account_tracks`: audio and subtitle preferences of the signed-in
-// Emby account (ADR 0115).
+// Emby account.
 func (s *EmbyService) AccountTracks(ctx context.Context) (AccountTracks, error) {
 	client, userID, err := s.session()
 	if err != nil {
@@ -1554,7 +1554,7 @@ func asEmbyError(err error) EmbyError {
 	return NewUnreachable(err.Error())
 }
 
-// Restore is `restore`: validates the saved session (ADR 0012), at startup and
+// Restore is `restore`: validates the saved session, at startup and
 // whenever the UI suspects the network. Only a rejection by the server forgets the
 // token: timeouts, 5xx and unreachable servers keep everything for a later retry.
 // ErrCancelled: a sign-in, sign-out or server change happened meanwhile.
@@ -1643,9 +1643,9 @@ func (s *EmbyService) validate(ctx context.Context, record SessionRecord, token 
 }
 
 // ChangeServer is `change_server`, "Changer de serveur": closes the session without
-// revoking it and sets it aside so the user can come back to it (ADR 0012). A
+// revoking it and sets it aside so the user can come back to it. A
 // rejected session (the reauthentication hint) stays on the shelf with "Mot de
-// passe requis" (ADR 0103).
+// passe requis".
 func (s *EmbyService) ChangeServer() error {
 	s.setCurrent(nil)
 	var evicted []SessionRecord
@@ -1681,7 +1681,7 @@ func (s *EmbyService) hasToken(r *SessionRecord) bool {
 	return err == nil && t != nil
 }
 
-// Shelf is `shelf`: tiles of the pre-connection shelf (ADR 0103), newest first, one
+// Shelf is `shelf`: tiles of the pre-connection shelf, newest first, one
 // per server and user: the session left by a failed check (never the open one), the
 // rejected session, then the shelf.
 func (s *EmbyService) Shelf() List[ShelfServer] {
@@ -1720,7 +1720,7 @@ func (s *EmbyService) Shelf() List[ShelfServer] {
 	return tiles
 }
 
-// ForgetServer is `forget_server`, "Oublier ce serveur" (ADR 0103): the record
+// ForgetServer is `forget_server`, "Oublier ce serveur": the record
 // (address, user name) leaves session.json and the token leaves the credential
 // store. Nothing changes on the server; the returned revocation is a best effort the
 // caller may run later, it never holds the removal back. nil without a token.
@@ -1841,7 +1841,7 @@ func (s *EmbyService) ResumeSaved(ctx context.Context, serverID, userID string) 
 
 // SignOut is `sign_out`: revokes the token on the server when reachable, then always
 // forgets it locally: an offline sign-out must not leave a usable token on disk. The
-// address and user name stay on the shelf, without token (ADR 0103).
+// address and user name stay on the shelf, without token.
 func (s *EmbyService) SignOut(ctx context.Context) error {
 	s.mu.Lock()
 	s.epoch.Add(1)
@@ -1877,9 +1877,9 @@ func (s *EmbyService) SignOut(ctx context.Context) error {
 	return nil
 }
 
-// Revocation is the best-effort revocation of a forgotten session (ADR 0103): the
+// Revocation is the best-effort revocation of a forgotten session: the
 // public probe goes **without** the token, which is only sent to the server with the
-// saved id, like a restore (ADR 0012).
+// saved id, like a restore.
 type Revocation struct {
 	client   *Client
 	serverID string

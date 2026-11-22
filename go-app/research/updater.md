@@ -25,7 +25,7 @@ Aucune connexion au Gitea ni à l'Emby : les tests ne parlent qu'à un `httptest
     - `requireSignedVersion` désactivé n'agit que sur une signature **sans** `version:`.
     - Quand le commentaire de confiance porte `version:X.Y.Z`, un écart avec la version du manifeste est refusé (`SignedVersionMismatch`). C'est le cas des `.sig` réels de 1.2.0, 1.3.0 et 1.3.1.
     - Le Rust bloque donc aujourd'hui le rejeu d'un ancien installateur authentique annoncé comme plus récent.
-    - La phrase de l'ADR 0112 (« le numéro de version du manifeste n'est pas signé ») est fausse pour ces releases.
+    - L'ancienne affirmation (« le numéro de version du manifeste n'est pas signé ») est fausse pour ces releases.
 - **Installation.**
   - Contrôle de l'en-tête `MZ` (`infer::app::is_exe`).
   - Écriture dans `%TEMP%\Viewer-<v>-updater-XXXX\Viewer-<v>-installer.exe`.

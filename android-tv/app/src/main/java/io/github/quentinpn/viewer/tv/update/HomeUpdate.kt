@@ -18,7 +18,7 @@ import io.github.quentinpn.viewer.tv.ui.UpdateCardMode
 import kotlinx.coroutines.launch
 
 /**
- * The update card on the home only (ADR 0112): shown once an APK is ready and not put off
+ * The update card on the home only: shown once an APK is ready and not put off
  * with « Plus tard ». Without the « sources inconnues » permission, « Installer » first
  * explains, then « Continuer » opens Android's setting; MainActivity installs on return.
  */
@@ -32,7 +32,7 @@ fun HomeUpdate() {
 }
 
 /**
- * The update card and its install flow, shared by the home and Réglages (ADR 0112): nothing
+ * The update card and its install flow, shared by the home and Réglages: nothing
  * while no APK is ready or when the ready version is [hidden]. [onLater] closes it.
  */
 @Composable

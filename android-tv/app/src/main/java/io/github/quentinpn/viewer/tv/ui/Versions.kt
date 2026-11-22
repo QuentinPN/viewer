@@ -9,8 +9,8 @@ import java.math.RoundingMode
 import java.text.NumberFormat
 import java.util.Locale
 
-// Version chooser of a film with several media sources (ADR 0058), ported from the
-// Windows client (src/lib/detail/versions.ts and format.ts, ADR 0036): same labels,
+// Version chooser of a film with several media sources, ported from the
+// Windows client (src/lib/detail/versions.ts and format.ts): same labels,
 // shown from two versions, the remembered one else the server's first.
 
 /** One version offered on the film page; [id] is sent as PlaybackInfo's `MediaSourceId`. */

@@ -8,7 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-// Same cases as src/lib/detail/versions.test.ts on Windows (ADR 0036).
+// Same cases as src/lib/detail/versions.test.ts on Windows.
 class VersionsTest {
     private val uhd = MediaSourceDto(
         id = "mediasource_1",

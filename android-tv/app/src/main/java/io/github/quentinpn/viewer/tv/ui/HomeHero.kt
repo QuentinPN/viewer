@@ -61,10 +61,10 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.HeroTitle
 import kotlinx.coroutines.launch
 
-/** Height of the first shelf's cards showing under the hero, its title hidden (ADR 0064). */
+/** Height of the first shelf's cards showing under the hero, its title hidden. */
 internal val HERO_PEEK = 76.dp
 
-/** Hero buttons; the one opened last takes the focus back on return (ADR 0059). */
+/** Hero buttons; the one opened last takes the focus back on return. */
 internal enum class HeroButton { Play, Info }
 
 /** Index after a step of [delta], wrapping around both ends (Windows `stepIndex`). */
@@ -108,7 +108,7 @@ internal fun heroRemaining(title: HeroTitle): Pair<Float, String>? {
 }
 
 /**
- * Home hero (ADR 0059, from Windows ADR 0015; laid out per ADR 0064): one title at a time
+ * Home hero: one title at a time
  * over its backdrop, the home's bar on top. Titles change only on request: Left on the
  * first button shows the previous one, Right on the last button the next one, wrapping
  * around; no automatic rotation. [focus] goes on [focusOn] when the home puts its focus

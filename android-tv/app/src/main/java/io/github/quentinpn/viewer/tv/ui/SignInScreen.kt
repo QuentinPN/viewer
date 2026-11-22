@@ -50,7 +50,7 @@ import io.github.quentinpn.viewer.tv.session.hostLabel
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 
-/** A sign-in that worked: the session, and the server's id and name for its tile (ADR 0104). */
+/** A sign-in that worked: the session, and the server's id and name for its tile. */
 class SignedIn(val session: Session, val serverId: String, val serverName: String)
 
 /**
@@ -65,7 +65,7 @@ internal suspend fun signIn(server: String, user: String, password: String, devi
 }
 
 /**
- * The manual sign-in and « Session expirée » cards (ADR 0104): logo, title, then address (or
+ * The manual sign-in and « Session expirée » cards: logo, title, then address (or
  * the saved server, read-only, when [fixedServer] is set), user name and password, and
  * « Retour » / « Se connecter ». The password is only kept in this card's memory.
  */

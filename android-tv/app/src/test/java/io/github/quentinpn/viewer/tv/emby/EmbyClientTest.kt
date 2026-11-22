@@ -180,7 +180,7 @@ class EmbyClientTest {
         assertEquals("12", url.queryParameter("Limit"))
         assertEquals("Movie,Episode", url.queryParameter("IncludeItemTypes"))
         assertEquals("true", url.queryParameter("EnableUserData"))
-        // The hero reads the same items (ADR 0059): their overview and year come along
+        // The hero reads the same items: their overview and year come along
         assertEquals("Overview,ProductionYear,PrimaryImageAspectRatio", url.queryParameter("Fields"))
     }
 
@@ -195,7 +195,7 @@ class EmbyClientTest {
         assertTrue(body.contains("\"IsPlayback\":true"))
         assertTrue(body.contains("\"MaxStreamingBitrate\":400000000"))
         assertTrue(body.contains("\"Format\":\"ass\",\"Method\":\"External\""))
-        // No version chosen: the server picks, as before ADR 0058
+        // No version chosen: the server picks
         assertFalse(body.contains("MediaSourceId"))
     }
 
@@ -235,7 +235,7 @@ class EmbyClientTest {
         assertTrue(body.contains("\"MediaSourceId\":\"mediasource_30501\""))
         assertFalse("secret-token" in body)
         assertTrue(request.headers["X-Emby-Authorization"]!!.contains("secret-token"))
-        // Ignored by the server without a version (ADR 0035): never sent alone, nor a negative index
+        // Ignored by the server without a version: never sent alone, nor a negative index
         client.withToken("t").playbackInfo("u1", "i1", deviceProfile(), audioStreamIndex = 2)
         assertFalse(server.takeRequest().body!!.utf8().contains("AudioStreamIndex"))
         client.withToken("t").playbackInfo("u1", "i1", deviceProfile(), "mediasource_30501", audioStreamIndex = -1)
@@ -677,7 +677,7 @@ class EmbyClientTest {
         assertEquals("tag=abc&maxWidth=300", url.query)
     }
 
-    /** The request of a write action (ADR 0097): its method and path, no body, the token in the header only. */
+    /** The request of a write action: its method and path, no body, the token in the header only. */
     private fun assertWrite(method: String, path: String, query: String?) {
         val request = server.takeRequest()
         assertEquals(method, request.method)

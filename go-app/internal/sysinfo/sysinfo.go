@@ -1,5 +1,5 @@
-// Package sysinfo is what this PC says about itself, for Réglages › À propos
-// (ADR 0116): the build, the Windows edition and build, the graphics adapters,
+// Package sysinfo is what this PC says about itself, for Réglages › À propos:
+// the build, the Windows edition and build, the graphics adapters,
 // their hardware decoders and the displays' HDR state. Port of
 // src-tauri/src/system_info.rs. Read only: registry values, DXGI descriptions and a
 // short-lived D3D11 video device; no shell, no cgo (see research/dxgi.md).
@@ -14,7 +14,7 @@ import (
 // Report is `SystemReport` (serde `rename_all = "camelCase"`; field order is the
 // order of the Rust struct). Slices are never nil, so they serialize as `[]`.
 type Report struct {
-	// DebugBuild is the separate debug build (ADR 0105): Rust's `debug_assertions`.
+	// DebugBuild is the separate debug build: Rust's `debug_assertions`.
 	// Go has no such flag, so the caller says (see MAP.md, decisions of wave2A).
 	DebugBuild bool `json:"debugBuild"`
 	// OS is nil (JSON null) when the registry could not be read.

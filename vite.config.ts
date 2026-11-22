@@ -6,7 +6,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig(({ mode }) => ({
   plugins: [svelte()],
   clearScreen: false,
-  // The native backend of src/lib/native (ADR 0128): mode "wails"
+  // The native backend of src/lib/native: mode "wails"
   // (`npm run build:wails`) selects Wails, any other mode Tauri. A literal,
   // so the bundler drops the unused backend.
   define: {

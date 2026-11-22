@@ -22,7 +22,7 @@ export function formatRemaining(position: number, duration: number): string {
 }
 
 /**
- * Heading of the player (ADR 0017): the name, and above it, for an episode,
+ * Heading of the player: the name, and above it, for an episode,
  * "Série · S1 · É12". Without a title the player says "Lecture".
  */
 export function playbackHeading(title: PlaybackTitle | null): {
@@ -57,7 +57,7 @@ export function openFailure(detail?: string | null): string {
 
 /**
  * A source that never played and was not already a transcode may be asked again as
- * a transcode (ADR 0023); one that played, or a transcode, is not retried.
+ * a transcode; one that played, or a transcode, is not retried.
  */
 export function canFallBack(
   everPlayed: boolean,

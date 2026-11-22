@@ -1,5 +1,5 @@
 <script lang="ts">
-// Réglages › Accueil (ADR 0113): show or hide each home row and set their order,
+// Réglages › Accueil: show or hide each home row and set their order,
 // by drag and drop or with « Monter / Descendre ». Kept on this device for this
 // server and user; the home applies it when it opens again.
 import { tick, untrack } from "svelte";

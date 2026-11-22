@@ -52,7 +52,7 @@ func (p appPlayback) Engine() (loader, error) {
 }
 
 // playbackPreferences is `PlaybackPreferences`: Réglages › Sous-titres, kept on
-// this PC and sent with each playback (ADR 0035). `rename_all = "camelCase",
+// this PC and sent with each playback. `rename_all = "camelCase",
 // default`: a missing field keeps its default, unknown keys are ignored.
 type playbackPreferences struct {
 	Tracks        emby.TrackPreferences `json:"tracks"`
@@ -70,9 +70,9 @@ func readPreferences(args tauriArgs) (playbackPreferences, error) {
 	return *prefs, nil
 }
 
-// embyPlay is `emby_play` (ADR 0007): PlaybackInfo, choice of the source, then the
+// embyPlay is `emby_play`: PlaybackInfo, choice of the source, then the
 // player. The UI gets the method only, never the URL or token. With resume, starts
-// where the server says the user stopped; the playback is reported (ADR 0008).
+// where the server says the user stopped; the playback is reported.
 func embyPlay(ctx context.Context, p playback, args tauriArgs) (any, error) {
 	var itemID string
 	var resume bool
@@ -120,7 +120,7 @@ func embyPlay(ctx context.Context, p playback, args tauriArgs) (any, error) {
 	return emby.NewPlaybackStart(itemID, resume, &plan), nil
 }
 
-// embyChangeQuality is `emby_change_quality` (ADR 0117): a new PlaybackInfo for
+// embyChangeQuality is `emby_change_quality`: a new PlaybackInfo for
 // the version playing at `cap` (null: « Maximale »), loaded at positionSeconds in
 // the same engine. The session goes on: a QualityChange progress, no stop.
 func embyChangeQuality(ctx context.Context, p playback, args tauriArgs) (any, error) {

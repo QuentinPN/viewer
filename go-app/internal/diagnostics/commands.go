@@ -93,7 +93,7 @@ func OpenLogDirHandler(dir string, open Opener) func(ctx context.Context, args j
 }
 
 // DefaultLogDir is Tauri's `app_log_dir` on Windows: `%LOCALAPPDATA%\{identifier}\logs`
-// ("io.github.quentinpn.viewer", or "io.github.quentinpn.viewer.debug" for the debug build, ADR 0105). In debug
+// ("io.github.quentinpn.viewer", or "io.github.quentinpn.viewer.debug" for the debug build). In debug
 // builds `VIEWER_E2E_LOG_DIR` overrides it (scripts/e2e). "" when there is no local
 // data folder.
 func DefaultLogDir(identifier string, debugBuild bool) string {

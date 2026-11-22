@@ -1,7 +1,7 @@
 <script lang="ts">
 // One film or series in a library grid, opening its detail page. Artwork comes
-// ready from Rust (ADR 0005). Right-click, the context-menu key or the "…"
-// button open its menu (ADR 0100).
+// ready from Rust. Right-click, the context-menu key or the "…"
+// button open its menu.
 import type { Snippet } from "svelte";
 import type { MediaItem } from "../emby/types";
 import { isMenuKey, type MenuContext, posterTarget } from "../menu/actions";
@@ -14,7 +14,7 @@ interface Props {
   item: MediaItem;
   onOpen: (item: MediaItem) => void;
   menuContext?: MenuContext;
-  /** Over the bottom left of the artwork, e.g. a request status (ADR 0125). */
+  /** Over the bottom left of the artwork, e.g. a request status. */
   badge?: Snippet;
 }
 
@@ -132,7 +132,7 @@ const initials = $derived(
     cursor: pointer;
     border-radius: var(--radius-md);
   }
-  /* Focus lifts the artwork (ADR 0031); the accent ring marks the keyboard focus. */
+  /* Focus lifts the artwork; the accent ring marks the keyboard focus. */
   .card:focus-visible {
     outline: none;
   }

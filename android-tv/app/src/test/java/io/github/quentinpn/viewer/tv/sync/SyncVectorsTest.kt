@@ -17,7 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** The vectors shared with the desktop (ADR 0124): both sides read the same file. */
+/** The vectors shared with the desktop: both sides read the same file. */
 class SyncVectorsTest {
     private val vectors: JsonObject = Json.parseToJsonElement(vectorsFile().readText()).jsonObject
 

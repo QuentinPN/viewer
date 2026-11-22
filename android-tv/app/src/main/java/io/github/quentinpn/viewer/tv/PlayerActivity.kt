@@ -130,64 +130,64 @@ private const val TAG = "ViewerTV"
 private const val TICKS_PER_SECOND = 10_000_000.0
 private const val TICKS_PER_MS = 10_000L
 
-/** Read ahead before a linked load answers `ready` (ADR 0124). */
+/** Read ahead before a linked load answers `ready`. */
 private const val READY_CACHE_SECONDS = 3.0
 
 /** A link message over the picture goes after this long. */
 private const val LINK_NOTICE_MS = 6_000L
 
-/** As the tracker (ADR 0012): an end further than this from the duration is a cut stream. */
+/** As the tracker: an end further than this from the duration is a cut stream. */
 private const val NATURAL_END_MARGIN_SECONDS = 30.0
 
-/** "Informations de lecture" is read again this often while it is open (ADR 0061). */
+/** "Informations de lecture" is read again this often while it is open. */
 private const val INFO_REFRESH_MS = 1_000L
 
 /**
  * Plays one Emby item. Not exported: it negotiates the stream itself through
- * PlaybackInfo, so the token never travels in an Intent (ADR 0007, 0038).
- * Start, progress and stop go to the server through [PlaybackReporter] (ADR 0040).
- * The last audio and subtitle picked in the menu apply to the next files (ADR 0042);
- * without one, the tracks the server picked from the account's preferences (ADR 0055),
- * else those preferences applied by the app (ADR 0065).
+ * PlaybackInfo, so the token never travels in an Intent.
+ * Start, progress and stop go to the server through [PlaybackReporter].
+ * The last audio and subtitle picked in the menu apply to the next files;
+ * without one, the tracks the server picked from the account's preferences,
+ * else those preferences applied by the app.
  * At the natural end of an episode, the next one is offered and plays in the same
- * engine (ADR 0043). Intros and credits get a skip button, and the next episode is
- * offered from the start of its credits (ADR 0048). The Réglages apply from the next
- * item played: external sources, automatic skip and the streaming cap (ADR 0051),
- * and the look of subtitles (ADR 0053). UP lists the item's chapters, if it has some (ADR 0057).
- * "Informations de lecture" opens from the last row of the track menu, or the INFO key (ADR 0061).
- * Subtitles and audio can be shifted from the track menu, for the current file only (ADR 0062).
- * ◀ ▶ show the server's thumbnail of the target above the bar, when it has extracted some (ADR 0069).
- * The track menu also sets the speed, for the current file only, and night mode, kept in Réglages (ADR 0072).
+ * engine. Intros and credits get a skip button, and the next episode is
+ * offered from the start of its credits. The Réglages apply from the next
+ * item played: external sources, automatic skip and the streaming cap,
+ * and the look of subtitles. UP lists the item's chapters, if it has some.
+ * "Informations de lecture" opens from the last row of the track menu, or the INFO key.
+ * Subtitles and audio can be shifted from the track menu, for the current file only.
+ * ◀ ▶ show the server's thumbnail of the target above the bar, when it has extracted some.
+ * The track menu also sets the speed, for the current file only, and night mode, kept in Réglages.
  * The controls show the time and when playback ends; the track menu's « Minuterie » pauses
- * playback after a while, or at the credits, for this player session only (ADR 0073).
- * Its « Format » crops or stretches the picture to the screen, for the current file only (ADR 0078).
- * Its « Qualité » asks the server again at another cap and reloads at the same place, for this playback only (ADR 0081).
- * A local trailer ([EXTRA_TRAILER]) plays without any report, segment lookup or next episode (ADR 0083).
+ * playback after a while, or at the credits, for this player session only.
+ * Its « Format » crops or stretches the picture to the screen, for the current file only.
+ * Its « Qualité » asks the server again at another cap and reloads at the same place, for this playback only.
+ * A local trailer ([EXTRA_TRAILER]) plays without any report, segment lookup or next episode.
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener, LinkedPlayer {
     private var engine: PlayerEngine? = null
     private val ui = PlayerUi()
     private var subtitles: List<ExternalSubtitle> = emptyList()
 
-    /** The server's track picks for the file being loaded, and whether it is a transcode (ADR 0055). */
+    /** The server's track picks for the file being loaded, and whether it is a transcode. */
     private var serverTracks = ServerTracks()
     private var transcode = false
 
-    /** How the server delivers the file being loaded, for "Informations de lecture" (ADR 0061). */
+    /** How the server delivers the file being loaded, for "Informations de lecture". */
     private var facts: PlaybackFacts? = null
 
-    /** The stream negotiated for the file being loaded or played: its version and session (ADR 0081). */
+    /** The stream negotiated for the file being loaded or played: its version and session. */
     private var stream: PlaybackPlan? = null
 
-    /** Speed, delays and format to put back once the file of a quality change loads (ADR 0081). */
+    /** Speed, delays and format to put back once the file of a quality change loads. */
     @Volatile private var restore: Adjustments? = null
 
-    /** Play session whose transcode ends once the file of a quality change loads (ADR 0081). */
+    /** Play session whose transcode ends once the file of a quality change loads. */
     @Volatile private var replacedEncoding: String? = null
     private var surfaceHolder: SurfaceHolder? = null
     private var preferences: TrackPreferenceStore? = null
 
-    /** The account's track preferences once read (ADR 0065); playback never waits for them. */
+    /** The account's track preferences once read; playback never waits for them. */
     @Volatile private var account: AccountTracks? = null
     private var settingsStore: PlaybackSettingsStore? = null
 
@@ -202,13 +202,13 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     /** The episode after the current one, once known. */
     private var next: BaseItemDto? = null
 
-    /** Intro and credits of the current item, once known (ADR 0048). */
+    /** Intro and credits of the current item, once known. */
     private var skips: SkipPlan? = null
 
-    /** The same segments, for « Fin de l'épisode » of the sleep timer (ADR 0073). */
+    /** The same segments, for « Fin de l'épisode » of the sleep timer. */
     private var segments: List<Segment> = emptyList()
 
-    /** Seek thumbnails of the file being played, fetched at its first seek (ADR 0069). */
+    /** Seek thumbnails of the file being played, fetched at its first seek. */
     private var thumbnails: SeekThumbnails? = null
 
     /** Lookup and decoding of the thumbnail at the last seek target; a newer seek replaces it. */
@@ -217,16 +217,16 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     // END_FILE events of a file replaced by the next episode: not the end of playback
     @Volatile private var replacedEnds = 0
 
-    /** External subtitles of the loaded file being added, off mpv's event thread (ADR 0085). */
+    /** External subtitles of the loaded file being added, off mpv's event thread. */
     @Volatile private var subtitleJob: Job? = null
     private val reporter by lazy { AppServices.reporter(this) }
 
-    /** A trailer (ADR 0083): nothing reported to the server, no segments, no next episode. */
+    /** A trailer: nothing reported to the server, no segments, no next episode. */
     private var trailer = false
 
     private val hub by lazy { AppServices.sync(this) }
 
-    /** The linked `load` being played: its tracks, and `ready` still to send until [readyJob] ends (ADR 0124). */
+    /** The linked `load` being played: its tracks, and `ready` still to send until [readyJob] ends. */
     private var linkLoad: Body.Load? = null
     private var readyJob: Job? = null
 
@@ -295,7 +295,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         surface.holder.addCallback(this)
         if (!trailer) {
             hub.attach(this)
-            // The session's socket stays open while the player shows (ADR 0123)
+            // The session's socket stays open while the player shows
             lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { hub.hold(client, userId) } }
             lifecycleScope.launch {
                 hub.view.collect { view ->
@@ -344,7 +344,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         if (linked != null) linkedLoad(linked) else play(itemId, startTicks, intent.getStringExtra(EXTRA_MEDIA_SOURCE_ID))
     }
 
-    /** A `load` from the leader: the usual negotiation, its tracks, its position, paused (ADR 0124). */
+    /** A `load` from the leader: the usual negotiation, its tracks, its position, paused. */
     override fun linkedLoad(load: Body.Load) {
         linkLoad = load
         linkSpeed = SPEED_NORMAL
@@ -445,7 +445,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         if (!trailer) hub.command(action, seconds?.let { (it * 1000).roundToLong() })
     }
 
-    /** [mediaSourceId]: the version chosen on the film page (ADR 0058); null lets the server pick. */
+    /** [mediaSourceId]: the version chosen on the film page; null lets the server pick. */
     private fun play(itemId: String, startTicks: Long, mediaSourceId: String? = null) {
         current = itemId
         next = null
@@ -491,7 +491,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     }
 
     /**
-     * Emby's markers, then IntroDB and TheIntroDB (ADR 0030): a failure only means no
+     * Emby's markers, then IntroDB and TheIntroDB: a failure only means no
      * button, and playback never waits for them.
      */
     private suspend fun findSegments(item: BaseItemDto) {
@@ -524,7 +524,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     private suspend fun negotiate(itemId: String, startTicks: Long, mediaSourceId: String?) {
         try {
-            // The cap of the server's kind of address, else the default limit (ADR 0037, 0051)
+            // The cap of the server's kind of address, else the default limit
             val bitrate = settings.maxStreamingBitrate(client.server.isLocal)
             val linked = linkLoad?.takeIf { it.itemId == itemId }
             val first = plan(
@@ -533,12 +533,12 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
                 mediaSourceId,
             )
             if (current != itemId) return
-            // In a link, the leader's audio comes first (ADR 0124)
+            // In a link, the leader's audio comes first
             val chosen = if (linked != null) first else withRememberedAudio(itemId, first, bitrate)
             if (current != itemId) return
             Log.i(TAG, "play method=${chosen.method} source=${chosen.mediaSourceId} subtitles=${chosen.subtitles.size} maxBitrate=$bitrate")
             Log.i(TAG, "subtitle style=${settings.subtitles}")
-            // Nothing fetched yet: the first seek asks for them, playback never waits (ADR 0069)
+            // Nothing fetched yet: the first seek asks for them, playback never waits
             thumbnails = SeekThumbnails(lifecycleScope, { downloadThumbnails(client, itemId) }) { Log.i(TAG, thumbnailsLog(it)) }
             val source = MediaSource.parse(chosen.url) ?: throw EmbyException(EmbyError.InvalidResponse("adresse de flux refusée"))
             val cap = settings.capFor(client.server.isLocal)
@@ -578,7 +578,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     /**
      * A transcode carries one audio, the server's default: when the remembered choice
      * names another of the source's audio streams, the server is asked again for it, as
-     * on Windows (ADR 0035, 0084). Kept only if it stays a transcode of the same version;
+     * on Windows. Kept only if it stays a transcode of the same version;
      * a refusal keeps the first answer.
      */
     private suspend fun withRememberedAudio(itemId: String, first: PlaybackPlan, bitrate: Long): PlaybackPlan {
@@ -594,9 +594,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         return if (kept) second else first
     }
 
-    /** What the player keeps of a negotiated stream, at its first load or after a quality change (ADR 0081). */
+    /** What the player keeps of a negotiated stream, at its first load or after a quality change. */
     private fun adopt(chosen: PlaybackPlan, cap: Long?, chosenInPlayer: Boolean) {
-        // The server's subtitle goes last, added selected; the others are added without (ADR 0055)
+        // The server's subtitle goes last, added selected; the others are added without
         subtitles = chosen.subtitles.sortedBy { it.selected }
         serverTracks = chosen.serverTracks
         transcode = chosen.method == PlayMethod.Transcode
@@ -609,13 +609,13 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         )
     }
 
-    /** ◀ ▶ on « Qualité »: the shown cap moves, nothing reloads (ADR 0081). */
+    /** ◀ ▶ on « Qualité »: the shown cap moves, nothing reloads. */
     private fun pickQuality(change: QualityChange) {
         ui.quality = ui.quality.step(change)
     }
 
     /**
-     * OK on « Qualité » (ADR 0081): the server is asked again at the shown cap, for the
+     * OK on « Qualité »: the server is asked again at the shown cap, for the
      * version playing and from the current position, then the file reloads there. Only
      * one change at a time, and only once the file plays.
      */
@@ -626,7 +626,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         val cap = ui.quality.chosen
         ui.quality = ui.quality.applying()
         val from = ui.position
-        // The audio heard now: a transcode would otherwise carry the server's default (ADR 0084)
+        // The audio heard now: a transcode would otherwise carry the server's default
         val audio = engine?.let { playingAudioIndex(playing, it.tracks()) }
         lifecycleScope.launch { requalify(itemId, playing, cap, from, audio) }
     }
@@ -674,7 +674,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         play(player, source, at)
     }
 
-    /** Loads a file; subtitles still being added to the replaced one are dropped (ADR 0085). */
+    /** Loads a file; subtitles still being added to the replaced one are dropped. */
     private fun play(player: PlayerEngine, source: MediaSource, at: Double, paused: Boolean = false) {
         subtitleJob?.cancel()
         player.load(source, at, paused)
@@ -682,7 +682,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     /**
      * After a quality change, once the new file is loaded: speed, delays and format as
-     * they were, then the server's transcode of the replaced stream ended (ADR 0081).
+     * they were, then the server's transcode of the replaced stream ended.
      */
     private fun restoreAdjustments(player: PlayerEngine) {
         val kept = restore ?: return
@@ -704,13 +704,13 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         }
     }
 
-    /** The subtitle look of Réglages for this item, above the controls if they show (ADR 0053). */
+    /** The subtitle look of Réglages for this item, above the controls if they show. */
     private fun styleSubtitles(player: PlayerEngine) {
         player.setSubtitleStyle(settings.subtitles)
         player.setSubtitlePosition(subtitlePosition(settings.subtitles.position, ui.covered))
     }
 
-    /** Night mode of Réglages, set before the file loads so its audio chain starts with it (ADR 0072). */
+    /** Night mode of Réglages, set before the file loads so its audio chain starts with it. */
     private fun applyNightMode(player: PlayerEngine) {
         val held = player.setNightMode(settings.nightMode)
         Log.i(TAG, "night=${settings.nightMode} held=$held")
@@ -747,14 +747,14 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
      * `sub-add` waits for the whole file: the first time, the server may take minutes to
      * extract it. Added on their own thread, never on mpv's event thread, which would stop
      * positions and reports meanwhile; the tracks are then chosen again, an external one
-     * may be the remembered choice (ADR 0085). A new file cancels the rest.
+     * may be the remembered choice. A new file cancels the rest.
      */
     private fun addSubtitles(added: List<ExternalSubtitle>) {
         subtitleJob?.cancel()
         if (added.isEmpty()) return
         subtitleJob = lifecycleScope.launch(Dispatchers.IO) {
             val started = System.currentTimeMillis()
-            // Named as the server describes them: the files themselves carry no title nor language (ADR 0084)
+            // Named as the server describes them: the files themselves carry no title nor language
             for (sub in added) {
                 val source = MediaSource.parse(sub.url) ?: continue
                 ensureActive()
@@ -769,7 +769,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     /**
      * After the external subtitles: one of them may be the remembered choice. The
      * remembered choice, else the server's pick, else the account's preferences, else
-     * mpv's (ADR 0042, 0055, 0065). Audio first: `Smart` subtitles depend on its language.
+     * mpv's. Audio first: `Smart` subtitles depend on its language.
      */
     private fun applyTracks() {
         val player = engine ?: return
@@ -781,7 +781,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             val server = if (type == TrackType.Audio) serverTracks.audio else serverTracks.subtitle
             // A transcode carries the server's audio only: nothing for the account to pick
             val wanted = if (type == TrackType.Audio && transcode) null else accountPick(tracks, type, prefs, audioLang)
-            // Languages set in Réglages on this device come before the server's account-based pick (ADR 0120)
+            // Languages set in Réglages on this device come before the server's account-based pick
             val local = localPick(tracks, type, prefs, settings.languages, audioLang, transcode)
             val decision = decide(tracks, type, store.load(type), server, transcode, wanted, local)
             if (type == TrackType.Audio) audioLang = playingAudioLanguage(tracks, decision)
@@ -862,7 +862,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             val following = next
             // A cut stream also reaches its end: no next episode then
             val natural = ui.duration <= 0 || ui.duration - ui.position <= NATURAL_END_MARGIN_SECONDS
-            // Linked, the leader decides what comes next: the last frame stays (ADR 0124)
+            // Linked, the leader decides what comes next: the last frame stays
             if (ui.linkBusy) return@runOnUiThread
             if (following != null && natural && ui.upNext == null) {
                 ui.closeMenus()
@@ -883,7 +883,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         runOnUiThread { finish() }
     }
 
-    /** Pauses playback if the sleep timer has run out (ADR 0073); true when it did. */
+    /** Pauses playback if the sleep timer has run out; true when it did. */
     private fun checkTimer(): Boolean {
         // Until the new file loads, positions are still those of the replaced one
         if (ui.status != null || !ui.sleep.on) return false
@@ -920,8 +920,8 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     /** The skip button, or the up-next card from the start of the credits. */
     private fun updateSkip() {
-        // « Fin de l'épisode » set: the credits get their button, never the next episode (ADR 0073)
-        // Nor while linked: the leader moves to the next episode (ADR 0124)
+        // « Fin de l'épisode » set: the credits get their button, never the next episode
+        // Nor while linked: the leader moves to the next episode
         val hasNext = next != null && !ui.sleep.holdsNext && !ui.linkBusy
         // Until the new file loads, positions are still those of the replaced one
         val prompt = if (ui.status == null) skips?.at(ui.position, ui.duration, hasNext) else null
@@ -941,7 +941,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         }
         ui.skip = prompt as? SkipPrompt.Button
         val since = trackSkipShown(ui.skipSince, ui.skip, System.currentTimeMillis())
-        // Entered by a seek (◀ back into the intro): no focus, OK keeps playing or pausing (ADR 0108)
+        // Entered by a seek (◀ back into the intro): no focus, OK keeps playing or pausing
         if (since !== ui.skipSince && since.button != null) ui.skipArmed = SkipArm.appeared(ui.controls)
         ui.skipSince = since
     }
@@ -991,9 +991,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         val player = engine ?: return false
         if (ui.status != null || ui.menuOpen || ui.upNext != null) return false
         // OK presses the skip button while it shows; play / pause keys still pause.
-        // Once it hid (ADR 0089), OK only brings it back with the controls
+        // Once it hid, OK only brings it back with the controls
         val ok = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER
-        // After a ◀ ▶ seek the button is disarmed: OK plays or pauses (ADR 0108)
+        // After a ◀ ▶ seek the button is disarmed: OK plays or pauses
         val okDoes = if (ok && ui.skip != null) SkipArm.onOk(ui.skipVisible, ui.skipArmed) else SkipOk.PlayPause
         if (okDoes != SkipOk.PlayPause) {
             if (event.action == KeyEvent.ACTION_DOWN) {
@@ -1023,7 +1023,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             p.togglePause()
             ui.show()
         }
-        // Only sent: the leader answers with the `load` of the episode (ADR 0124)
+        // Only sent: the leader answers with the `load` of the episode
         KeyEvent.KEYCODE_MEDIA_NEXT -> { _ -> relay(CmdAction.Next) }
         KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { _ -> relay(CmdAction.Previous) }
         KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> { p -> heldSeek(p, -1.0, event.repeatCount) }
@@ -1034,7 +1034,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         }
         KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_MENU -> { p ->
             ui.tracks = p.tracks()
-            // Audio passed through to the amplifier: night mode says it cannot apply (ADR 0072)
+            // Audio passed through to the amplifier: night mode says it cannot apply
             if (p.audioPassthrough()) ui.night = ui.night.copy(state = NightState.Passthrough)
             ui.show()
         }
@@ -1043,7 +1043,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         else -> null
     }
 
-    /** ◀ ▶ held (ADR 0090): the step grows with the repeats, and only some repeats seek. */
+    /** ◀ ▶ held: the step grows with the repeats, and only some repeats seek. */
     private fun heldSeek(player: PlayerEngine, direction: Double, repeatCount: Int) {
         if (!seeksOnRepeat(repeatCount)) return
         // One press is sent at once; a hold sends where it ends, on release
@@ -1053,7 +1053,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     private fun seek(player: PlayerEngine, seconds: Double, send: Boolean = true) {
         player.seekBy(seconds)
-        // The OK that follows a seek plays or pauses, never skips (ADR 0108)
+        // The OK that follows a seek plays or pauses, never skips
         ui.skipArmed = false
         // Shown at once; mpv's next position replaces it
         val end = if (ui.duration > 0) ui.duration else Double.MAX_VALUE
@@ -1065,7 +1065,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     }
 
     /**
-     * The thumbnail at [target] above the bar (ADR 0069): the BIF image nearest before it,
+     * The thumbnail at [target] above the bar: the BIF image nearest before it,
      * decoded off the main thread, unless it is the one already shown. Without thumbnails
      * for this file, nothing shows.
      */
@@ -1102,7 +1102,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         ui.show()
     }
 
-    /** "Informations de lecture" in place of the track menu (ADR 0061). */
+    /** "Informations de lecture" in place of the track menu. */
     private fun openInfo() {
         val rows = readInfo() ?: return
         ui.tracks = null
@@ -1125,7 +1125,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         ui.tracks = player.tracks()
     }
 
-    /** A delay row of the track menu: what mpv holds afterwards is shown (ADR 0062). */
+    /** A delay row of the track menu: what mpv holds afterwards is shown. */
     private fun shiftDelay(kind: DelayKind, change: DelayChange) {
         val player = engine ?: return
         val applied = player.setDelay(kind, changeDelay(ui.delays.of(kind), change))
@@ -1134,7 +1134,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         if (applied != null) ui.delays = ui.delays.with(kind, applied)
     }
 
-    /** The speed row of the track menu: what mpv holds afterwards is shown (ADR 0072). */
+    /** The speed row of the track menu: what mpv holds afterwards is shown. */
     private fun shiftSpeed(change: SpeedChange) {
         val player = engine ?: return
         val applied = player.setSpeed(changeSpeed(ui.speed, change))
@@ -1142,7 +1142,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         if (applied != null) ui.speed = applied
     }
 
-    /** The format row of the track menu: what mpv holds afterwards is shown (ADR 0078). */
+    /** The format row of the track menu: what mpv holds afterwards is shown. */
     private fun shiftFit(change: FitChange) {
         val player = engine ?: return
         val applied = player.setVideoFit(changeFit(ui.fit, change))
@@ -1176,7 +1176,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     }
 
     override fun onDestroy() {
-        // Back, Home or the end: the desktop stops too (`bye stopped`, ADR 0124)
+        // Back, Home or the end: the desktop stops too (`bye stopped`)
         if (!trailer) {
             if (ui.linkBusy) hub.stopped()
             hub.detach(this)
@@ -1189,7 +1189,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         super.onDestroy()
     }
 
-    /** Per-file settings of this playback that a reload would lose (ADR 0062, 0072, 0078). */
+    /** Per-file settings of this playback that a reload would lose. */
     private data class Adjustments(val speed: Double, val delays: Delays, val fit: VideoFit)
 
     companion object {
@@ -1197,10 +1197,10 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         const val EXTRA_START_TICKS = "startTicks"
         const val EXTRA_MEDIA_SOURCE_ID = "mediaSourceId"
 
-        /** True for a local trailer (ADR 0083): played without any report. */
+        /** True for a local trailer: played without any report. */
         const val EXTRA_TRAILER = "trailer"
 
-        /** Opened by a desktop's `load`: the hub holds it (ADR 0124). */
+        /** Opened by a desktop's `load`: the hub holds it. */
         const val EXTRA_LINKED = "linked"
     }
 }

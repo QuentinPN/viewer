@@ -1,13 +1,13 @@
 import type { Library } from "../emby/types";
 
-// Order and visibility of the home rows (ADR 0113). Same stable keys as the
-// Android TV app (ADR 0094): kept on this device per Emby server and user, never
+// Order and visibility of the home rows. Same stable keys as the
+// Android TV app: kept on this device per Emby server and user, never
 // on the server. The hero is not a row.
 
 export const RESUME_ROW = "resume";
 export const NEXT_UP_ROW = "nextUp";
 export const FAVORITES_ROW = "favorites";
-/** Last by default, as on the TV (ADR 0122). */
+/** Last by default, as on the TV. */
 export const PLAYLISTS_ROW = "playlists";
 
 /** By library id, so a renamed library keeps its place and choice. */

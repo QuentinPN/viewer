@@ -1,4 +1,4 @@
-// Compact library grid (ADR 0101) and card menu (ADR 0100) on the real Emby test
+// Compact library grid and card menu on the real Emby test
 // account, driven over CDP. Each change it makes is undone before the end:
 // - letter rail, icon rail and posters per row of the Films grid;
 // - a letter jump focuses a card of that letter;
@@ -278,7 +278,7 @@ try {
   );
   await menuShown(page);
   await shot(page, "menu-playlists");
-  // Desktop menus: ← goes back one page, Escape closes (ADR 0100).
+  // Desktop menus: ← goes back one page, Escape closes.
   await page.keyboard.press("ArrowLeft");
   const backOnMain = await menuRow(page, "Ajouter aux favoris")
     .waitFor({ timeout: 3000 })

@@ -1,6 +1,6 @@
 <script lang="ts">
-// The page of one playlist (ADR 0122): its films and episodes in the playlist's
-// order, as on the TV (ADR 0088). « Tout lire » plays the first entry; every
+// The page of one playlist: its films and episodes in the playlist's
+// order, as on the TV. « Tout lire » plays the first entry; every
 // card plays its own entry at once. Read only: nothing is changed on the server.
 import { onMount, tick } from "svelte";
 import { embyApi, errorHint, toEmbyError } from "../emby/api";

@@ -91,7 +91,7 @@ impl EmbyClient {
     }
 
     /// True when both clients carry the same token: a 401 only ends the session
-    /// whose token was refused, not a newer one (ADR 0012).
+    /// whose token was refused, not a newer one.
     pub fn same_token(&self, other: &EmbyClient) -> bool {
         match (&self.token, &other.token) {
             (Some(a), Some(b)) => a.expose() == b.expose(),
@@ -99,7 +99,7 @@ impl EmbyClient {
         }
     }
 
-    /// Only for `EmbyService::exchange_identity` (ADR 0125).
+    /// Only for `EmbyService::exchange_identity`.
     pub(crate) fn access_token(&self) -> Option<&AccessToken> {
         self.token.as_ref()
     }
@@ -108,7 +108,7 @@ impl EmbyClient {
         &self.server
     }
 
-    /// `ws(s)://…/embywebsocket` of the library events (ADR 0110). Emby 4.10 only
+    /// `ws(s)://…/embywebsocket` of the library events. Emby 4.10 only
     /// binds the socket to the session with the token in `api_key` (the header is
     /// accepted but nothing is pushed), so this URL holds a secret: never log it.
     pub fn library_socket_url(&self) -> Result<String, EmbyError> {
@@ -215,7 +215,7 @@ impl EmbyClient {
     }
 
     /// One page of a library, sorted and filtered as asked; or, by `shape`, the
-    /// sort names of the whole list or one random title of it (ADR 0101). The
+    /// sort names of the whole list or one random title of it. The
     /// server ignores an unknown `ParentId` and returns the whole server: callers
     /// pass known library ids only.
     pub async fn items(
@@ -279,7 +279,7 @@ impl EmbyClient {
     }
 
     /// Production year of every film or series of a library, without filters
-    /// (decade picker, ADR 0101).
+    /// (decade picker).
     pub async fn production_years(
         &self,
         user_id: &str,
@@ -350,7 +350,7 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
-    /// Home hero (ADR 0015): the items of `resume_items`, with the overview and
+    /// Home hero: the items of `resume_items`, with the overview and
     /// the wide artwork (episodes also get their series' backdrop and logo).
     pub async fn hero_resume(
         &self,
@@ -375,7 +375,7 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
-    /// Home hero (ADR 0015): films and series not watched yet that have a
+    /// Home hero: films and series not watched yet that have a
     /// backdrop, most recently added first.
     pub async fn hero_latest(
         &self,
@@ -554,8 +554,8 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
-    /// Titles of a person, collection, genre or studio (`/Users/{Id}/Items`,
-    /// ADR 0121); the query comes checked from `titles::titles_params`.
+    /// Titles of a person, collection, genre or studio (`/Users/{Id}/Items`);
+    /// the query comes checked from `titles::titles_params`.
     pub async fn titles(
         &self,
         user_id: &str,
@@ -570,7 +570,7 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
-    /// Films and series like an item (`/Items/{Id}/Similar`, ADR 0121); the
+    /// Films and series like an item (`/Items/{Id}/Similar`); the
     /// query comes checked from `titles::similar_params`.
     pub async fn similar(
         &self,
@@ -587,7 +587,7 @@ impl EmbyClient {
     }
 
     /// Trailer files of an item (`/Users/{Id}/Items/{Id}/LocalTrailers`, a bare
-    /// `BaseItemDto[]`), as the TV reads them (ADR 0121).
+    /// `BaseItemDto[]`), as the TV reads them.
     pub async fn local_trailers(
         &self,
         user_id: &str,
@@ -653,7 +653,7 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
-    /// Episodes around one of a series, across seasons (ADR 0016). Emby 4.10.1.0
+    /// Episodes around one of a series, across seasons. Emby 4.10.1.0
     /// answers up to 5 episodes before it then the rest of the series, not just
     /// its two neighbours: no images nor user data, to keep the answer small.
     pub async fn adjacent_episodes(
@@ -676,7 +676,7 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
-    /// Playback negotiation (ADR 0007): the server answers with its sources and how
+    /// Playback negotiation: the server answers with its sources and how
     /// each can be played for this profile. Unknown id: 404.
     pub async fn playback_info(
         &self,
@@ -711,7 +711,7 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
-    /// Playback report (ADR 0008) to `/Sessions/Playing`, `…/Progress` or
+    /// Playback report to `/Sessions/Playing`, `…/Progress` or
     /// `…/Stopped`. Emby 4.10.1.0 answers 204.
     pub async fn report_playback(
         &self,
@@ -724,13 +724,13 @@ impl EmbyClient {
         check(res, true).map(drop)
     }
 
-    /// Id of this device, matched against `GET /Sessions` (ADR 0124).
+    /// Id of this device, matched against `GET /Sessions`.
     pub fn device_id(&self) -> &str {
         &self.device.id
     }
 
     /// Declares this session controllable and able to receive `SendString`
-    /// (`POST /Sessions/Capabilities/Full`, ADR 0124). Emby answers 204.
+    /// (`POST /Sessions/Capabilities/Full`). Emby answers 204.
     pub async fn post_capabilities(&self) -> Result<(), EmbyError> {
         self.require_token()?;
         let body = serde_json::json!({
@@ -772,7 +772,7 @@ impl EmbyClient {
     }
 
     /// Stops the server's encodings of one play session of this device (`DELETE
-    /// /Videos/ActiveEncodings?DeviceId=&PlaySessionId=`, ADR 0117).
+    /// /Videos/ActiveEncodings?DeviceId=&PlaySessionId=`).
     pub async fn stop_active_encodings(&self, play_session_id: &str) -> Result<(), EmbyError> {
         self.require_token()?;
         let url = self.server.api("/Videos/ActiveEncodings");
@@ -838,7 +838,7 @@ impl EmbyClient {
     }
 
     /// Marks an item played on `date_played` (`yyyyMMddHHmmss`, UTC), or unplayed
-    /// with `None` (`POST` / `DELETE /Users/{Id}/PlayedItems/{Id}`, ADR 0096); the
+    /// with `None` (`POST` / `DELETE /Users/{Id}/PlayedItems/{Id}`); the
     /// server answers with the item's new user data.
     pub async fn set_played(
         &self,
@@ -861,7 +861,7 @@ impl EmbyClient {
     }
 
     /// Takes an item out of "Reprendre", or puts it back
-    /// (`POST /Users/{Id}/Items/{Id}/HideFromResume?Hide=`, ADR 0096).
+    /// (`POST /Users/{Id}/Items/{Id}/HideFromResume?Hide=`).
     pub async fn hide_from_resume(
         &self,
         user_id: &str,
@@ -883,7 +883,7 @@ impl EmbyClient {
     }
 
     /// Playlists of the user, by name
-    /// (`/Users/{Id}/Items?IncludeItemTypes=Playlist&Recursive=true`, ADR 0100).
+    /// (`/Users/{Id}/Items?IncludeItemTypes=Playlist&Recursive=true`).
     pub async fn playlists(
         &self,
         user_id: &str,
@@ -907,9 +907,8 @@ impl EmbyClient {
         json(check(res, true)?).await
     }
 
-    /// Playlists of the home row, A → Z with their entry count (ADR 0122, as the
-    /// TV's ADR 0088). No `MediaTypes`: on Emby 4.10.2.0 `MediaTypes=Video` next to
-    /// `IncludeItemTypes=Playlist` answered every video of the server; audio
+    /// Playlists of the home row, A → Z with their entry count. No `MediaTypes`: on Emby 4.10.2.0
+    /// `MediaTypes=Video` next to `IncludeItemTypes=Playlist` answered every video of the server; audio
     /// playlists are left out by the caller.
     pub async fn home_playlists(
         &self,
@@ -937,7 +936,7 @@ impl EmbyClient {
     }
 
     /// Entries of a playlist in its order (`GET /Playlists/{Id}/Items?UserId=`,
-    /// `PlaylistService`; ADR 0122, as the TV's ADR 0088).
+    /// `PlaylistService`).
     pub async fn playlist_items(
         &self,
         user_id: &str,
@@ -962,7 +961,7 @@ impl EmbyClient {
     }
 
     /// Appends an item to a playlist
-    /// (`POST /Playlists/{Id}/Items?Ids=&UserId=` → `AddToPlaylistResult`, ADR 0100).
+    /// (`POST /Playlists/{Id}/Items?Ids=&UserId=` → `AddToPlaylistResult`).
     pub async fn add_to_playlist(
         &self,
         user_id: &str,
@@ -983,7 +982,7 @@ impl EmbyClient {
 
     /// Creates a video playlist holding one item
     /// (`POST /Playlists?Name=&Ids=&MediaType=Video&UserId=` →
-    /// `PlaylistCreationResult`, ADR 0100). The name is checked by the caller.
+    /// `PlaylistCreationResult`). The name is checked by the caller.
     pub async fn create_playlist(
         &self,
         user_id: &str,
@@ -1008,7 +1007,7 @@ impl EmbyClient {
         Ok(vec![("X-Emby-Token".to_owned(), token.expose().to_owned())])
     }
 
-    /// Artwork bytes and content type for the `emby-img` protocol (ADR 0005).
+    /// Artwork bytes and content type for the `emby-img` protocol.
     pub async fn image(&self, req: &ImageRequest) -> Result<(String, Vec<u8>), EmbyError> {
         let url = self.server.api(&req.api_path());
         let width = req.max_width.to_string();
@@ -1070,7 +1069,7 @@ pub struct ItemsQuery<'a> {
     pub shape: ItemsShape,
 }
 
-/// What a library query returns (ADR 0101). `start_index` and `limit` only
+/// What a library query returns. `start_index` and `limit` only
 /// apply to `Page`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ItemsShape {

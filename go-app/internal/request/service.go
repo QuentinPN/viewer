@@ -1,6 +1,6 @@
 package request
 
-// Request session service (ADR 0125), port of src-tauri/src/request/service.rs:
+// Request session service, port of src-tauri/src/request/service.rs:
 // address in `request.json`, token in the OS credential store per Emby account,
 // single-flight exchange, one retry after a 401, persistent sign-out.
 
@@ -178,7 +178,7 @@ type Service struct {
 	checked   *checked
 
 	// exchange is the single-flight exchange: the server allows 10 failures per IP
-	// and 5 minutes, shared by the household (ADR 0125).
+	// and 5 minutes, shared by the household.
 	exchange sync.Mutex
 
 	// rejected: accounts whose exchange was refused, with the Emby token refused: no

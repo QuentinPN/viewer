@@ -1,5 +1,5 @@
-//! Linked playback envelope (ADR 0124): one JSON object of at most 1024 bytes,
-//! relayed by Emby `SendString`. Decoding checks every bound of the ADR; a
+//! Linked playback envelope: one JSON object of at most 1024 bytes,
+//! relayed by Emby `SendString`. Decoding checks every bound; a
 //! rejected message is dropped without answer, only its reason is logged.
 
 use serde_json::{Map, Value, json};
@@ -355,7 +355,7 @@ pub enum Accept {
     Busy,
 }
 
-/// Whether a valid message is read (ADR 0124 « Hors sujet »).
+/// Whether a valid message is read.
 pub fn accept(link: Option<&LinkView>, from: &str, msg_link: &str, seq: u32, kind: &str) -> Accept {
     let opens = matches!(kind, "join" | "load");
     match link {

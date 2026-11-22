@@ -1,13 +1,13 @@
 package emby
 
-// Secure token storage (ADR 0004), port of src-tauri/src/emby/credentials.rs: the
+// Secure token storage, port of src-tauri/src/emby/credentials.rs: the
 // Windows Credential Manager in the app (credentials_windows.go), an in-memory store
 // for tests. Tokens never go to disk files, SQLite or logs.
 
 import "sync"
 
 // Credential service names. Debug builds keep their tokens apart from the installed
-// app (ADR 0105): scripted UI tests never read, replace or delete the owner's session.
+// app: scripted UI tests never read, replace or delete the owner's session.
 // Rust picks one with `cfg!(debug_assertions)`; Go has no such switch, so the caller
 // passes it to NewWindowsCredentialStore.
 const (
@@ -16,7 +16,7 @@ const (
 )
 
 // CredentialStore is `CredentialStore`. One store is shared by the Emby and
-// Request services (ADR 0125): implementations are safe for concurrent use.
+// Request services: implementations are safe for concurrent use.
 type CredentialStore interface {
 	Save(account string, token AccessToken) error
 	// Load returns nil, nil when nothing is stored for account.

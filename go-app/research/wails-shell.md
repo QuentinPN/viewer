@@ -21,5 +21,5 @@ Ce qu'il faut savoir de Wails pour que `go-app/cmd/viewer` se comporte comme `sr
 
 ## Fenêtre
 - Elle reprend `tauri.conf.json` : 1280×720, minimum 640×360, maximisée, sans cadre, transparente, et le titre de `TitleFor`.
-- Le HWND pour mpv (ADR 0003, mode parent) vient de `NativeWindow()`.
+- Le HWND pour mpv (mode parent) vient de `NativeWindow()`.
 - Fermer avec `app.Quit()` pendant que WebView2 vit journalise « Failed to unregister class Chrome_WidgetWin_0 » (1412, voir gate1-go). Le port appelle donc `win.Close()`, et Wails quitte à la fermeture de la dernière fenêtre.

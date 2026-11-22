@@ -1,6 +1,6 @@
 <script lang="ts">
-// Search results in place of the current view (ADR 0011): films then series, as
-// poster grids, then episodes as 16:9 cards (ADR 0020); each opens its page.
+// Search results in place of the current view: films then series, as
+// poster grids, then episodes as 16:9 cards; each opens its page.
 import { errorHint } from "../emby/api";
 import type {
   EmbyError,

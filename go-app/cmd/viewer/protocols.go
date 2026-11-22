@@ -11,8 +11,8 @@ import (
 	"viewer/internal/request"
 )
 
-// The two artwork protocols of lib.rs: `emby-img` (ADR 0005) and `requestimg` (ADR
-// 0125). Only validated paths are served, fetched natively with the session's
+// The two artwork protocols of lib.rs: `emby-img` and `requestimg`.
+// Only validated paths are served, fetched natively with the session's
 // auth, so the token never reaches the WebView.
 //
 // Wails v3.1.0 only routes `http://wails.localhost` to Go (webview_window_windows.go
@@ -92,7 +92,7 @@ func embyImageStatus(err error) int {
 	case errors.Is(err, emby.ErrNotFound):
 		return http.StatusNotFound
 	case errors.Is(err, emby.ErrForbidden):
-		// An image of another server than the open session's (ADR 0012).
+		// An image of another server than the open session's.
 		return http.StatusForbidden
 	default:
 		return http.StatusBadGateway

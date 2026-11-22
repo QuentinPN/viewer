@@ -106,7 +106,7 @@ func Test_without_preferences_the_server_picks_stand(t *testing.T) {
 	if trAudio(c) != int32(1) || c.Subtitle != subtitleStream(4) {
 		t.Fatalf("%+v", c)
 	}
-	// No subtitle named by the server: the player decides, as before ADR 0035.
+	// No subtitle named by the server: the player decides.
 	c = Choose(trStreams(t, trFilm), MethodDirectPlay, ptr[int32](1), nil, &TrackPreferences{})
 	if c.Subtitle != (SubtitleChoice{Kind: SubtitlePlayer}) {
 		t.Fatalf("%+v", c)

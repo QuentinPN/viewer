@@ -1,5 +1,5 @@
 <script lang="ts">
-// Réglages › Demandes (ADR 0125): the Request address, the connection state,
+// Réglages › Demandes: the Request address, the connection state,
 // the devices signed in to this account and the sign-out.
 import { onMount } from "svelte";
 import "./requests.css";

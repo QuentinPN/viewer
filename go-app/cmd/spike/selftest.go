@@ -130,7 +130,7 @@ func runSelftest(app *application.App, win *application.WebviewWindow, p *Player
 		// Close the window and let Wails quit on the last window closed, as a
 		// user's click on the close button would. Calling app.Quit() directly
 		// left WebView2 logging "Failed to unregister class Chrome_WidgetWin_0.
-		// Error = 1412" (same symptom as Tauri before ADR 0003's fix).
+		// Error = 1412".
 		// app.Quit() stays as a fallback. The driver measures time to exit.
 		win.Close()
 		time.Sleep(2 * time.Second)

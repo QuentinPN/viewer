@@ -1,7 +1,7 @@
 import { type Readable, writable } from "svelte/store";
 import type { CheckOutcome, UpdateInfo, UpdaterApi } from "./api";
 
-// Manual check of Réglages › Mises à jour (ADR 0112, manual check addendum).
+// Manual check of Réglages › Mises à jour (manual check addendum).
 
 export type CheckStatus =
   | { kind: "idle" }

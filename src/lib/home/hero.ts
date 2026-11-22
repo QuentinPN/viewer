@@ -1,4 +1,4 @@
-// Pure logic of the home hero (ADR 0015); unit tested in hero.test.ts.
+// Pure logic of the home hero; unit tested in hero.test.ts.
 import type { HeroItem } from "../emby/types";
 import { formatMinutes } from "../format/duration";
 import { formatTime } from "../player/format";

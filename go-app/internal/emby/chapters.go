@@ -1,8 +1,8 @@
 package emby
 
-// Chapters of an item for the player (ADR 0034), port of src-tauri/src/emby/chapters.rs:
+// Chapters of an item for the player, port of src-tauri/src/emby/chapters.rs:
 // Emby's `Chapters`, kept to the regular `Chapter` markers, in seconds of the file. The
-// intro and credits markers stay with the segments (ADR 0030).
+// intro and credits markers stay with the segments.
 
 import (
 	"sort"

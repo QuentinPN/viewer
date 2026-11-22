@@ -1,5 +1,5 @@
-//! IntroDB and TheIntroDB read endpoints (ADR 0030), both anonymous. Contracts
-//! checked against their docs and real answers: `docs/evidence/intros-generiques-2026-11-07.md`.
+//! IntroDB and TheIntroDB read endpoints, both anonymous. Contracts
+//! checked against their docs and real answers captured on 2026-11-07.
 
 use serde::Deserialize;
 

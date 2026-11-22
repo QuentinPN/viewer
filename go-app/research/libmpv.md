@@ -16,7 +16,7 @@ Source primaire : `vendor/mpv/include/mpv/client.h` (en-tête du dépôt, `MPV_C
 `mpv_event_log_message { const char *prefix; const char *level; const char *text; int log_level; }` : `text` est une ligne terminée par `\n`. Rust écrit `[prefix] text` sans les blancs finaux, après `redact`.
 
 ## Fil d'exécution
-`mpv_wait_event` ne doit être appelé que depuis un seul fil, et l'événement rendu reste valable jusqu'à l'appel suivant : le binding copie tout avant de rendre la main. `mpv_wakeup` interrompt une attente. `mpv_terminate_destroy` bloque jusqu'à l'arrêt du cœur ; avec une fenêtre vidéo enfant de la fenêtre principale, il ne doit pas tourner sur le fil de l'UI (ADR 0003). Le reste de l'API est sûr entre fils.
+`mpv_wait_event` ne doit être appelé que depuis un seul fil, et l'événement rendu reste valable jusqu'à l'appel suivant : le binding copie tout avant de rendre la main. `mpv_wakeup` interrompt une attente. `mpv_terminate_destroy` bloque jusqu'à l'arrêt du cœur ; avec une fenêtre vidéo enfant de la fenêtre principale, il ne doit pas tourner sur le fil de l'UI. Le reste de l'API est sûr entre fils.
 
 ## Version
 `mpv_client_api_version()` rend `MAJOR << 16 | MINOR` sur un `unsigned long` (32 bits sous Windows). Rust refuse un majeur différent de 2 avec `UnsupportedApi("M.m")`, distinct de `LibraryUnavailable` : le binding rend donc une erreur typée `*UnsupportedAPIError` pour ce cas.

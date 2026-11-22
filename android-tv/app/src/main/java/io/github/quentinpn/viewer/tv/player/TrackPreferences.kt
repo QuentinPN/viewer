@@ -43,16 +43,16 @@ private fun isSelected(tracks: List<Track>, type: TrackType, selection: Selectio
 
 /** Where the track of a type comes from, as written in the `ViewerTV` log. */
 enum class TrackOrigin(val log: String) {
-    /** Picked in the track menu earlier (ADR 0042). */
+    /** Picked in the track menu earlier. */
     Remembered("remembered"),
 
-    /** `DefaultAudioStreamIndex` / `DefaultSubtitleStreamIndex` of PlaybackInfo (ADR 0055). */
+    /** `DefaultAudioStreamIndex` / `DefaultSubtitleStreamIndex` of PlaybackInfo. */
     Server("server"),
 
-    /** The languages set in Réglages on this device (ADR 0120), before the server's account-based pick. */
+    /** The languages set in Réglages on this device, before the server's account-based pick. */
     Local("local"),
 
-    /** The account's preferences applied by the client (ADR 0065). */
+    /** The account's preferences applied by the client. */
     Account("account"),
 
     /** None of them: mpv's own choice (`slang`, the file's default flags). */
@@ -67,13 +67,13 @@ enum class TrackOrigin(val log: String) {
 data class TrackDecision(val origin: TrackOrigin, val embyIndex: Int? = null, val selection: Selection? = null)
 
 /**
- * The remembered choice (ADR 0042) first, then the server's pick [serverIndex], then
- * mpv's. As on Windows (ADR 0035), when playing the file the Emby `Index` of one of
+ * The remembered choice first, then the server's pick [serverIndex], then
+ * mpv's. As on Windows, when playing the file the Emby `Index` of one of
  * its own streams is the mpv track of the same type with that `ff-index`, external
  * files left out. A transcode carries the server's audio, and its subtitle pick was
  * added selected ([transcode]): nothing is left to select. When the server names no
- * track, or one not in the file, the account's pick [account] (ADR 0065), then mpv's.
- * A language set in Réglages on this device ([local], ADR 0120) comes right after the
+ * track, or one not in the file, the account's pick [account], then mpv's.
+ * A language set in Réglages on this device ([local]) comes right after the
  * remembered choice: the server's pick only follows the account.
  */
 fun decide(
@@ -126,7 +126,7 @@ class TrackPreferenceStore(context: Context, private val userId: String) {
             .apply()
     }
 
-    /** Forgets the pick of [type]: a language changed in Réglages applies from the next playback (ADR 0120). */
+    /** Forgets the pick of [type]: a language changed in Réglages applies from the next playback. */
     fun clear(type: TrackType) {
         val key = key(type)
         prefs.edit().remove("$key.off").remove("$key.lang").remove("$key.title").apply()

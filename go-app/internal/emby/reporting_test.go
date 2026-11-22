@@ -355,7 +355,7 @@ func Test_go_reporter_sends_the_reports_and_announces_the_state(t *testing.T) {
 }
 
 // A stop report lost to a passing failure is retried once, kept, then sent again by
-// Flush and ResendStop with a late progress ahead of it (ADR 0024).
+// Flush and ResendStop with a late progress ahead of it.
 func Test_go_reporter_resends_a_lost_stop_report(t *testing.T) {
 	revoked := new(atomic.Bool)
 	down := new(atomic.Bool)

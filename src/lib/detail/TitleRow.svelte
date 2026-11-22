@@ -1,5 +1,5 @@
 <script lang="ts">
-// A row of posters under a detail page (ADR 0121): similar titles, or the
+// A row of posters under a detail page: similar titles, or the
 // titles of a collection. Stays hidden while empty; a failure says so quietly.
 import { onMount, untrack } from "svelte";
 import { embyApi, toEmbyError } from "../emby/api";
@@ -11,7 +11,7 @@ interface Props {
   heading: string;
   /** Unique within the page, for the heading id. */
   rowId: string;
-  /** Bumped when the connection comes back (ADR 0012). */
+  /** Bumped when the connection comes back. */
   refresh: number;
   onError: (error: EmbyError) => EmbyError;
   onOpen: (item: MediaItem) => void;

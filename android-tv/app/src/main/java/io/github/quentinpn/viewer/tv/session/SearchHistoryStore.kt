@@ -7,7 +7,7 @@ import io.github.quentinpn.viewer.tv.emby.decodeSearches
 import io.github.quentinpn.viewer.tv.emby.encodeSearches
 
 /**
- * Recent searches (ADR 0075), per server and Emby user, in plain preferences: search
+ * Recent searches, per server and Emby user, in plain preferences: search
  * terms are not a secret, and nothing else (never the token) is kept here.
  */
 class SearchHistoryStore(context: Context, private val server: String, private val userId: String) {

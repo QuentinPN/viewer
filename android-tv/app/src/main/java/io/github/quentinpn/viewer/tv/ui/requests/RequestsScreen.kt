@@ -118,7 +118,7 @@ internal fun FocusRestore(memory: RequestsMemory, ready: Boolean, target: FocusR
 }
 
 /**
- * Demander (ADR 0125): the setup states until Request is usable, then its segments. Back
+ * Demander: the setup states until Request is usable, then its segments. Back
  * closes the tab; the levels inside it (a title, a request) handle Back before it.
  */
 @Composable

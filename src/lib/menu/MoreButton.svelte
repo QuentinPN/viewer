@@ -1,5 +1,5 @@
 <script lang="ts">
-// The "…" button of a card (ADR 0100): over its artwork's top-right corner,
+// The "…" button of a card: over its artwork's top-right corner,
 // shown while the card is hovered or focused, and reached by Tab after it.
 interface Props {
   title: string;

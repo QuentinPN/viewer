@@ -1,4 +1,4 @@
-/* Design tokens (DESIGN.md; Apple TV direction, ADR 0031). */
+/* Design tokens (DESIGN.md; Apple TV direction). */
 :root {
   --color-bg: #000000;
   --color-surface: #1c1c1e;
@@ -40,7 +40,7 @@
   --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --font-display:
     "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
-  /* Custom title bar (ADR 0029); the player puts its own over the video. */
+  /* Custom title bar; the player puts its own over the video. */
   --titlebar-height: 32px;
   color-scheme: dark;
 }

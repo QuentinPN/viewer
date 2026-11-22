@@ -1,4 +1,4 @@
-//! Native video surface hosting strategies (Windows). See ADR 0003.
+//! Native video surface hosting strategies (Windows).
 //!
 //! `Parent` (default, validated in Gate 1): mpv receives the main window HWND as
 //! `wid` and creates its own child window; the transparent WebView2 composites

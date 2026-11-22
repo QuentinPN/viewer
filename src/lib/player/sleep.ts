@@ -1,4 +1,4 @@
-// « Minuterie » of the player's options, as on the TV (ADR 0073). Times are
+// « Minuterie » of the player's options, as on the TV. Times are
 // passed in: milliseconds of the wall clock, positions in seconds.
 import type { Segment } from "../emby/types";
 

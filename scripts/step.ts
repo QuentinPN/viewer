@@ -1,4 +1,4 @@
-// Shared steps of the CI publish scripts (ADR 0126): publish.ts and
+// Shared steps of the CI publish scripts: publish.ts and
 // publish-android.ts run on the Windows runner after the release action has
 // bumped the version, written the changelog and tagged the commit.
 import { spawnSync } from "node:child_process";

@@ -1,6 +1,6 @@
-// UI evidence of the « Demander » screens (ADR 0125) on the real Emby test
+// UI evidence of the « Demander » screens on the real Emby test
 // account and the real Request server, driven over CDP (no desktop takeover).
-// Screenshots go to docs/evidence/request/:
+// Screenshots go to artifacts/request/:
 // configuration, Découvrir, Parcourir, film page, series page with the request
 // dialog open (never sent), Mes demandes, library search with « À demander »,
 // Réglages › Demandes, « Lire » opening the Emby title of an available one

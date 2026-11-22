@@ -26,9 +26,9 @@ private const val TAG = "ViewerReport"
 private const val STOP_RETRY_DELAY_MS = 1_000L
 
 /**
- * Sends playback reports in order from one process-wide coroutine (ADR 0008, 0040),
+ * Sends playback reports in order from one process-wide coroutine,
  * so the stop report still goes out after the player activity is destroyed. A stop
- * report lost to the network is kept on disk and sent again (ADR 0066).
+ * report lost to the network is kept on disk and sent again.
  */
 class PlaybackReporter(storage: PendingStopStorage) {
     private sealed interface Message {

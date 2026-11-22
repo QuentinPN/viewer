@@ -1,4 +1,4 @@
-// Command viewer is the Go + Wails v3 build of Viewer (ADR 0128), the
+// Command viewer is the Go + Wails v3 build of Viewer, the
 // counterpart of src-tauri/src/lib.rs `run`. It serves the shared Svelte frontend,
 // built by `npm run build:wails` into frontend/dist, and answers its invoke calls
 // through internal/bridge.
@@ -48,7 +48,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// First, so everything after it is logged (ADR 0033).
+	// First, so everything after it is logged.
 	logger, _ := diagnostics.Init(paths.Logs, debug, app.Version())
 	if logger != nil {
 		defer func() { _ = logger.Close() }()
@@ -62,7 +62,7 @@ func main() {
 		}()
 	}
 
-	// Deferred by the app's goroutines: a panic there reaches the log (ADR 0033).
+	// Deferred by the app's goroutines: a panic there reaches the log.
 	var recoverPanic func()
 	if logger != nil {
 		recoverPanic = logger.RecoverAndRepanic
@@ -86,7 +86,7 @@ func main() {
 		Libmpv:  app.ResolveLibmpv(debug),
 		Emit:    emit,
 		Recover: recoverPanic,
-		// ADR 0003, parent mode: mpv renders into the main window's HWND, under the
+		// Parent mode: mpv renders into the main window's HWND, under the
 		// transparent WebView2.
 		WID: func() uintptr {
 			if w := mainWin.Load(); w != nil {
@@ -100,7 +100,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Debug builds only: the DevTools port of the scripted UI tests (ADR 0006),
+	// Debug builds only: the DevTools port of the scripted UI tests (scripted UI tests never take over the desktop),
 	// from VIEWER_E2E_BROWSER_ARGS (Wails blanks WebView2's own variable).
 	browserArgs := app.BrowserArgsFor(debug, os.Getenv(app.BrowserArgsEnv))
 
@@ -129,8 +129,8 @@ func main() {
 	})
 	wailsApp.Store(wails)
 
-	// Same window as src-tauri/tauri.conf.json: frameless and transparent (ADR
-	// 0003: mpv renders into this HWND under the WebView), maximized at start,
+	// Same window as src-tauri/tauri.conf.json: frameless and transparent
+	// (mpv renders into this HWND under the WebView), maximized at start,
 	// 1280x720 restored, 640x360 minimum.
 	opts := application.WebviewWindowOptions{
 		Name:           "main",
@@ -156,8 +156,8 @@ func main() {
 	mainWin.Store(win)
 	registerCommands(reg, state, wailsWindow{win})
 
-	// Window close during playback: cancel it, tear mpv down off the UI thread
-	// (ADR 0003), tell a linked TV, let the stop report reach the server, then
+	// Window close during playback: cancel it, tear mpv down off the UI thread,
+	// tell a linked TV, let the stop report reach the server, then
 	// close the window again (the hook lets it through once the player is gone):
 	// Wails quits on the last window closed. app.Quit() with WebView2 alive logs
 	// "Failed to unregister class Chrome_WidgetWin_0" (1412), see gate1-go.

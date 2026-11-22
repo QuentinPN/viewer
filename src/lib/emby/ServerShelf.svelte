@@ -1,5 +1,5 @@
 <script lang="ts">
-// Pre-connection shelf « L'étagère » (ADR 0103): one tile per saved server and
+// Pre-connection shelf « L'étagère »: one tile per saved server and
 // user, newest first. A tile with a saved token validates it (restore flow); a
 // rejected or signed-out tile asks the password at once. « Gérer » forgets a
 // server on this device only. Secondary views open over the shelf.

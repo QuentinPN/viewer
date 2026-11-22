@@ -15,8 +15,8 @@ type PlayerEngine interface {
 	// when it is torn down; it may arrive twice if mpv quits by itself, like Rust
 	// (event thread, then close_player). Exception: commands.rs:671 sends Shutdown to
 	// the reporter alone on a load failure, without engine teardown: the app-shell
-	// must reproduce that. Blocks until the player is gone, so not on the UI thread
-	// (ADR 0003). From the event sink it returns ErrShutdownFromSink and does nothing.
+	// must reproduce that. Blocks until the player is gone, so not on the UI thread.
+	// From the event sink it returns ErrShutdownFromSink and does nothing.
 	Shutdown() error
 }
 
@@ -27,7 +27,7 @@ type PlayerEngine interface {
 // the sink takes (Rust's close_player takes the engine out of its mutex first).
 type EventSink func(PlayerEvent)
 
-// SurfaceMode is how the video is hosted (video_surface.rs, ADR 0003), reported
+// SurfaceMode is how the video is hosted (video_surface.rs), reported
 // to the UI by `app_info` (`surfaceMode`). Only `parent` is ported: mpv gets the
 // main window's HWND as `wid` and creates its own child window, the transparent
 // WebView2 composites above it. `child` and `separate` were rejected by Gate 1.

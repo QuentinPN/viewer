@@ -5,7 +5,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.util.Locale
 import kotlin.math.roundToLong
 
-// The "Informations de lecture" panel (ADR 0061), as on Windows (ADR 0017, 0037):
+// The "Informations de lecture" panel, as on Windows:
 // how the server delivers the item and what this device does with it. Every value
 // comes from the PlaybackPlan or a libmpv property; a value mpv does not give is left out.
 

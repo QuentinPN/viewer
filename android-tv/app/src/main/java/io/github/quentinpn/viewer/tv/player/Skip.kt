@@ -3,7 +3,7 @@ package io.github.quentinpn.viewer.tv.player
 import io.github.quentinpn.viewer.tv.emby.Segment
 import io.github.quentinpn.viewer.tv.emby.SegmentKind
 
-// "Passer l'intro" and "Passer le générique" (ADR 0030, 0048), as src/lib/player/segments.ts.
+// "Passer l'intro" and "Passer le générique", as src/lib/player/segments.ts.
 
 /** Credits ending this close to the end of the file run to the end. */
 const val END_SLACK_SECONDS = 2.0
@@ -28,10 +28,10 @@ sealed interface SkipPrompt {
     /** A button that seeks to [to]; the end of the file closes the player as a natural end. */
     data class Button(val label: String, val to: Double) : SkipPrompt
 
-    /** The "Épisode suivant" card (ADR 0043), at the start of the credits. */
+    /** The "Épisode suivant" card, at the start of the credits. */
     data object UpNext : SkipPrompt
 
-    /** "Passer automatiquement" (ADR 0051): seek to [to] without waiting for a press. */
+    /** "Passer automatiquement": seek to [to] without waiting for a press. */
     data class Auto(val to: Double) : SkipPrompt
 }
 
@@ -58,7 +58,7 @@ class SkipPlan(private val segments: List<Segment>, private val auto: Boolean = 
     }
 }
 
-/** How long the button shows on its own once its segment starts (ADR 0089), as on Windows. */
+/** How long the button shows on its own once its segment starts, as on Windows. */
 const val SKIP_SHOWN_MS = 10_000L
 
 /**
@@ -73,7 +73,7 @@ fun trackSkipShown(prev: SkipShown, button: SkipPrompt.Button?, now: Long): Skip
     if (button == prev.button) prev else SkipShown(button, now)
 
 /**
- * Whether OK presses the visible skip button (ADR 0108). Armed when the button
+ * Whether OK presses the visible skip button. Armed when the button
  * appears during plain playback, when OK brings it back, and when the controls
  * fade; a ◀ ▶ seek disarms it, so the OK that follows a seek plays or pauses.
  */

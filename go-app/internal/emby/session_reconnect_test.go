@@ -1,7 +1,7 @@
 package emby
 
-// tests.rs, Gate 2.1 (persistent session and reconnection, ADR 0012), sessions set
-// aside, shelf and forget_server (ADR 0103), and linked playback calls (ADR 0124):
+// tests.rs, Gate 2.1 (persistent session and reconnection), sessions set
+// aside, shelf and forget_server, and linked playback calls:
 // lines 4660–5487, through EmbyService.
 
 import (
@@ -653,7 +653,7 @@ func Test_forget_server_without_token_only_removes_the_record(t *testing.T) {
 	}
 }
 
-// Linked playback calls (ADR 0124): capabilities, the session list and the
+// Linked playback calls: capabilities, the session list and the
 // `SendString` relay, with the token in the header only.
 func Test_linked_playback_calls_use_the_session_relay(t *testing.T) {
 	server := startFakeEmby(t, func(r fakeRequest) (int, string) {

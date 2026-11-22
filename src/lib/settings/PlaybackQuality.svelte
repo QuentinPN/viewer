@@ -4,7 +4,7 @@ import { embyApi, toEmbyError } from "../emby/api";
 import type { EmbyError, PlaybackQuality } from "../emby/types";
 import { addressNote, capLabel, capValue, parseCap } from "./quality";
 
-// Streaming bitrate caps of the current server (ADR 0037), kept in Rust.
+// Streaming bitrate caps of the current server, kept in Rust.
 let quality = $state<PlaybackQuality | null>(null);
 let loadError = $state<EmbyError | null>(null);
 let saveError = $state<EmbyError | null>(null);

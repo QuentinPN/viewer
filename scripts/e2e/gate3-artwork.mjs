@@ -1,4 +1,4 @@
-// Gate 3 artwork disk cache (ADR 0019) on the real Emby test account, driven over
+// Gate 3 artwork disk cache on the real Emby test account, driven over
 // CDP. Two launches on the same empty cache folder (`VIEWER_E2E_ARTWORK_DIR`, debug
 // builds only, never the user's cache):
 // - first launch: the posters of the films grid are downloaded and kept;

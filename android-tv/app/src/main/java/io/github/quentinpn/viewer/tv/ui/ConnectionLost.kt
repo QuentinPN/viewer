@@ -35,7 +35,7 @@ import io.github.quentinpn.viewer.tv.session.status
 import kotlinx.coroutines.delay
 
 /**
- * « Serveur injoignable » (ADR 0119): a calm full-screen state while the server is away. The
+ * « Serveur injoignable »: a calm full-screen state while the server is away. The
  * session is kept; automatic attempts run behind it. « Réessayer » is focused first;
  * « Changer de serveur » sets the session aside, token kept, and shows the shelf.
  */

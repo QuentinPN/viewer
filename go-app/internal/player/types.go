@@ -1,5 +1,5 @@
 // Package player is the transport-neutral playback abstraction, port of
-// src-tauri/src/player/mod.rs (ADR 0128).
+// src-tauri/src/player/mod.rs.
 //
 // Wave 2 ports only the types the Emby playback negotiation and the goldens need
 // (PlaybackRequest, TrackSelection, TrackPick, ExternalSubtitle, SubtitleStyle, Track,
@@ -46,9 +46,9 @@ type PlaybackRequest struct {
 	// Subtitles are files added once the media is loaded (e.g. text tracks a
 	// transcode delivers separately). Validated like Source.
 	Subtitles List[ExternalSubtitle] `json:"subtitles"`
-	// Tracks: audio and subtitle tracks to select once the file is loaded (ADR 0035).
+	// Tracks: audio and subtitle tracks to select once the file is loaded.
 	Tracks TrackSelection `json:"tracks"`
-	// SubtitleStyle: how text subtitles look (ADR 0035).
+	// SubtitleStyle: how text subtitles look.
 	SubtitleStyle SubtitleStyle `json:"subtitleStyle"`
 }
 
@@ -99,7 +99,7 @@ const (
 
 var trackPickTags = [...]string{"auto", "off", "stream"}
 
-// TrackPick is which track of a kind to select once the file is loaded (ADR 0035).
+// TrackPick is which track of a kind to select once the file is loaded.
 // Index is meaningful for TrackStream only. Serde: internally tagged by `type`.
 type TrackPick struct {
 	Kind  TrackPickKind
@@ -197,7 +197,7 @@ func (s *TrackSelection) UnmarshalJSON(b []byte) error {
 }
 
 // SubtitleStyle is the look of text subtitles (SRT, WebVTT…). ASS/SSA keep their
-// own styling unless OverrideASS is set (ADR 0035). The zero value is the default.
+// own styling unless OverrideASS is set. The zero value is the default.
 type SubtitleStyle struct {
 	Size        SubtitleSize       `json:"size"`
 	Color       SubtitleColor      `json:"color"`
@@ -405,13 +405,13 @@ type PlayerDiagnostics struct {
 	TimePos     *float64 `json:"timePos"`
 	Duration    *float64 `json:"duration"`
 	Paused      *bool    `json:"paused"`
-	// Volume is the engine volume in percent (0–130), as set by SetVolume (ADR 0017).
+	// Volume is the engine volume in percent (0–130), as set by SetVolume.
 	Volume                *float64 `json:"volume"`
 	FrameDropCount        *int64   `json:"frameDropCount"`
 	DecoderFrameDropCount *int64   `json:"decoderFrameDropCount"`
-	// ChapterCount: chapters mpv found in the file (`chapters`), compared with Emby's (ADR 0034).
+	// ChapterCount: chapters mpv found in the file (`chapters`), compared with Emby's.
 	ChapterCount *int64 `json:"chapterCount"`
-	// SubtitleOptions in effect (ADR 0035): `sub-scale`, `sub-color`,
+	// SubtitleOptions in effect: `sub-scale`, `sub-color`,
 	// `sub-border-style`, `sub-pos`, `sub-align-y`, `sub-ass-override`.
 	SubtitleOptions List[[2]string] `json:"subtitleOptions"`
 }

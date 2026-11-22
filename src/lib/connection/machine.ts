@@ -1,4 +1,4 @@
-// Connection states of the app (ADR 0012). Pure: no timer, no I/O, so every
+// Connection states of the app. Pure: no timer, no I/O, so every
 // transition is covered by Vitest. The coordinator feeds it events.
 import type {
   EmbyError,

@@ -1,7 +1,7 @@
 // Package bridge is the single command entry point of the Wails app: the
 // frontend calls Bridge.Invoke with a Tauri command name and its arguments,
 // and the registry dispatches to the Go handler registered under that name.
-// Keeping the Tauri names lets src/lib/native/ stay a thin layer (ADR 0128).
+// Keeping the Tauri names lets src/lib/native/ stay a thin layer.
 package bridge
 
 import (

@@ -1,7 +1,7 @@
 <script lang="ts">
 // Gate 1 prototype: minimal player overlay used to validate native video
-// composition, focus and keyboard handling. Emby playback uses PlayerView
-// (ADR 0017); this view stays as the test bench of the prototype mode.
+// composition, focus and keyboard handling. Emby playback uses PlayerView;
+// this view stays as the test bench of the prototype mode.
 import { onDestroy, onMount } from "svelte";
 import type { PlaybackStart } from "../emby/types";
 import { playerApi } from "./api";
@@ -22,7 +22,7 @@ interface Props {
   onExit?: () => void;
   /**
    * Emby playback that ended on an error or well before the end (the stream
-   * broke, ADR 0012): the player closes and the app offers to resume.
+   * broke): the player closes and the app offers to resume.
    */
   onInterrupted?: (itemId: string) => void;
 }

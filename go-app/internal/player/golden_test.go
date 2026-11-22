@@ -1,6 +1,6 @@
 package player
 
-// Golden tests of the player unit (ADR 0128): events.player_event.*,
+// Golden tests of the player unit: events.player_event.*,
 // events.end_reason.all and errors.player_error.all_kinds, built by Go code and
 // compared token by token (key order kept, numbers by value: serde writes 6000.0
 // where encoding/json writes 6000). The comparer is a copy of the one in

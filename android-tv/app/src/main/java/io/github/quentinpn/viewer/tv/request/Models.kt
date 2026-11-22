@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.jsonObject
 
 /*
- * The Request API as pinned in contracts/request/openapi.json (ADR 0125).
+ * The Request API as pinned in contracts/request/openapi.json.
  * Only the fields the app reads are declared; the shared fixtures check them against the contract.
  */
 

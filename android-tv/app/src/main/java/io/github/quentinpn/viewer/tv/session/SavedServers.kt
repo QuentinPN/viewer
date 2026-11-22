@@ -40,7 +40,7 @@ fun hostLabel(server: String): String {
 }
 
 /**
- * One server of the shelf (ADR 0104). Nothing here is a secret but [sealedToken], which is
+ * One server of the shelf. Nothing here is a secret but [sealedToken], which is
  * the token sealed by the [TokenCipher]; null once signed out or refused by the server.
  */
 @Serializable
@@ -67,7 +67,7 @@ data class SavedServer(
 }
 
 /**
- * The saved servers and the open session (ADR 0104), over [prefs] and [cipher]. The list is
+ * The saved servers and the open session, over [prefs] and [cipher]. The list is
  * JSON under `servers`, the open one's key under `active`. The single session of earlier
  * versions (`server`, `userId`, `userName`, `token`) becomes the first saved server on first
  * read, still signed in: its sealed token is kept as is, sealed with the same key.

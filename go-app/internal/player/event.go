@@ -36,7 +36,7 @@ type (
 		Reason EndReason
 		Error  *string
 	}
-	// Shutdown: the engine is gone; the overlay returns to idle (ADR 0003).
+	// Shutdown: the engine is gone; the overlay returns to idle.
 	Shutdown struct{}
 )
 

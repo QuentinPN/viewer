@@ -7,7 +7,7 @@ import java.io.InputStream
 import java.security.MessageDigest
 
 /**
- * `android/latest.json` of the releases repository (ADR 0112): the newest APK, its size and
+ * `android/latest.json` of the releases repository: the newest APK, its size and
  * SHA-256. The signature, checked after download, is what proves where the APK comes from.
  */
 @Serializable

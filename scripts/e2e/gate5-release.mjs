@@ -1,4 +1,4 @@
-// Gate 5 smoke test of the installed release build (ADR 0028), on the real Emby test
+// Gate 5 smoke test of the installed release build, on the real Emby test
 // account, driven over CDP. The release build ignores every VIEWER_* variable, so its
 // window shows on screen and its sound is only turned down through the player:
 // - the bundled frontend loads, not the Vite server, and the window is not moved off-screen;
@@ -6,7 +6,7 @@
 // - the bitrate cap of the scenarios is ignored: no "débit trop élevé" transcode;
 // - a film plays, a seek lands, back to 0 then Escape leaves no resume point.
 // VIEWER_RELEASE_EXE sets the executable, by default the per-user install. The installed
-// app holds the owner's data (ADR 0105): a session of another user is left untouched
+// app holds the owner's data: a session of another user is left untouched
 // and the scenario stops; at the end the test account is signed out and its tile
 // forgotten, so the owner's shelf keeps only their own servers.
 import { join } from "node:path";

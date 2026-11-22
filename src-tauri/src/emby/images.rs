@@ -1,4 +1,4 @@
-//! Emby artwork through the local `emby-img` protocol (ADR 0005). The UI gets ready
+//! Emby artwork through the local `emby-img` protocol. The UI gets ready
 //! made URLs on that protocol; Rust fetches the image with the session's auth header.
 
 use super::models::ImageRef;
@@ -19,7 +19,7 @@ pub const BACKDROP_WIDTHS: &[u32] = &[960, 1440, 1920];
 pub const LOGO_WIDTHS: &[u32] = &[320, 640];
 /// 16:9 episode stills.
 pub const THUMB_WIDTHS: &[u32] = &[320, 480, 640];
-/// Round cast photos of a detail page (ADR 0121).
+/// Round cast photos of a detail page.
 pub const PHOTO_WIDTHS: &[u32] = &[120, 240];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,7 +50,7 @@ impl ImageType {
 /// One validated artwork request coming from the WebView.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ImageRequest {
-    /// Emby server the URL was built for (ADR 0012): refused unless it is the current one.
+    /// Emby server the URL was built for: refused unless it is the current one.
     pub server_id: String,
     pub item_id: String,
     pub image_type: ImageType,
@@ -106,7 +106,7 @@ impl ImageRequest {
 
 /// `src`/`srcset` for an item image, or `None` when the item has no such image: a
 /// missing image still answers 200 with a generic picture, so `ImageTags` decides.
-/// The server id scopes the WebView's HTTP cache to one server (ADR 0012).
+/// The server id scopes the WebView's HTTP cache to one server.
 pub fn image_ref(
     server_id: &str,
     item_id: &str,

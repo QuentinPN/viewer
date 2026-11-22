@@ -39,9 +39,9 @@ import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.UserItemData
 
 /**
- * A film: backdrop, year, length, overview, "Reprendre" / "Lire depuis le début", « Bande-annonce » (ADR 0083), its version
- * if it has several, and below the screen the « Distribution » (ADR 0068), « Collection »
- * (ADR 0071) and « Titres similaires » (ADR 0063) rows.
+ * A film: backdrop, year, length, overview, "Reprendre" / "Lire depuis le début", « Bande-annonce », its version
+ * if it has several, and below the screen the « Distribution », « Collection »
+ * and « Titres similaires » rows.
  */
 @Composable
 fun MovieScreen(
@@ -54,9 +54,9 @@ fun MovieScreen(
     onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit,
     /** OK on a similar title opens its film or series page. */
     onOpenSimilar: (BaseItemDto) -> Unit,
-    /** OK on a « Distribution » card opens that person's page (ADR 0068). */
+    /** OK on a « Distribution » card opens that person's page. */
     onOpenPerson: (CastMember) -> Unit,
-    /** OK on a poster of a « Collection » row opens its page (ADR 0071). */
+    /** OK on a poster of a « Collection » row opens its page. */
     onOpenCollectionItem: (BaseItemDto) -> Unit,
     onSessionExpired: () -> Unit,
     /** The card a person page was opened from: focused instead of the play button. */
@@ -65,17 +65,17 @@ fun MovieScreen(
     focusCollection: String? = null,
     /** Changes after each playback: the resume point and watched mark are read again. */
     refresh: Int = 0,
-    /** OK on a genre chip opens the films library on it (ADR 0079); null hides the chips. */
+    /** OK on a genre chip opens the films library on it; null hides the chips. */
     onOpenGenre: ((String) -> Unit)? = null,
     /** The genre chip a grid was opened from: focused instead of the play button. */
     focusGenre: String? = null,
-    /** « Bande-annonce » beside the play buttons (ADR 0083); null hides it. */
+    /** « Bande-annonce » beside the play buttons; null hides it. */
     trailers: TrailerHandlers? = null,
-    /** OK on a studio chip opens the films library on it (ADR 0087); null hides the chips. */
+    /** OK on a studio chip opens the films library on it; null hides the chips. */
     onOpenStudio: ((String) -> Unit)? = null,
     /** The studio chip a grid was opened from: focused instead of the play button. */
     focusStudio: String? = null,
-    /** After a watched mark or favourite sent from here (ADR 0097): the home reads its shelves again. */
+    /** After a watched mark or favourite sent from here: the home reads its shelves again. */
     onUserDataChanged: () -> Unit = {},
 ) {
     var movie by remember { mutableStateOf<Load<BaseItemDto>>(Load.Loading) }
@@ -86,7 +86,7 @@ fun MovieScreen(
         val shown = movie is Load.Ready
         if (!shown) movie = Load.Loading
         val next = try {
-            // Without Fields, as Windows reads its detail: also carries the MediaSources (ADR 0058)
+            // Without Fields, as Windows reads its detail: also carries the MediaSources
             Load.Ready(client.fullItem(userId, movieId))
         } catch (e: EmbyException) {
             if (e.error == EmbyError.SessionExpired) onSessionExpired()
@@ -103,7 +103,7 @@ fun MovieScreen(
     // Back from a genre's grid: its chip, the play button if the film lost that genre
     val genreFocus = focusGenre?.takeIf { it in chips }
     val studios = remember(movieValue?.studios, onOpenStudio != null) { if (onOpenStudio != null && movieValue != null) studioChips(movieValue) else emptyList() }
-    // Likewise from a studio's grid (ADR 0087)
+    // Likewise from a studio's grid
     val studioFocus = focusStudio?.takeIf { it in studios }
     val takeFocus = focusPerson == null && genreFocus == null && studioFocus == null && (focusCollection == null || collections != null && focusedShelf < 0)
 
@@ -127,7 +127,7 @@ fun MovieScreen(
                             ChipLines(chips, genreFocus, { onOpenGenre?.invoke(it) }, studios, studioFocus) { onOpenStudio?.invoke(it) },
                             Modifier.height(screen).topOnFocus(scroll),
                             actions = { onMessage ->
-                                // The answer is the film's new user data: the page shows it at once (ADR 0097)
+                                // The answer is the film's new user data: the page shows it at once
                                 val update = { data: UserItemData ->
                                     movie = Load.Ready(m.value.copy(userData = data))
                                     onUserDataChanged()
@@ -158,19 +158,19 @@ private fun Details(
     onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit,
     /** False when the « Distribution » or a « Collection » row takes the first focus; may turn true later. */
     takeFocus: Boolean,
-    /** Genres and studios to open (ADR 0079, 0087); empty leaves them on the year line and in the facts. */
+    /** Genres and studios to open; empty leaves them on the year line and in the facts. */
     chips: ChipLines,
     modifier: Modifier,
-    /** The watched mark and favourite buttons (ADR 0097), on their own row under the play row. */
+    /** The watched mark and favourite buttons, on their own row under the play row. */
     actions: @Composable (onMessage: (String?) -> Unit) -> Unit,
-    /** The trailer button, last of the play row (ADR 0083); its message shows under the row. */
+    /** The trailer button, last of the play row; its message shows under the row. */
     trailer: @Composable (onMessage: (String?) -> Unit) -> Unit,
 ) {
     val played = movie.userData?.played == true
     val position = movie.userData?.playbackPositionTicks ?: 0
     val resume = !played && position > 0
     val first = remember { FocusRequester() }
-    // Empty with fewer than two versions: no button, and nothing sent to the server (ADR 0058)
+    // Empty with fewer than two versions: no button, and nothing sent to the server
     val choices = remember(movie.mediaSources) { versionChoices(movie.mediaSources) }
     var version by remember(movie.id, choices) { mutableStateOf(versions.load(movie.id, choices)) }
     var trailerMessage by remember { mutableStateOf<String?>(null) }
@@ -210,14 +210,14 @@ private fun Details(
                 Text(if (resume) "Reprendre à ${clock(position)}" else "Lire")
             }
             if (resume) OutlinedButton(onClick = { onPlay(movie.id, 0, version) }) { Text("Lire depuis le début") }
-            // The desktop leads, the TV follows (ADR 0124)
+            // The desktop leads, the TV follows
             WatchWithDesktopButton()
             trailer { trailerMessage = it }
         }
         trailerMessage?.let { Text(it, color = Palette.error) }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             actions { actionMessage = it }
-            // The version the page plays (ADR 0119)
+            // The version the page plays
             TechInfoButton(shownSource(movie.mediaSources, version), choices.firstOrNull { it.id == version }?.label)
         }
         actionMessage?.let { Text(it, color = Palette.error) }

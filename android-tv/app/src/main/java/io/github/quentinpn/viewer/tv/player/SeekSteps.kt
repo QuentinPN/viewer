@@ -1,6 +1,6 @@
 package io.github.quentinpn.viewer.tv.player
 
-// A held ◀ ▶ seeks faster the longer it is held (ADR 0090). Android repeats a held
+// A held ◀ ▶ seeks faster the longer it is held. Android repeats a held
 // key about 20 times a second, after a ~0.4 s delay; KeyEvent.repeatCount counts them.
 
 /** The step of a press and of the first second of repeats. */

@@ -1,7 +1,7 @@
 package request
 
 // Request API models, port of src-tauri/src/request/models.rs, field for
-// field from contracts/request/openapi.json (ADR 0125).
+// field from contracts/request/openapi.json.
 //
 // serde mapping (decode.go for the reading side):
 //   - a non-`Option` field is a non-pointer, required when read;

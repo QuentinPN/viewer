@@ -53,7 +53,7 @@ class LibraryOptionsTest {
 
     @Test
     fun aGenreGridStartsWithEveryDecade() {
-        // The grid opened from a genre chip keeps the sort, not the saved decade (ADR 0079, 0082)
+        // The grid opened from a genre chip keeps the sort, not the saved decade
         val saved = ItemsOptions(SortKey.Year, descending = true, decade = 1980)
         assertNull(genreOptions(saved, "Drame")?.decade)
         // « Réinitialiser » goes back to every decade

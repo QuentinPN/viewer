@@ -1,11 +1,11 @@
-// Gate 4 fallback when the player cannot open the direct source (ADR 0023), on the
+// Gate 4 fallback when the player cannot open the direct source, on the
 // real Emby test account, driven over CDP. The app signs in through the local proxy
 // (net-proxy.mjs), which answers direct file requests with bytes no player can read;
 // the file on the NAS is untouched.
 // - "Reprendre": the server transcodes and playback starts at the saved position;
 // - "Lire depuis le début": the fallback keeps that choice;
 // - a transcode that cannot open either: an explanation, "Retour", no retry loop;
-// - a direct source that never answers: the opening limit (ADR 0027), then the
+// - a direct source that never answers: the opening limit, then the
 //   fallback;
 // - a file the server can no longer read (HTTP 500 on the file and on every HLS
 //   segment): the fallback, then the opening limit and the explanation.

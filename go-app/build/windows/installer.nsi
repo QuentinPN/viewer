@@ -1,4 +1,4 @@
-; NSIS installer of the Wails build of Viewer (ADR 0128, unit "installer").
+; NSIS installer of the Wails build of Viewer (unit "installer").
 ;
 ; It installs over a Tauri install: same per-user directory, same uninstall key, same
 ; shortcuts, same AppUserModelId, same command-line flags (/S /P /NS /UPDATE /R /ARGS).
@@ -232,7 +232,7 @@ Section Install
   !insertmacro CheckIfAppIsRunning "$INSTDIR\${MAINBINARYNAME}.exe"
 
   File "${MAINBINARYSRCPATH}"
-  ; libmpv-2.dll next to the exe: the production build loads it from there only (ADR 0003)
+  ; libmpv-2.dll next to the exe: the production build loads it from there only
   File /a "/oname=libmpv-2.dll" "${LIBMPVSRCPATH}"
 
   WriteUninstaller "$INSTDIR\uninstall.exe"

@@ -9,7 +9,7 @@ import (
 	"viewer/internal/emby"
 )
 
-// Linked playback (ADR 0124) and session socket (ADR 0110) commands of commands.rs.
+// Linked playback and session socket commands of commands.rs.
 func registerSync(reg *bridge.Registry, a *app.App) {
 	// Viewer TVs open on the account the playback can be sent to.
 	reg.Register("sync_devices", noArgs(func(ctx context.Context) (any, error) {
@@ -37,7 +37,7 @@ func registerSync(reg *bridge.Registry, a *app.App) {
 	reg.Register("sync_status", noArgs(func(ctx context.Context) (any, error) {
 		return a.Sync.Status(ctx), nil
 	}))
-	// Listens for titles added on the server while the home is shown (ADR 0110);
+	// Listens for titles added on the server while the home is shown;
 	// each settled burst emits emby://library-changed.
 	reg.Register("emby_library_events_start", noArgs(func(context.Context) (any, error) {
 		a.Library.Start()

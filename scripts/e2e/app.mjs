@@ -1,7 +1,7 @@
 // Drives the debug build through WebView2's DevTools protocol (CDP) instead of OS
 // mouse and keyboard input: the app window never needs the foreground, so the
 // desktop stays usable while a scenario runs. Screenshots come from the page, so
-// they show the HTML UI only, never the native mpv video under it (ADR 0006).
+// they show the HTML UI only, never the native mpv video under it.
 import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -85,7 +85,7 @@ export async function launch({
       // No sound on the user's speakers during a scenario (debug builds only).
       VIEWER_E2E_SILENT: "1",
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: browserArgs,
-      // The Go + Wails debug build: Wails blanks the variable above (ADR 0128).
+      // The Go + Wails debug build: Wails blanks the variable above.
       VIEWER_E2E_BROWSER_ARGS: browserArgs,
     },
     stdio: "ignore",

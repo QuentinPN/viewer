@@ -1,7 +1,6 @@
 package emby
 
-// Playback, reports and segments of the open session (session.rs, ADR 0007, 0008,
-// 0023, 0030, 0035, 0036, 0117).
+// Playback, reports and segments of the open session (session.rs).
 
 import (
 	"context"
@@ -33,7 +32,7 @@ func EmbyMarkers(chapters []ChapterDto) []segs.Segment {
 }
 
 // SegmentQuery is `segment_query`: Emby's markers of an item and what the external
-// sources are asked about it (ADR 0030): a film by its ids, an episode by its
+// sources are asked about it: a film by its ids, an episode by its
 // series' ids and numbers. The query is nil when the item has no usable id.
 func (s *EmbyService) SegmentQuery(ctx context.Context, itemID string) ([]segs.Segment, *segs.Query, error) {
 	client, userID, err := s.session()
@@ -86,42 +85,42 @@ type PrepareResult struct {
 	Headers []player.Header
 }
 
-// PreparePlayback is `prepare_playback`: negotiates playback of a film or episode
-// (ADR 0007). With resume, the plan starts at the position the server holds now
-// (ADR 0008). The item is read alongside PlaybackInfo for the player's title (ADR
-// 0017); without resume, failing to read it only leaves the title out.
+// PreparePlayback is `prepare_playback`: negotiates playback of a film or episode.
+// With resume, the plan starts at the position the server holds now.
+// The item is read alongside PlaybackInfo for the player's title;
+// without resume, failing to read it only leaves the title out.
 func (s *EmbyService) PreparePlayback(ctx context.Context, itemID string, resume bool) (PrepareResult, error) {
 	return s.PrepareSource(ctx, itemID, nil, resume, false, TrackPreferences{})
 }
 
 // PrepareTranscode is `prepare_transcode`: PreparePlayback for when the player could
 // not open the direct source: Direct Play and Direct Stream are refused to the server
-// so it transcodes (ADR 0023). A server that still offers the file as is gives
+// so it transcodes. A server that still offers the file as is gives
 // NoCompatibleStream, so the fallback never loops on the same source.
 func (s *EmbyService) PrepareTranscode(ctx context.Context, itemID string, resume bool) (PrepareResult, error) {
 	return s.PrepareSource(ctx, itemID, nil, resume, true, TrackPreferences{})
 }
 
-// PrepareVersion is `prepare_version`: for one version of an item with several (ADR
-// 0036); nil lets the server pick.
+// PrepareVersion is `prepare_version`: for one version of an item with several;
+// nil lets the server pick.
 func (s *EmbyService) PrepareVersion(ctx context.Context, itemID string, mediaSourceID *string, resume, forceTranscode bool) (PrepareResult, error) {
 	return s.PrepareSource(ctx, itemID, mediaSourceID, resume, forceTranscode, TrackPreferences{})
 }
 
 // Prepare is `prepare`: with the audio and subtitles picked from the user's
-// preferences (ADR 0035).
+// preferences.
 func (s *EmbyService) Prepare(ctx context.Context, itemID string, resume, forceTranscode bool, prefs TrackPreferences) (PrepareResult, error) {
 	return s.PrepareSource(ctx, itemID, nil, resume, forceTranscode, prefs)
 }
 
 // PrepareSource is `prepare_source`: Prepare for one version of the item, or the
-// server's pick with nil (ADR 0035, 0036).
+// server's pick with nil.
 func (s *EmbyService) PrepareSource(ctx context.Context, itemID string, mediaSourceID *string, resume, forceTranscode bool, prefs TrackPreferences) (PrepareResult, error) {
 	return s.prepareWith(ctx, itemID, mediaSourceID, resume, forceTranscode, prefs, false, nil)
 }
 
 // PrepareAtCap is `prepare_at_cap`: a new negotiation of the version playing at
-// another bitrate cap, for this playback only (ADR 0117): Réglages is left as it is.
+// another bitrate cap, for this playback only: Réglages is left as it is.
 // nil is « Maximale ». The plan starts at startTicks, the position reached.
 func (s *EmbyService) PrepareAtCap(ctx context.Context, itemID, mediaSourceID string, cap *uint64, startTicks int64, prefs TrackPreferences) (PrepareResult, error) {
 	if cap != nil && !slices.Contains(BitrateChoices, *cap) {
@@ -137,7 +136,7 @@ func (s *EmbyService) PrepareAtCap(ctx context.Context, itemID, mediaSourceID st
 }
 
 // StopEncoding is `stop_encoding`: stops the transcode of a replaced play session
-// (`DELETE /Videos/ActiveEncodings`, ADR 0117); the token stays in the header.
+// (`DELETE /Videos/ActiveEncodings`); the token stays in the header.
 func (s *EmbyService) StopEncoding(ctx context.Context, playSessionID string) error {
 	client, err := s.Client()
 	if err != nil {
@@ -186,7 +185,7 @@ func (s *EmbyService) prepareWith(ctx context.Context, itemID string, mediaSourc
 	otherAudio := choice.Audio != nil && !sameIndex(choice.Audio, plan.DefaultAudioStreamIndex)
 	if otherAudio && plan.Method == MethodTranscode {
 		// A transcode carries the audio the server picked; it takes another one only
-		// with the source named (ADR 0035).
+		// with the source named.
 		source := plan.MediaSourceID
 		audio := *choice.Audio
 		again, err := client.PlaybackInfo(ctx, userID, itemID, &profile, forceTranscode, &source, &audio)
@@ -243,7 +242,7 @@ func (s *EmbyService) prepareWith(ctx context.Context, itemID string, mediaSourc
 	return PrepareResult{Plan: plan, Headers: headers}, nil
 }
 
-// ReportPlayback is `report_playback`: sends one playback report (ADR 0008).
+// ReportPlayback is `report_playback`: sends one playback report.
 func (s *EmbyService) ReportPlayback(ctx context.Context, report Report) error {
 	client, err := s.Client()
 	if err != nil {
@@ -253,7 +252,7 @@ func (s *EmbyService) ReportPlayback(ctx context.Context, report Report) error {
 }
 
 // ResendStop is `resend_stop`: sends a lost stop report again, only while owner is
-// still the open session: it must never reach another account or server (ADR 0024).
+// still the open session: it must never reach another account or server.
 func (s *EmbyService) ResendStop(ctx context.Context, owner *Client, report Report) error {
 	client, err := s.Client()
 	if err != nil {

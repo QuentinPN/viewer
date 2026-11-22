@@ -1,49 +1,36 @@
-# Viewer — Product specification
+# Viewer — Produit
 
-## Vision
+## Ce que c'est
 
-A polished, fast Windows desktop alternative to the official Emby client. Read media from the user's Emby server, which runs on a mini-PC with the files on a QNAP NAS, favor direct playback, and preserve Emby users, libraries and playback progress.
+Un client Emby personnel, rapide et soigné, en deux applications :
 
-## Target users and constraints
+- **Windows 10/11 x64** : client de bureau (fenêtre native, lecteur libmpv).
+- **Android TV** : application pour la Shield TV, pilotée à la télécommande.
 
-Initially a single Windows 10/11 x64 user with Emby Premiere. Multiple users and multiple servers should be architecturally possible, but not required for MVP. French UI first. LAN and HTTPS remote access. No extra backend.
+Le serveur Emby tourne sur un mini-PC ; les fichiers média sont sur un NAS QNAP. Les applications ne parlent qu'à Emby, jamais au NAS. Emby reste la source de vérité : utilisateurs, bibliothèques, progression et états « vu » restent ceux du serveur. Aucun backend supplémentaire.
 
-## MVP (P0)
+## Pour qui
 
-- Add server URL, validate connection, sign in/out securely, show recoverable connection errors.
-- Sign in once: later launches reopen the session automatically; a server outage shows a recovery screen (retry, change server) instead of the sign-in form; only a session rejected by the server asks for the password again; switching server keeps the previous session to return to (ADR 0012).
-- Browse authorized film and series libraries; posters, metadata, search and pagination.
-- Movie/episode details; play, pause, seek, fullscreen, select audio/subtitle tracks.
-- Select media source using server playback info; expose Direct Play/Direct Stream/Transcode diagnostic status.
-- Resume playback; send playback started/progress/stopped; display watched status from Emby.
-- Functional native video renderer, stable teardown, hardware decode when supported.
-- Accessible keyboard navigation, loading/empty/error states, installer and crash diagnostics without secrets.
+Un seul utilisateur : le propriétaire, sur son propre serveur. Pas de distribution, pas de public. Interface en français d'abord. Accès en réseau local et en HTTPS à distance.
 
-## P1
+Plusieurs comptes et plusieurs serveurs sont possibles, mais jamais au prix de la simplicité du cas courant.
 
-Continue watching, next episodes, favorites, filtering/sorting, chapters, advanced subtitle preferences, cache management, auto-next episode, multi-version selection, remote bitrate preference.
+## Principes, par ordre de priorité
 
-## P2 / exploratory
+1. **La lecture d'abord.** Une lecture qui démarre vite, reprend où elle s'est arrêtée et ne se coupe pas vaut plus que n'importe quelle fonction.
+2. **Lecture directe quand c'est possible**, transcodage en repli. La décision vient du serveur (négociation de lecture), jamais de l'extension du fichier.
+3. **Réactivité.** La navigation ne bloque jamais sur le réseau : squelettes, cache jetable, pagination.
+4. **Secrets protégés.** Le jeton vit dans le stockage sécurisé du système, jamais dans un journal, une URL ou un fichier en clair. TLS validé.
+5. **Honnêteté.** Les limites (codecs, HDR, passthrough audio) sont documentées et diagnostiquées, pas masquées. Une fonction n'est « finie » que vérifiée pour de vrai.
+6. **Accessibilité.** Clavier complet, focus visible, mouvement réduit respecté, états de chargement, de vide et d'erreur toujours prévus.
+7. **Maintenabilité.** Petites tranches verticales, peu de dépendances, aucune ajoutée sans nécessité.
 
-Multiple Emby servers, offline metadata mode, advanced HDR/audio passthrough support, auto-update, more library types. These are not MVP promises.
+## Hors périmètre
 
-## Out of scope initially
-
-Media server implementation, transcoding engine, DRM bypass, scraping third-party catalogs, media downloads/offline sync, TV/mobile clients.
-
-## Acceptance criteria
-
-- Can sign in to a permitted Emby test account without exposing secrets.
-- Can browse a representative library without blocking UI.
-- On Windows, can play a real local MKV and an authorized Emby HTTP media stream; seek, fullscreen, switch tracks and close without leaked player process.
-- Playback progress is reflected on Emby after resume/stop, verified against real server state.
-- An unsupported file fails gracefully with actionable diagnostics or negotiated fallback.
-- Lint, type checks, unit tests and release build pass in supported environment; exceptions explicitly documented.
-
-## Success measures (measure, do not assume)
-
-Cold start time, time to interactive, navigation latency, image cache hit rate, playback start latency, dropped frames, RAM usage, server transcoding frequency, crashes. Establish baselines before setting numerical targets.
-
-## Constraints and risks
-
-Emby Premiere does not guarantee third-party feature entitlements; verify. Codec, HDR and audio passthrough support depend on platform and licensing. Windows WebView/native video overlay integration is a critical feasibility risk.
+- Un serveur média, un moteur de transcodage, un contournement de DRM.
+- Parler directement au NAS ou modifier la configuration du serveur Emby.
+- Télécharger des médias ou les synchroniser hors ligne.
+- Récupérer des métadonnées depuis des catalogues tiers (le serveur s'en charge).
+- Distribuer l'application à d'autres personnes, la publier dans un magasin public.
+- Télémétrie envoyée à l'extérieur.
+- D'autres plateformes cibles : ni macOS, ni Linux, ni téléphone, ni autre télé que la Shield.

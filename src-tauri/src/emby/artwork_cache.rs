@@ -1,4 +1,4 @@
-//! Disk cache of Emby artwork behind the `emby-img` protocol (ADR 0019). A request
+//! Disk cache of Emby artwork behind the `emby-img` protocol. A request
 //! names one immutable image (its tag changes with the image), so the file name is
 //! the whole index: size and last use come from the file system.
 
@@ -141,7 +141,7 @@ impl ArtworkCache {
     }
 
     /// Removes every cached image of every server, then the empty folders; files
-    /// that are not ours stay. Returns the images and bytes removed (ADR 0021).
+    /// that are not ours stay. Returns the images and bytes removed.
     pub fn clear(&self) -> (u64, u64) {
         // Held throughout: no write counts its size against a half-emptied cache.
         let mut size = self.size.lock().unwrap_or_else(|p| p.into_inner());

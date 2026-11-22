@@ -1,4 +1,4 @@
-// Drives the connection machine (ADR 0012): one check in flight at a time,
+// Drives the connection machine: one check in flight at a time,
 // answers of a superseded check dropped, automatic attempts with backoff.
 import { toEmbyError } from "../emby/api";
 import type { EmbyError, SessionStatus, SignedInUser } from "../emby/types";

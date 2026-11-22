@@ -1,4 +1,4 @@
-// « Vitesse » and « Mode nuit » of the player's options, as on the TV (ADR 0072).
+// « Vitesse » and « Mode nuit » of the player's options, as on the TV.
 
 /** Speeds offered, slowest first; 1 is « Normale ». */
 export const SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const;
@@ -34,7 +34,7 @@ export function speedBadge(speed: number): string | null {
 
 /**
  * Night mode, kept on this PC like the volume: it applies to every playback
- * until turned off, here or in Réglages › Audio et sous-titres (ADR 0122).
+ * until turned off, here or in Réglages › Audio et sous-titres.
  */
 export const NIGHT_KEY = "viewer.player.nightMode";
 

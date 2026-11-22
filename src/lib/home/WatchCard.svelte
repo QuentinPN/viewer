@@ -1,8 +1,8 @@
 <script lang="ts">
 // 16:9 card of "Reprendre" and "À suivre": activating it plays the film or episode
-// at once, from the resume point when there is one (ADR 0010). An episode found by
-// the search opens its page instead, its own title first (ADR 0020).
-// Right-click, the context-menu key or the "…" button open its menu (ADR 0100).
+// at once, from the resume point when there is one. An episode found by
+// the search opens its page instead, its own title first.
+// Right-click, the context-menu key or the "…" button open its menu.
 import type { WatchItem } from "../emby/types";
 import { isMenuKey, type MenuContext, watchTarget } from "../menu/actions";
 import MoreButton from "../menu/MoreButton.svelte";
@@ -20,7 +20,7 @@ type Props = {
   item: WatchItem;
   /** Default: "nextUp" for a card that plays, "search" for one that opens. */
   menuContext?: MenuContext;
-  /** "Reprendre" (ADR 0096): the menu's "Marquer comme vu" takes the card out. */
+  /** "Reprendre": the menu's "Marquer comme vu" takes the card out. */
   onMarkPlayed?: (item: WatchItem) => void;
   onRemoveFromResume?: (item: WatchItem) => void;
 } & (
@@ -177,7 +177,7 @@ function oncontextmenu(e: MouseEvent) {
   .card[aria-disabled="true"] {
     cursor: progress;
   }
-  /* Focus lifts the artwork (ADR 0031); the accent ring marks the keyboard focus. */
+  /* Focus lifts the artwork; the accent ring marks the keyboard focus. */
   .card:focus-visible {
     outline: none;
   }

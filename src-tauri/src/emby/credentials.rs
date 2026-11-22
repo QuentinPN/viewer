@@ -1,4 +1,4 @@
-//! Secure token storage (ADR 0004): Windows Credential Manager in the app, an
+//! Secure token storage: Windows Credential Manager in the app, an
 //! in-memory store for tests. Tokens never go to disk files, SQLite or logs.
 
 use std::collections::HashMap;
@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use super::EmbyError;
 use super::client::AccessToken;
 
-/// Debug builds keep their tokens apart from the installed app (ADR 0105): scripted
+/// Debug builds keep their tokens apart from the installed app: scripted
 /// UI tests never read, replace or delete the owner's session.
 pub const SERVICE: &str = if cfg!(debug_assertions) {
     "Viewer-debug"
@@ -21,7 +21,7 @@ pub trait CredentialStore: Send + Sync {
     fn delete(&self, account: &str) -> Result<(), EmbyError>;
 }
 
-/// One store shared by the Emby and Request services (ADR 0125).
+/// One store shared by the Emby and Request services.
 impl<T: CredentialStore + ?Sized> CredentialStore for std::sync::Arc<T> {
     fn save(&self, account: &str, token: &AccessToken) -> Result<(), EmbyError> {
         (**self).save(account, token)

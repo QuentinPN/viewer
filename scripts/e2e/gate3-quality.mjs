@@ -1,4 +1,4 @@
-// Streaming quality setting (ADR 0037) on the real Emby test account, driven over
+// Streaming quality setting on the real Emby test account, driven over
 // CDP. No VIEWER_E2E_MAX_BITRATE: the cap comes from Réglages only.
 // - « Qualité de lecture » › « Réseau local » set to 1,5 Mbit/s with the keyboard,
 //   stored for the server and kept after a restart;

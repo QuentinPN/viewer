@@ -1,6 +1,6 @@
 package emby
 
-// Server address validation (ADR 0004), port of src-tauri/src/emby/server_url.rs:
+// Server address validation, port of src-tauri/src/emby/server_url.rs:
 // http(s) only, no credentials, query or fragment, and plain HTTP only towards local
 // network addresses.
 //

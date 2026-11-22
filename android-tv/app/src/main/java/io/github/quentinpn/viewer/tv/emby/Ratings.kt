@@ -3,7 +3,7 @@ package io.github.quentinpn.viewer.tv.emby
 import java.util.Locale
 import kotlin.math.roundToInt
 
-// Ratings of the film, series and episode pages (ADR 0074). The three are base fields of
+// Ratings of the film, series and episode pages. The three are base fields of
 // `BaseItemDto`, returned by `/Users/{Id}/Items/{Id}` whatever `Fields` says.
 
 /** `★ 7,4`: the public's score out of 10, one decimal; none when absent or 0 (not rated). */

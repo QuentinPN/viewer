@@ -88,7 +88,7 @@ internal class BrowseState(val type: MediaType, filters: BrowseFilters = BrowseF
 private enum class Pill(val title: String) { Sort("Tri"), Genre("Genre"), Years("Années"), Rating("Note") }
 
 /**
- * Parcourir (ADR 0125): the filter pills, each opening a list to pick from, over a six-column
+ * Parcourir: the filter pills, each opening a list to pick from, over a six-column
  * grid of posters that reads the next page as the focus nears its end.
  */
 @Composable

@@ -1,4 +1,4 @@
-//! Audio and subtitle preferences kept on this PC (ADR 0035): which streams of the
+//! Audio and subtitle preferences kept on this PC: which streams of the
 //! source to play, from the server's own picks and the user's languages and mode.
 
 use serde::{Deserialize, Serialize};
@@ -49,7 +49,7 @@ pub const LANGUAGES: [&[&str]; 12] = [
     &["ara", "ar"],
 ];
 
-/// Text formats the subtitle style applies to (ADR 0035); image formats (PGS,
+/// Text formats the subtitle style applies to; image formats (PGS,
 /// DVD) cannot be restyled, so text wins when both match.
 const TEXT_SUBTITLES: [&str; 7] = ["subrip", "srt", "ass", "ssa", "vtt", "webvtt", "mov_text"];
 
@@ -109,7 +109,7 @@ pub enum SubtitleChoice {
 /// Picks the audio and subtitle streams of a source. Without a preference the
 /// server's picks stand. When transcoding, only subtitles the server delivers as
 /// files can be shown: the others would be burnt into the picture, which fails on
-/// the test server (ADR 0009). When playing the file, the server's external
+/// the test server. When playing the file, the server's external
 /// subtitle files are not loaded, so only the file's own count.
 pub fn choose(
     streams: &[MediaStreamDto],
@@ -162,7 +162,7 @@ pub fn choose(
     let subtitle = match prefs.subtitle_mode {
         SubtitleMode::Server => match default_subtitle {
             Some(i) if candidates.iter().any(|s| s.index == Some(i)) => SubtitleChoice::Stream(i),
-            // None, or one this playback cannot show: as before ADR 0035.
+            // None, or one this playback cannot show.
             _ => SubtitleChoice::Player,
         },
         SubtitleMode::Off => SubtitleChoice::Off,
@@ -239,7 +239,7 @@ pub fn apply(plan: &mut PlaybackPlan, prefs: &TrackPreferences) -> Choice {
     choice
 }
 
-/// The audio and subtitle preferences of the Emby account (ADR 0115), shown next to
+/// The audio and subtitle preferences of the Emby account, shown next to
 /// the local settings. The server applies them itself when it picks the default
 /// streams of PlaybackInfo, which is what [`SubtitleMode::Server`] and an empty
 /// audio language keep.
@@ -383,7 +383,7 @@ mod tests {
         let c = direct(&TrackPreferences::default());
         assert_eq!(c.audio, Some(1));
         assert_eq!(c.subtitle, SubtitleChoice::Stream(4));
-        // No subtitle named by the server: the player decides, as before ADR 0035.
+        // No subtitle named by the server: the player decides.
         let c = choose(
             &film(),
             PlayMethod::DirectPlay,

@@ -1,5 +1,5 @@
-// Update manifests written to the public releases repository on each publish
-// (ADR 0112). The apps read them to find a newer version.
+// Update manifests written to the public releases repository on each publish.
+// The apps read them to find a newer version.
 
 /** `desktop/latest.json`, in the format of Tauri's updater plugin. */
 export function desktopManifest(

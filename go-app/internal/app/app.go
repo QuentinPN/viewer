@@ -1,4 +1,4 @@
-// Package app is the state of the Wails app (ADR 0128), port of `AppState` and
+// Package app is the state of the Wails app, port of `AppState` and
 // of the `setup` of src-tauri/src/lib.rs: the Emby session, the native player
 // slot, the playback reporter, the linked playback, the session socket, the
 // artwork cache, Request, segments and the updater, with the folders and
@@ -29,7 +29,7 @@ import (
 
 // Set at build time (`-ldflags -X`): Go has neither `CARGO_PKG_VERSION` nor
 // `cfg!(debug_assertions)`. A plain `go build` / `go test` is a debug build, so it
-// never touches the installed app's data (ADR 0105); the release build passes
+// never touches the installed app's data; the release build passes
 // `-X viewer/internal/app.buildMode=release -X viewer/internal/app.version=X.Y.Z`
 // (package.json `build:wails:exe`).
 var (
@@ -46,7 +46,7 @@ func DebugBuild() bool { return buildMode != "release" }
 const (
 	// Identifier is tauri.conf.json `identifier`.
 	Identifier = "io.github.quentinpn.viewer"
-	// DebugIdentifier is lib.rs `DEBUG_IDENTIFIER` (ADR 0105): debug builds are
+	// DebugIdentifier is lib.rs `DEBUG_IDENTIFIER`: debug builds are
 	// another app, with their own config, cache, logs and WebView storage.
 	DebugIdentifier = "io.github.quentinpn.viewer.debug"
 	// PlayerEvent is lib.rs `PLAYER_EVENT`.
@@ -54,7 +54,7 @@ const (
 	// Title is the main window's title (tauri.conf.json), « (debug) » appended in debug.
 	Title = "Viewer"
 	// SyncByeWait: a linked TV is told `bye stopped` before sign-out or a server
-	// change, waiting at most this long (commands.rs `SYNC_BYE_WAIT`, ADR 0124).
+	// change, waiting at most this long (commands.rs `SYNC_BYE_WAIT`).
 	SyncByeWait = 3 * time.Second
 )
 
@@ -66,7 +66,7 @@ func IdentifierFor(debug bool) string {
 	return Identifier
 }
 
-// VaultServiceFor is the credential service of a build (ADR 0105, wave2A):
+// VaultServiceFor is the credential service of a build (wave2A):
 // `{serverId}/{userId}.Viewer`, or `.Viewer-debug` in debug builds.
 func VaultServiceFor(debug bool) string {
 	if debug {
@@ -171,13 +171,13 @@ type Options struct {
 	Debug   bool
 	Version string
 	Paths   Paths
-	// Store holds the Emby and Request tokens (ADR 0004, 0125).
+	// Store holds the Emby and Request tokens.
 	Store emby.CredentialStore
 	// Libmpv is the DLL path (ResolveLibmpv).
 	Libmpv string
 	// Emit sends an event to the UI (Tauri's `app.emit`).
 	Emit func(name string, payload any)
-	// WID returns the main window's HWND (ADR 0003, parent mode), read when the
+	// WID returns the main window's HWND (parent mode), read when the
 	// engine is created; 0 lets mpv open its own window.
 	WID func() uintptr
 	// Log is the logger; nil is slog.Default().
@@ -239,7 +239,7 @@ func New(opts Options) (*App, error) {
 
 	device := DeviceName()
 	svc := emby.NewEmbyService(opts.Store, filepath.Join(opts.Paths.Config, "session.json"), device, opts.Version)
-	// Artwork cache (ADR 0019): disposable, so it lives in the local cache folder.
+	// Artwork cache: disposable, so it lives in the local cache folder.
 	// Debug builds only: scripted UI tests (scripts/e2e) use their own folder.
 	artworkDir := ""
 	if dir := os.Getenv("VIEWER_E2E_ARTWORK_DIR"); opts.Debug && dir != "" {
@@ -284,7 +284,7 @@ type emitter func(name string, payload any)
 func (e emitter) Emit(name string, payload any) { e(name, payload) }
 
 // Start runs what reaches the network for the app's lifetime: the session socket
-// (ADR 0110) and, in release builds, the update loop (ADR 0112).
+// and, in release builds, the update loop.
 func (a *App) Start() {
 	if a.started.Swap(true) {
 		return

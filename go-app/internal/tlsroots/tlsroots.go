@@ -1,5 +1,5 @@
 // Package tlsroots writes the Windows root certificates as a PEM file for mpv's
-// `tls-ca-file`: FFmpeg's OpenSSL has no certificate store of its own (ADR 0026).
+// `tls-ca-file`: FFmpeg's OpenSSL has no certificate store of its own.
 // Port of src-tauri/src/player/tls_roots.rs; see research/tls-roots.md.
 package tlsroots
 

@@ -1,5 +1,5 @@
-// Gate 2 HLS transcoding scenario on the real Emby test account, driven over CDP
-// (ADR 0009). The debug build caps the streaming bitrate at 3 Mbit/s through
+// Gate 2 HLS transcoding scenario on the real Emby test account, driven over CDP.
+// The debug build caps the streaming bitrate at 3 Mbit/s through
 // VIEWER_E2E_MAX_BITRATE, so the server must transcode the first film:
 // - the player badge shows the transcode and its reason in French;
 // - playback advances, the server's external text subtitles appear in the menu;
@@ -79,7 +79,7 @@ try {
   );
 
   // External subtitles: Emby extracts them from the file, which may take a while.
-  // They are listed in the "Sous-titres" panel of the player (ADR 0017).
+  // They are listed in the "Sous-titres" panel of the player.
   const subsButton = page.getByRole("button", {
     name: "Sous-titres",
     exact: true,

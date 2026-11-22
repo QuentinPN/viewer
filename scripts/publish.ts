@@ -1,9 +1,9 @@
-// node scripts/publish.ts [--dry-run] (ADR 0106, 0126): run by the `desktop` job of
+// node scripts/publish.ts [--dry-run]: run by the `desktop` job of
 // .gitea/workflows/release.yml on the tag vX.Y.Z made by the release action. Fetches
 // libmpv, runs verify:web and verify:rust, builds the signed NSIS installer, creates
 // the release with the installer and its CHANGELOG.md section on the public releases
-// repository (ADR 0111), then rewrites desktop/latest.json there for the auto-updater
-// (ADR 0112). --dry-run stops after the build and prints the notes: nothing is published.
+// repository, then rewrites desktop/latest.json there for the auto-updater.
+// --dry-run stops after the build and prints the notes: nothing is published.
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -19,7 +19,7 @@ const section =
   changelogSection(read("CHANGELOG.md"), version) ??
   fail(`CHANGELOG.md n'a pas de section ${version}`);
 
-// Updater signing key (ADR 0112), outside the repository, without password
+// Updater signing key, outside the repository, without password
 const signingKey =
   process.env.TAURI_SIGNING_PRIVATE_KEY ??
   join(homedir(), ".viewer", "updater.key");
@@ -34,7 +34,7 @@ powershell("verify:rust", "with-msvc.ps1", "npm", "run", "verify:rust");
 powershell("installateur", "with-msvc.ps1", "npx", "tauri", "build");
 
 const name = `Viewer_${version}_x64-setup.exe`;
-// The desktop job keeps CARGO_TARGET_DIR outside the per-run work folder (ADR 0126).
+// The desktop job keeps CARGO_TARGET_DIR outside the per-run work folder.
 const targetDir =
   process.env.CARGO_TARGET_DIR ?? join(root, "src-tauri/target");
 const installer = join(targetDir, "release/bundle/nsis", name);

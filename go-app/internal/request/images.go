@@ -1,6 +1,6 @@
 package request
 
-// Request artwork through the local `requestimg` protocol (ADR 0125), port of
+// Request artwork through the local `requestimg` protocol, port of
 // src-tauri/src/request/images.rs. Models sent to the UI carry ready-made
 // ImageRefs; Go fetches the image with the Bearer token, so the WebView never sees a
 // token nor the server address.
@@ -78,7 +78,7 @@ func ParseUrImage(path string) (UrImage, bool) {
 	return UrImage{Size: size, File: file}, true
 }
 
-// CacheKey is the key in the shared artwork cache (ADR 0019):
+// CacheKey is the key in the shared artwork cache:
 // `request/{stem}/Primary-{width}-{ext}`.
 func (r UrImage) CacheKey() emby.ImageRequest {
 	stem, ext := r.File, ""

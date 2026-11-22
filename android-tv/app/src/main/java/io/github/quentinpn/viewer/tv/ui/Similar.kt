@@ -22,19 +22,19 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 
-/** Posters of the « Titres similaires » row (ADR 0063). */
+/** Posters of the « Titres similaires » row. */
 internal const val SIMILAR_LIMIT = 12
 
 /** Pages deep enough for any chain of similar titles; the oldest is forgotten past it. */
 internal const val MAX_PAGES = 10
 
 /**
- * A page in the navigation of `MainActivity`; similar titles stack them (ADR 0063), as do an
- * episode and a person (ADR 0068). [person] names the « Distribution » card a page left for a
+ * A page in the navigation of `MainActivity`; similar titles stack them, as do an
+ * episode and a person. [person] names the « Distribution » card a page left for a
  * person page, so Back from it focuses that card again on the page read anew; [Movie.collection]
- * likewise names the poster of a collection row a film was opened from (ADR 0071), and
- * [Movie.genre] / [Series.genre] the genre chip a library grid was opened from (ADR 0079), and
- * [Movie.studio] / [Series.studio] its studio chip (ADR 0087).
+ * likewise names the poster of a collection row a film was opened from, and
+ * [Movie.genre] / [Series.genre] the genre chip a library grid was opened from, and
+ * [Movie.studio] / [Series.studio] its studio chip.
  */
 internal sealed interface DetailPage {
     data class Movie(
@@ -47,23 +47,23 @@ internal sealed interface DetailPage {
 
     data class Series(val target: SeriesTarget, val person: String? = null, val genre: String? = null, val studio: String? = null) : DetailPage
 
-    /** A library grid on one genre or studio, opened from a film or series page (ADR 0079, 0087); [memory] keeps its scroll and focus. */
+    /** A library grid on one genre or studio, opened from a film or series page; [memory] keeps its scroll and focus. */
     data class Grid(val memory: LibraryMemory) : DetailPage
 
-    /** Over its series page; Back names that page's season and card (ADR 0060). */
+    /** Over its series page; Back names that page's season and card. */
     data class Episode(val target: SeriesTarget, val person: String? = null) : DetailPage
 
     /** [opened]: the title last opened from it, focused again on Back. */
     data class Person(val member: CastMember, val opened: String? = null) : DetailPage
 
-    /** A playlist opened from the home (ADR 0088); [opened]: the entry last opened from it, focused again on Back. */
+    /** A playlist opened from the home; [opened]: the entry last opened from it, focused again on Back. */
     data class Playlist(val id: String, val name: String, val opened: String? = null) : DetailPage
 }
 
 /** [page] over [pages], Back going down to the one below. */
 internal fun pushPage(pages: List<DetailPage>, page: DetailPage): List<DetailPage> = (pages + page).takeLast(MAX_PAGES)
 
-/** The top page swapped for [page], as Back from an episode names its season and card (ADR 0060). */
+/** The top page swapped for [page], as Back from an episode names its season and card. */
 internal fun replaceTop(pages: List<DetailPage>, page: DetailPage): List<DetailPage> = pages.dropLast(1) + page
 
 /** The page a similar title opens; null for any other type. */

@@ -39,7 +39,7 @@ import io.github.quentinpn.viewer.tv.emby.SourceStreamDto
 import io.github.quentinpn.viewer.tv.player.languageName
 import java.util.Locale
 
-// « Informations techniques » of the film and episode pages (ADR 0119), as the desktop's
+// « Informations techniques » of the film and episode pages, as the desktop's
 // section in src/lib/detail/ItemDetail.svelte: video, file, audio and subtitle tracks of the
 // version chosen on the page. A button opens a side panel, so the page itself stays short.
 

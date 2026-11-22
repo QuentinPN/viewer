@@ -1,5 +1,5 @@
-//! Request API models, field for field from `contracts/request/openapi.json`
-//! (ADR 0125). Optional schema fields are `Option` with `#[serde(default)]`.
+//! Request API models, field for field from `contracts/request/openapi.json`.
+//! Optional schema fields are `Option` with `#[serde(default)]`.
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 

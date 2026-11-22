@@ -1,6 +1,6 @@
 import { invoke, listen, type Unlisten } from "../native";
 
-// Thin typed wrapper over the update commands of src-tauri/src/updater.rs (ADR 0112).
+// Thin typed wrapper over the update commands of src-tauri/src/updater.rs.
 
 export const UPDATE_READY_EVENT = "app://update-ready";
 

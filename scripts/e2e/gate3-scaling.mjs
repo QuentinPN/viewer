@@ -1,4 +1,4 @@
-// Redesigned screens (ADR 0031) at the CSS sizes Windows display scaling gives,
+// Redesigned screens at the CSS sizes Windows display scaling gives,
 // on the real Emby test account, driven over CDP. Windows scaling shrinks the CSS
 // viewport and raises devicePixelRatio; the scenario reproduces both without
 // touching the system setting: the real window is resized to the CSS size and

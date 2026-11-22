@@ -1,5 +1,5 @@
 // Package redact removes secrets from text before it is logged. Port of
-// `redact` in src-tauri/src/diagnostics.rs (ADR 0033).
+// `redact` in src-tauri/src/diagnostics.rs.
 //
 // Ported early, in wave 3, because the player logs mpv's messages through it
 // (player/mpv.rs); the diagnostics unit (wave 7) reuses this package rather than

@@ -1,6 +1,6 @@
 package request
 
-// « Bande-annonce » of a title page of Demander (ADR 0127), port of
+// « Bande-annonce » of a title page of Demander, port of
 // src-tauri/src/request/trailer.rs: the `trailerKey` of Request is a YouTube
 // video id, opened in the default browser. The WebView passes the key only; the
 // address is built and checked here.

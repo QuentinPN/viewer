@@ -23,7 +23,7 @@ onMount(() => {
 });
 </script>
 
-<!-- Replaces the Windows title bar (ADR 0029). The empty area drags the window and
+<!-- Replaces the Windows title bar. The empty area drags the window and
      double-clicking it maximizes; the buttons keep Windows' order and glyphs.
      data-tauri-drag-region is Tauri-specific: Wails reads the CSS
      `--wails-draggable` instead (see .titlebar and button). -->

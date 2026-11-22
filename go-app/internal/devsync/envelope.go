@@ -1,4 +1,4 @@
-// Package devsync is the linked playback computer ↔ TV (ADR 0123, 0124), ported
+// Package devsync is the linked playback computer ↔ TV, ported
 // from src-tauri/src/sync: the computer leads, the TV follows, and messages go
 // through the Emby session relay (`SendString`).
 //
@@ -6,8 +6,8 @@
 // library's sync package.
 package devsync
 
-// Linked playback envelope (ADR 0124): one JSON object of at most 1024 bytes,
-// relayed by Emby `SendString`. Decoding checks every bound of the ADR; a
+// Linked playback envelope: one JSON object of at most 1024 bytes,
+// relayed by Emby `SendString`. Decoding checks every bound; a
 // rejected message is dropped without answer, only its reason is logged.
 
 // MaxBytes is the largest envelope, in bytes.
@@ -271,7 +271,7 @@ const (
 	AcceptBusy
 )
 
-// Accepts is whether a valid message is read (ADR 0124 « Hors sujet »). link is
+// Accepts is whether a valid message is read. link is
 // nil outside a link.
 func Accepts(link *LinkView, from, msgLink string, seq uint32, kind string) Accept {
 	opens := kind == "join" || kind == "load"

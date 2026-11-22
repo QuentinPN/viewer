@@ -99,7 +99,7 @@ func Test_artwork_cache_spares_the_server_and_keeps_its_checks(t *testing.T) {
 		t.Fatal(fetched())
 	}
 
-	// Emptied from the settings (ADR 0021): local only, no session needed. Rust's
+	// Emptied from the settings: local only, no session needed. Rust's
 	// artwork_stats / clear_artwork are the cache's Stats / Clear here.
 	if c := cache.Clear(); c.Entries != 1 || c.Bytes != 3+14 {
 		t.Fatalf("%+v", c)
@@ -123,7 +123,7 @@ func TestRequestAccountIsRequestAccount(t *testing.T) {
 
 // request/tests.rs `emby_forget_drops_request_token`, deferred to wave 4 by
 // wave 6: forget_server and sign_out delete the Request token of that account
-// only (ADR 0125).
+// only.
 func Test_emby_forget_drops_request_token(t *testing.T) {
 	const embyUser = emby.FakeUserID
 	for _, forget := range []bool{true, false} {

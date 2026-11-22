@@ -18,7 +18,7 @@ import type {
 } from "./types";
 
 // Thin typed wrapper over the Request commands of
-// src-tauri/src/request/commands.rs. Every call goes through Rust (ADR 0125).
+// src-tauri/src/request/commands.rs. Every call goes through Rust.
 export const requestsApi = {
   status: () => invoke<UrStatus>("ur_status"),
   setAddress: (address: string) =>
@@ -43,7 +43,7 @@ export const requestsApi = {
   cancel: (id: number) => invoke<RequestDetail>("ur_cancel", { id }),
   sessions: () => invoke<AuthSession[]>("ur_sessions"),
   revokeSession: (id: string) => invoke<void>("ur_revoke_session", { id }),
-  /** « Bande-annonce »: the YouTube page of the key, in the default browser (ADR 0127). */
+  /** « Bande-annonce »: the YouTube page of the key, in the default browser. */
   openTrailer: (key: string) => invoke<void>("ur_open_trailer", { key }),
 };
 

@@ -1,4 +1,4 @@
-// Request search next to the Emby one (Recherche C, ADR 0125).
+// Request search next to the Emby one (Recherche C).
 import type { MediaSummary } from "./types";
 
 /**

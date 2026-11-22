@@ -1,4 +1,4 @@
-// « Format de l'image »: how the picture fills the window, as on the TV (ADR 0078).
+// « Format de l'image »: how the picture fills the window, as on the TV.
 
 export type VideoFit = "original" | "fill" | "stretch";
 

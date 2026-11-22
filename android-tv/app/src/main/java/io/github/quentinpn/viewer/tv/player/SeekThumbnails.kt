@@ -8,10 +8,10 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 
-/** Width asked of `index.bif`, the usual Emby thumbnail width; not confirmed by the documentation (ADR 0069). */
+/** Width asked of `index.bif`, the usual Emby thumbnail width; not confirmed by the documentation. */
 const val THUMBNAIL_WIDTH = 320
 
-/** Why a file has no seek thumbnails, for the log line (ADR 0069). */
+/** Why a file has no seek thumbnails, for the log line. */
 enum class NoThumbnails(val reason: String) {
     /** 404: the server has not extracted any for this item, or does not offer them. */
     Missing("not on the server"),
@@ -41,7 +41,7 @@ sealed interface ThumbnailsOutcome {
 class ThumbnailFrame(val index: Int, val bytes: ByteArray, val offset: Int, val length: Int)
 
 /**
- * The seek thumbnails of one file (ADR 0069). Nothing is fetched until the first [frameAt];
+ * The seek thumbnails of one file. Nothing is fetched until the first [frameAt];
  * [fetch] then runs once in [scope], so a seek that cancels its own lookup never cancels
  * the download. [fetch] answers the file's bytes, or the reason there are none; every
  * later call answers from memory. [close] drops the bytes; a new file gets a new instance.

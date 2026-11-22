@@ -1,6 +1,6 @@
-// Smoke test of the Go + Wails debug build (ADR 0128, go-app/MAP.md « Checklist
+// Smoke test of the Go + Wails debug build (Go/Wails port, go-app/MAP.md « Checklist
 // smoke ») on the real Emby server, driven over CDP like the Tauri scenarios
-// (ADR 0006): no OS input, no screen capture. Keys go to the page through
+// (scripted UI tests never take over the desktop): no OS input, no screen capture. Keys go to the page through
 // Input.dispatchKeyEvent; the HTML is captured with Page.captureScreenshot and the
 // window itself, mpv video included, with PrintWindow on the app's own HWND
 // (print-window.ps1).
@@ -69,7 +69,7 @@ const PORT = 9341;
 const INVOKE = "viewer/internal/bridge.Bridge.Invoke";
 const EMBY_IMG = "http://wails.localhost/emby-img/";
 const UR_IMG = "http://wails.localhost/requestimg/";
-/** Brief of the smoke run; MAP.md allows 6 s (see the evidence doc). */
+/** Brief of the smoke run; MAP.md allows 6 s. */
 const EXIT_LIMIT_MS = 3000;
 
 mkdirSync(out, { recursive: true });
@@ -90,7 +90,7 @@ const account = OFFLINE
       password: debugEnv("PASSWORD"),
       ur: debugEnv("VIEWER_UR_URL"),
     };
-// Read once: never passed on to the app process (ADR 0006).
+// Read once: never passed on to the app process.
 for (const key of ["EMBY_IP", "LOGIN", "PASSWORD", "VIEWER_UR_URL"])
   delete process.env[key];
 const secrets = account

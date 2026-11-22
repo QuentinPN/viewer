@@ -4,7 +4,7 @@
 //! Drives the real app (same `AppState` and engine as the IPC commands), writes the
 //! current step to `<out>/checkpoint.txt` so `scripts/spike/run-gate1.ps1` can take
 //! screenshots and send real keystrokes, and writes `<out>/report.json`.
-//! Results are evidence for ROADMAP Gate 1; they are not a substitute for manual review.
+//! Results are evidence for Gate 1; they are not a substitute for manual review.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};

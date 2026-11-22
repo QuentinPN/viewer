@@ -1,4 +1,4 @@
-// The home reads its rows again on its own (ADR 0109): a title added on the
+// The home reads its rows again on its own: a title added on the
 // server shows in « Ajoutés récemment » without restarting the app.
 
 /** While the home stays shown, its rows are read again after this long. */

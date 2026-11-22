@@ -1,4 +1,4 @@
-//! Playback reporting (ADR 0008): player events become Emby start, progress and stop
+//! Playback reporting: player events become Emby start, progress and stop
 //! reports, sent in order by one background task. The UI never sends reports.
 
 use std::time::{Duration, Instant};
@@ -18,7 +18,7 @@ pub const PROGRESS_INTERVAL: Duration = Duration::from_secs(10);
 pub const PLAYBACK_STOPPED_EVENT: &str = "emby://playback-stopped";
 const TICKS_PER_SECOND: f64 = 10_000_000.0;
 const STOP_RETRY_DELAY: Duration = Duration::from_secs(1);
-/// A lost stop report (ADR 0024): waits between tries, doubled up to the cap.
+/// A lost stop report: waits between tries, doubled up to the cap.
 const STOP_RESEND_FIRST: Duration = Duration::from_secs(5);
 const STOP_RESEND_CAP: Duration = Duration::from_secs(15);
 /// An older report could overwrite a playback made elsewhere in the meantime.
@@ -77,7 +77,7 @@ pub struct Report {
 }
 
 impl Report {
-    /// The progress report sent ahead of a lost stop report (ADR 0024).
+    /// The progress report sent ahead of a lost stop report.
     pub fn late_progress(&self) -> Self {
         Self {
             kind: ReportKind::Progress,
@@ -97,7 +97,7 @@ impl Report {
 pub struct Tracker {
     phase: Phase,
     /// Play session of a transcode replaced by a quality change, to stop on the
-    /// server once the new stream is loaded (ADR 0117).
+    /// server once the new stream is loaded.
     ended_encoding: Option<String>,
 }
 
@@ -108,7 +108,7 @@ enum Phase {
     /// Announced, file not loaded yet: nothing is reported if loading fails.
     Pending(ActivePlayback),
     Playing(Playing),
-    /// A quality change (ADR 0117): the old stream plays on until the new one,
+    /// A quality change: the old stream plays on until the new one,
     /// same item, is loaded. Neither stop nor start is reported.
     Switching(Playing, ActivePlayback),
 }
@@ -125,7 +125,7 @@ struct Playing {
 
 impl Playing {
     /// An end of file well before the known duration: mpv reports a stream cut
-    /// by the network as EOF once its cache drains (ADR 0012). Never "watched".
+    /// by the network as EOF once its cache drains. Never "watched".
     fn ended_early(&self) -> bool {
         self.playback
             .run_time_ticks
@@ -146,7 +146,7 @@ impl Playing {
                 run_time_ticks: p.run_time_ticks,
                 is_paused: live.then_some(self.paused),
                 can_seek: live.then_some(true),
-                // Also on a stop: `late_progress` needs it (ADR 0024).
+                // Also on a stop: `late_progress` needs it.
                 play_method: Some(p.method.as_emby()),
                 event_name: event,
                 failed: None,
@@ -167,7 +167,7 @@ impl Tracker {
         out
     }
 
-    /// A quality change of the item playing (ADR 0117): no stop, no new start; a
+    /// A quality change of the item playing: no stop, no new start; a
     /// `QualityChange` progress with the new session once its file is loaded.
     /// Anything else playing (or nothing) is a new playback, as `begin`.
     pub fn switch(&mut self, playback: ActivePlayback, now: Instant) -> Vec<Report> {
@@ -343,7 +343,7 @@ fn ticks(seconds: f64) -> Option<i64> {
     (seconds.is_finite() && seconds >= 0.0).then(|| (seconds * TICKS_PER_SECOND).round() as i64)
 }
 
-/// When a lost stop report is sent again, and when it is given up (ADR 0024).
+/// When a lost stop report is sent again, and when it is given up.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct ResendSchedule {
     give_up_at: Instant,
@@ -415,7 +415,7 @@ impl Reporter {
         let _ = self.tx.send(Message::Begin(playback));
     }
 
-    /// A quality change of the playback in progress (ADR 0117).
+    /// A quality change of the playback in progress.
     pub fn switch(&self, playback: ActivePlayback) {
         let _ = self.tx.send(Message::Switch(playback));
     }
@@ -438,7 +438,7 @@ impl Reporter {
     }
 
     /// Sends a lost stop report now, so that the server's position is the right one
-    /// before a new playback asks for it (ADR 0024). Waits a bounded time.
+    /// before a new playback asks for it. Waits a bounded time.
     pub async fn resend_stop(&self) {
         let (ack, done) = tokio::sync::oneshot::channel();
         if self.tx.send(Message::ResendStop(ack)).is_ok() {

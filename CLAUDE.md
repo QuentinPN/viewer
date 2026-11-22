@@ -6,7 +6,7 @@ Build a production-quality Windows 10/11 desktop client for an existing Emby ser
 
 ## Source of truth and reading order
 
-At the start of every task, read `PRODUCT.md`, `ARCHITECTURE.md`, `DESIGN.md`, `ROADMAP.md`, and relevant sections of `TESTING.md`. Inspect the actual repository before changing it. Treat these files as specifications, but verify implementation and upstream documentation. When documents disagree, identify the conflict and propose a resolution; do not silently choose.
+At the start of every task, read `PRODUCT.md`, `DESIGN.md`, `DECISIONS.md`, and relevant sections of `TESTING.md`. Inspect the actual repository before changing it. Treat these files as specifications, but verify implementation and upstream documentation. When documents disagree, identify the conflict and propose a resolution; do not silently choose.
 
 ## Stack baseline (subject to feasibility gate)
 
@@ -31,9 +31,9 @@ At the start of every task, read `PRODUCT.md`, `ARCHITECTURE.md`, `DESIGN.md`, `
 
 1. Read project docs and inspect code/tests; restate scope, assumptions, acceptance criteria and risks.
 2. Consult the relevant `.claude/skills/*/SKILL.md` (skills are guidance, not proof of runtime capabilities).
-3. For significant choices, record an ADR in `docs/adr/` before implementation.
+3. When a choice is not obvious from the code, add one line (decision + reason) to `DECISIONS.md`; remove lines that stop being true.
 4. Plan a small change, implement it, add/update tests, and verify it.
-5. Update `ROADMAP.md` status and relevant docs when actual behavior changes.
+5. Update the relevant docs (`PRODUCT.md`, `DESIGN.md`, `DECISIONS.md`, `TESTING.md`) when actual behavior changes. Evidence (captures, logs, measurements) goes in the PR, not in the repository.
 6. End with: summary, files changed, commands/results, known limitations, next recommended task.
 
 ## Architecture boundaries
@@ -54,7 +54,7 @@ At the start of every task, read `PRODUCT.md`, `ARCHITECTURE.md`, `DESIGN.md`, `
 
 ## Testing and release
 
-Releases are automatic (ADR 0126): merge into `main` (merge commit, Conventional Commits: `feat`/`fix` release, `ci`/`docs`/`refactor`/`chore` do not) and `.gitea/workflows/release.yml` bumps, tags and publishes each changed track (desktop `vX.Y.Z`, Android TV `android-vX.Y.Z`). Before a risky release, run it by `workflow_dispatch` with `dry-run` on `dev`: both artifacts are built, nothing is published. Never edit versions or `CHANGELOG.md` / `android-tv/CHANGELOG.md` by hand, except a deliberate version bump.
+Releases are automatic: merge into `main` (merge commit, Conventional Commits: `feat`/`fix` release, `ci`/`docs`/`refactor`/`chore` do not) and `.gitea/workflows/release.yml` bumps, tags and publishes each changed track (desktop `vX.Y.Z`, Android TV `android-vX.Y.Z`). Before a risky release, run it by `workflow_dispatch` with `dry-run` on `dev`: both artifacts are built, nothing is published. Never edit versions or `CHANGELOG.md` / `android-tv/CHANGELOG.md` by hand, except a deliberate version bump.
 
 Follow `TESTING.md`. Never deploy or package a release if core playback gates are unverified. Audit redistribution and licensing obligations for mpv/FFmpeg and bundled binaries. Ship a Windows installer only after smoke tests on a clean Windows machine.
 

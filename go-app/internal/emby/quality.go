@@ -1,6 +1,6 @@
 package emby
 
-// Streaming quality setting (ADR 0037), port of src-tauri/src/emby/quality.rs: a
+// Streaming quality setting, port of src-tauri/src/emby/quality.rs: a
 // bitrate cap per Emby server, one for a local-network address and one for a remote
 // one, kept in `playback-quality.json`. Contains no secret.
 
