@@ -113,6 +113,10 @@ Les points ci-dessous ne s'automatisent pas : image et son réels, matériel, hu
 - Couper puis rétablir le réseau (câble, Wi-Fi) pendant une lecture ; forcer l'arrêt de l'app ; reprise à la bonne position, y compris des heures après.
 - États d'erreur de la grille et de la recherche ; serveur Emby passé en HTTPS.
 
+### Stremio
+
+- Réglages › Stremio : connexion au vrai compte, liste des addons de flux, mauvais mot de passe, déconnexion (plus d'entrée `stremio` dans le Gestionnaire d'identification).
+
 ### Parcours
 
 - Enchaînement d'épisodes : carte « épisode suivant », saut du générique, minuterie.

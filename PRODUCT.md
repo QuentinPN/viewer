@@ -7,7 +7,7 @@ Un client Emby personnel, rapide et soigné, en deux applications :
 - **Windows 10/11 x64** : client de bureau (fenêtre native, lecteur libmpv).
 - **Android TV** : application pour la Shield TV, pilotée à la télécommande.
 
-Le serveur Emby tourne sur un mini-PC ; les fichiers média sont sur un NAS QNAP. Les applications ne parlent qu'à Emby, jamais au NAS. Emby reste la source de vérité : utilisateurs, bibliothèques, progression et états « vu » restent ceux du serveur. Aucun backend supplémentaire.
+Le serveur Emby tourne sur un mini-PC ; les fichiers média sont sur un NAS QNAP. Les applications parlent à Emby, jamais au NAS. Emby reste la source de vérité : utilisateurs, bibliothèques, progression et états « vu » restent ceux du serveur. Elles parlent aussi à Request (« Demander ») et, si un compte Stremio est connecté (Réglages › Stremio), aux addons de ce compte, qui fournissent seulement des flux supplémentaires à lire : ni catalogue, ni synchronisation de la bibliothèque ou de la progression Stremio. Aucun backend à nous en plus.
 
 Sur Android TV, l'icône et la bannière du lanceur, comme le logo affiché dans l'app, changent de tenue aux fêtes (calendrier de `contracts/seasons`). Le réglage « Icônes saisonnières » (activé par défaut, par appareil) les coupe ; le changement se fait à chaque lancement de l'app et tout de suite quand on bascule le réglage, sans redémarrer l'app.
 
@@ -36,7 +36,8 @@ Le raton laveur change de tenue selon la date (Noël, Halloween, Pâques, 14 jui
 - Un serveur média, un moteur de transcodage, un contournement de DRM.
 - Parler directement au NAS ou modifier la configuration du serveur Emby.
 - Télécharger des médias ou les synchroniser hors ligne.
-- Récupérer des métadonnées depuis des catalogues tiers (le serveur s'en charge).
+- Récupérer des métadonnées depuis des catalogues tiers (le serveur s'en charge ; les addons Stremio ne servent qu'à trouver des flux).
+- Installer ou configurer des addons Stremio depuis l'app, lire des flux torrent sans lien direct.
 - Distribuer l'application à d'autres personnes, la publier dans un magasin public.
 - Télémétrie envoyée à l'extérieur.
 - D'autres plateformes cibles : ni macOS, ni Linux, ni téléphone, ni autre télé que la Shield.

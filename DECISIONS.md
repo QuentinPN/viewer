@@ -74,6 +74,16 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **`http://` accepté seulement sur boucle locale et réseaux privés, avec avertissement** — hors LAN, le jeton circulerait en clair.
 - **Protocole d'image `requestimg` avec liste blanche de tailles et de noms de fichiers, jamais de SVG** — pas de contenu actif servi dans la webview.
 
+## Stremio
+
+- **Le cœur travaille sur une liste d'addons ; en v1, le compte Stremio est sa seule source** — une saisie d'adresse manuelle ou une synchro du compte pourront s'ajouter sans le refaire.
+- **Clé de compte dans le coffre de l'OS (compte `stremio`, un seul par installation), adresses d'addons en mémoire seulement, recharge à chaque session** — les adresses portent la clé debrid.
+- **Un refus d'authentification passe à « reconnexion requise », le mot de passe n'est jamais gardé** — pas de reconnexion silencieuse.
+- **L'API Stremio répond HTTP 200 avec `{"error":…}` (code 3 mauvais mot de passe, 1 session inconnue) : tout objet `error` vaut refus** — constaté sur les vraies réponses.
+- **« Se déconnecter » efface la clé locale sans fermer la session côté Stremio** — l'app Stremio du propriétaire reste connectée.
+- **Adresse d'addon en `https`, `http` seulement en LAN, sans identifiants ni paramètres dans l'URL** — même règle que Request.
+- **Erreurs, journaux et UI ne nomment un addon que par le nom de son manifeste ; les erreurs `net/http` (qui contiennent l'URL) sont remplacées par un type à nous** — jamais de clé debrid hors du Go.
+
 ## Cache et images
 
 - **Protocole `emby-img` : tailles bornées, 6 téléchargements simultanés, 10 Mo max, 401 sans session** — le jeton ne quitte pas le natif et la webview ne peut pas saturer le serveur.
