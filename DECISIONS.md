@@ -84,6 +84,11 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **« Se déconnecter » efface la clé locale sans fermer la session côté Stremio** — l'app Stremio du propriétaire reste connectée.
 - **Adresse d'addon en `https`, `http` seulement en LAN, sans identifiants ni paramètres dans l'URL** — même règle que Request.
 - **Erreurs, journaux et UI ne nomment un addon que par le nom de son manifeste ; les erreurs `net/http` (qui contiennent l'URL) sont remplacées par un type à nous** — jamais de clé debrid hors du Go.
+- **L'UI ne reçoit que des identifiants opaques (requête, addon, flux) ; le Go garde les flux des 4 dernières listes, vidées à la connexion/déconnexion** — l'URL et les en-têtes d'un flux ne quittent jamais le Go.
+- **Une liste interroge chaque addon par un appel séparé, en parallèle, 10 s chacun** — les résultats s'affichent au fil de l'eau sans canal d'événements.
+- **« Autres sources » visible dès que Stremio est connecté, même sans IMDb (la liste l'explique)** — savoir si un épisode a un IMDb coûterait une requête Emby de plus à chaque fiche. La 1re fiche d'une session lit l'état Stremio (liste d'addons mise en cache), sans bloquer la fiche.
+- **Lecture Stremio : `origin: "stremio"`, sans PlaybackInfo, rapport, synchro TV, segments, chapitres, qualité ni épisode suivant ; une lecture Emby en cours est d'abord arrêtée normalement** — Emby ne doit jamais attribuer la position d'un flux externe à un de ses éléments.
+- **Erreur ou fin anticipée d'un flux Stremio : retour à la fiche, liste rouverte avec « Ce lien ne répond plus, choisis une autre source. », sans nouvelle tentative** — les liens debrid expirent ; choisir une autre source est plus sûr que réessayer.
 
 ## Cache et images
 
