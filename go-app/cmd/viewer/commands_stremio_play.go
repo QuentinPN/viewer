@@ -46,7 +46,8 @@ func stremioPlay(ctx context.Context, p stremioPlayback, itemID string, title *e
 	p.ReportEvent(player.Shutdown{})
 	p.SyncEvent(player.Shutdown{})
 	p.ResendStop(ctx)
-	request := player.PlaybackRequest{Source: link}
+	// A debrid link answers with a redirect; headers must not follow it elsewhere.
+	request := player.PlaybackRequest{Source: link, FollowRedirects: len(headers) == 0}
 	for _, name := range slices.Sorted(maps.Keys(headers)) {
 		request.HTTPHeaders = append(request.HTTPHeaders, player.Header{name, headers[name]})
 	}

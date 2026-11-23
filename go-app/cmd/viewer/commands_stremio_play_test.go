@@ -107,3 +107,22 @@ func Test_go_stremio_play_is_wired_in_release_builds(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// A stream without headers follows the debrid host's redirect; with headers, it
+// does not: they must not reach another host.
+func Test_go_stremio_play_follows_redirects_only_without_headers(t *testing.T) {
+	bare := &recording{}
+	if _, err := stremioPlay(context.Background(), bare, "30207", nil, debridLink, nil); err != nil {
+		t.Fatal(err)
+	}
+	if !bare.request.FollowRedirects || len(bare.request.HTTPHeaders) != 0 {
+		t.Fatalf("%+v", bare.request)
+	}
+	withHeaders := &recording{}
+	if _, err := stremioPlay(context.Background(), withHeaders, "30207", nil, debridLink, map[string]string{"User-Agent": "UA"}); err != nil {
+		t.Fatal(err)
+	}
+	if withHeaders.request.FollowRedirects {
+		t.Fatalf("%+v", withHeaders.request)
+	}
+}

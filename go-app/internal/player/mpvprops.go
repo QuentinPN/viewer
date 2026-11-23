@@ -17,8 +17,20 @@ import (
 // end of stream, it waits 0, 1, 3 then 7 s before each new try; the next delay
 // (15 s) is past `reconnect_delay_max`, so it gives up there. HTTP errors such as
 // 401 are not retried. No redirects: they would carry the auth header
-// to another host.
+// to another host. streamLavfFor relaxes that for one load.
 const streamLavfOptions = "reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=7,max_redirects=0"
+
+// streamLavfRedirects is streamLavfOptions with up to 5 redirects followed.
+const streamLavfRedirects = "reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=7,max_redirects=5"
+
+// streamLavfFor is the `stream-lavf-o` of one load: redirects only when it asks
+// for them (PlaybackRequest.FollowRedirects).
+func streamLavfFor(followRedirects bool) string {
+	if followRedirects {
+		return streamLavfRedirects
+	}
+	return streamLavfOptions
+}
 
 // demuxerLavfOptions is what FFmpeg may open by itself, such as HLS segments: a
 // playlist from the server must not reach local files.

@@ -325,6 +325,11 @@ func (e *MpvEngine) Load(request *PlaybackRequest, source MediaSource) error {
 	if err := e.setProperty("start", start); err != nil {
 		return err
 	}
+	// Each load sets it: a Stremio load that follows redirects never leaves them on
+	// for the next Emby one.
+	if err := e.setProperty("stream-lavf-o", streamLavfFor(request.FollowRedirects && len(request.HTTPHeaders) == 0)); err != nil {
+		return err
+	}
 	subtitles := make([]pendingSubtitle, 0, len(request.Subtitles))
 	for _, s := range request.Subtitles {
 		src, err := ParseSource(s.Source)
