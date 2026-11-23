@@ -142,13 +142,15 @@ func (s *ResumeStore) save() error {
 
 // ResumeTracker follows the Stremio playback going on, fed every engine event
 // (app.go's sink) before the UI: it writes where the playback stopped, and puts a
-// start past the end of a shorter file back to 0 without letting that end of file
-// reach the UI.
+// start past the end of a shorter file back to 0, holding back the one end of file
+// that start caused.
 type ResumeTracker struct {
 	store *ResumeStore
-	// command drives the open engine (seek and pause); spawn runs f off the sink.
+	// command drives the open engine (seek and pause); spawn runs f off the sink;
+	// release hands a held-back event on to the rest of the sink.
 	command func(player.PlayerCommand) error
 	spawn   func(f func())
+	release func(player.PlayerEvent)
 
 	mu sync.Mutex
 	// duration is the last one the engine gave, whatever played: a stream reopened
@@ -157,7 +159,18 @@ type ResumeTracker struct {
 	s        *tracked
 }
 
-// tracked is the Stremio playback followed.
+// fixState is where putting a start past the end back to 0 is.
+type fixState uint8
+
+const (
+	fixNone fixState = iota
+	fixPending
+	fixDone
+	fixFailed
+)
+
+// tracked is the Stremio playback followed. Its pointer is the load: a fix sent for
+// one never touches the next.
 type tracked struct {
 	target string
 	// loaded: its FileLoaded came. Before it, the events are the previous file's.
@@ -165,17 +178,24 @@ type tracked struct {
 	pos    float64
 	hasPos bool
 	saved  time.Time
+	// seen is the last position since FileLoaded, recorded or not.
+	seen    float64
+	hasSeen bool
 	// check is the start asked, while not known to be inside the file.
 	check float64
-	// fixing: put back to 0 after a start past the end; until a position under
-	// fixBelow, an end of file and the positions are still that start's.
-	fixing   bool
-	fixBelow float64
+	// A start past the end put back to 0: positions from ignoreFrom on are still
+	// the end's until one under it; holdEOF holds back one end of file, the first,
+	// until then; held is that end while the seek has not answered.
+	fix        fixState
+	ignoring   bool
+	ignoreFrom float64
+	holdEOF    bool
+	held       *player.EndFile
 }
 
 // NewResumeTracker follows playbacks into store.
-func NewResumeTracker(store *ResumeStore, command func(player.PlayerCommand) error, spawn func(f func())) *ResumeTracker {
-	return &ResumeTracker{store: store, command: command, spawn: spawn}
+func NewResumeTracker(store *ResumeStore, command func(player.PlayerCommand) error, spawn func(f func()), release func(player.PlayerEvent)) *ResumeTracker {
+	return &ResumeTracker{store: store, command: command, spawn: spawn, release: release}
 }
 
 // Saved is the point saved for target.
@@ -218,7 +238,7 @@ func (t *ResumeTracker) PlayerEvent(ev player.PlayerEvent) bool {
 		// left pending ends on an end of file or once past the start.
 		if s != nil && s.loaded && s.check > 0 {
 			if s.check >= e.Seconds {
-				t.fix(s, e.Seconds)
+				t.fixStart(s, e.Seconds)
 			}
 			s.check = 0
 		}
@@ -230,11 +250,13 @@ func (t *ResumeTracker) PlayerEvent(ev player.PlayerEvent) bool {
 		if s == nil || !s.loaded || math.IsInf(e.Seconds, 0) || math.IsNaN(e.Seconds) || e.Seconds < 0 {
 			break
 		}
-		if s.fixing {
-			if e.Seconds >= s.fixBelow {
+		s.seen, s.hasSeen = e.Seconds, true
+		if s.ignoring {
+			if e.Seconds >= s.ignoreFrom {
 				break
 			}
-			s.fixing = false
+			// Playing from 0: any end of file from here on is a real one.
+			s.ignoring, s.holdEOF = false, false
 		}
 		if s.check > 0 {
 			if e.Seconds < s.check+startSettled {
@@ -253,12 +275,20 @@ func (t *ResumeTracker) PlayerEvent(ev player.PlayerEvent) bool {
 		if s == nil || !s.loaded {
 			break
 		}
-		if e.Reason == player.EndEOF && (s.fixing || s.check > 0) {
-			// No Duration came first: the start was past the end all the same.
-			if !s.fixing {
-				t.fix(s, s.check)
+		if e.Reason == player.EndEOF {
+			// No Duration came first: the start is past the end only when mpv
+			// stopped short of it, at the end of a shorter file.
+			if s.check > 0 && s.hasSeen && s.seen < s.check-1 {
+				t.fixStart(s, s.check)
 			}
-			return false
+			if s.holdEOF {
+				s.holdEOF = false
+				if s.fix == fixPending {
+					held := e
+					s.held = &held
+				}
+				return false
+			}
 		}
 		t.finish(e.Reason == player.EndEOF)
 	case player.Shutdown:
@@ -268,21 +298,45 @@ func (t *ResumeTracker) PlayerEvent(ev player.PlayerEvent) bool {
 	return true
 }
 
-// fix seeks back to 0 and resumes (keep-open pauses at the end) off the sink.
-// Until a position under half of span (the duration, else the start asked), the
-// positions and end of file are still those of the start past the end.
-func (t *ResumeTracker) fix(s *tracked, span float64) {
-	s.fixing, s.fixBelow, s.check = true, span/2, 0
-	command := t.command
-	t.spawn(func() {
-		err := command(player.PlayerCommand{Type: player.CmdSeekAbsolute, Seconds: 0})
-		if err == nil {
-			err = command(player.PlayerCommand{Type: player.CmdSetPaused, Paused: false})
-		}
-		if err != nil {
-			slog.Warn("Stremio start past the end not put back to 0")
-		}
-	})
+// fixStart puts s back to 0 and resumes (keep-open pauses at the end), off the
+// sink. Positions from half of span (the duration, else the start asked) on are
+// still the end's.
+func (t *ResumeTracker) fixStart(s *tracked, span float64) {
+	s.check = 0
+	s.fix, s.ignoring, s.ignoreFrom, s.holdEOF = fixPending, true, span/2, true
+	t.spawn(func() { t.runFix(s) })
+}
+
+// runFix sends the seek and the resume for s, unless another load came since: the
+// lock is held across them, so Begin and End (called before any load) wait for
+// it. On a failure, the end of file held back goes on to the UI, which shows the
+// playback as it is.
+func (t *ResumeTracker) runFix(s *tracked) {
+	t.mu.Lock()
+	if t.s != s {
+		t.mu.Unlock()
+		return
+	}
+	err := t.command(player.PlayerCommand{Type: player.CmdSeekAbsolute, Seconds: 0})
+	if err == nil {
+		err = t.command(player.PlayerCommand{Type: player.CmdSetPaused, Paused: false})
+	}
+	if err == nil {
+		s.fix, s.held = fixDone, nil
+		t.mu.Unlock()
+		return
+	}
+	slog.Warn("Stremio start past the end not put back to 0")
+	s.fix, s.ignoring, s.holdEOF = fixFailed, false, false
+	held := s.held
+	s.held = nil
+	if held != nil {
+		t.finish(true)
+	}
+	t.mu.Unlock()
+	if held != nil {
+		t.release(*held)
+	}
 }
 
 // finish saves the playback followed, if any, and stops following it.

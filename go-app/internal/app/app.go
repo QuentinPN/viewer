@@ -273,7 +273,7 @@ func New(opts Options) (*App, error) {
 			return e.Command(c)
 		}
 		return player.ErrNotOpen
-	}, a.Go)
+	}, a.Go, a.forwardEvent)
 	a.Segments = segments.NewService(opts.Version)
 	a.Reporter = emby.NewReporter(svc, opts.Emit)
 	a.Sync = devsync.NewService(ctx, devsync.ServiceConfig{
@@ -372,12 +372,16 @@ func (a *App) Engine() (*player.MpvEngine, error) {
 }
 
 // playerEvent is the engine's sink: the Stremio tracker first, which holds back
-// the end of file of a start past the end, then the reporter, the linked playback
-// and the UI.
+// the end of file of a start past the end, then forwardEvent.
 func (a *App) playerEvent(ev player.PlayerEvent) {
-	if !a.StremioResume.PlayerEvent(ev) {
-		return
+	if a.StremioResume.PlayerEvent(ev) {
+		a.forwardEvent(ev)
 	}
+}
+
+// forwardEvent is the rest of the sink: the reporter, the linked playback and the
+// UI. The tracker calls it too, with an end of file it held back in vain.
+func (a *App) forwardEvent(ev player.PlayerEvent) {
 	a.Reporter.PlayerEvent(ev)
 	a.Sync.PlayerEvent(ev)
 	a.opts.Emit(PlayerEvent, ev)

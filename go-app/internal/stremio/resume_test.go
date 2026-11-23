@@ -3,6 +3,7 @@ package stremio
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,14 +34,17 @@ func storeAt(path string, c *clock) *ResumeStore {
 	return s
 }
 
-// trackerRig is a tracker over a store on disk, a hand clock, and the engine
-// commands it sent (run at once, in order).
+// trackerRig is a tracker over a store on disk, a hand clock, the engine commands
+// it sent, the fixes it spawned (run by run) and the events it released.
 type trackerRig struct {
 	path     string
 	clock    *clock
 	store    *ResumeStore
 	tr       *ResumeTracker
 	commands []string
+	fail     error
+	spawned  []func()
+	released []string
 }
 
 func newRig(t *testing.T) *trackerRig {
@@ -48,9 +52,21 @@ func newRig(t *testing.T) *trackerRig {
 	r.store = storeAt(r.path, r.clock)
 	r.tr = NewResumeTracker(r.store, func(c player.PlayerCommand) error {
 		r.commands = append(r.commands, fmt.Sprintf("%s %v %v", c.Type, c.Seconds, c.Paused))
-		return nil
-	}, func(f func()) { f() })
+		return r.fail
+	}, func(f func()) { r.spawned = append(r.spawned, f) }, func(ev player.PlayerEvent) {
+		b, _ := json.Marshal(ev)
+		r.released = append(r.released, string(b))
+	})
 	return r
+}
+
+// run runs the fixes spawned so far, as their goroutines would.
+func (r *trackerRig) run() {
+	fs := r.spawned
+	r.spawned = nil
+	for _, f := range fs {
+		f()
+	}
 }
 
 // feed sends events, failing on one held back.
@@ -315,15 +331,17 @@ func TestResumeStartInsideTheFile(t *testing.T) {
 	r := newRig(t)
 	r.playing(t, "tt0111161", startAt(1200), 3000)
 	r.feed(t, player.TimePos{Seconds: 1200}, player.TimePos{Seconds: 2999.9}, eof())
-	if len(r.commands) != 0 {
+	if len(r.spawned)+len(r.commands) != 0 {
 		t.Fatal(r.commands)
 	}
 	r.tr.Begin("tt0111161", startAt(1200))
 	r.feed(t, player.FileLoaded{}, player.TimePos{Seconds: 1200}, player.TimePos{Seconds: 1206}, player.TimePos{Seconds: 2999.9}, eof())
-	if len(r.commands) != 0 {
+	if len(r.spawned)+len(r.commands) != 0 {
 		t.Fatal(r.commands)
 	}
 }
+
+const fixed = "seekAbsolute 0 false,setPaused 0 false"
 
 // A start past the end of a shorter file (seen with libmpv 0.40 and keep-open:
 // FileLoaded, TimePos at the end, Duration, Seeked, Paused, EndFile eof) is put
@@ -335,12 +353,13 @@ func TestResumeStartPastTheEnd(t *testing.T) {
 	}
 	r.tr.Begin("tt0111161", startAt(5000))
 	r.feed(t, player.FileLoaded{}, player.TimePos{Seconds: 3000}, player.Duration{Seconds: 3000})
-	if got := strings.Join(r.commands, ","); got != "seekAbsolute 0 false,setPaused 0 false" {
-		t.Fatal(got)
-	}
 	r.feed(t, player.Seeked{}, player.Paused{Paused: true})
 	if r.tr.PlayerEvent(eof()) {
 		t.Fatal("fin de fichier montrée à l'UI")
+	}
+	r.run()
+	if got := strings.Join(r.commands, ","); got != fixed || len(r.released) != 0 {
+		t.Fatal(got, r.released)
 	}
 	r.clock.advance(time.Minute)
 	r.feed(t, player.TimePos{Seconds: 3000}, player.TimePos{Seconds: 0}, player.Paused{Paused: false}, player.TimePos{Seconds: 30})
@@ -348,30 +367,111 @@ func TestResumeStartPastTheEnd(t *testing.T) {
 	if p, ok := r.onDisk("tt0111161"); !ok || p != point(5000, 6000) {
 		t.Fatal("entrée perdue", p, ok)
 	}
-	// From 0 on, the playback is followed as any other: its end goes to the UI.
+
+	// The seek answered first, its end of file comes after: still held back once.
 	r.tr.Begin("tt0111161", startAt(5000))
-	r.feed(t, player.FileLoaded{}, player.Duration{Seconds: 3000}, player.TimePos{Seconds: 0}, player.TimePos{Seconds: 2999.9}, eof())
+	r.feed(t, player.FileLoaded{}, player.Duration{Seconds: 3000})
+	r.run()
+	if r.tr.PlayerEvent(eof()) {
+		t.Fatal("fin de fichier montrée à l'UI")
+	}
+	// From 0 on, the playback is followed as any other: its end goes to the UI.
+	r.feed(t, player.TimePos{Seconds: 0}, player.TimePos{Seconds: 2999.9}, eof())
 	if _, ok := r.onDisk("tt0111161"); ok {
 		t.Fatal("gardé après la fin")
 	}
 
 	// The seek won the race: no end of file came, the next real one is shown.
-	r.commands = nil
 	r.tr.Begin("tt0111161", startAt(5000))
-	r.feed(t, player.FileLoaded{}, player.Duration{Seconds: 3000}, player.TimePos{Seconds: 0}, player.TimePos{Seconds: 2999.9}, eof())
-	if len(r.commands) != 2 {
+	r.feed(t, player.FileLoaded{}, player.Duration{Seconds: 3000})
+	r.run()
+	r.feed(t, player.TimePos{Seconds: 0}, player.TimePos{Seconds: 2999.9}, eof())
+}
+
+// Only the one end of file of the start past the end is held back: a second one
+// goes to the UI, even before any position from 0.
+func TestResumeHoldsBackOneEndOfFile(t *testing.T) {
+	r := newRig(t)
+	r.tr.Begin("tt0111161", startAt(5000))
+	r.feed(t, player.FileLoaded{}, player.Duration{Seconds: 3000})
+	r.run()
+	if r.tr.PlayerEvent(eof()) {
+		t.Fatal("première fin montrée")
+	}
+	r.feed(t, eof())
+	// That end finished the playback: nothing is followed any more.
+	r.feed(t, player.TimePos{Seconds: 0}, eof())
+}
+
+// A seek or resume that fails hands the end of file held back on to the UI, which
+// shows the playback as it is; one that comes after the failure is not held back.
+func TestResumeFailedFixReleasesTheEndOfFile(t *testing.T) {
+	r := newRig(t)
+	r.fail = errors.New("mpv")
+	r.tr.Begin("tt0111161", startAt(5000))
+	r.feed(t, player.FileLoaded{}, player.Duration{Seconds: 3000})
+	if r.tr.PlayerEvent(eof()) {
+		t.Fatal("fin montrée avant la réponse du seek")
+	}
+	r.run()
+	if got := strings.Join(r.released, ","); got != `{"type":"endFile","reason":"eof","error":null}` {
+		t.Fatal(got)
+	}
+	if r.tr.s != nil {
+		t.Fatal("lecture encore suivie")
+	}
+
+	r.released = nil
+	r.tr.Begin("tt0111161", startAt(5000))
+	r.feed(t, player.FileLoaded{}, player.Duration{Seconds: 3000})
+	r.run()
+	r.feed(t, eof())
+	if len(r.released) != 0 {
+		t.Fatal(r.released)
+	}
+}
+
+// Without a Duration first, an end of file on a resumed load is held back only
+// when mpv stopped short of the start (the end of a shorter file).
+func TestResumeEndOfFileBeforeAnyDuration(t *testing.T) {
+	r := newRig(t)
+	r.tr.Begin("tt0111161", startAt(5000))
+	r.feed(t, player.FileLoaded{}, eof())
+	r.tr.Begin("tt0111161", startAt(5000))
+	r.feed(t, player.FileLoaded{}, player.TimePos{Seconds: 5000}, player.TimePos{Seconds: 5003}, eof())
+	r.run()
+	if len(r.spawned)+len(r.commands) != 0 {
 		t.Fatal(r.commands)
 	}
 
-	// No Duration before the end of file: put back to 0 all the same.
-	r.commands = nil
-	r.tr.PlayerEvent(player.Shutdown{})
 	r.tr.Begin("tt0111161", startAt(5000))
 	r.feed(t, player.FileLoaded{}, player.TimePos{Seconds: 3000})
-	if r.tr.PlayerEvent(eof()) || len(r.commands) != 2 {
-		t.Fatal("fin de fichier montrée à l'UI", r.commands)
+	if r.tr.PlayerEvent(eof()) {
+		t.Fatal("fin de fichier montrée à l'UI")
+	}
+	r.run()
+	if got := strings.Join(r.commands, ","); got != fixed || len(r.released) != 0 {
+		t.Fatal(got, r.released)
 	}
 	r.feed(t, player.TimePos{Seconds: 0}, player.TimePos{Seconds: 2999.9}, eof())
+}
+
+// A fix sent for one load never touches the next: an Emby playback (End) or
+// another Stremio one (Begin) came first.
+func TestResumeFixSkipsALaterLoad(t *testing.T) {
+	r := newRig(t)
+	r.tr.Begin("tt0111161", startAt(5000))
+	r.feed(t, player.FileLoaded{}, player.Duration{Seconds: 3000})
+	r.tr.End()
+	r.run()
+	r.tr.Begin("tt0111161", startAt(5000))
+	r.feed(t, player.FileLoaded{}, player.Duration{Seconds: 3000})
+	r.tr.Begin("tt0944947:2:5", nil)
+	r.run()
+	if len(r.spawned)+len(r.commands) != 0 {
+		t.Fatal(r.commands)
+	}
+	r.feed(t, player.FileLoaded{}, eof())
 }
 
 // Each list carries the position saved for its content, null when none.
@@ -442,7 +542,7 @@ func TestResumeStartCheckWaitsForTheNewFile(t *testing.T) {
 	r.feed(t, player.Duration{Seconds: 1200}, stopped(), player.FileLoaded{}, player.TimePos{Seconds: 5000},
 		player.Duration{Seconds: 7200}, player.TimePos{Seconds: 5010})
 	r.tr.End()
-	if len(r.commands) != 0 {
+	if len(r.spawned)+len(r.commands) != 0 {
 		t.Fatal(r.commands)
 	}
 	if p, ok := r.onDisk("tt0111161"); !ok || p != point(5010, 7200) {

@@ -159,11 +159,12 @@ func Test_go_close_slot_keeps_the_engine_when_shutdown_is_refused(t *testing.T) 
 	}
 }
 
-// The engine's sink: the end of file of a Stremio start past the end of a shorter
-// file never reaches the UI (it would close the player or reopen the list as an
-// interrupted stream); every other event does. Positions go to
-// stremio-resume.json beside session.json.
-func Test_go_sink_holds_back_the_end_of_a_start_past_the_end(t *testing.T) {
+// The engine's sink: the Stremio tracker sees each event before the reporter, the
+// linked playback and the UI. A start past the end of a shorter file is put back
+// to 0; without an engine that fails, so its end of file reaches the UI once, from
+// the sink or released by the tracker. Positions go to stremio-resume.json beside
+// session.json.
+func Test_go_sink_goes_through_the_stremio_tracker(t *testing.T) {
 	dir := t.TempDir()
 	var mu sync.Mutex
 	var emitted []string
@@ -181,34 +182,40 @@ func Test_go_sink_holds_back_the_end_of_a_start_past_the_end(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer a.Close(time.Second)
-	start := 5000.0
-	a.StremioResume.Begin("tt0111161", &start)
-	for _, ev := range []player.PlayerEvent{
-		player.FileLoaded{}, player.TimePos{Seconds: 3000}, player.Duration{Seconds: 3000},
-		player.EndFile{Reason: player.EndEOF}, player.TimePos{Seconds: 0}, player.TimePos{Seconds: 120},
-	} {
+	const end = `player://event {"type":"endFile","reason":"eof","error":null}`
+	count := func() (n int) {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, e := range emitted {
+			if e == end {
+				n++
+			}
+		}
+		return n
+	}
+
+	a.StremioResume.Begin("tt0111161", nil)
+	for _, ev := range []player.PlayerEvent{player.FileLoaded{}, player.Duration{Seconds: 3000}, player.TimePos{Seconds: 120}} {
 		a.playerEvent(ev)
 	}
 	a.StremioResume.End()
-	mu.Lock()
-	got := strings.Join(emitted, ",")
-	mu.Unlock()
-	want := `player://event {"type":"fileLoaded"},player://event {"type":"timePos","seconds":3000},` +
-		`player://event {"type":"duration","seconds":3000},player://event {"type":"timePos","seconds":0},` +
-		`player://event {"type":"timePos","seconds":120}`
-	if got != want {
-		t.Fatal(got)
-	}
 	if b, err := os.ReadFile(filepath.Join(dir, "c", "stremio-resume.json")); err != nil || !strings.Contains(string(b), `"positionSeconds": 120`) {
 		t.Fatal(string(b), err)
 	}
-	// Any other end of file goes through.
-	a.StremioResume.Begin("tt0111161", nil)
-	a.playerEvent(player.FileLoaded{})
-	a.playerEvent(player.EndFile{Reason: player.EndEOF})
-	mu.Lock()
-	defer mu.Unlock()
-	if last := emitted[len(emitted)-1]; last != `player://event {"type":"endFile","reason":"eof","error":null}` {
-		t.Fatal(last)
+
+	start := 5000.0
+	a.StremioResume.Begin("tt0111161", &start)
+	for _, ev := range []player.PlayerEvent{player.FileLoaded{}, player.Duration{Seconds: 3000}, player.EndFile{Reason: player.EndEOF}} {
+		a.playerEvent(ev)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for count() == 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if n := count(); n != 1 {
+		mu.Lock()
+		defer mu.Unlock()
+		t.Fatal(n, emitted)
 	}
 }
