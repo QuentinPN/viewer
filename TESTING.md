@@ -75,6 +75,7 @@ adb shell am start -n io.github.quentinpn.viewer.tv.debug/io.github.quentinpn.vi
 - Scénarios flaky : `gate2-transcode` et `gate2-resume` ont chacun échoué une fois au premier passage, puis réussi.
 - Scénarios : `ls scripts/e2e/*.mjs` (gate2 à gate7, `measure-*`, `requests-ui`, hors fichiers de support `app`, `scenario`, `net-proxy`).
 - Version Go : `node scripts/e2e/wails-smoke.mjs [--build] [--offline]` pilote le build **debug** Wails avec le compte de `debug.env`. Il écrit puis efface une position sur le compte de test. Il couvre la connexion, les illustrations `/emby-img/` et `/requestimg/`, la lecture (`player://event`, hwdec, pistes), une capture PrintWindow de la seule fenêtre de l'app, Espace et → envoyés par CDP, le point de reprise, Demander en lecture seule, la fermeture pendant la lecture et la déconnexion. Wails efface `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` : en debug seulement, `VIEWER_E2E_BROWSER_ARGS` le remplace. Dernier passage le 2026-11-22 : 33/33 sur le vrai serveur.
+- Réglages › Stremio : `node scripts/e2e/stremio-settings.mjs [--build] [--out <dossier>]` (build debug, compte de `debug.env`) vérifie le panneau après « Demandes », le focus visible au Tab, le mauvais mot de passe, puis, avec `ST_EMAIL_FILE` et `ST_PASS_FILE` (fichiers du compte Stremio), la connexion, les addons, la déconnexion et l'absence d'entrée `stremio` dans le coffre, d'adresse d'addon et d'authKey dans la page et le journal ; captures PrintWindow. Dernier passage le 2026-11-23 : 26/26 sur le vrai compte.
 
 ### Bancs de lecture (`scripts/spike/`)
 
