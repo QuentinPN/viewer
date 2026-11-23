@@ -14,13 +14,13 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"viewer/internal/artworkcache"
+	"viewer/internal/atomicfile"
 	"viewer/internal/emby"
 	"viewer/internal/redact"
 )
@@ -252,10 +252,6 @@ func (s *Service) updateSettings(f func(*settings)) error {
 	defer s.settingsMu.Unlock()
 	next := s.settings.clone()
 	f(&next)
-	ioErr := func(err error) error { return NewSettings("request.json : " + err.Error()) }
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return ioErr(err)
-	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
@@ -263,13 +259,8 @@ func (s *Service) updateSettings(f func(*settings)) error {
 	if err := enc.Encode(next); err != nil {
 		return NewSettings(err.Error())
 	}
-	// `with_extension("json.tmp")`.
-	temp := strings.TrimSuffix(s.path, filepath.Ext(s.path)) + ".json.tmp"
-	if err := os.WriteFile(temp, bytes.TrimSuffix(buf.Bytes(), []byte("\n")), 0o644); err != nil {
-		return ioErr(err)
-	}
-	if err := os.Rename(temp, s.path); err != nil {
-		return ioErr(err)
+	if err := atomicfile.Write(s.path, bytes.TrimSuffix(buf.Bytes(), []byte("\n"))); err != nil {
+		return NewSettings("request.json : " + err.Error())
 	}
 	s.settings = next
 	return nil
