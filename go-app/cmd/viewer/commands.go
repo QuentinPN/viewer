@@ -1,11 +1,13 @@
 package main
 
 import (
+	"maps"
 	"slices"
 
 	"viewer/internal/app"
 	"viewer/internal/bridge"
 	"viewer/internal/diagnostics"
+	"viewer/internal/stremio"
 	"viewer/internal/sysinfo"
 	"viewer/internal/updater"
 	"viewer/internal/request"
@@ -32,6 +34,12 @@ func registerCommands(reg *bridge.Registry, a *app.App, win Window) {
 		reg.Register(name, handlers[name])
 	}
 	reg.Register("ur_open_trailer", request.OpenTrailerHandler(request.OpenInExplorer))
+
+	// Réglages › Stremio: the 3 stremio_* commands.
+	stremioHandlers := stremio.Handlers(a.Stremio)
+	for _, name := range slices.Sorted(maps.Keys(stremioHandlers)) {
+		reg.Register(name, stremioHandlers[name])
+	}
 
 	// Réglages › À propos and the log folder.
 	reg.Register("system_report", sysinfo.SystemReportHandler(a.Debug()))
