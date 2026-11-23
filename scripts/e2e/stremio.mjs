@@ -1,12 +1,69 @@
-// Shared pieces of the Stremio scenarios (stremio-settings, stremio-sources):
-// accounts read once and redacted, a report whose every line is scrubbed, the
-// Windows vault, PrintWindow captures with the account values masked, and the
-// Réglages › Stremio panel.
+// Shared pieces of the Stremio scenarios (stremio-settings, stremio-sources,
+// stremio-watch-now): accounts read once and redacted, a report whose every
+// line is scrubbed, the run's folders, the Windows vault, PrintWindow captures
+// with the account values masked, the Réglages › Stremio panel, the
+// « Autres sources » dialog, the player of a Stremio stream and the checks of
+// the app log at the end.
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { root } from "./app.mjs";
-import { debugEnv, libraryNav } from "./scenario.mjs";
+import {
+  debugEnv,
+  invoke,
+  libraryNav,
+  signIn,
+  startScreen,
+} from "./scenario.mjs";
+
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** `fn()` every `stepMs` until `accept` takes it, or its last value at the end. */
+export async function poll(fn, accept, timeoutMs, stepMs = 250) {
+  const deadline = Date.now() + timeoutMs;
+  let last;
+  while (Date.now() < deadline) {
+    last = await fn();
+    if (accept(last)) return last;
+    await sleep(stepMs);
+  }
+  return last;
+}
+
+/**
+ * The run's folders: `out` (--out, else <tmp>/viewer-<name>-<timestamp>) for
+ * the captures and report.json, and `work`, a temporary folder for the app's
+ * APPDATA, LOCALAPPDATA and log (`appEnv`), deleted at the end.
+ */
+export function runFolders(name, argv) {
+  const at = argv.indexOf("--out");
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace("T", "-")
+    .slice(0, 15);
+  const out = at >= 0 ? argv[at + 1] : join(tmpdir(), `viewer-${name}-${stamp}`);
+  mkdirSync(out, { recursive: true });
+  const work = mkdtempSync(join(tmpdir(), `viewer-e2e-${name}-`));
+  return {
+    out,
+    work,
+    logFile: join(work, "logs", "viewer.log"),
+    appEnv: {
+      APPDATA: join(work, "Roaming"),
+      LOCALAPPDATA: join(work, "Local"),
+      VIEWER_E2E_LOG_DIR: join(work, "logs"),
+    },
+  };
+}
 
 /** Vault target of the Stremio authKey in the debug build. */
 export const STREMIO_VAULT_TARGET = "stremio.Viewer-debug";
@@ -264,4 +321,428 @@ export async function signInFromSettings(page, { email, password }) {
   await passwordField(page).fill(password);
   await settingsButton(page, "Se connecter").click();
   await waitForSettingsState(page, "Connecté", 45000);
+}
+
+// ---- start and end --------------------------------------------------------------
+
+/** libmpv found (else an error), and the page keeps the focus under CDP. */
+export async function readyApp(page, check) {
+  const info = await invoke(page, "app_info");
+  check("libmpv_found", info.libmpvFound === true);
+  if (!info.libmpvFound)
+    throw new Error(
+      "libmpv absent : vendor/mpv/libmpv-2.dll (fetch-libmpv.ps1)",
+    );
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+}
+
+/**
+ * Emby sign-in with `account`, then Stremio from Réglages; `state.emby` and
+ * `state.stremio` are set as each starts (the end undoes them), `onStep`
+ * names the step. Returns the authKey read from the vault, added to `secrets`.
+ */
+export async function signInEmbyAndStremio(
+  page,
+  { account, stremio, check, state, secrets, onStep },
+) {
+  check("first_run_signed_out", (await startScreen(page)) === "signedOut");
+  onStep("connexion Emby");
+  await signIn(page, account, account.password);
+  state.emby = true;
+  await libraryNav(page).waitFor({ timeout: 30000 });
+  onStep("connexion Stremio");
+  await openSettings(page);
+  await waitForSettingsState(page, "Déconnecté", 20000);
+  state.stremio = true;
+  await signInFromSettings(page, stremio);
+  check("stremio_signed_in", true);
+  const authKey = readAuthKey();
+  if (authKey) secrets.push(authKey);
+  check("auth_key_in_vault", authKey !== null);
+  return authKey;
+}
+
+/** The player closed, Stremio signed out, its vault entry gone. */
+export async function signOutStremio(page, state, check) {
+  if (await decision(page).count()) await leavePlayer(page);
+  if (state.stremio || vaultTargets(/stremio/i) > 0) {
+    await invoke(page, "stremio_sign_out");
+    state.stremio = false;
+  }
+  const left = vaultTargets(/stremio/i) > 0;
+  console.log(`cmdkey stremio target present: ${left}`);
+  check("stremio_signed_out_vault_empty", !left, String(left));
+}
+
+/** After a failed end: the key must not outlive the run. */
+export async function lastStremioSignOut(app) {
+  if (vaultTargets(/stremio/i) > 0 && app && app.proc.exitCode === null)
+    await app.page
+      .evaluate(() => window.__viewer.invoke("stremio_sign_out"))
+      .catch(() => {});
+}
+
+// ---- navigation ---------------------------------------------------------------
+
+/** Escape out of detail pages and the player until the navigation shows. */
+export async function toNav(page) {
+  for (let i = 0; i < 5 && !(await libraryNav(page).isVisible()); i++) {
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(500);
+  }
+  await libraryNav(page).waitFor({ timeout: 10000 });
+}
+
+/** Text of the focused element and whether it is in « Autres sources ». */
+export const focusInfo = (page) =>
+  page.evaluate(() => {
+    const a = document.activeElement;
+    return {
+      text: a?.textContent?.trim() ?? "",
+      tag: a?.tagName ?? "",
+      inDialog: !!a?.closest("dialog[aria-labelledby=sources-title]"),
+    };
+  });
+
+// ---- « Autres sources » ---------------------------------------------------------
+
+/** The panel's message after a link that stopped answering. */
+export const SOURCE_FAILED =
+  "Ce lien ne répond plus, choisis une autre source.";
+
+export const sourcesDialog = (page) =>
+  page.locator("dialog[aria-labelledby=sources-title]");
+
+/** Every addon section with its state, read from the dialog. */
+export const panelState = (page) =>
+  page.evaluate(() => {
+    const d = document.querySelector("dialog[aria-labelledby=sources-title]");
+    if (!d?.open) return { open: false, addons: [] };
+    const addons = [...d.querySelectorAll("section.addon")].map((s) => {
+      const name = s.querySelector("h3")?.textContent?.trim() ?? "";
+      const streams = s.querySelectorAll("button.stream").length;
+      const note = s.querySelector("p.muted")?.textContent?.trim() ?? "";
+      const state =
+        streams > 0
+          ? "ok"
+          : note === "Recherche…"
+            ? "loading"
+            : note === "Aucun flux."
+              ? "empty"
+              : "error";
+      return { name, state, streams, note: state === "error" ? note : "" };
+    });
+    return {
+      open: true,
+      busy: d.getAttribute("aria-busy") === "true",
+      // « Recherche dans N sources… » while addons are pending: only the
+      // addons with streams have a section.
+      searching:
+        d.querySelector(".st-head p.muted[role=status]")?.textContent?.trim() ??
+        null,
+      error: d.querySelector(".list .state")?.textContent?.trim() ?? null,
+      notice: d.querySelector(".notice")?.textContent?.trim() ?? null,
+      unsupported: d.querySelector(".foot .muted")?.textContent?.trim() ?? null,
+      addons,
+    };
+  });
+
+/**
+ * Samples the panel until every addon answered (list loaded, no « Recherche
+ * dans N sources… » left); `progressive` when a sample showed sections while
+ * addons were still pending.
+ */
+export async function waitSettled(page, timeoutMs = 45000) {
+  const t0 = Date.now();
+  const settledAt = {};
+  let progressive = false;
+  let last = null;
+  while (Date.now() - t0 < timeoutMs) {
+    last = await panelState(page);
+    if (last.error) break;
+    const states = last.addons.map((a) => a.state);
+    for (const a of last.addons)
+      if (a.state !== "loading" && !(a.name in settledAt))
+        settledAt[a.name] = Date.now() - t0;
+    if (
+      (last.searching || states.includes("loading")) &&
+      states.some((s) => s !== "loading")
+    )
+      progressive = true;
+    if (
+      last.open &&
+      !last.busy &&
+      !last.searching &&
+      !states.includes("loading")
+    )
+      break;
+    await sleep(100);
+  }
+  const times = Object.values(settledAt);
+  return {
+    ...last,
+    progressive,
+    firstMs: times.length ? Math.min(...times) : null,
+    lastMs: times.length ? Math.max(...times) : null,
+  };
+}
+
+/** « name: streams » (or its state) of each addon of a settled panel. */
+export const addonsSummary = (settled) =>
+  [
+    ...settled.addons.map(
+      (a) => `${a.name}: ${a.state === "ok" ? a.streams : a.state}`,
+    ),
+    ...(settled.searching ? [settled.searching] : []),
+  ].join(" ; ");
+
+export async function closePanel(page) {
+  await page.keyboard.press("Escape");
+  await sourcesDialog(page).waitFor({ state: "detached", timeout: 10000 });
+}
+
+/** The dialog's markup: no address, manifest or debrid host, booleans only. */
+export const dialogLeaks = (page) =>
+  sourcesDialog(page).evaluate((d) => {
+    const html = d.outerHTML;
+    return {
+      address: /https?:|:\/\//i.test(html),
+      manifest: /manifest\.json/i.test(html),
+      debridHost:
+        /[a-z0-9-]*debrid[a-z0-9-]*\.(com|net|org|io|app|fr|link|it|me|cc|xyz|tv)\b/i.test(
+          html,
+        ),
+    };
+  });
+
+// ---- the player -------------------------------------------------------------------
+
+export const decision = (page) => page.locator(".player .decision");
+
+/** Records the app's own `player://event` stream in the page (window.__st). */
+export async function watchPlayer(page) {
+  await page.evaluate(async () => {
+    if (!window.__st) {
+      const rt = await import("/wails/runtime.js");
+      rt.Events.On("player://event", (e) => {
+        const d = e.data;
+        const s = window.__st;
+        if (d.type === "fileLoaded") s.loaded.push(Date.now());
+        if (d.type === "timePos" && d.seconds != null)
+          s.times.push([Date.now(), d.seconds]);
+        if (d.type === "duration") s.duration = d.seconds;
+        if (d.type === "endFile") s.ends.push([d.reason, d.error ?? null]);
+        if (s.times.length > 400) s.times.shift();
+      });
+    }
+    window.__st = { loaded: [], times: [], ends: [], duration: null };
+  });
+}
+export const events = (page) => page.evaluate(() => window.__st);
+export const playerCommand = (page, c) =>
+  invoke(page, "player_command", { command: c });
+
+/** Escape until the player is gone. */
+export async function leavePlayer(page) {
+  for (let i = 0; i < 3 && (await decision(page).count()); i++) {
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(600);
+  }
+  await decision(page).waitFor({ state: "detached", timeout: 15000 });
+}
+
+/**
+ * Plays the first stream of `addon` from the open panel. Success: `fileLoaded`
+ * within 30 s and 3 s of position. A failed link brings the panel back with
+ * its message; a stalled one is closed here.
+ */
+export async function tryAddon(page, addon) {
+  await watchPlayer(page);
+  const t0 = Date.now();
+  await sourcesDialog(page)
+    .locator("section.addon", {
+      has: page.locator("h3", { hasText: addon }),
+    })
+    .locator("button.stream")
+    .first()
+    .click();
+  const outcome = await poll(
+    async () => {
+      const ev = await events(page);
+      const panel = await panelState(page);
+      return { ev, panel, player: (await decision(page).count()) > 0 };
+    },
+    ({ ev, panel, player }) =>
+      ev.loaded.length > 0 ||
+      ev.ends.some(([r]) => r === "error") ||
+      (panel.open && panel.notice) ||
+      (!player && !panel.open && Date.now() - t0 > 5000),
+    30000,
+    200,
+  );
+  const loadedMs = outcome.ev.loaded[0] ? outcome.ev.loaded[0] - t0 : null;
+  if (loadedMs === null) {
+    if (await decision(page).count()) await leavePlayer(page);
+    const reason = outcome.panel.notice
+      ? outcome.panel.notice === SOURCE_FAILED
+        ? "lien qui ne répond plus"
+        : `refusé : ${outcome.panel.notice}`
+      : outcome.ev.ends.length
+        ? `fin ${outcome.ev.ends.map(([r]) => r).join(",")}`
+        : "pas de fileLoaded en 30 s";
+    return { ok: false, reason };
+  }
+  // The position moves 3 s past the first one reported.
+  const moved = await poll(
+    () => events(page),
+    (s) => s.times.length > 1 && s.times.at(-1)[1] - s.times[0][1] >= 3,
+    30000,
+  );
+  const first = moved.times[0]?.[1];
+  const last = moved.times.at(-1)?.[1];
+  if (!(last - first >= 3)) {
+    await leavePlayer(page);
+    return {
+      ok: false,
+      loadedMs,
+      reason: `position ${first?.toFixed(1)} → ${last?.toFixed(1)} s`,
+    };
+  }
+  return { ok: true, loadedMs, from: first, to: last };
+}
+
+/**
+ * The first stream of the first addon with streams, else of up to `others`
+ * other addons; `open()` shows the panel again when a failed link closed it.
+ * `played` is null when none played.
+ */
+export async function playFirstWorking(page, open, others = 3) {
+  if (!(await sourcesDialog(page).isVisible())) await open();
+  let panel = await waitSettled(page);
+  const candidates = panel.addons
+    .filter((a) => a.state === "ok")
+    .map((a) => a.name)
+    .slice(0, 1 + others);
+  const attempts = [];
+  for (const addon of candidates) {
+    if (!(await sourcesDialog(page).isVisible())) await open();
+    panel = await waitSettled(page);
+    if (!panel.addons.some((a) => a.name === addon && a.state === "ok")) {
+      attempts.push({ addon, ok: false, reason: "plus de flux" });
+      continue;
+    }
+    const r = await tryAddon(page, addon);
+    attempts.push({ addon, ...r });
+    if (r.ok) return { attempts, played: { addon, ...r } };
+  }
+  return { attempts, played: null };
+}
+
+/** One line per attempt of `playFirstWorking`. */
+export const attemptsText = (attempts) =>
+  attempts
+    .map(
+      (a) =>
+        `${a.addon}: ${a.ok ? `lu (fileLoaded en ${a.loadedMs} ms, ${a.from.toFixed(1)} → ${a.to.toFixed(1)} s)` : `échec (${a.reason})`}`,
+    )
+    .join(" ; ");
+
+/**
+ * Past Emby's 10 s progress interval, far into the stream (a seek to 40 % of
+ * a stream longer than 2 min): any report would leave a trace on Emby.
+ */
+export async function holdPastProgressInterval(page) {
+  const duration = (await events(page)).duration;
+  if (duration > 120) {
+    const target = Math.round(duration * 0.4);
+    await playerCommand(page, { type: "seekAbsolute", seconds: target });
+    await poll(
+      () => events(page),
+      (s) => (s.times.at(-1)?.[1] ?? 0) > target + 1,
+      30000,
+    );
+  }
+  const holdFrom = (await events(page)).times.at(-1)?.[1] ?? 0;
+  await poll(
+    () => events(page),
+    (s) => (s.times.at(-1)?.[1] ?? 0) > holdFrom + 12,
+    40000,
+  );
+  const stopAt = (await events(page)).times.at(-1)?.[1] ?? 0;
+  return { duration, holdFrom, stopAt };
+}
+
+// ---- Emby's trace ---------------------------------------------------------------------
+
+/** Emby's view of an item: resume point, played, in « Reprendre ». */
+export async function embyTrace(page, id) {
+  const d = await invoke(page, "emby_item_detail", { itemId: id });
+  const cw = await invoke(page, "emby_continue_watching");
+  return {
+    resume: d.resume?.positionSeconds ?? null,
+    played: d.played,
+    continueWatching: cw.some((w) => w.id === id),
+  };
+}
+export const sameTrace = (a, b) =>
+  a.resume === b.resume &&
+  a.played === b.played &&
+  a.continueWatching === b.continueWatching;
+export const traceText = (t) =>
+  `reprise ${t.resume === null ? "aucune" : `${t.resume.toFixed(0)} s`}, vu ${t.played}, dans Reprendre ${t.continueWatching}`;
+
+// ---- end of the run -----------------------------------------------------------------
+
+/**
+ * The app log (`logFile`) holds no manifest or stream address, no address
+ * outside `allowedUrls`, no authKey and no account value; then no `stremio`
+ * nor Viewer-debug entry is left in the vault. Returns the log, or null.
+ */
+export function checkLogAndVault(
+  check,
+  { logFile, allowedUrls, authKey, secrets },
+) {
+  let log = null;
+  if (!existsSync(logFile)) check("log_written", false, "journal absent");
+  else {
+    log = readFileSync(logFile, "utf8");
+    const allowed = new Set(
+      allowedUrls
+        .filter(Boolean)
+        .flatMap((u) => {
+          try {
+            return [new URL(u).host];
+          } catch {
+            return [];
+          }
+        })
+        .concat(["wails.localhost", "localhost", "127.0.0.1"]),
+    );
+    const foreign = (log.match(/https?:\/\/[^\s"'\\<>]+/gi) ?? []).filter(
+      (u) => {
+        try {
+          return !allowed.has(new URL(u).host);
+        } catch {
+          return true;
+        }
+      },
+    ).length;
+    check(
+      "log_without_stream_addresses_or_key",
+      !/manifest\.json/i.test(log) &&
+        foreign === 0 &&
+        (authKey === null || !log.includes(authKey)),
+      `manifest.json ${/manifest\.json/i.test(log)}, ${foreign} adresse(s) hors Emby, authKey ${authKey ? log.includes(authKey) : "non lu"}`,
+    );
+    const leaked = secrets.filter((s) => log.includes(s)).length;
+    check("log_without_account_values", leaked === 0, `${leaked} valeur(s)`);
+  }
+  check("no_stremio_vault_entry", vaultTargets(/stremio/i) === 0);
+  check(
+    "no_debug_vault_entry",
+    vaultTargets(/Viewer-debug/i) === 0,
+    "Viewer-debug",
+  );
+  return log;
 }
