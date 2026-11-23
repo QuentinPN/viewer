@@ -1,0 +1,513 @@
+{
+  "addon-1": {
+    "name": "TMDB Collections",
+    "status": 200,
+    "error": null,
+    "total": 0,
+    "response": {
+      "streams": []
+    }
+  },
+  "addon-2": {
+    "name": "Local Files (without catalog support)",
+    "status": 0,
+    "error": "TypeError",
+    "total": 0,
+    "response": null
+  },
+  "addon-4": {
+    "name": "Lumio · Profil",
+    "status": 200,
+    "error": null,
+    "total": 25,
+    "response": {
+      "streams": [
+        {
+          "name": "[AD⚡️] Lumio",
+          "description": "1080p • BluRay REMUX • REPACK • 📶 30 Mb/s\n🇫🇷 🇬🇧 ✓ • 💾 31,7 Go • 🔎 C411 | YGG | DMM | GenerationFree | Nostradamus | Tr4ker | Torr9 | V3X\n🎧 H264 • DTS-HD MA 5.1 • Wilson\n🗂️ The Shawshank Redemption (Les Evadés) - (1994).mkv",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "notWebReady": true,
+            "bingeGroup": "lumio|r|wilson|3|25|4|fr|",
+            "filename": "The Shawshank Redemption (Les Evadés) - (1994).mkv",
+            "videoSize": 31682067376
+          }
+        },
+        {
+          "name": "[AD⚡️] Lumio",
+          "description": "1080p • BluRay REMUX • REPACK • 📶 30 Mb/s\n🌍 🇫🇷 🇬🇧 • 💾 31,7 Go • 🔎 Darki | Lesalkodiques • 🔗 1fichier\n🎧 H264 • DTS-HD MA 5.1 • Wilson\n🗂️ Les.Evades.1994.MULTI.VFF.1080p.Bluray.Remux.Repack.DTS.HD.MA.5.1.AVC-Wilson.mkv",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "notWebReady": true,
+            "bingeGroup": "lumio|r|wilson|3|25|4|fr|",
+            "filename": "Les.Evades.1994.MULTI.VFF.1080p.Bluray.Remux.Repack.DTS.HD.MA.5.1.AVC-Wilson.mkv",
+            "videoSize": 31682067376
+          }
+        },
+        {
+          "name": "[AD⚡️] Lumio",
+          "description": "1080p • BluRay • 📶 17 Mb/s\n🇫🇷 • 💾 17,9 Go • 🔎 YGG\n🎧 AAC\n🗂️ Les.Evadés.1994.FRENCH.1080.BluRay.VC-1.AAC-NoTag.mkv",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "notWebReady": true,
+            "bingeGroup": "lumio|3|fr|",
+            "filename": "Les.Evadés.1994.FRENCH.1080.BluRay.VC-1.AAC-NoTag.mkv",
+            "videoSize": 17899364466
+          }
+        },
+        {
+          "name": "[AD⚡️] Lumio",
+          "description": "1080p • BluRay • 📶 15 Mb/s\n🇫🇷 🇬🇧 ✓ • 💾 15,7 Go • 🔎 C411 | Tr4ker\n🎧 H264 • DTS-HD MA 5.1 • CherryCoke\n🗂️ The.Shawshank.Redemption.1994.MULTi.1080p.BluRay.x264-CherryCoke.mkv",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "notWebReady": true,
+            "bingeGroup": "lumio|r|cherrycoke|3|23|4|fr|",
+            "filename": "The.Shawshank.Redemption.1994.MULTi.1080p.BluRay.x264-CherryCoke.mkv",
+            "videoSize": 15706834161
+          }
+        },
+        {
+          "name": "[AD⚡️] Lumio",
+          "description": "1080p • BluRay • 📶 12 Mb/s\n🇫🇷 🇬🇧 ✓ • 💾 12,9 Go • 🔎 C411\n🎧 H264 • DTS 5.1 • rough\n🗂️ the.shawshank.redemption.1994.multi.1080p.bluray.x264.dts-rough.mkv",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "notWebReady": true,
+            "bingeGroup": "lumio|r|rough|3|23|4|fr|",
+            "filename": "the.shawshank.redemption.1994.multi.1080p.bluray.x264.dts-rough.mkv",
+            "videoSize": 12910018757
+          }
+        },
+        {
+          "name": "[AD⚡️] Lumio",
+          "description": "1080p • BluRay • 📶 12 Mb/s\n🇫🇷 🇬🇧 ✓ • 💾 12,9 Go • 🔎 YGG | DMM | Torr9 | GenerationFree | TheOldSchool | Tr4ker\n🎧 H264 • AC3 5.1\n🗂️ the.shawshank.redemption.1994.multi.1080p.bluray.x264.dts-rough.mkv",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "notWebReady": true,
+            "bingeGroup": "lumio|3|fr|",
+            "filename": "the.shawshank.redemption.1994.multi.1080p.bluray.x264.dts-rough.mkv",
+            "videoSize": 12910018757
+          }
+        }
+      ]
+    }
+  },
+  "addon-5": {
+    "name": "AIOSources",
+    "status": 200,
+    "error": null,
+    "total": 11,
+    "response": {
+      "streams": [
+        {
+          "name": "[AD+] ⚡ Cached\n🌍 French / MULTI 🇫🇷",
+          "description": "🖼️ 1080P\n🎞️ BLURAY • X265 • H.265\n🎨 10BIT • SDR\n🔊 DTS.HD.MA • DTS-HD.MA • DTS-HD MA • 5.1\n📦 10.0 GB\n📅 2026-03-04\n🔍 AIOSources 🧭 C411-2 🌐 AllDebrid",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "aiosource|REDACTED|alldebrid",
+            "videoSize": 10745108902,
+            "filename": "The.Shawshank.Redemption.1994.VFF.1080p.BluRay.10bit.Dts-Hd.Ma.5.1.x265-KPORAL/The.Shawshank.Redemption.1994.VFF.1080p.BluRay.10bit.Dts-Hd.Ma.5.1.x265-KPORAL.mkv",
+            "notWebReady": true,
+            "folderName": "Les.Evades.1994.VFF.1080p.BluRay.DTS.HD.MA.5.1.x265-KPORAL",
+            "folderSize": 10745108902,
+            "indexer": "C411-2",
+            "service": "alldebrid",
+            "cached": true,
+            "publishDate": "2026-03-04T16:46:15Z"
+          }
+        },
+        {
+          "name": "[AD+] ⚡ Cached\n🌍 French / MULTI 🇫🇷",
+          "description": "🖼️ 1080P\n🎞️ BLURAY • X265\n🎨 10BIT\n🔊 DTS.HD.MA • DTS-HD.MA • 5.1\n📦 10.0 GB\n📅 2026-03-04\n🔍 AIOSources 🧭 C411 🌐 AllDebrid",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "aiosource|REDACTED|alldebrid",
+            "videoSize": 10745108902,
+            "filename": "The.Shawshank.Redemption.1994.VFF.1080p.BluRay.10bit.Dts-Hd.Ma.5.1.x265-KPORAL/The.Shawshank.Redemption.1994.VFF.1080p.BluRay.10bit.Dts-Hd.Ma.5.1.x265-KPORAL.mkv",
+            "notWebReady": true,
+            "folderName": "Les.Evades.1994.VFF.1080p.BluRay.DTS.HD.MA.5.1.x265-KPORAL",
+            "folderSize": 10745108902,
+            "indexer": "C411",
+            "service": "alldebrid",
+            "cached": true,
+            "publishDate": "2026-03-04T16:46:15Z"
+          }
+        },
+        {
+          "name": "[AD+] ⚡ Cached\n🌍 MULTI / French 🇫🇷",
+          "description": "🖼️ 2160P\n🎞️ BLURAY • X265\n🎨 DV • HDR\n🔊 DDP • 5.1\n📦 7.62 GB\n📅 2026-03-14\n🔍 AIOSources 🧭 TR4KER 🌐 AllDebrid",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "aiosource|REDACTED|alldebrid",
+            "videoSize": 8179155494,
+            "filename": "The.Shawshank.redemption.1994.MULTi.VFF.2160p.BLURAY.4KLight.DV.HDR.x265.DDP.5.1.Bender_37.mkv",
+            "notWebReady": true,
+            "folderName": "The.Shawshank.redemption.1994.MULTi.VFF.2160p.BLURAY.4KLight.DV.HDR.x265.DDP.5.1.Bender_37.mkv",
+            "folderSize": 8179155494,
+            "indexer": "TR4KER",
+            "service": "alldebrid",
+            "cached": true,
+            "publishDate": "2026-03-14T07:35:10Z"
+          }
+        },
+        {
+          "name": "[AD+] ⚡ Cached\n🌍 MULTI / French / English 🇫🇷 🇬🇧",
+          "description": "🖼️ 1080P\n🎞️ WEB • WEB-DL • H264 • H.264\n🎨 SDR\n🔊 AAC • AC3 • 2.0 • 5.1\n📦 7.12 GB\n📅 2026-08-29\n🔍 AIOSources 🧭 C411-2 🌐 AllDebrid",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "aiosource|REDACTED|alldebrid",
+            "videoSize": 7643935869,
+            "filename": "The.Shawshank.Redemption.1994.MULTi.1080p.WEB.H264-FW/The.Shawshank.Redemption.1994.MULTi.1080p.WEB.H264-FW.mkv",
+            "notWebReady": true,
+            "folderName": "Les.Evades.1994.MULTI.VFF.1080p.WEB.AAC.2.0.H264-FW",
+            "folderSize": 7643942100,
+            "indexer": "C411-2",
+            "service": "alldebrid",
+            "cached": true,
+            "publishDate": "2026-08-29T16:01:26Z"
+          }
+        },
+        {
+          "name": "[AD+] ⚡ Cached\n🌍 MULTI / French / English 🇫🇷 🇬🇧",
+          "description": "🖼️ 1080P\n🎞️ WEB • H264\n🔊 AAC • 2.0\n📦 7.12 GB\n📅 2026-08-29\n🔍 AIOSources 🧭 C411 🌐 AllDebrid",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "aiosource|REDACTED|alldebrid",
+            "videoSize": 7643935869,
+            "filename": "The.Shawshank.Redemption.1994.MULTi.1080p.WEB.H264-FW/The.Shawshank.Redemption.1994.MULTi.1080p.WEB.H264-FW.mkv",
+            "notWebReady": true,
+            "folderName": "Les.Evades.1994.MULTI.VFF.1080p.WEB.AAC.2.0.H264-FW",
+            "folderSize": 7643942100,
+            "indexer": "C411",
+            "service": "alldebrid",
+            "cached": true,
+            "publishDate": "2026-08-29T16:01:26Z"
+          }
+        },
+        {
+          "name": "[AD+] ⚡ Cached\n🌍 MULTI / French / English 🇫🇷 🇬🇧",
+          "description": "🖼️ 1080P\n🎞️ BLURAY • X265\n🔊 AC3\n📦 6.60 GB\n📅 2026-03-14\n🔍 AIOSources 🧭 TR4KER 🌐 AllDebrid",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "aiosource|REDACTED|alldebrid",
+            "videoSize": 7087353580,
+            "filename": "The Shawshank Redemption 1994 MULTi VFF 1080p BluRay E-AC3 x265-Winks.mkv",
+            "notWebReady": true,
+            "folderName": "The Shawshank Redemption 1994 MULTi VFF 1080p BluRay E-AC3 x265-Winks.mkv",
+            "folderSize": 7087353580,
+            "indexer": "TR4KER",
+            "service": "alldebrid",
+            "cached": true,
+            "publishDate": "2026-03-14T07:37:04Z"
+          }
+        }
+      ]
+    }
+  },
+  "addon-6": {
+    "name": "StreamFusionReborn",
+    "status": 200,
+    "error": null,
+    "total": 12,
+    "response": {
+      "streams": [
+        {
+          "name": "⚡instant\nAllDebrid\n(1080p)",
+          "description": "Les.Evades.1994.MULTI.VF2.1080p.BluRay.HDLight.HDR10.AC3.2.0.x265-Winks\n🔊 ⚜️• 🇫🇷 • 🇺🇸  ☠️ Winks\n🔍 C411 - Cache 💾 5.84GB 👥 39 \n🎥 hevc 📺 BluRay 🌈 HDR 🎧 Dolby Digital",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "infoHash": "8a8a22d8815745331a9f8f17e5a21b830b4339fe",
+          "fileIdx": null,
+          "behaviorHints": {
+            "bingeGroup": "REDACTED",
+            "filename": "The Shawshank Redemption 1994 MULTi VF2 1080p BluRay HDR10 AC3 x265-Winks.mkv"
+          }
+        },
+        {
+          "name": "⚡instant\nAllDebrid\n(1080p)",
+          "description": "The Shawshank Redemption 1994 MULTi VF2 1080p BluRay HDR10 AC3 x265-Winks.FRENCH\n🔊 ⚜️• 🇫🇷 • 🇺🇸   ✓  ☠️ Winks\n🔍 YggReborn - Cache 💾 5.84GB 👥 3 \n🎥 hevc 📺 BluRay 🌈 HDR 🎧 Dolby Digital",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "infoHash": "fe78e3e73dbc13c901be33374173c36f75cdd9af",
+          "fileIdx": null,
+          "behaviorHints": {
+            "bingeGroup": "REDACTED",
+            "filename": "The Shawshank Redemption 1994 MULTi VF2 1080p BluRay HDR10 AC3 x265-Winks.mkv"
+          }
+        },
+        {
+          "name": "⚡instant\nAllDebrid\n(1080p)",
+          "description": "Les.Evades.1994.MULTI.VFF.1080p.BluRay.AAC.5.1.x265-SireHawk\n🔊 🇫🇷 • 🇺🇸   ✓  ☠️ SireHawk\n🔍 C411 - Cache 💾 3.25GB 👥 176 \n🎥 hevc 📺 BluRay 🎧 AAC",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "infoHash": "e0c82ec5e02965a10e5681cc38839db289c49a9f",
+          "fileIdx": null,
+          "behaviorHints": {
+            "bingeGroup": "REDACTED",
+            "filename": "Les.Evades.1994.BDRip.x265.10bit.1080p.AAC.5.1.Fr.Eng.Subs.Fr.Eng-SireHawk.mkv"
+          }
+        },
+        {
+          "name": "⚡instant\nAllDebrid\n(1080p)",
+          "description": "Les.Evades.1994.MULTI.VFF.1080p.WEB.AAC.2.0.H265-FW\n🔊 🇫🇷 • 🇺🇸   ✓  ☠️ FW\n🔍 C411 - Cache 💾 3.29GB 👥 175 \n🎥 hevc 📺 WEB 🎧 AAC",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "infoHash": "a0f4f3405cb1b03c0597794d895631441ee86e14",
+          "fileIdx": null,
+          "behaviorHints": {
+            "bingeGroup": "REDACTED",
+            "filename": "The.Shawshank.Redemption.1994.MULTi.1080p.WEB.H265-FW.mkv"
+          }
+        },
+        {
+          "name": "⚡instant\nAllDebrid\n(1080p)",
+          "description": "Les.Evades.1994.MULTI.VFF.1080p.WEB.AAC.2.0.H264-FW\n🔊 🇫🇷 • 🇺🇸   ✓  ☠️ FW\n🔍 C411 - Cache 💾 7.12GB 👥 49 \n🎥 avc 📺 WEB 🎧 AAC",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "infoHash": "0a9c6e51ac4c30329832816039550eec2b3bb8d2",
+          "fileIdx": null,
+          "behaviorHints": {
+            "bingeGroup": "REDACTED",
+            "filename": "The.Shawshank.Redemption.1994.MULTi.1080p.WEB.H264-FW.mkv"
+          }
+        },
+        {
+          "name": "⚡instant\nAllDebrid\n(1080p)",
+          "description": "Les.Evades.1994.MULTI.1080p.x264.AC3-mHDgz\n🔊 🇫🇷 • 🇺🇸   ✓  ☠️ mHDgz\n🔍 Torr9 - Cache 💾 3.53GB 👥 36 \n🎥 avc 🎧 Dolby Digital",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "infoHash": "f5e0541838148c2ef3dd04d0ce0002982f5902f1",
+          "fileIdx": null,
+          "behaviorHints": {
+            "bingeGroup": "REDACTED",
+            "filename": "Les Evades (1994) - 1080p  FR EN x264 ac3 mHDgz..mkv"
+          }
+        }
+      ]
+    }
+  },
+  "addon-7": {
+    "name": "Wastream | AD",
+    "status": 200,
+    "error": null,
+    "total": 20,
+    "response": {
+      "streams": [
+        {
+          "name": "[AD ⚡]\nWastream\n1080p",
+          "description": "📁 Les.Évadés.1994.VFF.MULTI.BluRay.Remux.1080p.mkv\n🌍 Multi · 🎞️ 1080p · 📦 29.51 GB\n🌐 WASource · 1Fichier",
+          "behaviorHints": {
+            "filename": "Les.Évadés.1994.VFF.MULTI.BluRay.Remux.1080p.mkv",
+            "videoSize": 31686121226,
+            "service": "alldebrid",
+            "cached": true,
+            "indexer": "WASource"
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "size": 31686121226,
+          "sizeBytes": 31686121226
+        },
+        {
+          "name": "[AD ⚡]\nWastream\n1080p",
+          "description": "📁 Les.Évadés.1994.MULTI.BluRay.1080p.mkv\n🌍 Multi · 🎞️ BluRay 1080p · 📦 12.9 GB\n🌐 Loadix · 1fichier",
+          "behaviorHints": {
+            "filename": "Les.Évadés.1994.MULTI.BluRay.1080p.mkv",
+            "videoSize": 13851269529,
+            "service": "alldebrid",
+            "cached": true,
+            "indexer": "Loadix"
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "size": 13851269529,
+          "sizeBytes": 13851269529
+        },
+        {
+          "name": "[AD ⚡]\nWastream\n1080p",
+          "description": "📁 Les.Évadés.1994.MULTI.BluRay.1080p.mkv\n🌍 Multi · 🎞️ BluRay 1080p · 📦 10.3 GB\n🌐 Loadix · 1fichier",
+          "behaviorHints": {
+            "filename": "Les.Évadés.1994.MULTI.BluRay.1080p.mkv",
+            "videoSize": 11059540787,
+            "service": "alldebrid",
+            "cached": true,
+            "indexer": "Loadix"
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "size": 11059540787,
+          "sizeBytes": 11059540787
+        },
+        {
+          "name": "[AD ⚡]\nWastream\n1080p",
+          "description": "📁 Les.Évadés.1994.MULTI.WEB.DL.1080p.mkv\n🌍 Multi · 🎞️ WEB-DL 1080p · 📦 7.6 GB\n🌐 Loadix · 1fichier",
+          "behaviorHints": {
+            "filename": "Les.Évadés.1994.MULTI.WEB.DL.1080p.mkv",
+            "videoSize": 8160437862,
+            "service": "alldebrid",
+            "cached": true,
+            "indexer": "Loadix"
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "size": 8160437862,
+          "sizeBytes": 8160437862
+        },
+        {
+          "name": "[AD ⚡]\nWastream\n1080p",
+          "description": "📁 Les.Évadés.1994.English.TrueFrench.Blu.Ray.1080p.x265.mkv\n🌍 Multi (English, French) · 🎞️ Blu-Ray 1080p (x265) · 📦 6.60 GB\n🌐 Movix · 1Fichier",
+          "behaviorHints": {
+            "filename": "Les.Évadés.1994.English.TrueFrench.Blu.Ray.1080p.x265.mkv",
+            "videoSize": 7086696038,
+            "service": "alldebrid",
+            "cached": true,
+            "indexer": "Movix"
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "size": 7086696038,
+          "sizeBytes": 7086696038
+        },
+        {
+          "name": "[AD ⚡]\nWastream\n1080p",
+          "description": "📁 The Shawshank Redemption 1994 MULTi VFF 1080p BluRay E-AC3 x265-Winks.mkv\n🌍 Multi (English, French) · 🎞️ 1080p · 📦 6.60 GB\n🌐 WASource · 1Fichier",
+          "behaviorHints": {
+            "filename": "The Shawshank Redemption 1994 MULTi VFF 1080p BluRay E-AC3 x265-Winks.mkv",
+            "videoSize": 7086696038,
+            "service": "alldebrid",
+            "cached": true,
+            "indexer": "WASource"
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "size": 7086696038,
+          "sizeBytes": 7086696038
+        }
+      ]
+    }
+  },
+  "addon-8": {
+    "name": "Comet | AD",
+    "status": 200,
+    "error": null,
+    "total": 8,
+    "response": {
+      "streams": [
+        {
+          "name": "[AD⚡] Comet 1080p",
+          "description": "📄 The.Shawshank.Redemption.1994.BDRemux.1080p.mkv\n⭐ BluRay REMUX\n💾 75.6 GB 🔎 StremThru",
+          "behaviorHints": {
+            "bingeGroup": "comet|alldebrid|REDACTED",
+            "filename": "The.Shawshank.Redemption.1994.BDRemux.1080p.mkv",
+            "videoSize": 81190579857
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv"
+        },
+        {
+          "name": "[AD⚡] Comet 1080p",
+          "description": "📄 REDACTED\n⭐ BluRay REMUX\n👤 0 💾 57.5 GB 🔎 Torrentio|Rutracker",
+          "behaviorHints": {
+            "bingeGroup": "comet|alldebrid|REDACTED",
+            "filename": "REDACTED",
+            "videoSize": 61733097779
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv"
+        },
+        {
+          "name": "[AD⚡] Comet 1080p",
+          "description": "📄 The Shawshank Redemption 1994 UHD BluRay 1080p DDP 5 1 DoVi HDR10 x265-SM737.mkv\n📹 hevc • DV • HDR • 10bit | 🔊 Dolby Digital Plus • 5.1\n⭐ BluRay | 🏷️ SM737\n👤 1 💾 8.4 GB 🔎 Torrentio|ThePirateBay",
+          "behaviorHints": {
+            "bingeGroup": "comet|alldebrid|REDACTED",
+            "filename": "The Shawshank Redemption 1994 UHD BluRay 1080p DDP 5 1 DoVi HDR10 x265-SM737.mkv",
+            "videoSize": 8981083015
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv"
+        },
+        {
+          "name": "[AD⚡] Comet 1080p",
+          "description": "📄 The.Shawshank.Redemption.1994.1080p.NF.WEB-DL.H264-ETRG[EtHD].mkv\n📹 avc\n⭐ WEB-DL | 🏷️ ETRG\n💾 6.8 GB 🔎 StremThru|Knaben",
+          "behaviorHints": {
+            "bingeGroup": "comet|alldebrid|REDACTED",
+            "filename": "The.Shawshank.Redemption.1994.1080p.NF.WEB-DL.H264-ETRG[EtHD].mkv",
+            "videoSize": 7289957820
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv"
+        },
+        {
+          "name": "[AD⚡] Comet 1080p",
+          "description": "📄 [ OxTorrent.com ] Les evades (1994) - 1080p FR EN x264 ac3 mHDgz..mkv\n📹 avc | 🔊 Dolby Digital\n💾 3.5 GB 🔎 StremThru\n🌎/🇬🇧/🇫🇷",
+          "behaviorHints": {
+            "bingeGroup": "comet|alldebrid|REDACTED",
+            "filename": "[ OxTorrent.com ] Les evades (1994) - 1080p FR EN x264 ac3 mHDgz..mkv",
+            "videoSize": 3792316726
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv"
+        },
+        {
+          "name": "[AD⚡] Comet 1080p",
+          "description": "📄 Побег.из.Шоушенка.The.Shawshank.Redemption.1994.Warner.Bros.Remastered.BDRip-HEVC.1080p.mkv\n📹 hevc\n⭐ BDRip\n👤 7 💾 22.0 GB 🔎 Torrentio|Rutor\n🇷🇺",
+          "behaviorHints": {
+            "bingeGroup": "comet|alldebrid|REDACTED",
+            "filename": "Побег.из.Шоушенка.The.Shawshank.Redemption.1994.Warner.Bros.Remastered.BDRip-HEVC.1080p.mkv",
+            "videoSize": 23643571838
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv"
+        }
+      ]
+    }
+  },
+  "addon-9": {
+    "name": "TorrentsDB AD",
+    "status": 200,
+    "error": null,
+    "total": 75,
+    "response": {
+      "streams": [
+        {
+          "name": "[AD download] TorrentsDB\n1080p",
+          "title": "The Shawshank Redemption (1994) 1080p BrRip - 1.6GB - YIFY\n👤 450 💾 1.60 GB ⚙️ ThePirateBay",
+          "url": "https://debrid.example/REDACTED/file.mp4",
+          "behaviorHints": {
+            "bingeGroup": "torrentsdb|1080p|brrip|x264",
+            "filename": "REDACTED"
+          }
+        },
+        {
+          "name": "[AD download] TorrentsDB\n1080p",
+          "title": "The.Shawshank.Redemption.1994.1080p.BluRay.x265.AAC.5.1 -88\n👤 127 💾 2.22 GB ⚙️ rargb",
+          "url": "https://debrid.example/REDACTED/file.mp4",
+          "behaviorHints": {
+            "bingeGroup": "torrentsdb|1080p|bluray|x265",
+            "filename": "REDACTED"
+          }
+        },
+        {
+          "name": "[AD download] TorrentsDB\n1080p",
+          "title": "The Shawshank Redemption (1994) 1080p BRRip x264 -YTS\n👤 100 💾 1.60 GB ⚙️ knaben",
+          "url": "https://debrid.example/REDACTED/file.mp4",
+          "behaviorHints": {
+            "bingeGroup": "torrentsdb|1080p|brrip|x264",
+            "filename": "REDACTED"
+          }
+        },
+        {
+          "name": "[AD download] TorrentsDB\n1080p",
+          "title": "The.Shawshank.Redemption.1994.1080p.BluRay.x265.AAC.5.1 -88\n👤 85 💾 2.22 GB ⚙️ knaben",
+          "url": "https://debrid.example/REDACTED/file.mp4",
+          "behaviorHints": {
+            "bingeGroup": "torrentsdb|1080p|bluray|x265",
+            "filename": "REDACTED"
+          }
+        },
+        {
+          "name": "[AD download] TorrentsDB\n1080p",
+          "title": "The.Shawshank.Redemption.1994.REMASTERED.1080p.BluRay.H264.AAC-R4RBG[TGx]\n👤 84 💾 2.72 GB ⚙️ rargb",
+          "url": "https://debrid.example/REDACTED/file.mp4",
+          "behaviorHints": {
+            "bingeGroup": "torrentsdb|1080p|bluray|h264",
+            "filename": "REDACTED"
+          }
+        },
+        {
+          "name": "[AD download] TorrentsDB\n1080p",
+          "title": "The.Shawshank.Redemption.1994.1080p.NF.WEB-DL.H264-ETRG[EtHD]\n👤 83 💾 6.79 GB ⚙️ rargb",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "torrentsdb|1080p|web-dl|h264",
+            "filename": "The.Shawshank.Redemption.1994.1080p.NF.WEB-DL.H264-ETRG[EtHD].mkv"
+          }
+        }
+      ],
+      "cacheMaxAge": 3600,
+      "staleRevalidate": 14400,
+      "staleError": 604800
+    }
+  }
+}
