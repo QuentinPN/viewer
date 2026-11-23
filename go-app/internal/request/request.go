@@ -7,12 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/netip"
 	"net/url"
 	"strings"
 	"unicode"
 
 	"viewer/internal/emby"
+	"viewer/internal/netaddr"
 	"viewer/internal/redact"
 )
 
@@ -240,25 +240,11 @@ func NormalizeAddress(input string) (string, error) {
 	origin := base.String()
 	if scheme == "http" {
 		u, err := url.Parse(origin)
-		if err != nil || !isLocal(u.Hostname()) {
+		if err != nil || !netaddr.IsLocalHost(u.Hostname()) {
 			return "", ErrInvalidAddress
 		}
 	}
 	return strings.TrimRight(origin+normalizePath(rawPath), "/"), nil
-}
-
-// isLocal is `is_local` on the serialized host: IPv4 loopback or private, IPv6
-// loopback, `localhost` or `*.local`.
-func isLocal(host string) bool {
-	if addr, err := netip.ParseAddr(host); err == nil {
-		if addr.Is4() {
-			return addr.IsLoopback() || addr.IsPrivate()
-		}
-		// Ipv6Addr::is_loopback is `::1` only, not an IPv4-mapped loopback.
-		return addr == netip.IPv6Loopback()
-	}
-	d := redact.ASCIILower(host)
-	return d == "localhost" || strings.HasSuffix(d, ".local")
 }
 
 // normalizePath is the WHATWG path state for a special scheme: `/` and `\` split
