@@ -11,6 +11,7 @@ import (
 	"io"
 	"math"
 	"strconv"
+	"strings"
 )
 
 // streamLavfOptions are FFmpeg's HTTP options: after a network error or an early
@@ -21,7 +22,7 @@ import (
 const streamLavfOptions = "reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=7,max_redirects=0"
 
 // streamLavfRedirects is streamLavfOptions with up to 5 redirects followed.
-const streamLavfRedirects = "reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=7,max_redirects=5"
+var streamLavfRedirects = strings.TrimSuffix(streamLavfOptions, "max_redirects=0") + "max_redirects=5"
 
 // streamLavfFor is the `stream-lavf-o` of one load: redirects only when it asks
 // for them (PlaybackRequest.FollowRedirects).

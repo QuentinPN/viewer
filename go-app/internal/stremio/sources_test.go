@@ -72,7 +72,8 @@ func TestTargetOfAnEmbyItem(t *testing.T) {
 		{"film sans IMDb", emby.ExternalRef{ItemType: "Movie", IDs: segs.MediaIDs{Tmdb: ptr(uint64(278))}}, "", "", ErrNoImdb},
 		{"épisode sans IMDb", emby.ExternalRef{ItemType: "Episode", Episode: &segs.EpisodeNumber{Season: 1, Episode: 1}}, "", "", ErrNoImdb},
 		{"épisode sans numéros", emby.ExternalRef{ItemType: "Episode"}, "", "", ErrNoImdb},
-		{"épisode spécial", emby.ExternalRef{ItemType: "Episode", IDs: segs.MediaIDs{Imdb: ptr("tt0944947")}, Episode: &segs.EpisodeNumber{Season: 0, Episode: 3}}, "", "", ErrInvalidID},
+		{"épisode spécial", emby.ExternalRef{ItemType: "Episode", IDs: segs.MediaIDs{Imdb: ptr("tt0944947")}, Episode: &segs.EpisodeNumber{Season: 0, Episode: 3}}, Series, "tt0944947:0:3", nil},
+		{"épisode numéro 0", emby.ExternalRef{ItemType: "Episode", IDs: segs.MediaIDs{Imdb: ptr("tt0944947")}, Episode: &segs.EpisodeNumber{Season: 0, Episode: 0}}, "", "", ErrInvalidID},
 		{"série", emby.ExternalRef{ItemType: "Series", IDs: segs.MediaIDs{Imdb: ptr("tt0944947")}}, "", "", ErrInvalidID},
 	}
 	for _, c := range cases {

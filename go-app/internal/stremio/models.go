@@ -124,7 +124,7 @@ func ParseAddon(transportURL string, manifest json.RawMessage) (Addon, error) {
 var imdbID = regexp.MustCompile(`^tt[0-9]{5,}$`)
 
 // StreamID is the `{id}` of a stream request: `tt…` for a movie (season and
-// episode 0), `tt…:S:E` for an episode (both ≥ 1). Anything else is ErrInvalidID.
+// episode 0), `tt…:S:E` for an episode (season ≥ 0, 0 being the specials; episode ≥ 1). Anything else is ErrInvalidID.
 func StreamID(imdb string, season, episode int) (string, error) {
 	if !imdbID.MatchString(imdb) {
 		return "", ErrInvalidID
@@ -132,7 +132,7 @@ func StreamID(imdb string, season, episode int) (string, error) {
 	switch {
 	case season == 0 && episode == 0:
 		return imdb, nil
-	case season >= 1 && episode >= 1:
+	case season >= 0 && episode >= 1:
 		return imdb + ":" + strconv.Itoa(season) + ":" + strconv.Itoa(episode), nil
 	default:
 		return "", ErrInvalidID

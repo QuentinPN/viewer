@@ -85,6 +85,9 @@ func Target(ref emby.ExternalRef) (ContentType, string, error) {
 	var season, episode int
 	if t == Series {
 		season, episode = int(ref.Episode.Season), int(ref.Episode.Episode)
+		if episode == 0 { // (0, 0) would be a movie's id
+			return "", "", ErrInvalidID
+		}
 	}
 	id, err := StreamID(*ref.IDs.Imdb, season, episode)
 	if err != nil {
