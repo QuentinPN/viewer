@@ -35,6 +35,8 @@ import coil3.ImageLoader
 import io.github.quentinpn.viewer.tv.sync.nextOffset
 import io.github.quentinpn.viewer.tv.AppServices
 import io.github.quentinpn.viewer.tv.BuildConfig
+import io.github.quentinpn.viewer.tv.brand.LauncherIcon
+import io.github.quentinpn.viewer.tv.brand.SeasonalIconStore
 import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.player.AccountTracks
@@ -155,6 +157,9 @@ fun SettingsScreen(
         change(settings.copy(languages = next))
     }
     val style = settings.subtitles
+    // Per device: the launcher is the TV's, not the Emby user's
+    val seasonalIcons = remember { SeasonalIconStore(context) }
+    var seasonal by remember { mutableStateOf(seasonalIcons.enabled) }
     LaunchedEffect(Unit) {
         withFrameNanos {}
         runCatching { first.requestFocus() }
@@ -284,6 +289,19 @@ fun SettingsScreen(
             ) { change(style.copy(overrideAss = !style.overrideAss)) }
         }
         item { Note("Ces réglages restent sur cet appareil et s'appliquent à la prochaine lecture.") }
+
+        item { Section("Apparence") }
+        item {
+            Choice(
+                "Icônes saisonnières",
+                "Le raton change de tenue pour Noël, Halloween…",
+                onOff(seasonal),
+            ) {
+                seasonal = !seasonal
+                seasonalIcons.enabled = seasonal
+                scope.launch(Dispatchers.Default) { LauncherIcon.sync(context) }
+            }
+        }
 
         item { Section("Accueil") }
         item {

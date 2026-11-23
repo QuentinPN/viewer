@@ -98,10 +98,9 @@ func Test_failures_log_a_category_only(t *testing.T) {
 	}
 }
 
-// The Rust test parses tauri.conf.json; the Go counterpart checks DefaultConfig,
-// which carries the same values. Deviation (MAP.md): the pinned key is injected
-// at build time, so instead of `pubkey.len() > 40` the test checks that the
-// committed placeholder is empty and fails closed.
+// DefaultConfig carries the values the Tauri app's tauri.conf.json had. The
+// pinned key is injected at build time, so the test checks that the committed
+// placeholder is empty and fails closed.
 func Test_shipped_config_is_quiet_and_signed(t *testing.T) {
 	cfg := DefaultConfig("1.0.0")
 	if len(cfg.Endpoints) != 1 || !strings.HasSuffix(cfg.Endpoints[0], "/desktop/latest.json") {
@@ -119,36 +118,8 @@ func Test_shipped_config_is_quiet_and_signed(t *testing.T) {
 	if err := Verify([]byte("MZ"), "1.0.0", strings.Repeat("A", 86), cfg.PublicKey); Category(err) != "signature" {
 		t.Errorf("an empty key must fail closed, got %v", err)
 	}
-	// tauri.conf.json is the source of these values until the cutover, which
-	// removes src-tauri/: the cross-check then ends.
-	conf, err := os.ReadFile(filepath.Join("..", "..", "..", "src-tauri", "tauri.conf.json"))
-	if errors.Is(err, os.ErrNotExist) {
-		t.Log("src-tauri/tauri.conf.json is gone (after the cutover): cross-check skipped")
-		return
-	}
-	if err != nil {
-		t.Fatalf("tauri.conf.json: %v", err)
-	}
-	var c struct {
-		Plugins struct {
-			Updater struct {
-				Endpoints                          []string `json:"endpoints"`
-				DangerousInsecureTransportProtocol bool     `json:"dangerousInsecureTransportProtocol"`
-				Windows                            struct {
-					InstallMode string `json:"installMode"`
-				} `json:"windows"`
-			} `json:"updater"`
-		} `json:"plugins"`
-	}
-	if err := json.Unmarshal(conf, &c); err != nil {
-		t.Fatalf("tauri.conf.json: %v", err)
-	}
-	up := c.Plugins.Updater
-	if len(up.Endpoints) != 1 || up.Endpoints[0] != DefaultEndpoint {
-		t.Errorf("tauri.conf.json endpoints %v, Go %s", up.Endpoints, DefaultEndpoint)
-	}
-	if !up.DangerousInsecureTransportProtocol || up.Windows.InstallMode != "quiet" {
-		t.Errorf("tauri.conf.json updater %+v", up)
+	if len(cfg.Endpoints) != 1 || cfg.Endpoints[0] != DefaultEndpoint {
+		t.Errorf("endpoints %v, want %s", cfg.Endpoints, DefaultEndpoint)
 	}
 }
 

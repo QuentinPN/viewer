@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -24,8 +22,9 @@ type fakeWindow struct {
 	calls                 []string
 }
 
-func (w *fakeWindow) IsFullscreen() bool { return w.fullscreen }
-func (w *fakeWindow) IsMaximised() bool  { return w.maximized }
+func (w *fakeWindow) IsFullscreen() bool    { return w.fullscreen }
+func (w *fakeWindow) IsMaximised() bool     { return w.maximized }
+func (w *fakeWindow) NativeWindow() uintptr { return 0 }
 func (w *fakeWindow) SetFullscreen(on bool) {
 	w.calls = append(w.calls, "fullscreen")
 	w.fullscreen = on
@@ -85,44 +84,45 @@ func invoke(t *testing.T, b *bridge.Bridge, cmd, args string) (string, string) {
 	return string(out), ""
 }
 
-// rustCommands reads the invoke_handler of src-tauri/src/lib.rs: the last path
-// segment of each `tauri::generate_handler!` entry.
-func rustCommands(t *testing.T) []string {
-	t.Helper()
-	src, err := os.ReadFile(filepath.Join("..", "..", "..", "src-tauri", "src", "lib.rs"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	block := regexp.MustCompile(`(?s)generate_handler!\[(.*?)\]`).FindSubmatch(src)
-	if block == nil {
-		t.Fatal("generate_handler! introuvable dans lib.rs")
-	}
-	var names []string
-	for _, entry := range strings.Split(string(block[1]), ",") {
-		entry = strings.TrimSpace(entry)
-		if entry == "" {
-			continue
-		}
-		names = append(names, entry[strings.LastIndex(entry, "::")+2:])
-	}
-	slices.Sort(names)
-	return names
+// commands is every command the frontend may invoke: the 82 of the former Rust
+// invoke_handler minus the two ui_settings_* of the finished Tauri handover, plus
+// the two of the logo.
+var commands = []string{
+	"app_info", "app_update_check", "app_update_install", "app_update_pending",
+	"artwork_cache_clear", "artwork_cache_stats",
+	"diagnostics_open_log_dir",
+	"emby_account_tracks", "emby_add_to_playlist", "emby_change_quality", "emby_change_server",
+	"emby_chapters", "emby_continue_watching", "emby_create_playlist", "emby_episodes",
+	"emby_favorites", "emby_forget_server", "emby_genres", "emby_hero", "emby_hide_from_resume",
+	"emby_home_playlists", "emby_item_detail", "emby_items", "emby_last_server", "emby_latest",
+	"emby_libraries", "emby_library_events_start", "emby_library_events_stop", "emby_local_trailer",
+	"emby_next_up", "emby_play", "emby_playback_quality", "emby_playlist_items", "emby_playlists",
+	"emby_probe", "emby_production_years", "emby_random_item", "emby_restore", "emby_resume_saved",
+	"emby_search", "emby_seasons", "emby_segments", "emby_series_next_episode", "emby_server_info",
+	"emby_set_favorite", "emby_set_playback_quality", "emby_set_played", "emby_shelf", "emby_sign_in",
+	"emby_sign_out", "emby_sort_names", "emby_titles",
+	"player_close", "player_command", "player_diagnostics", "player_open", "player_tracks",
+	"sync_devices", "sync_invite", "sync_status", "sync_unlink",
+	"system_report",
+	"ur_browse", "ur_cancel", "ur_discover", "ur_genres", "ur_media", "ur_my_requests",
+	"ur_open_trailer", "ur_quota", "ur_request", "ur_request_detail", "ur_revoke_session",
+	"ur_search", "ur_sessions", "ur_set_address", "ur_sign_in", "ur_sign_out", "ur_status",
+	"window_set_fullscreen",
+	// The logo (commands_brand.go): no Rust counterpart.
+	"app_is_debug", "window_set_icon",
 }
 
-// Every command of the Rust invoke_handler is registered, and nothing else.
-func TestRegisteredCommandsAreTheRustInvokeHandler(t *testing.T) {
-	want := rustCommands(t)
-	if len(want) != 82 {
-		t.Fatalf("lib.rs liste %d commandes, MAP.md en compte 82", len(want))
-	}
+// Exactly these commands are registered.
+func TestRegisteredCommands(t *testing.T) {
 	reg := bridge.NewRegistry()
 	a, _, win, _ := testApp(t, true)
 	registerCommands(reg, a, win)
 	got := reg.Names()
+	want := slices.Sorted(slices.Values(commands))
 	if !slices.Equal(got, want) {
 		for _, n := range want {
 			if !slices.Contains(got, n) {
-				t.Errorf("non portée : %s", n)
+				t.Errorf("absente : %s", n)
 			}
 		}
 		for _, n := range got {
@@ -156,7 +156,6 @@ func Test_go_first_run_answers(t *testing.T) {
 		{"emby_library_events_stop", `{}`, `null`, ""},
 		{"artwork_cache_stats", `{}`, `{"entries":0,"bytes":0,"quotaBytes":536870912,"hits":0,"misses":0}`, ""},
 		{"app_update_pending", `{}`, `null`, ""},
-		{"ui_settings_import", `{}`, `null`, ""},
 		{"player_close", `{}`, `null`, ""},
 		{"player_tracks", `{}`, "", `"aucune lecture ouverte"`},
 		{"emby_libraries", `{}`, "", `{"kind":"notSignedIn","message":"non connecté au serveur Emby"}`},
@@ -198,9 +197,6 @@ func Test_go_arguments_follow_tauri(t *testing.T) {
 		{"emby_set_favorite", `{"itemId":"i","favorite":null}`, "invalid args `favorite` for command `emby_set_favorite`"},
 		{"window_set_fullscreen", `{}`, `"command window_set_fullscreen missing required key fullscreen"`},
 		{"emby_play", `[]`, "invalid args for command `emby_play`: expected an object"},
-		{"ui_settings_export", `{}`, `"command ui_settings_export missing required key entries"`},
-		{"ui_settings_export", `{"entries":null}`, "invalid args `entries` for command `ui_settings_export`"},
-		{"ui_settings_export", `{"entries":{"a":1}}`, "invalid args `entries` for command `ui_settings_export`"},
 	}
 	for _, c := range cases {
 		_, err := invoke(t, b, c.cmd, c.args)
@@ -332,20 +328,36 @@ func Test_go_set_played_needs_a_session(t *testing.T) {
 	}
 }
 
-// ui_settings_export then ui_settings_import through the bridge, in the app config
-// folder (a refused export leaves the previous one).
-func TestUISettingsHandover(t *testing.T) {
-	a, b, _, _ := testApp(t, true)
-	if _, err := invoke(t, b, "ui_settings_export", `{"entries":{"viewer.player.volume":"7"}}`); err != "" {
-		t.Fatal(err)
+// app_is_debug is the build flag, and costs nothing.
+func Test_go_app_is_debug(t *testing.T) {
+	for _, debug := range []bool{true, false} {
+		_, b, _, _ := testApp(t, debug)
+		want := "false"
+		if debug {
+			want = "true"
+		}
+		if out, err := invoke(t, b, "app_is_debug", `{}`); out != want || err != "" {
+			t.Errorf("debug=%v : %s %s", debug, out, err)
+		}
 	}
-	if _, err := invoke(t, b, "ui_settings_export", `{"entries":{"token":"x"}}`); err != `"réglages refusés : clé non autorisée"` {
-		t.Fatal(err)
+}
+
+// window_set_icon refuses an id that is not an embedded logo, and a window that
+// does not exist yet; it never reaches WM_SETICON with either.
+func Test_go_window_set_icon_validates(t *testing.T) {
+	_, b, _, _ := testApp(t, true)
+	for _, id := range []string{"", "Debug", "../default", "default.png", "debug.png"} {
+		if _, err := invoke(t, b, "window_set_icon", `{"id":"`+id+`"}`); err != `"logo inconnu"` {
+			t.Errorf("%q : %s", id, err)
+		}
 	}
-	if _, err := os.Stat(filepath.Join(a.Paths().Config, "ui-settings.json")); err != nil {
-		t.Fatal(err)
+	// "debug" is an embedded logo (the hard hat), like a season.
+	for _, id := range []string{"christmas", "debug"} {
+		if _, err := invoke(t, b, "window_set_icon", `{"id":"`+id+`"}`); err != `"fenêtre indisponible"` {
+			t.Errorf("%s, fenêtre sans HWND : %s", id, err)
+		}
 	}
-	if out, err := invoke(t, b, "ui_settings_import", `{}`); out != `{"viewer.player.volume":"7"}` || err != "" {
-		t.Fatal(out, err)
+	if _, err := invoke(t, b, "window_set_icon", `{}`); err == "" {
+		t.Error("sans id")
 	}
 }

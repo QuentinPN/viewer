@@ -78,10 +78,10 @@ const showMemory = (m) =>
   `${m.privateMib} Mio privés dont ${m.appPrivateMib} pour l'exécutable (mpv compris), ensemble de travail ${m.workingSetMib} Mio, ${m.processes} processus`;
 
 const invoke = (page, command, args = {}) =>
-  page.evaluate(
-    ({ command, args }) => window.__TAURI_INTERNALS__.invoke(command, args),
-    { command, args },
-  );
+  page.evaluate(({ command, args }) => window.__viewer.invoke(command, args), {
+    command,
+    args,
+  });
 
 /** Clicks inside the page, so CDP is not timed, until the awaited state is painted. */
 const timedClick = (page, click, until) =>
@@ -205,7 +205,7 @@ const untilAdvancing = (page, click, seek, timeoutMs = 45000) =>
       const t0 = performance.now();
       if (click) document.querySelector(click).click();
       if (seek !== null)
-        window.__TAURI_INTERNALS__.invoke("player_command", {
+        window.__viewer.invoke("player_command", {
           command: { type: "seekAbsolute", seconds: seek },
         });
       let badgeMs = null;
@@ -214,7 +214,7 @@ const untilAdvancing = (page, click, seek, timeoutMs = 45000) =>
       while (performance.now() - t0 < timeoutMs) {
         if (badgeMs === null && badge())
           badgeMs = Math.round(performance.now() - t0);
-        last = await window.__TAURI_INTERNALS__
+        last = await window.__viewer
           .invoke("player_diagnostics")
           .catch(() => null);
         const pos = last?.timePos ?? null;
@@ -299,7 +299,7 @@ async function longSession(page, app, label) {
   if (seeks.length) check(`${label}_seeks`, true, list(seeks));
 
   await page.evaluate(() =>
-    window.__TAURI_INTERNALS__.invoke("player_command", {
+    window.__viewer.invoke("player_command", {
       command: { type: "seekAbsolute", seconds: 0 },
     }),
   );

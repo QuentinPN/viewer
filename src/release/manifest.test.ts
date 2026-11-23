@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { androidManifest, desktopManifest } from "./manifest";
 
 describe("desktopManifest", () => {
-  it("follows the Tauri updater format", () => {
+  it("carries what the Go updater checks", () => {
     const m = desktopManifest(
       "1.2.0",
       "- Mises à jour automatiques",
       "http://x/setup.exe",
-      { minisign: "c2ln\n", ed25519: "ZWQ=\n" },
+      "ZWQ=\n",
       new Date("2026-11-13T18:00:00Z"),
     );
     expect(m).toEqual({
@@ -16,7 +16,6 @@ describe("desktopManifest", () => {
       pub_date: "2026-11-13T18:00:00.000Z",
       platforms: {
         "windows-x86_64": {
-          signature: "c2ln",
           ed25519: "ZWQ=",
           url: "http://x/setup.exe",
         },

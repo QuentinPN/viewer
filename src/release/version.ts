@@ -1,21 +1,6 @@
 // Version and changelog readers of the CI publish scripts. The release
 // action writes versions and changelogs; these pure helpers read them back.
 
-/** The `[package]` version of a Cargo.toml (the first `version =` line). */
-export function cargoTomlVersion(toml: string): string | undefined {
-  return /^version = "([^"]+)"/m.exec(toml)?.[1];
-}
-
-/** The version of package `name` in a Cargo.lock. */
-export function cargoLockVersion(
-  lock: string,
-  name: string,
-): string | undefined {
-  return new RegExp(
-    `\\[\\[package\\]\\]\\r?\\nname = "${name}"\\r?\\nversion = "([^"]+)"`,
-  ).exec(lock)?.[1];
-}
-
 /** Body of the CHANGELOG.md section of `version`, without its heading; null when absent. */
 export function changelogSection(
   changelog: string,

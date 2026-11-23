@@ -21,11 +21,11 @@ export const INVOKE_METHOD = "viewer/internal/bridge.Bridge.Invoke";
 export const RESIZED_EVENT = "common:WindowDidResize";
 
 /**
- * The value `invoke` rejects with, the same as the Tauri backend: a Go
- * command error reaches JS as a `RuntimeError` whose `cause` is the error's
- * JSON (`{ kind, message }`, a bare string or null, see bridge.MarshalError).
- * Anything else (bad arguments, transport, a Go panic without cause) becomes
- * its message string, as Tauri rejects its own IPC failures with a string.
+ * The value `invoke` rejects with: a Go command error reaches JS as a
+ * `RuntimeError` whose `cause` is the error's JSON (`{ kind, message }`, a
+ * bare string or null, see bridge.MarshalError), and that value is what
+ * callers get. Anything else (bad arguments, transport, a Go panic without
+ * cause) becomes its message string.
  */
 export function toRejection(err: unknown): unknown {
   if (err instanceof Error) {
@@ -76,8 +76,8 @@ const loadRuntime = (): Promise<WailsRuntime> => {
   return runtime;
 };
 
-// Built on first use: nothing runs at module load, so the Tauri build drops
-// this whole module (see index.ts).
+// Built on first use: nothing runs at module load (unit tests import this
+// module without a Wails runtime).
 let native: Native | undefined;
 const get = (): Native => {
   native ??= createWailsNative(loadRuntime);

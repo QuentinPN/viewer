@@ -20,6 +20,8 @@ import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import io.github.quentinpn.viewer.tv.brand.LauncherIcon
+import io.github.quentinpn.viewer.tv.brand.isRedundantLauncherStart
 import io.github.quentinpn.viewer.tv.emby.BaseItemDto
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.EmbyError
@@ -77,12 +79,15 @@ import io.github.quentinpn.viewer.tv.ui.studioOptions
 import io.github.quentinpn.viewer.tv.ui.titleLibrary
 import io.github.quentinpn.viewer.tv.update.HomeUpdate
 import io.github.quentinpn.viewer.tv.update.Updater
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /** Launcher: the server shelf when no session is open, else the home shelves, a library grid or the search, the settings, the series and film pages. */
 class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
+        // Also on coming back to the front: a TV left running across midnight changes season
+        syncLauncherIcon(intent)
         // Back from « sources inconnues »: the install the user asked for goes on if allowed
         if (Updater.awaitingPermission) {
             Updater.awaitingPermission = false
@@ -90,8 +95,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** The launcher entry follows the date and the setting; off the main thread, the package manager is a binder call. */
+    private fun syncLauncherIcon(intent: Intent?) {
+        val season = intent?.getStringExtra(LauncherIcon.EXTRA_SEASON)
+        lifecycleScope.launch(Dispatchers.Default) { LauncherIcon.sync(this@MainActivity, season) }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // A tile of a new launcher alias (the season changed while the app lived) starts a second activity: resume the task instead
+        if (isRedundantLauncherStart(isTaskRoot, intent?.action, intent?.categories)) {
+            finish()
+            return
+        }
         val store = AppServices.store(this)
         val device = AppServices.device(this)
         val reporter = AppServices.reporter(this)

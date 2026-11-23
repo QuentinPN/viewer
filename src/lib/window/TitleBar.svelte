@@ -25,9 +25,8 @@ onMount(() => {
 
 <!-- Replaces the Windows title bar. The empty area drags the window and
      double-clicking it maximizes; the buttons keep Windows' order and glyphs.
-     data-tauri-drag-region is Tauri-specific: Wails reads the CSS
-     `--wails-draggable` instead (see .titlebar and button). -->
-<div class="titlebar" class:over-video={overVideo} data-tauri-drag-region>
+     Wails reads the CSS `--wails-draggable` (see .titlebar and button). -->
+<div class="titlebar" class:over-video={overVideo}>
   <div class="controls">
     <button
       type="button"

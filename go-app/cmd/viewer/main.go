@@ -1,6 +1,6 @@
 // Command viewer is the Go + Wails v3 build of Viewer, the
 // counterpart of src-tauri/src/lib.rs `run`. It serves the shared Svelte frontend,
-// built by `npm run build:wails` into frontend/dist, and answers its invoke calls
+// built by `npm run build` into frontend/dist, and answers its invoke calls
 // through internal/bridge.
 //
 // Window operations (minimize, maximize, close, resize events) run in the
@@ -40,7 +40,7 @@ func main() {
 		log.Fatal(err)
 	}
 	if _, err := fs.Stat(assets, "index.html"); err != nil {
-		log.Fatal("interface absente : lancer `npm run build:wails` avant `go build`")
+		log.Fatal("interface absente : lancer `npm run build` avant `go build`")
 	}
 
 	debug := app.DebugBuild()
@@ -193,10 +193,11 @@ func main() {
 // wailsWindow is the Window of window_set_fullscreen.
 type wailsWindow struct{ w *application.WebviewWindow }
 
-func (w wailsWindow) IsFullscreen() bool { return w.w.IsFullscreen() }
-func (w wailsWindow) IsMaximised() bool  { return w.w.IsMaximised() }
-func (w wailsWindow) Maximise()          { w.w.Maximise() }
-func (w wailsWindow) UnMaximise()        { w.w.UnMaximise() }
+func (w wailsWindow) IsFullscreen() bool    { return w.w.IsFullscreen() }
+func (w wailsWindow) IsMaximised() bool     { return w.w.IsMaximised() }
+func (w wailsWindow) Maximise()             { w.w.Maximise() }
+func (w wailsWindow) UnMaximise()           { w.w.UnMaximise() }
+func (w wailsWindow) NativeWindow() uintptr { return uintptr(w.w.NativeWindow()) }
 func (w wailsWindow) SetFullscreen(on bool) {
 	if on {
 		w.w.Fullscreen()

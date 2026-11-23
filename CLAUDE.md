@@ -10,11 +10,11 @@ At the start of every task, read `PRODUCT.md`, `DESIGN.md`, `DECISIONS.md`, and 
 
 ## Stack baseline (subject to feasibility gate)
 
-- Windows desktop: Tauri 2; frontend: Svelte 5 + TypeScript strict + Vite (no SSR).
-- Native integration: Rust; media engine: libmpv, isolated behind a `PlayerEngine` interface.
+- Windows desktop: Go + Wails v3 (`go-app/`, `CGO_ENABLED=0`); frontend: Svelte 5 + TypeScript strict + Vite (no SSR), embedded in the Go exe.
+- Native integration: Go; media engine: libmpv (loaded at run time, no cgo), isolated behind a `PlayerEngine` interface.
 - Local metadata/image cache: SQLite plus bounded on-disk image cache. Emby remains source of truth.
 - Frontend formatting/lint: Biome; Svelte type/diagnostics: svelte-check; TypeScript: tsc where applicable.
-- Rust: cargo fmt, cargo clippy, cargo test. Frontend: Vitest; integration/E2E tests when practical.
+- Go: gofmt, go vet, go test (`npm run verify:go`). Frontend: Vitest; integration/E2E tests when practical (CDP scenarios on the Go debug build).
 - Do not add a new backend, ORM, UI framework, state library, or plugin without explaining necessity.
 
 ## Non-negotiable engineering gates
@@ -43,7 +43,7 @@ At the start of every task, read `PRODUCT.md`, `DESIGN.md`, `DECISIONS.md`, and 
 - `PlaybackCoordinator`: selects source and tracks lifecycle; maps Emby decisions to player requests.
 - `PlayerEngine`: transport-neutral native playback abstraction and events.
 - `CacheRepository`: user/server-scoped disposable cache; never authoritative for watched state.
-- Tauri commands/events are typed, validated and minimal; no unrestricted shell access.
+- Wails bridge commands/events (`Bridge.Invoke`, `src/lib/native/`) are typed, validated and minimal; no unrestricted shell access.
 - Handle cancellation, retries with backoff, paging, race conditions, and offline states.
 
 ## UX requirements
@@ -64,7 +64,7 @@ Follow `TESTING.md`. Never deploy or package a release if core playback gates ar
 - Player/native video → `.claude/skills/media-playback/SKILL.md`
 - UI/UX → `.claude/skills/desktop-ui/SKILL.md`
 - Lint/test/build → `.claude/skills/quality-gates/SKILL.md`
-- Authentication/storage/Tauri permissions → `.claude/skills/security-review/SKILL.md`
+- Authentication/storage/Wails bridge → `.claude/skills/security-review/SKILL.md`
 
 ## Communication
 

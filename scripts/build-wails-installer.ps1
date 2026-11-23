@@ -5,13 +5,14 @@
   Packages go-app/bin/viewer.exe (from
   `npm run build:wails:exe`: CGO_ENABLED=0, -H=windowsgui) and vendor/mpv/libmpv-2.dll with
   go-app/build/windows/installer.nsi. The version comes from package.json.
-  makensis is looked up, never installed: -Makensis, $env:MAKENSIS, PATH, Tauri's cached
-  NSIS (%LOCALAPPDATA%\tauri\NSIS), then Program Files (x86)\NSIS.
+  makensis is looked up, never installed: -Makensis, $env:MAKENSIS, PATH, the NSIS cache
+  the former Tauri CLI left on this PC (%LOCALAPPDATA%\tauri\NSIS), then
+  Program Files (x86)\NSIS. The icon is go-app/build/windows/icon.ico.
 .PARAMETER Build
   Runs `npm run build:wails:exe` first (also done when the exe is missing).
 .PARAMETER ExePath
   The exe to package. Default: go-app/bin/viewer.exe. It must be named viewer.exe
-  once installed: the name is the one of the Tauri build.
+  once installed: the name the installed app (first shipped by the Tauri build) already has.
 .PARAMETER OutDir
   Where the setup exe goes. Default: go-app/bin.
 .EXAMPLE
@@ -31,7 +32,7 @@ if (-not $ExePath) { $ExePath = Join-Path $root 'go-app\bin\viewer.exe' }
 if (-not $LibmpvPath) { $LibmpvPath = Join-Path $root 'vendor\mpv\libmpv-2.dll' }
 if (-not $OutDir) { $OutDir = Join-Path $root 'go-app\bin' }
 $nsi = Join-Path $root 'go-app\build\windows\installer.nsi'
-$icon = Join-Path $root 'src-tauri\icons\icon.ico'
+$icon = Join-Path $root 'go-app\build\windows\icon.ico'
 
 $version = (Get-Content (Join-Path $root 'package.json') -Raw | ConvertFrom-Json).version
 if ($version -notmatch '^(\d+\.\d+\.\d+)') { throw "Version illisible dans package.json : $version" }
@@ -44,7 +45,7 @@ if ($Build -or -not (Test-Path $ExePath)) {
     if ($LASTEXITCODE -ne 0) { throw "npm run build:wails:exe a échoué ($LASTEXITCODE)" }
   } finally { Pop-Location }
 }
-foreach ($f in $ExePath, $LibmpvPath, $nsi) {
+foreach ($f in $ExePath, $LibmpvPath, $nsi, $icon) {
   if (-not (Test-Path $f)) { throw "Introuvable : $f (libmpv : scripts/fetch-libmpv.ps1)" }
 }
 
@@ -58,7 +59,7 @@ if (-not $Makensis) {
   $Makensis = $candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 }
 if (-not $Makensis) {
-  throw 'makensis introuvable. Il vient avec npx tauri build (cache %LOCALAPPDATA%\tauri\NSIS) ou NSIS 3.x.'
+  throw 'makensis introuvable : installer NSIS 3.x ou passer -Makensis / $env:MAKENSIS.'
 }
 
 New-Item -ItemType Directory -Force $OutDir | Out-Null

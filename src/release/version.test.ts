@@ -2,28 +2,17 @@ import { describe, expect, it } from "vitest";
 import androidGradle from "../../android-tv/app/build.gradle.kts?raw";
 import pkg from "../../package.json";
 import lock from "../../package-lock.json";
-import cargoLock from "../../src-tauri/Cargo.lock?raw";
-import cargoToml from "../../src-tauri/Cargo.toml?raw";
-import tauriConf from "../../src-tauri/tauri.conf.json";
 import {
   androidReleaseNotes,
-  cargoLockVersion,
-  cargoTomlVersion,
   changelogSection,
   gradleVersion,
   releaseNotes,
 } from "./version";
 
 describe("the version of the repository", () => {
-  it("is the same in npm and Cargo files", () => {
-    expect(cargoTomlVersion(cargoToml)).toBe(pkg.version);
-    expect(cargoLockVersion(cargoLock, "viewer")).toBe(pkg.version);
+  it("is the same in package.json and package-lock.json", () => {
     expect(lock.version).toBe(pkg.version);
     expect(lock.packages[""].version).toBe(pkg.version);
-  });
-
-  it("is read by Tauri from package.json", () => {
-    expect(tauriConf.version).toBe("../package.json");
   });
 });
 

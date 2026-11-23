@@ -262,7 +262,7 @@ onMount(() => {
     .logo {
       margin-bottom: var(--space-2);
     }
-    .logo :global(svg) {
+    .logo :global(img) {
       width: 48px;
       height: 48px;
     }

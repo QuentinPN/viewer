@@ -33,7 +33,7 @@ const text = (s) => (s ?? "").replace(/\s+/g, " ").trim();
 const call = async (page, cmd, args) => {
   const r = await page.evaluate(
     ([c, a]) =>
-      window.__TAURI_INTERNALS__
+      window.__viewer
         .invoke(c, a)
         .then((value) => ({ value }))
         .catch((e) => ({ error: JSON.stringify(e) })),
@@ -250,9 +250,7 @@ try {
             "section[aria-labelledby=settings-updates] [role=status]",
           );
           return (
-            s &&
-            s.textContent.trim() &&
-            !/Recherche en cours/.test(s.textContent)
+            s?.textContent.trim() && !/Recherche en cours/.test(s.textContent)
           );
         },
         null,

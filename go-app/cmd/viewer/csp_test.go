@@ -1,12 +1,9 @@
 package main
 
 import (
-	"encoding/json"
 	"maps"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -34,26 +31,19 @@ func cspDirectives(policy string) map[string]string {
 	return out
 }
 
-// The Wails CSP is tauri.conf.json's with only the two documented changes: 'self'
-// in connect-src, and artwork from 'self' instead of the Tauri protocol hosts.
-func Test_go_csp_is_tauris_with_artwork_from_self(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "src-tauri", "tauri.conf.json"))
-	if err != nil {
-		t.Fatal(err)
+// The CSP, directive by directive: tauri.conf.json's (removed with src-tauri/)
+// with 'self' in connect-src and artwork from 'self' instead of the Tauri
+// protocol hosts.
+func Test_go_csp_directives(t *testing.T) {
+	want := map[string]string{
+		"default-src": "'self'",
+		"img-src":     "'self' data: blob:",
+		"style-src":   "'self' 'unsafe-inline'",
+		"connect-src": "'self' ipc: http://ipc.localhost",
+		"object-src":  "'none'",
+		"base-uri":    "'none'",
+		"form-action": "'none'",
 	}
-	var conf struct {
-		App struct {
-			Security struct {
-				CSP string `json:"csp"`
-			} `json:"security"`
-		} `json:"app"`
-	}
-	if err := json.Unmarshal(raw, &conf); err != nil || conf.App.Security.CSP == "" {
-		t.Fatal("CSP introuvable dans tauri.conf.json", err)
-	}
-	want := cspDirectives(conf.App.Security.CSP)
-	want["connect-src"] = "'self' " + want["connect-src"]
-	want["img-src"] = "'self' data: blob:"
 	if got := cspDirectives(contentSecurityPolicy); !maps.Equal(got, want) {
 		t.Fatalf("CSP Wails %v\nattendu %v", got, want)
 	}

@@ -4,7 +4,7 @@ Ce fichier dit comment vérifier le code, ce qui ne s'automatise pas, ce qui a r
 
 ## Commandes
 
-Deux piles coexistent. `npm run verify` et le harnais E2E `run.ps1` visent encore Tauri/Rust (`src-tauri`). La porte Go (`go-app`) se lance à la main, avec un seul scénario E2E : `wails-smoke.mjs`.
+`npm run verify` couvre le frontend et la partie native Go (`go-app`). Le harnais E2E (`scripts/e2e/`) pilote le build debug Go.
 
 ### Frontend (racine)
 
@@ -13,29 +13,15 @@ Deux piles coexistent. `npm run verify` et le harnais E2E `run.ps1` visent encor
 | `npm run lint` | `biome check .` (`npm run lint:fix` corrige) |
 | `npm run check` | `svelte-check` avec `--fail-on-warnings` |
 | `npm run test` | `vitest run` (`npm run test:watch` en continu) |
-| `npm run build` | `vite build` (produit `dist/`) |
+| `npm run build` | `vite build` (produit `go-app/cmd/viewer/frontend/dist`, embarqué par l'exe Go) |
 | `npm run verify:web` | lint, check, test, build |
-| `npm run verify` | `verify:web` puis `verify:rust` |
+| `npm run verify` | `verify:web` puis `verify:go` |
 
-La CI (`.github/workflows/ci.yml`) lance `npx biome ci .`, `npm run check`, `npm run test`, `npm run build`, puis un job Rust avec `VIEWER_REQUIRE_LIBMPV=1`. Les releases passent par `.gitea/workflows/release.yml`.
-
-### Rust (Tauri)
-
-`npm run verify:rust` enchaîne trois commandes, à lancer à la main si besoin :
-
-```
-cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path src-tauri/Cargo.toml
-```
-
-- Sur un checkout propre, lancer d'abord `npm run build` (Tauri attend `dist/`) et `scripts/fetch-libmpv.ps1` (libmpv).
-- Erreur de lien `LNK1104 msvcrt.lib` : préfixer la commande par `scripts/with-msvc.ps1`.
-- Sous PowerShell, passer le séparateur entre guillemets : `'--'`.
-- Tests réels contre le serveur Emby, ignorés par défaut, un par un : `./scripts/with-test-account.ps1 ./scripts/with-msvc.ps1 cargo test --manifest-path src-tauri/Cargo.toml real_server_search '--' --ignored --nocapture`. Le préfixe prend `VIEWER_EMBY_URL`, `VIEWER_EMBY_USER`, `VIEWER_EMBY_PASSWORD` dans le Gestionnaire d'identifiants. Autres noms : `cargo test ... '--' --ignored --list` ; `real_server_playback_reporting_and_resume`, `real_server_home_rows`, `real_server_next_up` et `real_server_transcoding` écrivent sur le compte de test.
-- Avant une release : `cargo audit` depuis `src-tauri`.
+La CI (`.github/workflows/ci.yml`) lance `npx biome ci .`, `npm run check`, `npm run test`, `npm run build`, puis un job Go sous Windows (`gofmt -l`, `go vet ./...`, `go test ./...`, `CGO_ENABLED=0`, Go de `go-app/go.mod`), avec la libmpv épinglée (`VIEWER_MPV_DLL`, `VIEWER_REQUIRE_LIBMPV=1` : les tests moteur échouent au lieu de sauter). Ce job n'a pas encore tourné. Les releases passent par `.gitea/workflows/release.yml`.
 
 ### Go (Wails v3), depuis `go-app/`
+
+`npm run verify:go` (`scripts/verify-go.ts`) lance `gofmt -l`, `go vet` et `go test` en `CGO_ENABLED=0`, comme `publish.ts`. À la main :
 
 ```
 gofmt -l .                  # ne doit rien afficher
@@ -45,14 +31,13 @@ go test ./...
 CGO_ENABLED=0 go build ./...   # PowerShell : $env:CGO_ENABLED='0'; go build ./...
 ```
 
-Le frontend Wails se construit avec `npm run build:wails`, l'exécutable avec `npm run build:wails:exe` (`go-app/bin/viewer.exe`) : `scripts/build-wails-exe.ts` porte les seuls drapeaux de release (`-H=windowsgui`, `buildMode=release`, version de package.json, `updater.PublicKey` lu dans `go-app/build/updater-ed25519.pub`) et vérifie que l'exe contient la clé.
+Les tests réels contre le serveur Emby de l'ancienne app Rust ne sont pas portés : `internal/emby/session_real_server_test.go` garde leurs noms en `t.Skip`.
+
+Le frontend se construit avec `npm run build`, l'exécutable avec `npm run build:wails:exe` (`go-app/bin/viewer.exe`) : `scripts/build-wails-exe.ts` porte les seuls drapeaux de release (`-H=windowsgui`, `buildMode=release`, version de package.json, `updater.PublicKey` lu dans `go-app/build/updater-ed25519.pub`) et vérifie que l'exe contient la clé.
 
 ### Release desktop (`scripts/publish.ts`)
 
-`node scripts/publish.ts --dry-run` fait tout sauf publier : libmpv, `verify:web`, portes Go (`gofmt -l` vide, `go vet`, `go test`, en `CGO_ENABLED=0` ; staticcheck absent), `scripts/build-wails-installer.ps1 -Build` (frontend Wails, exe, NSIS), puis deux signatures de l'installateur :
-
-- minisign avec la clé Tauri (`~/.viewer/updater.key`, `tauri signer sign --app-version`), relue par `scripts/minisign.ts` contre la `pubkey` de `tauri.conf.json` et le `version:` du commentaire de confiance ;
-- ed25519 sur `SignedMessage` (`src/release/signature.ts`) avec `~/.viewer/updater-ed25519.key`, dont la clé publique doit être celle de `go-app/build/updater-ed25519.pub`.
+`node scripts/publish.ts --dry-run` fait tout sauf publier : libmpv, `verify:web`, portes Go (`gofmt -l` vide, `go vet`, `go test`, en `CGO_ENABLED=0` ; staticcheck absent), `scripts/build-wails-installer.ps1 -Build` (frontend, exe, NSIS, icône `go-app/build/windows/icon.ico`), puis la signature ed25519 de l'installateur sur `SignedMessage` (`src/release/signature.ts`) avec `~/.viewer/updater-ed25519.key`, dont la clé publique doit être celle de `go-app/build/updater-ed25519.pub`. Le manifeste ne porte plus que `ed25519` et `url` : la signature minisign de l'updater Tauri a été retirée avec l'app Tauri.
 
 Il écrit `go-app/bin/latest.json` (url `file://`). Vérification par le code Go de l'app (`parseManifest` puis `Verify`) :
 
@@ -64,23 +49,36 @@ go test ./internal/updater -run Test_go_release_manifest_verifies -v -count=1
 
 Les vecteurs `go-app/internal/updater/testdata/signature-vectors.json` sont lus par le test Go et par `src/release/signature.test.ts` : les deux côtés doivent produire le même message et la même signature.
 
+Les vecteurs `contracts/seasons/vectors.json` (logo saisonnier) sont lus par `src/lib/brand/season.test.ts` et par `SeasonTest` côté Android (chemin relatif `../../contracts/seasons`, pas de copie à synchroniser).
+
+Le logo saisonnier du bureau : `src/lib/brand/logo.test.ts` (réglage, minuit, minuteur, build de débogage toujours au casque de chantier) et `go-app/internal/brand` (ids ; sous Windows, `WM_GETICON` d'une fenêtre cachée avant et après un changement de logo). À la main sur l'exe de débogage (fenêtre hors écran, `VIEWER_E2E_OFFSCREEN`) : `WM_GETICON` grande et petite icône non nulles au démarrage, différentes avec la date forcée au 25 décembre, identiques à celles du départ une fois le réglage coupé. Non vérifié : le bouton épinglé de la barre des tâches (il garde l'icône de l'exe), le rendu de la barre de titre à 125 et 150 %.
+
 ### Android TV, depuis `android-tv/`
 
 `./gradlew testDebugUnitTest assembleDebug` (commande enregistrée le 2026-11-09, AGP 9.5.1, Gradle 9.9.0, SDK 37, minSdk 28). Libmpv Android : `scripts/fetch-libmpv-android.ps1`.
 
+Icône saisonnière du lanceur : la logique pure est testée par `LauncherIconTest` (saison voulue selon réglage, build et date ; ordre activer puis désactiver ; aucun changement quand tout est déjà juste) et `LauncherManifestTest` (un alias par saison, bonnes images, seul `default` activé, `MainActivity` sans filtre de lanceur). Le build debug fige l'alias `default` (casque de chantier), donc le changement par date et le réglage ne se voient que par test unitaire ; pour voir une saison sur la Shield, avec l'app debug installée :
+
+```
+adb shell am start -n io.github.quentinpn.viewer.tv.debug/io.github.quentinpn.viewer.tv.MainActivity --es season christmas
+```
+
+`season` est un identifiant de `Season` (`halloween`, `april-fools`, `new-year`…) ; ignoré en release. Un lancement sans l'extra (tuile du lanceur, `am start` nu) remet l'alias `default`. La bannière du lanceur se met à jour après quelques secondes ; vérifier aussi que l'app n'est pas tuée (`adb shell pidof io.github.quentinpn.viewer.tv.debug` avant et après), qu'il n'y a qu'une tuile et que `am start -n …/io.github.quentinpn.viewer.tv.MainActivity` marche toujours. Vérifié le 2026-11-22 sur la Shield (alias `christmas` puis `halloween` : bannière changée en quelques secondes, même pid, une seule tuile à la même place). Limite : si l'app tourne encore quand l'alias change, la tuile suivante en empile une deuxième instance de `MainActivity` dans la même tâche (Retour revient à l'ancienne).
+
 ### E2E (CDP, `scripts/e2e/`)
 
-`./scripts/e2e/run.ps1 <scénario>` lance `scripts/e2e/<scénario>.mjs` avec le compte de test. Prérequis : `cargo build --manifest-path src-tauri/Cargo.toml` et `npm run dev` ; la fenêtre s'ouvre hors écran. Le harnais pilote `src-tauri/target/debug/viewer.exe`.
+`./scripts/e2e/run.ps1 <scénario> [-Build]` lance `scripts/e2e/<scénario>.mjs` avec le compte de test. Le harnais (`app.mjs`) pilote le build debug Go `go-app/bin/viewer-debug.exe` (`-Build`, ou `node scripts/e2e/app.mjs --build` : `npm run build` puis `go build` debug, frontend embarqué). La fenêtre s'ouvre hors écran (`VIEWER_E2E_OFFSCREEN`) ; DevTools par `VIEWER_E2E_BROWSER_ARGS`, car Wails efface `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`. Les scénarios appellent les commandes par `window.__viewer.invoke` (pont Wails, installé par `app.mjs`) ; aucune entrée clavier ou souris de l'OS, captures par CDP ou PrintWindow de la seule fenêtre de l'app.
 
-- Il attaque le vrai serveur Emby ; `gate3-upnext` marque un épisode vu puis non vu.
+- Il attaque le vrai serveur Emby ; `gate3-upnext` et `gate4-watched` marquent un élément vu, puis non vu par `emby_set_played` avant la déconnexion.
+- Les scénarios gate n'ont pas été relancés depuis le passage au build Go : non vérifiés. `gate5-release` ne peut pas s'attacher à une release Go (elle ignore `VIEWER_E2E_BROWSER_ARGS`, aucun port DevTools).
 - Il ne voit ni l'image vidéo ni le son.
 - Scénarios flaky : `gate2-transcode` et `gate2-resume` ont chacun échoué une fois au premier passage, puis réussi.
-- Scénarios : `ls scripts/e2e/*.mjs` (gate2 à gate7, `measure-*`, `requests-ui`, hors fichiers de support `app`, `scenario`, `net-proxy`, `dev-styles`).
+- Scénarios : `ls scripts/e2e/*.mjs` (gate2 à gate7, `measure-*`, `requests-ui`, hors fichiers de support `app`, `scenario`, `net-proxy`).
 - Version Go : `node scripts/e2e/wails-smoke.mjs [--build] [--offline]` pilote le build **debug** Wails avec le compte de `debug.env`. Il écrit puis efface une position sur le compte de test. Il couvre la connexion, les illustrations `/emby-img/` et `/requestimg/`, la lecture (`player://event`, hwdec, pistes), une capture PrintWindow de la seule fenêtre de l'app, Espace et → envoyés par CDP, le point de reprise, Demander en lecture seule, la fermeture pendant la lecture et la déconnexion. Wails efface `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` : en debug seulement, `VIEWER_E2E_BROWSER_ARGS` le remplace. Dernier passage le 2026-11-22 : 33/33 sur le vrai serveur.
 
 ### Bancs de lecture (`scripts/spike/`)
 
-`run-gate1.ps1` et `close-probe.ps1` (Tauri), `run-gate1-go.ps1` (Go/Wails, à lancer avec `pwsh`), `run-gate-tv1.ps1` (Shield), `serve-file.mjs` (fichier local en HTTP), `emby-remote-control-probe.mjs` (relais de commandes Emby).
+`run-gate1-go.ps1` (Go/Wails, à lancer avec `pwsh`), `run-gate-tv1.ps1` (Shield), `serve-file.mjs` (fichier local en HTTP), `emby-remote-control-probe.mjs` (relais de commandes Emby).
 
 ## Ce qu'il faut tester à la main
 
@@ -160,8 +158,8 @@ La dérive de la ligne du 2026-11-14 est l'estimation de la TV elle-même (`time
 - Coupures réseau : seul le relais local a servi, jamais de vrai débranchement.
 - Le premier transcodage d'un film peut prendre environ 1 min (extraction des sous-titres). Un film sur un partage NAS périmé donnait un transcodage qui ne s'ouvrait jamais, corrigé depuis par un délai d'ouverture. Après une longue coupure HLS, la reprise revient à la position de la coupure.
 - Prévisualisation de seek non testée (miniatures Emby désactivées). Le relais Emby répond 204 pour une session disparue, et `/Command/SendString` perd `Arguments` dans le corps.
-- E2E : Tauri uniquement, sans image ni son, scénarios parfois instables.
+- E2E : sans image ni son, scénarios parfois instables ; seul `wails-smoke` a tourné sur le build Go.
 - Licence : la build libmpv est GPL v3 (x264/x265, rubberband), déduite de la recette et confirmée seulement en partie par les chaînes des DLL ; usage personnel uniquement, ce n'est pas un avis juridique.
-- `staticcheck` absent du poste ; la porte Go n'est pas dans `npm run verify`.
+- `staticcheck` absent du poste.
 
 Les nouvelles preuves (captures, journaux) vont dans la description de la PR ou un dossier temporaire, pas dans le dépôt ; ne consigner ici que le résultat, en une ligne de tableau.

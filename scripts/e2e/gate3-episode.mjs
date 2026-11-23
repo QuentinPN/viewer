@@ -33,7 +33,7 @@ const { check, shot, finish } = createReport("gate3-episode");
 const invoke = (page, cmd, args) =>
   page.evaluate(
     ([c, a]) =>
-      window.__TAURI_INTERNALS__
+      window.__viewer
         .invoke(c, a)
         .then((value) => ({ value }))
         .catch((e) => ({ error: JSON.stringify(e) })),
@@ -63,7 +63,7 @@ const pressedSeason = (page) =>
     .evaluate((b) => b.firstChild.textContent.trim());
 const command = (page, cmd) =>
   page.evaluate(
-    (c) => window.__TAURI_INTERNALS__.invoke("player_command", { command: c }),
+    (c) => window.__viewer.invoke("player_command", { command: c }),
     cmd,
   );
 
