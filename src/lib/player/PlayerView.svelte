@@ -1826,14 +1826,10 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     outline: none;
   }
   .choice {
-    display: flex;
-    align-items: center;
     gap: var(--space-3);
     min-height: 40px;
     padding: 0 10px;
-    border-radius: var(--radius-sm);
     font-size: 15px;
-    cursor: pointer;
   }
   .choice:hover {
     background: rgb(255 255 255 / 8%);
@@ -1895,10 +1891,6 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   }
   fieldset + fieldset {
     margin-top: var(--space-3);
-  }
-  .choice input {
-    accent-color: var(--color-accent);
-    margin: 0;
   }
   dl {
     display: grid;

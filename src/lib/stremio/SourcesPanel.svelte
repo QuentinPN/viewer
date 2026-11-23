@@ -248,13 +248,9 @@ onDestroy(() => {
     color: var(--color-text-muted);
   }
   .choice {
-    display: flex;
-    align-items: center;
     gap: var(--space-3);
     min-height: 40px;
     padding: 0 var(--space-3);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
   }
   .choice:hover {
     background: rgb(255 255 255 / 0.06);
@@ -262,10 +258,6 @@ onDestroy(() => {
   .choice:has(input:focus-visible) {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
-  }
-  .choice input {
-    accent-color: var(--color-accent);
-    margin: 0;
   }
   .addon {
     display: grid;

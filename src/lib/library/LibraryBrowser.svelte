@@ -2126,20 +2126,12 @@ $effect(() => {
     color: var(--color-text-muted);
   }
   .choice {
-    display: flex;
-    align-items: center;
     gap: var(--space-2);
     padding: 6px var(--space-2);
-    border-radius: var(--radius-sm);
     font-size: 14px;
-    cursor: pointer;
   }
   .choice:hover {
     background: rgb(255 255 255 / 0.1);
-  }
-  .choice input {
-    accent-color: var(--color-accent);
-    margin: 0;
   }
   .choice input:focus-visible {
     outline: 2px solid var(--color-accent);
