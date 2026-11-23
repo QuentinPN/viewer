@@ -12,8 +12,8 @@ android {
         applicationId = "io.github.quentinpn.viewer.tv"
         minSdk = 28
         targetSdk = 37
-        versionCode = 10
-        versionName = "1.5.0"
+        versionCode = 11
+        versionName = "1.6.0"
         // Only arm64-v8a libmpv is fetched
         ndk { abiFilters += "arm64-v8a" }
     }
