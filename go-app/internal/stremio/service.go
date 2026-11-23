@@ -56,16 +56,25 @@ type Service struct {
 	fetch sync.Mutex
 
 	mu sync.Mutex
+	// st, and the collection inside it, are behind pointers: fmt cannot call
+	// Addon.Format on an unexported field, so a Service printed by value would show
+	// each addon's base; a pointer prints as an address (under a bad verb such as
+	// %s, fmt expands one level only).
+	st *cacheState
+}
+
+// cacheState is what the Service remembers in memory.
+type cacheState struct {
 	// gen changes on each sign-in and sign-out: an answer fetched for an older
 	// generation is dropped.
 	gen      uint64
-	addons   []Addon // nil: not fetched
+	addons   *[]Addon // nil: not fetched
 	rejected bool
 }
 
 // NewService builds the service over the vault and the client.
 func NewService(store emby.CredentialStore, client *Client) *Service {
-	return &Service{store: store, client: client}
+	return &Service{store: store, client: client, st: &cacheState{}}
 }
 
 func (s *Service) String() string             { return redact.Masked("StremioService") }
@@ -76,9 +85,9 @@ func (s *Service) Format(f fmt.State, _ rune) { redact.WriteMasked(f, "StremioSe
 func (s *Service) reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.gen++
-	s.addons = nil
-	s.rejected = false
+	s.st.gen++
+	s.st.addons = nil
+	s.st.rejected = false
 }
 
 // collection is the account's addons: from memory, or fetched with the stored key.
@@ -90,7 +99,7 @@ func (s *Service) collection(ctx context.Context) ([]Addon, error) {
 	defer s.fetch.Unlock()
 	for {
 		s.mu.Lock()
-		gen, cached, rejected := s.gen, s.addons, s.rejected
+		gen, cached, rejected := s.st.gen, s.st.addons, s.st.rejected
 		s.mu.Unlock()
 		tok, err := s.store.Load(Account)
 		if err != nil {
@@ -103,20 +112,20 @@ func (s *Service) collection(ctx context.Context) ([]Addon, error) {
 			return nil, ErrReauthRequired
 		}
 		if cached != nil {
-			return cached, nil
+			return *cached, nil
 		}
 		addons, err := s.client.Addons(ctx, NewAuthKey(tok.Expose()))
 		s.mu.Lock()
-		if s.gen != gen {
+		if s.st.gen != gen {
 			// Signed in or out meanwhile: this answer belongs to another key.
 			s.mu.Unlock()
 			continue
 		}
 		switch {
 		case err == nil:
-			s.addons = addons
+			s.st.addons = &addons
 		case kindOf(err) == KindRejected:
-			s.rejected = true
+			s.st.rejected = true
 			err = ErrReauthRequired
 		}
 		s.mu.Unlock()

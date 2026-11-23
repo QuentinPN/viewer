@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -224,6 +225,13 @@ func TestServiceNeverPrintsSecrets(t *testing.T) {
 		assertNoSecret(t, "service", out, f.URL)
 		if !strings.Contains(out, "StremioService(***)") {
 			t.Errorf("%s : %s", verb, out)
+		}
+		// By value, fmt cannot call Addon.Format on the cached collection: no addon
+		// base may show. (Under a bad verb fmt shows what the test's memory vault
+		// holds and the API base, neither an addon secret.)
+		byValue := fmt.Sprintf(verb, reflect.ValueOf(svc).Elem().Interface())
+		if strings.Contains(byValue, "/addon-") || strings.Contains(byValue, "Comet") {
+			t.Errorf("service par valeur %s : %s", verb, byValue)
 		}
 	}
 }
