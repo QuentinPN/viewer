@@ -23,6 +23,7 @@ import (
 	"viewer/internal/libraryevents"
 	"viewer/internal/player"
 	"viewer/internal/segments"
+	"viewer/internal/stremio"
 	"viewer/internal/updater"
 	"viewer/internal/request"
 )
@@ -171,7 +172,7 @@ type Options struct {
 	Debug   bool
 	Version string
 	Paths   Paths
-	// Store holds the Emby and Request tokens.
+	// Store holds the Emby, Request and Stremio tokens.
 	Store emby.CredentialStore
 	// Libmpv is the DLL path (ResolveLibmpv).
 	Libmpv string
@@ -194,6 +195,7 @@ type App struct {
 
 	Emby        *emby.EmbyService
 	Request *request.Service
+	Stremio     *stremio.Service
 	Segments    *segments.Service
 	// Artwork is nil when the app has no cache folder.
 	Artwork  *artworkcache.Cache
@@ -261,6 +263,7 @@ func New(opts Options) (*App, error) {
 	a.Emby = svc
 	a.Request = request.NewService(opts.Store, filepath.Join(opts.Paths.Config, "request.json"), device, opts.Version).
 		WithArtworkCache(a.Artwork)
+	a.Stremio = stremio.NewService(opts.Store, stremio.NewClient(stremio.APIBase, opts.Version))
 	a.Segments = segments.NewService(opts.Version)
 	a.Reporter = emby.NewReporter(svc, opts.Emit)
 	a.Sync = devsync.NewService(ctx, devsync.ServiceConfig{
