@@ -24,9 +24,12 @@ export const stremioApi = {
     invoke<StremioSources>("stremio_sources", target),
   addonStreams: (query: string, addonId: string) =>
     invoke<AddonStreams>("stremio_addon_streams", { query, addonId }),
-  /** Loads the stream in the player, with no Emby report. */
-  play: (streamId: string) =>
-    invoke<PlaybackStart>("stremio_play", { streamId }),
+  /**
+   * Loads the stream in the player, with no Emby report. `resume` starts at
+   * the position Go saved for the title instead of at the beginning.
+   */
+  play: (streamId: string, resume = false) =>
+    invoke<PlaybackStart>("stremio_play", { streamId, resume }),
 };
 
 /** The `{ kind, message }` of a failed command; Go's French text is kept as is. */

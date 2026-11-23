@@ -44,6 +44,12 @@ export interface ExternalTarget {
 /** What `stremio_sources` lists the streams of: an Emby item or an outside title. */
 export type SourcesTarget = { itemId: string } | { external: ExternalTarget };
 
+/** Where this title was left off, kept by Go per content (IMDb and S/E). */
+export interface ResumePosition {
+  positionSeconds: number;
+  durationSeconds: number;
+}
+
 /** Answer of `stremio_sources`: the query the streams are asked under. */
 export interface StremioSources {
   /**
@@ -54,6 +60,8 @@ export interface StremioSources {
   query: string;
   /** Go may send `null` for an empty list. */
   addons: SourceAddon[] | null;
+  /** The saved position for this title, whichever stream it was played from. */
+  resume: ResumePosition | null;
 }
 
 /** A playable stream: an opaque id, never its URL or headers. */

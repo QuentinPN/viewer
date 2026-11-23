@@ -2,9 +2,11 @@
 // French labels. Pure, so the panel only shows what these return.
 import { formatSize } from "../detail/format";
 import type { DetailKind, PlaybackStart } from "../emby/types";
+import { formatTime } from "../player/format";
 import { stremioUsable } from "./status";
 import type {
   AddonStreams,
+  ResumePosition,
   StreamDescriptor,
   StremioSources,
   StremioState,
@@ -175,4 +177,23 @@ const FINAL = new Set(["signedOut", "reauthRequired", "noImdb", "invalidId"]);
 /** Whether « Réessayer » can change the outcome of this error. */
 export function canRetry(kind: string): boolean {
   return !FINAL.has(kind);
+}
+
+/** Past this share of the runtime, the title counts as watched: no resume. */
+const RESUME_LIMIT = 0.95;
+
+/** The second choice of the resume group. */
+export const RESTART_LABEL = "Depuis le début";
+
+/** « Reprendre à 42:10 » over the list, or none when there is nothing to resume. */
+export function resumeLabel(resume: ResumePosition | null | undefined) {
+  if (
+    !resume ||
+    !Number.isFinite(resume.positionSeconds) ||
+    !Number.isFinite(resume.durationSeconds) ||
+    resume.positionSeconds <= 0 ||
+    resume.positionSeconds >= resume.durationSeconds * RESUME_LIMIT
+  )
+    return null;
+  return `Reprendre à ${formatTime(resume.positionSeconds)}`;
 }

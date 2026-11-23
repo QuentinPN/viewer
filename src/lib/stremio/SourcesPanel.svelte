@@ -11,6 +11,8 @@ import {
   addonFailed,
   canRetry,
   outcomeNotes,
+  RESTART_LABEL,
+  resumeLabel,
   type SourcesState,
   searchNote,
   shownAddons,
@@ -41,6 +43,10 @@ let sources = $state<SourcesState | null>(null);
 let error = $state<StremioError | null>(null);
 /** The last failed play, over the list. */
 let playError = $state<string | null>(null);
+/** Where the title was left off, as « Reprendre à … »; null: no choice. */
+let resumeText = $state<string | null>(null);
+/** The choice made: start over instead of resuming. */
+let fromStart = $state(false);
 /** Id of the stream being opened: the other buttons wait. */
 let starting = $state<string | null>(null);
 /** Closed: late answers are dropped. */
@@ -58,10 +64,13 @@ async function load() {
   sources = null;
   error = null;
   playError = null;
+  resumeText = null;
+  fromStart = false;
   try {
     const found = await stremioApi.sources(target);
     if (closed || mine !== run) return;
     sources = startSources(found);
+    resumeText = resumeLabel(found.resume);
     for (const addon of sources.addons) void ask(found.query, addon.id);
   } catch (e) {
     if (!closed && mine === run) error = toStremioError(e);
@@ -90,7 +99,10 @@ async function play(stream: StreamDescriptor) {
   starting = stream.id;
   playError = null;
   try {
-    const start = await stremioApi.play(stream.id);
+    const start = await stremioApi.play(
+      stream.id,
+      resumeText !== null && !fromStart,
+    );
     // Loaded already: closing meanwhile must not leave it playing unseen.
     onPlay(start);
   } catch (e) {
@@ -146,6 +158,19 @@ onDestroy(() => {
     {:else if sources.addons.length === 0}
       <p class="muted">Aucun addon Stremio ne propose ce type de titre.</p>
     {:else}
+      {#if resumeText}
+        <fieldset class="resume">
+          <legend>Lecture</legend>
+          <label class="choice">
+            <input type="radio" name="resume" checked={!fromStart} onchange={() => (fromStart = false)} />
+            <span>{resumeText}</span>
+          </label>
+          <label class="choice">
+            <input type="radio" name="resume" checked={fromStart} onchange={() => (fromStart = true)} />
+            <span>{RESTART_LABEL}</span>
+          </label>
+        </fieldset>
+      {/if}
       {#each shownAddons(sources) as addon (addon.id)}
         {@const addonState = addon.state}
         <section class="addon" aria-labelledby="addon-{addon.id}">
@@ -208,6 +233,39 @@ onDestroy(() => {
     display: grid;
     align-content: start;
     gap: var(--space-4);
+  }
+  .resume {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 2px;
+  }
+  legend {
+    padding: 0 var(--space-3) var(--space-2);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+  .choice {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 40px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+  .choice:hover {
+    background: rgb(255 255 255 / 0.06);
+  }
+  .choice:has(input:focus-visible) {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  .choice input {
+    accent-color: var(--color-accent);
+    margin: 0;
   }
   .addon {
     display: grid;

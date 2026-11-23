@@ -6,6 +6,8 @@ import {
   isStremio,
   offersSources,
   outcomeNotes,
+  RESTART_LABEL,
+  resumeLabel,
   searchNote,
   shownAddons,
   startSources,
@@ -20,6 +22,7 @@ const sources = {
     { id: "a1", name: "Comet" },
     { id: "a2", name: "Lumio" },
   ],
+  resume: null,
 };
 
 const stream = {
@@ -42,7 +45,8 @@ describe("startSources", () => {
 
   it("takes a null list from Go as no addon", () => {
     expect(
-      startSources({ key: "item1", query: "q1", addons: null }).addons,
+      startSources({ key: "item1", query: "q1", addons: null, resume: null })
+        .addons,
     ).toEqual([]);
   });
 });
@@ -162,7 +166,9 @@ describe("outcomeNotes", () => {
 
   it("says nothing without addon", () => {
     expect(
-      outcomeNotes(startSources({ key: "item1", query: "q1", addons: [] })),
+      outcomeNotes(
+        startSources({ key: "item1", query: "q1", addons: [], resume: null }),
+      ),
     ).toEqual([]);
   });
 });
@@ -234,5 +240,53 @@ describe("canRetry", () => {
     for (const kind of ["signedOut", "reauthRequired", "noImdb", "invalidId"])
       expect(canRetry(kind)).toBe(false);
     expect(canRetry("unreachable")).toBe(true);
+  });
+});
+
+describe("resumeLabel", () => {
+  it("offers to resume at the saved position", () => {
+    expect(resumeLabel({ positionSeconds: 2530, durationSeconds: 7200 })).toBe(
+      "Reprendre à 42:10",
+    );
+    expect(resumeLabel({ positionSeconds: 3725, durationSeconds: 7200 })).toBe(
+      "Reprendre à 1:02:05",
+    );
+  });
+
+  it("offers nothing without a saved position", () => {
+    expect(resumeLabel(null)).toBeNull();
+    expect(resumeLabel(undefined)).toBeNull();
+    expect(
+      resumeLabel({ positionSeconds: 0, durationSeconds: 7200 }),
+    ).toBeNull();
+  });
+
+  it("offers nothing from 95 % of the runtime, nor past it", () => {
+    expect(resumeLabel({ positionSeconds: 6839, durationSeconds: 7200 })).toBe(
+      "Reprendre à 1:53:59",
+    );
+    expect(
+      resumeLabel({ positionSeconds: 6840, durationSeconds: 7200 }),
+    ).toBeNull();
+    expect(
+      resumeLabel({ positionSeconds: 7300, durationSeconds: 7200 }),
+    ).toBeNull();
+  });
+
+  it("offers nothing when the runtime is unusable", () => {
+    expect(resumeLabel({ positionSeconds: 60, durationSeconds: 0 })).toBeNull();
+    expect(
+      resumeLabel({ positionSeconds: Number.NaN, durationSeconds: 7200 }),
+    ).toBeNull();
+    expect(
+      resumeLabel({
+        positionSeconds: 60,
+        durationSeconds: Number.POSITIVE_INFINITY,
+      }),
+    ).toBeNull();
+  });
+
+  it("names the other choice", () => {
+    expect(RESTART_LABEL).toBe("Depuis le début");
   });
 });
