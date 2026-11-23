@@ -40,7 +40,8 @@ func requireID(cmd, key string, v *string) error {
 //   - stremio_status `{}` → Status;
 //   - stremio_sign_in `{email, password}` → Status once signed in;
 //   - stremio_sign_out `{}` → Status;
-//   - stremio_sources `{itemId}` → Sources;
+//   - stremio_sources `{itemId}` (Emby item) or `{external: {imdb, name, season?,
+//     episode?}}` (title outside Emby), exactly one → Sources;
 //   - stremio_addon_streams `{query, addonId}` → AddonStreams.
 func Handlers(svc *Service, resolve ItemResolver) map[string]Handler {
 	noArgs := func(cmd string, f func(ctx context.Context) (any, error)) Handler {
@@ -84,10 +85,28 @@ func Handlers(svc *Service, resolve ItemResolver) map[string]Handler {
 		"stremio_sources": func(ctx context.Context, raw json.RawMessage) (any, error) {
 			const cmd = "stremio_sources"
 			var a struct {
-				ItemID *string `json:"itemId"`
+				ItemID   *string `json:"itemId"`
+				External *struct {
+					Imdb    *string `json:"imdb"`
+					Name    *string `json:"name"`
+					Season  *int64  `json:"season"`
+					Episode *int64  `json:"episode"`
+				} `json:"external"`
 			}
 			if err := decodeArgs(cmd, raw, &a); err != nil {
 				return nil, err
+			}
+			if (a.ItemID == nil) == (a.External == nil) {
+				return nil, fmt.Errorf("invalid args for command `%s`: expected exactly one of itemId, external", cmd)
+			}
+			if e := a.External; e != nil {
+				if e.Imdb == nil {
+					return nil, fmt.Errorf("command %s missing required key external.imdb", cmd)
+				}
+				if e.Name == nil {
+					return nil, fmt.Errorf("command %s missing required key external.name", cmd)
+				}
+				return svc.ExternalSources(ctx, External{Imdb: *e.Imdb, Name: *e.Name, Season: e.Season, Episode: e.Episode})
 			}
 			if err := requireID(cmd, "itemId", a.ItemID); err != nil {
 				return nil, err

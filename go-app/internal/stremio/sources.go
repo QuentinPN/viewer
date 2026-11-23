@@ -1,7 +1,7 @@
 package stremio
 
-// « Autres sources » of an Emby film or episode: a query lists the addons that
-// serve it, each addon is then asked for its streams, and a stream is played by
+// « Autres sources » of a film or episode, of Emby or outside it (by its IMDb id):
+// a query lists the addons that serve it, each addon is then asked for its streams, and a stream is played by
 // its id. The table of queries keeps, in memory only, the addons (their address)
 // and the streams (URL and headers) behind those ids; the UI gets opaque random
 // ids, names, descriptions and sizes.
@@ -12,6 +12,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"math"
+	"strconv"
+	"strings"
 
 	"viewer/internal/emby"
 	"viewer/internal/redact"
@@ -30,11 +33,20 @@ type SourceAddon struct {
 	Name string `json:"name"`
 }
 
-// Sources is the answer of stremio_sources: the query and its addons, in
-// collection order.
+// Sources is the answer of stremio_sources: the query, what it is about (Key)
+// and its addons, in collection order.
 type Sources struct {
-	Query  string        `json:"query"`
+	Query string `json:"query"`
+	// Key is the Emby item id, or `stremio:<target>` for a title outside Emby.
+	Key    string        `json:"key"`
 	Addons []SourceAddon `json:"addons"`
+}
+
+// External is a title outside Emby: a film by its IMDb id and name, or an episode
+// by its series' IMDb id and name, its season (0 the specials) and its number.
+type External struct {
+	Imdb, Name      string
+	Season, Episode *int64
 }
 
 // StreamDescriptor is a stream as the UI sees it: never its URL or headers.
@@ -52,8 +64,9 @@ type AddonStreams struct {
 	Unsupported int                `json:"unsupported"`
 }
 
-// Selected is a stream picked to play, with the Emby item of its query and that
-// item's player title. It prints masked and never serializes.
+// Selected is a stream picked to play, with the key of its query (ItemID: the Emby
+// item id or `stremio:<target>`) and its player title. It prints masked and never
+// serializes.
 type Selected struct {
 	ItemID string
 	Title  *emby.PlaybackTitle
@@ -96,6 +109,39 @@ func Target(ref emby.ExternalRef) (ContentType, string, error) {
 	return t, id, nil
 }
 
+// ExternalTarget is what the addons are asked for e, and its player title: a film
+// without season and episode, an episode with both (season ≥ 0, episode ≥ 1),
+// titled « Épisode N ». ErrInvalidID for anything else, an IMDb id that is not one
+// or an empty name.
+func ExternalTarget(e External) (ContentType, string, *emby.PlaybackTitle, error) {
+	name := strings.TrimSpace(e.Name)
+	if name == "" {
+		return "", "", nil, ErrInvalidID
+	}
+	if e.Season == nil && e.Episode == nil {
+		id, err := StreamID(e.Imdb, 0, 0)
+		if err != nil {
+			return "", "", nil, err
+		}
+		return Movie, id, &emby.PlaybackTitle{Name: name}, nil
+	}
+	if e.Season == nil || e.Episode == nil || *e.Season < 0 || *e.Episode < 1 ||
+		*e.Season > math.MaxUint32 || *e.Episode > math.MaxUint32 {
+		return "", "", nil, ErrInvalidID
+	}
+	season, episode := uint32(*e.Season), uint32(*e.Episode)
+	id, err := StreamID(e.Imdb, int(season), int(episode))
+	if err != nil {
+		return "", "", nil, err
+	}
+	return Series, id, &emby.PlaybackTitle{
+		Name:        "Épisode " + strconv.FormatUint(uint64(episode), 10),
+		SeriesName:  &name,
+		SeasonIndex: &season,
+		Index:       &episode,
+	}, nil
+}
+
 // queryAddon is an addon of a query and its opaque id.
 type queryAddon struct {
 	id    string
@@ -110,7 +156,7 @@ type queryStream struct {
 
 // query is one « Autres sources » list.
 type query struct {
-	itemID  string
+	key     string
 	title   *emby.PlaybackTitle
 	ctype   ContentType
 	id      string
@@ -155,6 +201,34 @@ func newID(prefix string) string {
 // Sources opens a query on the Emby item: the account's addons that serve it, in
 // collection order. The account is checked before Emby is read.
 func (s *Service) Sources(ctx context.Context, itemID string, resolve ItemResolver) (Sources, error) {
+	return s.open(ctx, func(ctx context.Context) (*query, error) {
+		ref, err := resolve(ctx, itemID)
+		if err != nil {
+			return nil, err
+		}
+		ctype, id, err := Target(ref)
+		if err != nil {
+			return nil, onPage(err)
+		}
+		return &query{key: itemID, title: ref.Title, ctype: ctype, id: id}, nil
+	})
+}
+
+// ExternalSources opens a query on a title outside Emby, keyed `stremio:<target>`;
+// the account is checked first, as for an Emby item.
+func (s *Service) ExternalSources(ctx context.Context, e External) (Sources, error) {
+	return s.open(ctx, func(context.Context) (*query, error) {
+		ctype, id, title, err := ExternalTarget(e)
+		if err != nil {
+			return nil, onPage(err)
+		}
+		return &query{key: "stremio:" + id, title: title, ctype: ctype, id: id}, nil
+	})
+}
+
+// open checks the account, then opens the query that target describes (key,
+// title, type and id) on the addons that serve it.
+func (s *Service) open(ctx context.Context, target func(ctx context.Context) (*query, error)) (Sources, error) {
 	s.mu.Lock()
 	gen := s.st.gen
 	s.mu.Unlock()
@@ -165,16 +239,13 @@ func (s *Service) Sources(ctx context.Context, itemID string, resolve ItemResolv
 		}
 		return Sources{}, onPage(err)
 	}
-	ref, err := resolve(ctx, itemID)
+	q, err := target(ctx)
 	if err != nil {
 		return Sources{}, err
 	}
-	ctype, id, err := Target(ref)
-	if err != nil {
-		return Sources{}, onPage(err)
-	}
-	q := &query{itemID: itemID, title: ref.Title, ctype: ctype, id: id, streams: map[string]queryStream{}}
-	out := Sources{Query: newID("query_"), Addons: []SourceAddon{}}
+	ctype, id := q.ctype, q.id
+	q.streams = map[string]queryStream{}
+	out := Sources{Query: newID("query_"), Key: q.key, Addons: []SourceAddon{}}
 	for _, a := range addons {
 		if a.Serves(ctype, id) {
 			qa := queryAddon{id: newID("addon_"), addon: a}
@@ -241,7 +312,7 @@ func (s *Service) Selected(streamID string) (Selected, error) {
 	defer s.mu.Unlock()
 	for _, q := range s.st.queries.byID {
 		if st, ok := q.streams[streamID]; ok {
-			return Selected{ItemID: q.itemID, Title: q.title, Stream: st.stream}, nil
+			return Selected{ItemID: q.key, Title: q.title, Stream: st.stream}, nil
 		}
 	}
 	return Selected{}, ErrExpired

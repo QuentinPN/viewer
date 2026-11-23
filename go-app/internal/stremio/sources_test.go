@@ -121,6 +121,10 @@ func TestSourcesListsTheAddonsServingTheItem(t *testing.T) {
 	if !strings.HasPrefix(movie.Query, "query_") || len(slices.Compact(slices.Sorted(slices.Values(ids)))) != len(ids) {
 		t.Fatal(out)
 	}
+	// An Emby item is keyed by its own id.
+	if !strings.HasPrefix(out, `{"query":"`+movie.Query+`","key":"30207","addons":[`) {
+		t.Fatal(out)
+	}
 
 	out, errText = call(t, h, "stremio_sources", `{"itemId":"80475"}`)
 	if errText != "" || strings.Contains(out, "TMDB Collections") || !strings.Contains(out, `"name":"Lumio · Profil"`) {
@@ -385,10 +389,17 @@ func TestSourcesHandlersRefuseBadArgs(t *testing.T) {
 	})
 	h["stremio_play"] = play
 	cases := []struct{ cmd, args, want string }{
-		{"stremio_sources", `{}`, "command stremio_sources missing required key itemId"},
+		{"stremio_sources", `{}`, "invalid args for command `stremio_sources`"},
+		{"stremio_sources", `{"itemId":null,"external":null}`, "invalid args for command `stremio_sources`"},
 		{"stremio_sources", `{"itemId":""}`, "command stremio_sources missing required key itemId"},
 		{"stremio_sources", `{"itemId":7}`, "invalid args for command `stremio_sources`"},
 		{"stremio_sources", `{"itemId":"1","x":1}`, "invalid args for command `stremio_sources`"},
+		{"stremio_sources", `{"itemId":"1","external":{"imdb":"tt0111161","name":"hunter2"}}`, "invalid args for command `stremio_sources`"},
+		{"stremio_sources", `{"external":"tt0111161"}`, "invalid args for command `stremio_sources`"},
+		{"stremio_sources", `{"external":{"imdb":"tt0111161","name":"hunter2","year":1994}}`, "invalid args for command `stremio_sources`"},
+		{"stremio_sources", `{"external":{"imdb":"tt0111161","name":"hunter2","season":1.5,"episode":2}}`, "invalid args for command `stremio_sources`"},
+		{"stremio_sources", `{"external":{"name":"hunter2"}}`, "command stremio_sources missing required key external.imdb"},
+		{"stremio_sources", `{"external":{"imdb":"tt0111161"}}`, "command stremio_sources missing required key external.name"},
 		{"stremio_addon_streams", `{"query":"q"}`, "command stremio_addon_streams missing required key addonId"},
 		{"stremio_addon_streams", `{"addonId":"a"}`, "command stremio_addon_streams missing required key query"},
 		{"stremio_addon_streams", `["q","a"]`, "invalid args for command `stremio_addon_streams`"},
@@ -431,5 +442,152 @@ func TestPlayHandler(t *testing.T) {
 	}
 	if len(played) != 1 || played[0].ItemID != "30207" || played[0].Stream.Name != "[AD⚡️] Lumio" {
 		t.Fatal(played)
+	}
+}
+
+func TestTargetOfATitleOutsideEmby(t *testing.T) {
+	cases := []struct {
+		name  string
+		ext   External
+		typ   ContentType
+		id    string
+		title string
+	}{
+		{"film", External{Imdb: "tt0111161", Name: "Les Évadés"}, Movie, "tt0111161",
+			`{"name":"Les Évadés","seriesName":null,"seasonIndex":null,"index":null,"indexEnd":null}`},
+		{"épisode", External{Imdb: "tt0944947", Name: "La Série", Season: ptr(int64(1)), Episode: ptr(int64(2))}, Series, "tt0944947:1:2",
+			`{"name":"Épisode 2","seriesName":"La Série","seasonIndex":1,"index":2,"indexEnd":null}`},
+		{"épisode spécial", External{Imdb: "tt0944947", Name: "La Série", Season: ptr(int64(0)), Episode: ptr(int64(3))}, Series, "tt0944947:0:3",
+			`{"name":"Épisode 3","seriesName":"La Série","seasonIndex":0,"index":3,"indexEnd":null}`},
+		{"nom entouré d'espaces", External{Imdb: "tt0111161", Name: "  Les Évadés \n"}, Movie, "tt0111161",
+			`{"name":"Les Évadés","seriesName":null,"seasonIndex":null,"index":null,"indexEnd":null}`},
+	}
+	for _, c := range cases {
+		typ, id, title, err := ExternalTarget(c.ext)
+		if err != nil || typ != c.typ || id != c.id {
+			t.Errorf("%s : %q %q %v", c.name, typ, id, err)
+			continue
+		}
+		if b, _ := json.Marshal(title); string(b) != c.title {
+			t.Errorf("%s : titre %s", c.name, b)
+		}
+	}
+	invalid := []struct {
+		name string
+		ext  External
+	}{
+		{"saison seule", External{Imdb: "tt0944947", Name: "x", Season: ptr(int64(1))}},
+		{"épisode seul", External{Imdb: "tt0944947", Name: "x", Episode: ptr(int64(1))}},
+		{"épisode 0", External{Imdb: "tt0944947", Name: "x", Season: ptr(int64(1)), Episode: ptr(int64(0))}},
+		{"saison négative", External{Imdb: "tt0944947", Name: "x", Season: ptr(int64(-1)), Episode: ptr(int64(1))}},
+		{"saison trop grande", External{Imdb: "tt0944947", Name: "x", Season: ptr(int64(1) << 32), Episode: ptr(int64(1))}},
+		{"épisode trop grand", External{Imdb: "tt0944947", Name: "x", Season: ptr(int64(1)), Episode: ptr(int64(1) << 32)}},
+		{"pas un id IMDb", External{Imdb: "278", Name: "x"}},
+		{"id IMDb vide", External{Imdb: "", Name: "x"}},
+		{"nom vide", External{Imdb: "tt0111161", Name: " "}},
+	}
+	for _, c := range invalid {
+		if _, _, _, err := ExternalTarget(c.ext); !errors.Is(err, ErrInvalidID) {
+			t.Errorf("%s : %v", c.name, err)
+		}
+	}
+}
+
+// A title outside Emby is asked by its IMDb id: Emby is never read, the query is
+// keyed `stremio:<target>`, and its streams play under that key and the title given.
+func TestSourcesOfATitleOutsideEmby(t *testing.T) {
+	svc, f := signedIn(t)
+	res := newResolver()
+	h := Handlers(svc, res.resolve)
+	var played []Selected
+	h["stremio_play"] = PlayHandler(svc, func(_ context.Context, s Selected) (any, error) {
+		played = append(played, s)
+		return "ok", nil
+	})
+	var src Sources
+
+	out, errText := call(t, h, "stremio_sources", `{"external":{"imdb":"tt0111161","name":"Les Évadés"}}`)
+	if errText != "" || json.Unmarshal([]byte(out), &src) != nil {
+		t.Fatal(out, errText)
+	}
+	assertNoSecret(t, "sources", out, f.URL)
+	var names []string
+	ids := map[string]string{}
+	for _, a := range src.Addons {
+		names = append(names, a.Name)
+		ids[a.Name] = a.ID
+	}
+	if src.Key != "stremio:tt0111161" || !strings.HasPrefix(src.Query, "query_") || !slices.Contains(names, "TMDB Collections") {
+		t.Fatal(out)
+	}
+	s, err := svc.AddonStreams(context.Background(), src.Query, ids["Lumio · Profil"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out, err := call(t, h, "stremio_play", fmt.Sprintf(`{"streamId":%q}`, s.Streams[0].ID)); err != "" || out != `"ok"` {
+		t.Fatal(out, err)
+	}
+	if len(played) != 1 || played[0].ItemID != "stremio:tt0111161" || played[0].Title == nil || played[0].Title.Name != "Les Évadés" ||
+		played[0].Title.SeriesName != nil || played[0].Stream.Name != "[AD⚡️] Lumio" {
+		t.Fatalf("%+v %+v", played, played[0].Title)
+	}
+
+	out, errText = call(t, h, "stremio_sources", `{"external":{"imdb":"tt0944947","name":"La Série","season":1,"episode":2}}`)
+	src = Sources{}
+	if errText != "" || json.Unmarshal([]byte(out), &src) != nil || src.Key != "stremio:tt0944947:1:2" ||
+		strings.Contains(out, "TMDB Collections") || !strings.Contains(out, `"name":"Lumio · Profil"`) {
+		t.Fatal(out, errText)
+	}
+	ids = map[string]string{}
+	for _, a := range src.Addons {
+		ids[a.Name] = a.ID
+	}
+	s, err = svc.AddonStreams(context.Background(), src.Query, ids["Comet | AD"])
+	if err != nil || len(s.Streams) == 0 {
+		t.Fatal(err)
+	}
+	sel, err := svc.Selected(s.Streams[0].ID)
+	if err != nil || sel.ItemID != "stremio:tt0944947:1:2" {
+		t.Fatal(sel.ItemID, err)
+	}
+	if b, _ := json.Marshal(sel.Title); string(b) != `{"name":"Épisode 2","seriesName":"La Série","seasonIndex":1,"index":2,"indexEnd":null}` {
+		t.Fatal(string(b))
+	}
+	if len(res.asked) != 0 {
+		t.Fatal("Emby lu pour un titre hors Emby", res.asked)
+	}
+}
+
+func TestSourcesOfATitleOutsideEmbyErrors(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	res := newResolver()
+	h := Handlers(svc, res.resolve)
+	if _, err := call(t, h, "stremio_sources", `{"external":{"imdb":"tt0111161","name":"x"}}`); err != `{"kind":"signedOut","message":"Connecte ton compte Stremio dans les Réglages."}` {
+		t.Fatal(err)
+	}
+	if err := svc.SignIn(context.Background(), "owner@example.com", "hunter2"); err != nil {
+		t.Fatal(err)
+	}
+	const invalid = `{"kind":"invalidId","message":"Identifiant de contenu invalide."}`
+	for _, a := range []string{
+		`{"external":{"imdb":"tt0944947","name":"hunter2","season":1}}`,
+		`{"external":{"imdb":"tt0944947","name":"hunter2","episode":1}}`,
+		`{"external":{"imdb":"tt0944947","name":"hunter2","season":-1,"episode":1}}`,
+		`{"external":{"imdb":"tt0944947","name":"hunter2","season":1,"episode":0}}`,
+		`{"external":{"imdb":"tt0944947","name":"hunter2","season":1,"episode":null}}`,
+		`{"external":{"imdb":"https://debrid.example/x","name":"hunter2"}}`,
+		`{"external":{"imdb":"tt0111161","name":""}}`,
+	} {
+		if _, err := call(t, h, "stremio_sources", a); err != invalid {
+			t.Errorf("%s : %s", a, err)
+		}
+	}
+	for _, r := range f.log() {
+		if strings.Contains(r.URI, "/stream/") {
+			t.Fatal("addon interrogé pour un titre invalide", r.URI)
+		}
+	}
+	if len(res.asked) != 0 {
+		t.Fatal("Emby lu", res.asked)
 	}
 }
