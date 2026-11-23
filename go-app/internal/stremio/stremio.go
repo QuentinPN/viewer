@@ -34,6 +34,10 @@ const (
 	KindReauthRequired ErrorKind = "reauthRequired"
 	// KindCredentialStore: the Windows vault refused to save or delete the session.
 	KindCredentialStore ErrorKind = "credentialStore"
+	// KindNoImdb: the Emby item has no IMDb id, the only id the addons are asked by.
+	KindNoImdb ErrorKind = "noImdb"
+	// KindExpired: a stream list (query, addon or stream id) no longer kept.
+	KindExpired ErrorKind = "expired"
 )
 
 // Error is a Stremio failure. Addon is the manifest name of the addon concerned,
@@ -46,6 +50,9 @@ type Error struct {
 	Addon string
 	// login: a rejection of the e-mail and password, not of a stored session.
 	login bool
+	// page: raised by « Autres sources » on a detail page, whose texts point to
+	// Réglages and name an addon that failed as unavailable.
+	page bool
 }
 
 // Variants without a payload.
@@ -53,6 +60,8 @@ var (
 	ErrSignedOut      = Error{Kind: KindSignedOut}
 	ErrReauthRequired = Error{Kind: KindReauthRequired}
 	ErrInvalidID      = Error{Kind: KindInvalidID}
+	ErrNoImdb         = Error{Kind: KindNoImdb}
+	ErrExpired        = Error{Kind: KindExpired}
 )
 
 // Error is the French text shown to the user.
@@ -64,11 +73,17 @@ func (e Error) Error() string {
 		}
 		return "Session Stremio expirée. Reconnecte-toi."
 	case KindUnreachable:
+		if e.Addon != "" && e.page {
+			return e.Addon + " : indisponible."
+		}
 		if e.Addon != "" {
 			return e.Addon + " ne répond pas."
 		}
 		return "Stremio ne répond pas. Réessaie plus tard."
 	case KindServer:
+		if e.Addon != "" && e.page {
+			return e.Addon + " : indisponible."
+		}
 		if e.Addon != "" {
 			return "Réponse inattendue de " + e.Addon + "."
 		}
@@ -81,14 +96,34 @@ func (e Error) Error() string {
 	case KindInvalidID:
 		return "Identifiant de contenu invalide."
 	case KindSignedOut:
+		if e.page {
+			return "Connecte ton compte Stremio dans les Réglages."
+		}
 		return "Aucun compte Stremio connecté."
 	case KindReauthRequired:
+		if e.page {
+			return "Reconnecte Stremio dans les Réglages."
+		}
 		return "Session Stremio expirée. Reconnecte-toi."
 	case KindCredentialStore:
 		return "Le coffre de Windows est indisponible pour la session Stremio."
+	case KindNoImdb:
+		return "Ce titre n'a pas d'identifiant IMDb : les addons ne peuvent pas le chercher."
+	case KindExpired:
+		return "La liste a expiré, rouvre-la."
 	default:
 		return "Erreur Stremio."
 	}
+}
+
+// onPage is err with the texts of a detail page, when it is an Error.
+func onPage(err error) error {
+	var e Error
+	if errors.As(err, &e) {
+		e.page = true
+		return e
+	}
+	return err
 }
 
 // Is matches on the kind, so errors.Is(err, ErrSignedOut) works.

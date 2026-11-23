@@ -29,18 +29,18 @@ func call(t *testing.T, h map[string]Handler, cmd, args string) (string, string)
 func TestHandlersNames(t *testing.T) {
 	svc, _, _, _ := newTestService(t)
 	var names []string
-	for n := range Handlers(svc) {
+	for n := range Handlers(svc, nil) {
 		names = append(names, n)
 	}
 	slices.Sort(names)
-	if !slices.Equal(names, []string{"stremio_sign_in", "stremio_sign_out", "stremio_status"}) {
+	if !slices.Equal(names, []string{"stremio_addon_streams", "stremio_sign_in", "stremio_sign_out", "stremio_sources", "stremio_status"}) {
 		t.Fatal(names)
 	}
 }
 
 func TestHandlersSignInStatusSignOut(t *testing.T) {
 	svc, f, store, _ := newTestService(t)
-	h := Handlers(svc)
+	h := Handlers(svc, nil)
 	if out, err := call(t, h, "stremio_status", `{}`); err != "" || out != `{"state":"signed_out","addons":[]}` {
 		t.Fatal(out, err)
 	}
@@ -59,7 +59,7 @@ func TestHandlersSignInStatusSignOut(t *testing.T) {
 
 func TestHandlersErrors(t *testing.T) {
 	svc, f, _, _ := newTestService(t)
-	h := Handlers(svc)
+	h := Handlers(svc, nil)
 	f.login = string(fixture(t, "login_wrong_password"))
 	if _, err := call(t, h, "stremio_sign_in", `{"email":"owner@example.com","password":"hunter2"}`); err != `{"kind":"rejected","message":"Adresse e-mail ou mot de passe incorrect."}` {
 		t.Fatal(err)
@@ -75,7 +75,7 @@ func TestHandlersErrors(t *testing.T) {
 
 func TestHandlersRefuseBadArgs(t *testing.T) {
 	svc, f, _, _ := newTestService(t)
-	h := Handlers(svc)
+	h := Handlers(svc, nil)
 	cases := []struct{ cmd, args, want string }{
 		{"stremio_sign_in", `{"email":"owner@example.com"}`, "command stremio_sign_in missing required key password"},
 		{"stremio_sign_in", `{"password":"hunter2"}`, "command stremio_sign_in missing required key email"},

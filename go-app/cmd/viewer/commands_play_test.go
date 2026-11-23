@@ -17,6 +17,8 @@ type recording struct {
 	url       string
 	engineErr error
 	loadErr   error
+	// request is the last one loaded.
+	request player.PlaybackRequest
 }
 
 func (r *recording) add(c string) { r.calls = append(r.calls, c) }
@@ -39,6 +41,10 @@ func (r *recording) ReportEvent(ev player.PlayerEvent) {
 	b, _ := json.Marshal(ev)
 	r.add("reporter " + string(b))
 }
+func (r *recording) SyncEvent(ev player.PlayerEvent) {
+	b, _ := json.Marshal(ev)
+	r.add("sync " + string(b))
+}
 func (r *recording) Playing(_, src string, direct bool) {
 	if direct {
 		r.add("playing " + src + " direct")
@@ -53,8 +59,9 @@ func (r *recording) Engine() (loader, error) {
 	}
 	return r, nil
 }
-func (r *recording) Load(*player.PlaybackRequest, player.MediaSource) error {
+func (r *recording) Load(request *player.PlaybackRequest, _ player.MediaSource) error {
 	r.add("load")
+	r.request = *request
 	return r.loadErr
 }
 

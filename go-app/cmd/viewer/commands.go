@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"maps"
 	"slices"
 
@@ -35,8 +36,12 @@ func registerCommands(reg *bridge.Registry, a *app.App, win Window) {
 	}
 	reg.Register("ur_open_trailer", request.OpenTrailerHandler(request.OpenInExplorer))
 
-	// Réglages › Stremio: the 3 stremio_* commands.
-	stremioHandlers := stremio.Handlers(a.Stremio)
+	// Réglages › Stremio and « Autres sources »: the 6 stremio_* commands. stremio_play
+	// is in release builds too: the link it opens is Go's, never the UI's.
+	stremioHandlers := stremio.Handlers(a.Stremio, a.Emby.ExternalRef)
+	stremioHandlers["stremio_play"] = stremio.PlayHandler(a.Stremio, func(ctx context.Context, s stremio.Selected) (any, error) {
+		return stremioPlay(ctx, appPlayback{a}, s.ItemID, s.Title, s.Stream.URL(), s.Stream.Headers())
+	})
 	for _, name := range slices.Sorted(maps.Keys(stremioHandlers)) {
 		reg.Register(name, stremioHandlers[name])
 	}

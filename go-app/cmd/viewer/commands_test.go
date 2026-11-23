@@ -86,7 +86,7 @@ func invoke(t *testing.T, b *bridge.Bridge, cmd, args string) (string, string) {
 
 // commands is every command the frontend may invoke: the 82 of the former Rust
 // invoke_handler minus the two ui_settings_* of the finished Tauri handover, plus
-// the two of the logo and the three of Stremio.
+// the two of the logo and the six of Stremio.
 var commands = []string{
 	"app_info", "app_update_check", "app_update_install", "app_update_pending",
 	"artwork_cache_clear", "artwork_cache_stats",
@@ -111,7 +111,8 @@ var commands = []string{
 	// The logo (commands_brand.go): no Rust counterpart.
 	"app_is_debug", "window_set_icon",
 	// Réglages › Stremio (internal/stremio): no Rust counterpart.
-	"stremio_sign_in", "stremio_sign_out", "stremio_status",
+	"stremio_addon_streams", "stremio_play", "stremio_sign_in", "stremio_sign_out", "stremio_sources",
+	"stremio_status",
 }
 
 // Exactly these commands are registered.

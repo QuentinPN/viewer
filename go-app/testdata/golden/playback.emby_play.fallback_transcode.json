@@ -13,5 +13,6 @@
     "indexEnd": null
   },
   "bitrateCap": null,
-  "localAddress": true
+  "localAddress": true,
+  "origin": "emby"
 }

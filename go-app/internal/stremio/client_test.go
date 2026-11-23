@@ -199,16 +199,16 @@ func TestStreamsMovie(t *testing.T) {
 	s := r.Streams[0]
 	if s.Name != "[AD⚡️] Lumio" || s.Filename != "The Shawshank Redemption (Les Evadés) - (1994).mkv" ||
 		s.Size != 31682067376 || s.URL() != "https://debrid.example/REDACTED/file.mkv" || s.Headers() != nil ||
-		!strings.Contains(s.Title, "1080p • BluRay REMUX") {
-		t.Fatalf("%q %q %d %q %q", s.Name, s.Filename, s.Size, s.URL(), s.Title)
+		!strings.Contains(s.Description, "1080p • BluRay REMUX") {
+		t.Fatalf("%q %q %d %q %q", s.Name, s.Filename, s.Size, s.URL(), s.Description)
 	}
 	// TorrentsDB gives `title` instead of `description`.
 	r, err = NewClient(f.URL, "1").Streams(context.Background(), addonNamed(t, f.addons(t), "TorrentsDB AD"), Movie, "tt0111161")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(r.Streams[0].Title, "YIFY") {
-		t.Fatalf("titre %q", r.Streams[0].Title)
+	if !strings.Contains(r.Streams[0].Description, "YIFY") {
+		t.Fatalf("titre %q", r.Streams[0].Description)
 	}
 }
 
@@ -264,12 +264,12 @@ func TestStreamsUnsupportedAndHeaders(t *testing.T) {
 		t.Fatalf("%d jouables, %d non pris en charge", len(r.Streams), r.Unsupported)
 	}
 	both, float := r.Streams[0], r.Streams[1]
-	if both.Name != "both" || both.Title != "desc" || both.Filename != "a.mkv" || both.Size != 1234 ||
+	if both.Name != "both" || both.Description != "desc" || both.Filename != "a.mkv" || both.Size != 1234 ||
 		len(both.Headers()) != 1 || both.Headers()["User-Agent"] != "UA" {
-		t.Fatalf("%q %q %q %d %v", both.Name, both.Title, both.Filename, both.Size, both.Headers())
+		t.Fatalf("%q %q %q %d %v", both.Name, both.Description, both.Filename, both.Size, both.Headers())
 	}
-	if float.Title != "t" || float.Size != 1500000000 || float.Headers() != nil || float.URL() != "http://192.168.1.20/b.mkv" {
-		t.Fatalf("%q %d %v", float.Title, float.Size, float.Headers())
+	if float.Description != "t" || float.Size != 1500000000 || float.Headers() != nil || float.URL() != "http://192.168.1.20/b.mkv" {
+		t.Fatalf("%q %d %v", float.Description, float.Size, float.Headers())
 	}
 }
 
@@ -340,5 +340,13 @@ func TestStreamsTimeout(t *testing.T) {
 	assertNoSecret(t, "erreur", err.Error(), f.URL)
 	if StreamTimeout != 10*time.Second || NewClient(f.URL, "1").streamTimeout != StreamTimeout {
 		t.Fatal("délai par addon")
+	}
+}
+
+// `description` wins over the deprecated `title` when an entry has both.
+func TestStreamsDescriptionWinsOverTitle(t *testing.T) {
+	s, ok := parseStream(json.RawMessage(`{"name":"n","title":"old","description":"new\nline","url":"https://debrid.example/REDACTED/a.mkv"}`))
+	if !ok || s.Description != "new\nline" {
+		t.Fatalf("%q", s.Description)
 	}
 }

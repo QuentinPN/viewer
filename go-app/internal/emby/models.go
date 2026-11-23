@@ -1036,7 +1036,18 @@ type PlaybackStart struct {
 	BitrateCap *uint64 `json:"bitrateCap"`
 	// LocalAddress: whether the session's address counts as local, so which cap applied.
 	LocalAddress bool `json:"localAddress"`
+	// Origin is where the stream comes from: OriginEmby, or OriginStremio for an
+	// addon's stream, which Emby never hears about.
+	Origin PlaybackOrigin `json:"origin"`
 }
+
+// PlaybackOrigin is the `origin` of a PlaybackStart.
+type PlaybackOrigin string
+
+const (
+	OriginEmby    PlaybackOrigin = "emby"
+	OriginStremio PlaybackOrigin = "stremio"
+)
 
 // PlaybackTitle is the name of what plays and, for an episode, where it sits in its
 // series.

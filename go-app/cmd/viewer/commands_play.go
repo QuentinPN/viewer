@@ -40,6 +40,7 @@ func (p appPlayback) PrepareAtCap(ctx context.Context, itemID, mediaSourceID str
 func (p appPlayback) Begin(ap emby.ActivePlayback)      { p.a.Reporter.Begin(ap) }
 func (p appPlayback) Switch(ap emby.ActivePlayback)     { p.a.Reporter.Switch(ap) }
 func (p appPlayback) ReportEvent(ev player.PlayerEvent) { p.a.Reporter.PlayerEvent(ev) }
+func (p appPlayback) SyncEvent(ev player.PlayerEvent)   { p.a.Sync.PlayerEvent(ev) }
 func (p appPlayback) Playing(itemID, mediaSourceID string, direct bool) {
 	p.a.Sync.Playing(itemID, mediaSourceID, direct)
 }

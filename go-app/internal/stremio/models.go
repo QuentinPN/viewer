@@ -139,11 +139,13 @@ func StreamID(imdb string, season, episode int) (string, error) {
 	}
 }
 
-// Stream is one playable stream of an addon: what the UI may show (Name, Title,
-// Filename, Size) and, kept inside, the URL and the HTTP headers to open it with.
+// Stream is one playable stream of an addon: what the UI may show (Name,
+// Description, Filename, Size) and, kept inside, the URL and the HTTP headers to open it with.
 // The URL is a signed debrid link: it prints masked and never serializes.
 type Stream struct {
-	Name, Title, Filename string
+	// Description is the entry's `description`, or its `title` without one; both
+	// keep their line breaks.
+	Name, Description, Filename string
 	// Size in bytes, 0 when unknown.
 	Size int64
 

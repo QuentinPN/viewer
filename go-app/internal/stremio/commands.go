@@ -1,6 +1,6 @@
 package stremio
 
-// Bridge commands of Réglages › Stremio. Arguments are validated here; a domain
+// Bridge commands of Réglages › Stremio and « Autres sources ». Arguments are validated here; a domain
 // failure rejects with the {kind, message} of Error (the shape of the ur_*
 // commands), a malformed call with a bare string, as the ur_* commands do. No
 // message ever repeats an argument.
@@ -27,11 +27,22 @@ func decodeArgs(cmd string, raw json.RawMessage, dst any) error {
 	return nil
 }
 
-// Handlers are the stremio_* commands, bound to svc:
+// requireID refuses a missing or empty id argument.
+func requireID(cmd, key string, v *string) error {
+	if v == nil || *v == "" {
+		return fmt.Errorf("command %s missing required key %s", cmd, key)
+	}
+	return nil
+}
+
+// Handlers are the stremio_* commands but stremio_play (PlayHandler), bound to svc
+// and to the Emby items read by resolve:
 //   - stremio_status `{}` → Status;
 //   - stremio_sign_in `{email, password}` → Status once signed in;
-//   - stremio_sign_out `{}` → Status.
-func Handlers(svc *Service) map[string]Handler {
+//   - stremio_sign_out `{}` → Status;
+//   - stremio_sources `{itemId}` → Sources;
+//   - stremio_addon_streams `{query, addonId}` → AddonStreams.
+func Handlers(svc *Service, resolve ItemResolver) map[string]Handler {
 	noArgs := func(cmd string, f func(ctx context.Context) (any, error)) Handler {
 		return func(ctx context.Context, raw json.RawMessage) (any, error) {
 			if err := decodeArgs(cmd, raw, &struct{}{}); err != nil {
@@ -70,5 +81,58 @@ func Handlers(svc *Service) map[string]Handler {
 			}
 			return svc.Status(ctx), nil
 		}),
+		"stremio_sources": func(ctx context.Context, raw json.RawMessage) (any, error) {
+			const cmd = "stremio_sources"
+			var a struct {
+				ItemID *string `json:"itemId"`
+			}
+			if err := decodeArgs(cmd, raw, &a); err != nil {
+				return nil, err
+			}
+			if err := requireID(cmd, "itemId", a.ItemID); err != nil {
+				return nil, err
+			}
+			return svc.Sources(ctx, *a.ItemID, resolve)
+		},
+		"stremio_addon_streams": func(ctx context.Context, raw json.RawMessage) (any, error) {
+			const cmd = "stremio_addon_streams"
+			var a struct {
+				Query   *string `json:"query"`
+				AddonID *string `json:"addonId"`
+			}
+			if err := decodeArgs(cmd, raw, &a); err != nil {
+				return nil, err
+			}
+			if err := requireID(cmd, "query", a.Query); err != nil {
+				return nil, err
+			}
+			if a.AddonID == nil {
+				return nil, fmt.Errorf("command %s missing required key addonId", cmd)
+			}
+			return svc.AddonStreams(ctx, *a.Query, *a.AddonID)
+		},
+	}
+}
+
+// PlayHandler is stremio_play `{streamId}`: the stream is looked up here
+// (ErrExpired when unknown) and play opens it. The URL never comes from the UI, so
+// this command exists in release builds too.
+func PlayHandler(svc *Service, play func(ctx context.Context, s Selected) (any, error)) Handler {
+	return func(ctx context.Context, raw json.RawMessage) (any, error) {
+		const cmd = "stremio_play"
+		var a struct {
+			StreamID *string `json:"streamId"`
+		}
+		if err := decodeArgs(cmd, raw, &a); err != nil {
+			return nil, err
+		}
+		if err := requireID(cmd, "streamId", a.StreamID); err != nil {
+			return nil, err
+		}
+		s, err := svc.Selected(*a.StreamID)
+		if err != nil {
+			return nil, err
+		}
+		return play(ctx, s)
 	}
 }

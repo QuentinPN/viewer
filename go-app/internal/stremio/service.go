@@ -70,6 +70,9 @@ type cacheState struct {
 	gen      uint64
 	addons   *[]Addon // nil: not fetched
 	rejected bool
+	// queries are the « Autres sources » lists (sources.go): forgotten with the
+	// collection.
+	queries queryTable
 }
 
 // NewService builds the service over the vault and the client.
@@ -81,13 +84,15 @@ func (s *Service) String() string             { return redact.Masked("StremioSer
 func (s *Service) GoString() string           { return s.String() }
 func (s *Service) Format(f fmt.State, _ rune) { redact.WriteMasked(f, "StremioService") }
 
-// reset forgets the collection and the refusal, and starts a new generation.
+// reset forgets the collection, the refusal and the stream lists, and starts a new
+// generation.
 func (s *Service) reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.st.gen++
 	s.st.addons = nil
 	s.st.rejected = false
+	s.st.queries = queryTable{}
 }
 
 // collection is the account's addons: from memory, or fetched with the stored key.
@@ -162,7 +167,7 @@ func (s *Service) Status(ctx context.Context) Status {
 	return st
 }
 
-// Addons is the account's whole collection (tranche 2 filters it with Serves):
+// Addons is the account's whole collection (Sources filters it with Serves):
 // ErrSignedOut, ErrReauthRequired or the failure of the request.
 func (s *Service) Addons(ctx context.Context) ([]Addon, error) {
 	addons, err := s.collection(ctx)

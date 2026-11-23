@@ -7,5 +7,6 @@
   "transcodeReasons": "conteneur non pris en charge",
   "title": null,
   "bitrateCap": null,
-  "localAddress": true
+  "localAddress": true,
+  "origin": "emby"
 }

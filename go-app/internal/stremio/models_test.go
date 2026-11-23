@@ -142,7 +142,7 @@ func TestSecretsMasked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stream := Stream{Name: "Comet", Title: "1080p", url: secretStream, headers: map[string]string{"Authorization": secretHeader}}
+	stream := Stream{Name: "Comet", Description: "1080p", url: secretStream, headers: map[string]string{"Authorization": secretHeader}}
 	key := NewAuthKey(secretKey)
 	values := map[string]any{
 		"Addon":         addon,
@@ -181,6 +181,8 @@ func TestErrorsNeverShowAnAddress(t *testing.T) {
 		{Kind: KindRejected}, {Kind: KindRejected, login: true}, {Kind: KindUnreachable},
 		{Kind: KindUnreachable, Addon: "Comet"}, {Kind: KindServer}, {Kind: KindServer, Addon: "Comet"},
 		{Kind: KindInvalid}, {Kind: KindInvalid, Addon: "Comet"}, ErrSignedOut, ErrReauthRequired, ErrInvalidID,
+		ErrNoImdb, ErrExpired, {Kind: KindUnreachable, Addon: "Comet", page: true}, {Kind: KindServer, Addon: "Comet", page: true},
+		{Kind: KindSignedOut, page: true}, {Kind: KindReauthRequired, page: true},
 	}
 	for _, e := range errs {
 		msg := e.Error()

@@ -261,9 +261,10 @@ func parseStream(raw json.RawMessage) (Stream, bool) {
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
 		return Stream{}, false
 	}
-	s := Stream{Name: e.Name, Title: e.Title, url: e.URL}
-	if s.Title == "" {
-		s.Title = e.Description
+	// `description` replaces the deprecated `title`.
+	s := Stream{Name: e.Name, Description: e.Description, url: e.URL}
+	if s.Description == "" {
+		s.Description = e.Title
 	}
 	var filename string
 	if json.Unmarshal(e.BehaviorHints.Filename, &filename) == nil {
