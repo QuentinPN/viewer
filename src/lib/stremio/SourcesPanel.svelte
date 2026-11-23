@@ -9,6 +9,7 @@ import { stremioApi, toStremioError } from "./api";
 import {
   addonAnswered,
   addonFailed,
+  canRetry,
   outcomeNotes,
   type SourcesState,
   searchNote,
@@ -33,9 +34,6 @@ interface Props {
 }
 
 let { target, notice = null, onClose, onPlay }: Props = $props();
-
-/** Errors where a new query cannot help: the fix is in Réglages or the title. */
-const FINAL = new Set(["signedOut", "reauthRequired", "noImdb"]);
 
 let dialog = $state<HTMLDialogElement | null>(null);
 let heading = $state<HTMLHeadingElement | null>(null);
@@ -139,7 +137,7 @@ onDestroy(() => {
     {#if error}
       <div class="state" role="alert">
         <p>{error.message}</p>
-        {#if !FINAL.has(error.kind)}
+        {#if canRetry(error.kind)}
           <button type="button" class="st-btn" onclick={() => void load()}>Réessayer</button>
         {/if}
       </div>
@@ -273,9 +271,6 @@ onDestroy(() => {
     display: grid;
     justify-items: start;
     gap: var(--space-3);
-  }
-  .muted {
-    color: var(--color-text-muted);
   }
   .small {
     font-size: 13px;

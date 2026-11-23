@@ -152,7 +152,4 @@ onMount(() => {
   .episode:hover {
     background: var(--fill-glass-hover);
   }
-  .muted {
-    color: var(--color-text-muted);
-  }
 </style>

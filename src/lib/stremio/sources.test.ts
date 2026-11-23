@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addonAnswered,
   addonFailed,
+  canRetry,
   isStremio,
   offersSources,
   outcomeNotes,
@@ -225,5 +226,13 @@ describe("isStremio", () => {
     expect(isStremio({ origin: "stremio" })).toBe(true);
     expect(isStremio({ origin: "emby" })).toBe(false);
     expect(isStremio({})).toBe(false);
+  });
+});
+
+describe("canRetry", () => {
+  it("offers no retry for an error that can never succeed", () => {
+    for (const kind of ["signedOut", "reauthRequired", "noImdb", "invalidId"])
+      expect(canRetry(kind)).toBe(false);
+    expect(canRetry("unreachable")).toBe(true);
   });
 });

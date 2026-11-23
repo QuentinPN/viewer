@@ -168,3 +168,11 @@ export function offersSources(
 export function isStremio(p: Pick<PlaybackStart, "origin">): boolean {
   return p.origin === "stremio";
 }
+
+/** Errors where a new query cannot help: the fix is in Réglages or the title. */
+const FINAL = new Set(["signedOut", "reauthRequired", "noImdb", "invalidId"]);
+
+/** Whether « Réessayer » can change the outcome of this error. */
+export function canRetry(kind: string): boolean {
+  return !FINAL.has(kind);
+}
