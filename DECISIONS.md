@@ -88,6 +88,8 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **Une liste interroge chaque addon par un appel séparé, en parallèle, 10 s chacun** — les résultats s'affichent au fil de l'eau sans canal d'événements.
 - **« Autres sources » visible dès que Stremio est connecté, même sans IMDb (la liste l'explique)** — savoir si un épisode a un IMDb coûterait une requête Emby de plus à chaque fiche. La 1re fiche d'une session lit l'état Stremio (liste d'addons mise en cache), sans bloquer la fiche.
 - **Lecture Stremio : `origin: "stremio"`, sans PlaybackInfo, rapport, synchro TV, segments, chapitres, qualité ni épisode suivant ; une lecture Emby en cours est d'abord arrêtée normalement** — Emby ne doit jamais attribuer la position d'un flux externe à un de ses éléments.
+- **Fiches Demander : « Regarder maintenant » si la fiche a un IMDb ; une série passe par un choix saison puis épisode tiré des saisons d'Request (`episodeCount`), spéciaux en dernier, sans Cinemeta** — pas de service de plus ; le nombre d'épisodes peut inclure des épisodes pas encore diffusés.
+- **Titre hors Emby : le film par son nom, l'épisode « Épisode N » + nom de la série ; clé de lecture `stremio:<imdb>[:S:E]` construite par le Go seulement** — Request ne donne pas les titres d'épisodes ; l'UI ne refabrique jamais la clé.
 - **Erreur ou fin anticipée d'un flux Stremio : retour à la fiche, liste rouverte avec « Ce lien ne répond plus, choisis une autre source. », sans nouvelle tentative** — les liens debrid expirent ; choisir une autre source est plus sûr que réessayer.
 
 ## Cache et images
