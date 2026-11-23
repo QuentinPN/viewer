@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addonLabel, statusLabel } from "./status";
+import { addonLabel, statusLabel, stremioUsable } from "./status";
 
 describe("statusLabel", () => {
   it("reads each state in French", () => {
@@ -33,5 +33,18 @@ describe("addonLabel", () => {
     expect(addonLabel({ name: "Comet", movie: false, series: false })).toBe(
       "Comet",
     );
+  });
+});
+
+describe("stremioUsable", () => {
+  it("is true once an account is linked, even with an expired session", () => {
+    expect(stremioUsable("signed_in")).toBe(true);
+    expect(stremioUsable("reauth_required")).toBe(true);
+  });
+
+  it("is false signed out, unreachable or before the status is known", () => {
+    expect(stremioUsable("signed_out")).toBe(false);
+    expect(stremioUsable("unreachable")).toBe(false);
+    expect(stremioUsable(null)).toBe(false);
   });
 });

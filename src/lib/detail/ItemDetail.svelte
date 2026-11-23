@@ -13,7 +13,7 @@ import type {
   PlaybackStart,
   PlaybackStopped,
 } from "../emby/types";
-import { stremioApi } from "../stremio/api";
+import { stremioState } from "../stremio/api";
 import { sourcesReopen } from "../stremio/reopen.svelte";
 import SourcesPanel from "../stremio/SourcesPanel.svelte";
 import { offersSources } from "../stremio/sources";
@@ -379,10 +379,7 @@ function onMouseup(e: MouseEvent) {
 onMount(() => {
   void load();
   void tick().then(() => heading?.focus({ preventScroll: true }));
-  stremioApi.status().then(
-    (s) => (stremio = s.state),
-    () => {},
-  );
+  void stremioState().then((s) => (stremio = s));
   const unlisten = embyApi.onPlaybackStopped(onStopped);
   return () => void unlisten.then((stop) => stop());
 });
@@ -924,7 +921,7 @@ onMount(() => {
 
 {#if sources}
   <SourcesPanel
-    itemId={detail?.id ?? item.id}
+    target={{ itemId: detail?.id ?? item.id }}
     notice={sources.notice}
     onClose={() => void closeSources()}
     onPlay={(start) => void playSource(start)}

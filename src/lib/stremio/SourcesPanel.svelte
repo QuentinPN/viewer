@@ -1,9 +1,10 @@
 <script lang="ts">
 // « Autres sources »: the streams of the Stremio addons for an Emby film or
-// episode, one section per addon in the account's order, shown as each addon
-// answers. A stream is only an opaque id here: Go holds its URL and plays it.
+// episode, or a title outside Emby by its IMDb id, one section per addon in
+// the account's order, shown as each addon answers. A stream is only an opaque id here: Go holds its URL and plays it.
 import { onDestroy, onMount, tick } from "svelte";
 import type { PlaybackStart } from "../emby/types";
+import "./dialog.css";
 import { stremioApi, toStremioError } from "./api";
 import {
   addonAnswered,
@@ -16,11 +17,14 @@ import {
   streamLines,
   unsupportedNote,
 } from "./sources";
-import type { StreamDescriptor, StremioError } from "./types";
+import type { SourcesTarget, StreamDescriptor, StremioError } from "./types";
 
 interface Props {
-  /** The Emby film or episode. */
-  itemId: string;
+  /**
+   * The Emby film or episode, or a title outside Emby. The stream played has
+   * the `key` of the answer as `itemId`: the page reopens on it.
+   */
+  target: SourcesTarget;
   /** Shown over the list, e.g. after a stream that stopped answering. */
   notice?: string | null;
   onClose: () => void;
@@ -28,7 +32,7 @@ interface Props {
   onPlay: (start: PlaybackStart) => void;
 }
 
-let { itemId, notice = null, onClose, onPlay }: Props = $props();
+let { target, notice = null, onClose, onPlay }: Props = $props();
 
 /** Errors where a new query cannot help: the fix is in Réglages or the title. */
 const FINAL = new Set(["signedOut", "reauthRequired", "noImdb"]);
@@ -57,7 +61,7 @@ async function load() {
   error = null;
   playError = null;
   try {
-    const found = await stremioApi.sources(itemId);
+    const found = await stremioApi.sources(target);
     if (closed || mine !== run) return;
     sources = startSources(found);
     for (const addon of sources.addons) void ask(found.query, addon.id);
@@ -119,14 +123,14 @@ onDestroy(() => {
 
 <dialog
   bind:this={dialog}
-  class="dialog"
+  class="st-dialog"
   aria-labelledby="sources-title"
   aria-busy={sources === null && error === null}
   onclose={onClose}
   onkeydown={(e) => e.stopPropagation()}
 >
-  <div class="head">
-    <h2 id="sources-title" tabindex="-1" bind:this={heading}>Autres sources</h2>
+  <div class="st-head">
+    <h2 id="sources-title" class="st-title" tabindex="-1" bind:this={heading}>Autres sources</h2>
     {#if note}<p class="notice" role="alert">{note}</p>{/if}
     {#if searching}<p class="muted" role="status" aria-live="polite">{searching}</p>{/if}
   </div>
@@ -136,7 +140,7 @@ onDestroy(() => {
       <div class="state" role="alert">
         <p>{error.message}</p>
         {#if !FINAL.has(error.kind)}
-          <button type="button" class="btn" onclick={() => void load()}>Réessayer</button>
+          <button type="button" class="st-btn" onclick={() => void load()}>Réessayer</button>
         {/if}
       </div>
     {:else if sources === null}
@@ -184,48 +188,13 @@ onDestroy(() => {
     {/if}
   </div>
 
-  <div class="foot">
+  <div class="st-foot">
     {#if unsupported}<p class="muted small">{unsupported}</p>{/if}
-    <button type="button" class="btn" onclick={() => dialog?.close()}>Fermer</button>
+    <button type="button" class="st-btn" onclick={() => dialog?.close()}>Fermer</button>
   </div>
 </dialog>
 
 <style>
-  .dialog {
-    width: min(640px, calc(100vw - 32px));
-    max-height: calc(100vh - 64px);
-    padding: 0;
-    border: 1px solid var(--separator);
-    border-radius: var(--radius-lg);
-    background: var(--material-thick);
-    backdrop-filter: var(--material-blur);
-    color: var(--color-text);
-    font: inherit;
-  }
-  .dialog[open] {
-    display: flex;
-    flex-direction: column;
-  }
-  .dialog::backdrop {
-    background: rgb(0 0 0 / 0.55);
-    backdrop-filter: blur(6px);
-  }
-  p {
-    margin: 0;
-  }
-  .head {
-    display: grid;
-    gap: var(--space-3);
-    padding: var(--space-6) var(--space-6) var(--space-4);
-  }
-  h2 {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: 22px;
-  }
-  h2:focus {
-    outline: none;
-  }
   .notice {
     padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-sm);
@@ -311,33 +280,7 @@ onDestroy(() => {
   .small {
     font-size: 13px;
   }
-  .foot {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--space-4);
-    padding: var(--space-4) var(--space-6) var(--space-6);
-  }
-  .foot .muted {
+  .st-foot .muted {
     margin-right: auto;
-  }
-  .btn {
-    height: 38px;
-    padding: 0 var(--space-4);
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: var(--fill-glass);
-    color: var(--color-text);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background var(--motion-fast);
-  }
-  .btn:hover {
-    background: var(--fill-glass-hover);
-  }
-  button:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
   }
 </style>

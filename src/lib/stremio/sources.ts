@@ -2,6 +2,7 @@
 // French labels. Pure, so the panel only shows what these return.
 import { formatSize } from "../detail/format";
 import type { DetailKind, PlaybackStart } from "../emby/types";
+import { stremioUsable } from "./status";
 import type {
   AddonStreams,
   StreamDescriptor,
@@ -160,9 +161,7 @@ export function offersSources(
   state: StremioState | null,
   kind: DetailKind,
 ): boolean {
-  return (
-    kind !== "series" && (state === "signed_in" || state === "reauth_required")
-  );
+  return kind !== "series" && stremioUsable(state);
 }
 
 /** A Stremio stream: no Emby quality, chapters, segments or next episode. */

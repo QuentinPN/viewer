@@ -1,4 +1,4 @@
-// French labels of Réglages › Stremio.
+// French labels of Réglages › Stremio, and whether its streams can be asked.
 import type { AddonInfo, StremioState, StremioStatus } from "./types";
 
 const STATE_LABELS: Record<StremioState, string> = {
@@ -7,6 +7,14 @@ const STATE_LABELS: Record<StremioState, string> = {
   reauth_required: "Session Stremio expirée. Reconnecte-toi.",
   unreachable: "Stremio ne répond pas.",
 };
+
+/**
+ * A Stremio account is linked: its sources are offered. An expired session
+ * still offers them; the panel then says to sign in again.
+ */
+export function stremioUsable(state: StremioState | null): boolean {
+  return state === "signed_in" || state === "reauth_required";
+}
 
 export function statusLabel(s: StremioStatus): string {
   return STATE_LABELS[s.state];

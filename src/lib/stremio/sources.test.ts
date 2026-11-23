@@ -13,6 +13,7 @@ import {
 } from "./sources";
 
 const sources = {
+  key: "item1",
   query: "q1",
   addons: [
     { id: "a1", name: "Comet" },
@@ -39,7 +40,9 @@ describe("startSources", () => {
   });
 
   it("takes a null list from Go as no addon", () => {
-    expect(startSources({ query: "q1", addons: null }).addons).toEqual([]);
+    expect(
+      startSources({ key: "item1", query: "q1", addons: null }).addons,
+    ).toEqual([]);
   });
 });
 
@@ -157,7 +160,9 @@ describe("outcomeNotes", () => {
   });
 
   it("says nothing without addon", () => {
-    expect(outcomeNotes(startSources({ query: "q1", addons: [] }))).toEqual([]);
+    expect(
+      outcomeNotes(startSources({ key: "item1", query: "q1", addons: [] })),
+    ).toEqual([]);
   });
 });
 

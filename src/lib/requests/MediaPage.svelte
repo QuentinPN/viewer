@@ -2,10 +2,19 @@
 // Page of an Request title (Fiche A), laid out as the Emby film page:
 // backdrop with its scrim, round back button (Échap), title, metadata, genres,
 // status of the title and of each season, « Lire » when it is on Emby,
-// « Demander » when something is left to request, « Bande-annonce » when the
+// « Demander » when something is left to request, « Regarder maintenant »
+// (its Stremio sources, an episode picked first for a series) when the title
+// has an IMDb id and a Stremio account is linked, « Bande-annonce » when the
 // title has one (its YouTube page in the browser), synopsis and cast.
-import { onMount, tick } from "svelte";
-import type { MediaItem } from "../emby/types";
+import { onMount, tick, untrack } from "svelte";
+import type { MediaItem, PlaybackStart } from "../emby/types";
+import { stremioState } from "../stremio/api";
+import EpisodePicker from "../stremio/EpisodePicker.svelte";
+import { externalTarget } from "../stremio/episodes";
+import { sourcesReopen } from "../stremio/reopen.svelte";
+import SourcesPanel from "../stremio/SourcesPanel.svelte";
+import { stremioUsable } from "../stremio/status";
+import type { SourcesTarget, StremioState } from "../stremio/types";
 import "./requests.css";
 import { requestsApi, toRequestsError } from "./api";
 import { mediaStatusText, statusTone } from "./labels";
@@ -25,9 +34,11 @@ interface Props {
   onClose: () => void;
   /** « Lire »: the Emby title opens in the existing detail page. */
   onPlay: (item: MediaItem) => void;
+  /** « Regarder maintenant »: a Stremio stream is loaded in the player. */
+  onStream: (start: PlaybackStart) => void;
 }
 
-let { media, viewer, onClose, onPlay }: Props = $props();
+let { media, viewer, onClose, onPlay, onStream }: Props = $props();
 
 let details = $state<MediaDetails | null>(null);
 let error = $state<RequestsError | null>(null);
@@ -38,6 +49,20 @@ let backdropFailed = $state(false);
 let section = $state<HTMLElement | null>(null);
 let heading = $state<HTMLElement | null>(null);
 let askButton = $state<HTMLButtonElement | null>(null);
+/** Stremio account state, read once without waiting; null: no button. */
+let stremio = $state<StremioState | null>(null);
+/** « Choisir un épisode » is open. */
+let picking = $state(false);
+/** Season of the last episode picked: the picker opens on it again. */
+let pickedSeason = $state<number | null>(null);
+/** « Autres sources » is open for this title, with the message over its list. */
+let sources = $state.raw<{
+  target: SourcesTarget;
+  notice: string | null;
+} | null>(null);
+/** The title of the stream last played from here, for a reopen on failure. */
+let streamed: { key: string; target: SourcesTarget } | null = null;
+let watchButton = $state<HTMLButtonElement | null>(null);
 
 const shown = $derived(details ?? media);
 const backdrop = $derived(
@@ -51,6 +76,8 @@ const askable = $derived(
 const seasons = $derived(
   details?.seasons.filter((s) => s.seasonNumber > 0) ?? [],
 );
+const imdb = $derived(details?.externalIds.imdb ?? null);
+const watchable = $derived(imdb !== null && stremioUsable(stremio));
 const meta = $derived(
   [
     shown.year ? String(shown.year) : null,
@@ -96,8 +123,61 @@ async function closeDialog() {
   askButton?.focus();
 }
 
+/** A film lists its sources; a series asks for the episode first. */
+function watchNow() {
+  if (!details || !imdb) return;
+  if (details.type === "movie")
+    sources = { target: externalTarget(imdb, details.title), notice: null };
+  else picking = true;
+}
+
+async function focusWatch() {
+  await tick();
+  watchButton?.focus({ preventScroll: true });
+}
+
+function pickEpisode(pick: { season: number; episode: number }) {
+  picking = false;
+  if (!details || !imdb) return;
+  pickedSeason = pick.season;
+  sources = {
+    target: externalTarget(imdb, details.title, pick),
+    notice: null,
+  };
+}
+
+async function closePicker() {
+  if (!picking) return;
+  picking = false;
+  await focusWatch();
+}
+
+async function closeSources() {
+  sources = null;
+  await focusWatch();
+}
+
+/** The panel closes first: the player gives the focus back to the button. */
+async function playSource(target: SourcesTarget, start: PlaybackStart) {
+  streamed = { key: start.itemId, target };
+  await closeSources();
+  onStream(start);
+}
+
+// A Stremio stream played from here failed: its list opens again, read anew.
+$effect(() => {
+  if (!sourcesReopen.request) return;
+  untrack(() => {
+    const last = streamed;
+    if (!last || sources || picking || !section?.checkVisibility()) return;
+    const notice = sourcesReopen.take(last.key);
+    if (notice !== null) sources = { target: last.target, notice };
+  });
+});
+
 function onKeydown(e: KeyboardEvent) {
-  if (e.defaultPrevented || asking || !section?.checkVisibility()) return;
+  if (e.defaultPrevented || asking || picking || sources) return;
+  if (!section?.checkVisibility()) return;
   if (e.key === "Escape" || (e.altKey && e.key === "ArrowLeft")) {
     e.preventDefault();
     onClose();
@@ -107,6 +187,7 @@ function onKeydown(e: KeyboardEvent) {
 onMount(() => {
   void load();
   void tick().then(() => heading?.focus({ preventScroll: true }));
+  void stremioState().then((s) => (stremio = s));
 });
 </script>
 
@@ -197,6 +278,18 @@ onMount(() => {
           {:else if !playable}
             <button type="button" class="ur-btn large" disabled>Rien à demander</button>
           {/if}
+          {#if watchable}
+            <button
+              type="button"
+              class="ur-btn large"
+              class:primary={!playable && !askable}
+              aria-haspopup="dialog"
+              bind:this={watchButton}
+              onclick={watchNow}
+            >
+              Regarder maintenant
+            </button>
+          {/if}
           {#if details.trailerKey}
             {@const key = details.trailerKey}
             <button type="button" class="ur-btn large" onclick={() => openTrailer(key)}>
@@ -250,6 +343,26 @@ onMount(() => {
 
 {#if asking && details}
   <RequestDialog {details} onClose={closeDialog} onDone={requested} />
+{/if}
+
+{#if picking && details}
+  <EpisodePicker
+    seriesName={details.title}
+    seasons={details.seasons}
+    initialSeason={pickedSeason}
+    onClose={() => void closePicker()}
+    onPick={pickEpisode}
+  />
+{/if}
+
+{#if sources}
+  {@const target = sources.target}
+  <SourcesPanel
+    {target}
+    notice={sources.notice}
+    onClose={() => void closeSources()}
+    onPlay={(start) => void playSource(target, start)}
+  />
 {/if}
 
 <style>

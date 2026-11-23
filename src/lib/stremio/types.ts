@@ -30,8 +30,27 @@ export interface SourceAddon {
   name: string;
 }
 
+/**
+ * A title outside Emby, by its IMDb id: a film without `season` and
+ * `episode`, an episode with both (`name` is then the series').
+ */
+export interface ExternalTarget {
+  imdb: string;
+  name: string;
+  season?: number;
+  episode?: number;
+}
+
+/** What `stremio_sources` lists the streams of: an Emby item or an outside title. */
+export type SourcesTarget = { itemId: string } | { external: ExternalTarget };
+
 /** Answer of `stremio_sources`: the query the streams are asked under. */
 export interface StremioSources {
+  /**
+   * The title's key, the `itemId` of the stream played from it: the Emby item
+   * id, or « stremio:… » for a title outside Emby.
+   */
+  key: string;
   query: string;
   /** Go may send `null` for an empty list. */
   addons: SourceAddon[] | null;

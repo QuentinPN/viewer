@@ -1516,6 +1516,7 @@ $effect(() => {
           viewer={requestMedia.viewer}
           onClose={() => void closeRequestMedia()}
           onPlay={playRequestMedia}
+          onStream={onPlay}
         />
       </div>
     {/key}
