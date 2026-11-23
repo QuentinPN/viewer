@@ -86,18 +86,44 @@ export function addonFailed(
   return settle(s, query, addonId, { kind: "error", message }, 0);
 }
 
-/** The line under an addon's name; none once its streams are listed. */
-export function addonNote(state: AddonState): string | null {
-  switch (state.kind) {
-    case "loading":
-      return "Recherche…";
-    case "empty":
-      return "Aucun flux.";
-    case "error":
-      return state.message;
-    case "ok":
-      return null;
-  }
+/** The addons with streams: the others are not shown. */
+export function shownAddons(s: SourcesState): AddonSection[] {
+  return s.addons.filter((a) => a.state.kind === "ok");
+}
+
+function count(s: SourcesState, kind: AddonState["kind"]): number {
+  return s.addons.filter((a) => a.state.kind === kind).length;
+}
+
+function plural(n: number, one: string, many: string): string {
+  return n === 1 ? one : many;
+}
+
+/** « Recherche dans N sources… » while addons are pending, else none. */
+export function searchNote(s: SourcesState): string | null {
+  const n = count(s, "loading");
+  return n > 0
+    ? `Recherche dans ${n} ${plural(n, "source", "sources")}…`
+    : null;
+}
+
+/** When every addon is done and none has streams: nothing found, and why. */
+export function outcomeNotes(s: SourcesState): string[] {
+  if (s.addons.length === 0 || count(s, "loading") > 0) return [];
+  if (shownAddons(s).length > 0) return [];
+  const failed = count(s, "error");
+  return [
+    "Aucune source trouvée.",
+    ...(failed > 0
+      ? [
+          plural(
+            failed,
+            "1 source n'a pas répondu.",
+            `${failed} sources n'ont pas répondu.`,
+          ),
+        ]
+      : []),
+  ];
 }
 
 function lines(text: string): string[] {

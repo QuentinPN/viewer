@@ -8,8 +8,10 @@ import { stremioApi, toStremioError } from "./api";
 import {
   addonAnswered,
   addonFailed,
-  addonNote,
+  outcomeNotes,
   type SourcesState,
+  searchNote,
+  shownAddons,
   startSources,
   streamLines,
   unsupportedNote,
@@ -45,6 +47,8 @@ let closed = false;
 let run = 0;
 
 const note = $derived(playError ?? notice);
+const searching = $derived(sources ? searchNote(sources) : null);
+const outcome = $derived(sources ? outcomeNotes(sources) : []);
 const unsupported = $derived(unsupportedNote(sources?.unsupported ?? 0));
 
 async function load() {
@@ -124,6 +128,7 @@ onDestroy(() => {
   <div class="head">
     <h2 id="sources-title" tabindex="-1" bind:this={heading}>Autres sources</h2>
     {#if note}<p class="notice" role="alert">{note}</p>{/if}
+    {#if searching}<p class="muted" role="status" aria-live="polite">{searching}</p>{/if}
   </div>
 
   <div class="list">
@@ -139,7 +144,7 @@ onDestroy(() => {
     {:else if sources.addons.length === 0}
       <p class="muted">Aucun addon Stremio ne propose ce type de titre.</p>
     {:else}
-      {#each sources.addons as addon (addon.id)}
+      {#each shownAddons(sources) as addon (addon.id)}
         {@const addonState = addon.state}
         <section class="addon" aria-labelledby="addon-{addon.id}">
           <h3 id="addon-{addon.id}">{addon.name}</h3>
@@ -170,12 +175,11 @@ onDestroy(() => {
                 </li>
               {/each}
             </ul>
-          {:else}
-            <p class="muted" role={addonState.kind === "loading" ? undefined : "status"}>
-              {addonNote(addonState)}
-            </p>
           {/if}
         </section>
+      {/each}
+      {#each outcome as line (line)}
+        <p class="muted" role="status">{line}</p>
       {/each}
     {/if}
   </div>

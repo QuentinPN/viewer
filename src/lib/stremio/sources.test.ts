@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   addonAnswered,
   addonFailed,
-  addonNote,
   isStremio,
   offersSources,
+  outcomeNotes,
+  searchNote,
+  shownAddons,
   startSources,
   streamLines,
   unsupportedNote,
@@ -105,14 +107,57 @@ describe("addonFailed", () => {
   });
 });
 
-describe("addonNote", () => {
-  it("reads each state in French", () => {
-    expect(addonNote({ kind: "loading" })).toBe("Recherche…");
-    expect(addonNote({ kind: "empty" })).toBe("Aucun flux.");
-    expect(addonNote({ kind: "error", message: "Comet : indisponible." })).toBe(
-      "Comet : indisponible.",
-    );
-    expect(addonNote({ kind: "ok", streams: [stream] })).toBeNull();
+describe("shownAddons", () => {
+  it("keeps only the addons with streams, in order", () => {
+    let s = startSources(sources);
+    expect(shownAddons(s)).toEqual([]);
+    s = addonAnswered(s, "q1", "a2", { streams: [stream], unsupported: 0 });
+    s = addonFailed(s, "q1", "a1", "Comet : indisponible.");
+    expect(shownAddons(s).map((a) => a.id)).toEqual(["a2"]);
+  });
+});
+
+describe("searchNote", () => {
+  it("counts the addons still searching", () => {
+    let s = startSources(sources);
+    expect(searchNote(s)).toBe("Recherche dans 2 sources…");
+    s = addonFailed(s, "q1", "a1", "x");
+    expect(searchNote(s)).toBe("Recherche dans 1 source…");
+    s = addonAnswered(s, "q1", "a2", { streams: [], unsupported: 0 });
+    expect(searchNote(s)).toBeNull();
+  });
+});
+
+describe("outcomeNotes", () => {
+  it("says nothing while an addon is searching or a stream is listed", () => {
+    let s = startSources(sources);
+    expect(outcomeNotes(s)).toEqual([]);
+    s = addonAnswered(s, "q1", "a1", { streams: [stream], unsupported: 0 });
+    s = addonAnswered(s, "q1", "a2", { streams: [], unsupported: 0 });
+    expect(outcomeNotes(s)).toEqual([]);
+  });
+
+  it("says no source was found once every addon is done", () => {
+    let s = startSources(sources);
+    s = addonAnswered(s, "q1", "a1", { streams: [], unsupported: 0 });
+    s = addonAnswered(s, "q1", "a2", { streams: [], unsupported: 0 });
+    expect(outcomeNotes(s)).toEqual(["Aucune source trouvée."]);
+  });
+
+  it("adds how many addons did not answer", () => {
+    let s = startSources(sources);
+    s = addonAnswered(s, "q1", "a1", { streams: [], unsupported: 0 });
+    s = addonFailed(s, "q1", "a2", "x");
+    expect(outcomeNotes(s)).toEqual([
+      "Aucune source trouvée.",
+      "1 source n'a pas répondu.",
+    ]);
+    s = addonFailed(s, "q1", "a1", "y");
+    expect(outcomeNotes(s)[1]).toBe("2 sources n'ont pas répondu.");
+  });
+
+  it("says nothing without addon", () => {
+    expect(outcomeNotes(startSources({ query: "q1", addons: [] }))).toEqual([]);
   });
 });
 
