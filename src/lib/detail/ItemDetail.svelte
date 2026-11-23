@@ -13,6 +13,11 @@ import type {
   PlaybackStart,
   PlaybackStopped,
 } from "../emby/types";
+import { stremioApi } from "../stremio/api";
+import { sourcesReopen } from "../stremio/reopen.svelte";
+import SourcesPanel from "../stremio/SourcesPanel.svelte";
+import { offersSources } from "../stremio/sources";
+import type { StremioState } from "../stremio/types";
 import EpisodeList from "./EpisodeList.svelte";
 import { changeFavorite } from "./favorite";
 import {
@@ -124,6 +129,11 @@ let openedSeason: string | null = null;
 let episodeList = $state<ReturnType<typeof EpisodeList> | null>(null);
 /** Cast photos that failed to load, by index. */
 let failedPhotos = $state<Set<number>>(new Set());
+/** Stremio account state, read once without waiting; null: no button. */
+let stremio = $state<StremioState | null>(null);
+/** « Autres sources » is open, with the message shown over its list. */
+let sources = $state<{ notice: string | null } | null>(null);
+let sourcesButton = $state<HTMLButtonElement | null>(null);
 
 const poster = $derived(detail?.poster ?? item.poster);
 const meta = $derived(detail ? metaParts(detail) : []);
@@ -227,6 +237,28 @@ async function playTrailer() {
   }
 }
 
+async function closeSources() {
+  sources = null;
+  await tick();
+  sourcesButton?.focus({ preventScroll: true });
+}
+
+/** The panel closes first: the player gives the focus back to its button. */
+async function playSource(start: PlaybackStart) {
+  await closeSources();
+  onPlay(start);
+}
+
+// A Stremio stream of this page failed: its list opens again, read anew.
+$effect(() => {
+  if (!sourcesReopen.request) return;
+  untrack(() => {
+    if (opened || !section?.checkVisibility()) return;
+    const notice = sourcesReopen.take(item.id);
+    if (notice !== null) sources = { notice };
+  });
+});
+
 function openTitle(item: MediaItem) {
   onOpenPage?.({ kind: "item", item, via: null });
 }
@@ -325,7 +357,7 @@ async function closeEpisode() {
 
 /** Hidden under the player or an episode page: keys belong to them then. */
 function active() {
-  return !opened && (section?.checkVisibility() ?? false);
+  return !opened && !sources && (section?.checkVisibility() ?? false);
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -347,6 +379,10 @@ function onMouseup(e: MouseEvent) {
 onMount(() => {
   void load();
   void tick().then(() => heading?.focus({ preventScroll: true }));
+  stremioApi.status().then(
+    (s) => (stremio = s.state),
+    () => {},
+  );
   const unlisten = embyApi.onPlaybackStopped(onStopped);
   return () => void unlisten.then((stop) => stop());
 });
@@ -557,6 +593,17 @@ onMount(() => {
                   ><rect x="1.5" y="3" width="13" height="10" rx="1.5" /><path d="m6.5 6 3.5 2-3.5 2z" /></svg
                 >
                 {starting === "trailer" ? "Ouverture…" : "Bande-annonce"}
+              </button>
+            {/if}
+            {#if offersSources(stremio, detail.kind)}
+              <button
+                type="button"
+                class="secondary"
+                aria-haspopup="dialog"
+                bind:this={sourcesButton}
+                onclick={() => (sources = { notice: null })}
+              >
+                Autres sources
               </button>
             {/if}
           </div>
@@ -874,6 +921,15 @@ onMount(() => {
     </div>
   {/if}
 </section>
+
+{#if sources}
+  <SourcesPanel
+    itemId={detail?.id ?? item.id}
+    notice={sources.notice}
+    onClose={() => void closeSources()}
+    onPlay={(start) => void playSource(start)}
+  />
+{/if}
 
 {#if opened}
   {#key opened.item.id}

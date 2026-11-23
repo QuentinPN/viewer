@@ -23,3 +23,35 @@ export interface StremioStatus {
 
 /** The `{ kind, message }` of a failed command: same bridge shape as `ur_*`. */
 export type StremioError = RequestsError;
+
+/** An addon asked for streams of a title, in the account's collection order. */
+export interface SourceAddon {
+  id: string;
+  name: string;
+}
+
+/** Answer of `stremio_sources`: the query the streams are asked under. */
+export interface StremioSources {
+  query: string;
+  /** Go may send `null` for an empty list. */
+  addons: SourceAddon[] | null;
+}
+
+/** A playable stream: an opaque id, never its URL or headers. */
+export interface StreamDescriptor {
+  id: string;
+  /** May hold several lines. */
+  name: string;
+  /** The addon's `description` or `title`, lines kept. */
+  description: string;
+  /** In bytes; null when the addon gave none. */
+  size: number | null;
+}
+
+/** Answer of `stremio_addon_streams` for one addon. */
+export interface AddonStreams {
+  /** Go may send `null` for an empty list. */
+  streams: StreamDescriptor[] | null;
+  /** Streams left out: torrents without a link and the like. */
+  unsupported: number;
+}
