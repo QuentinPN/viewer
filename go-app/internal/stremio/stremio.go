@@ -32,6 +32,8 @@ const (
 	KindSignedOut ErrorKind = "signedOut"
 	// KindReauthRequired: the stored session was refused; sign in again.
 	KindReauthRequired ErrorKind = "reauthRequired"
+	// KindCredentialStore: the Windows vault refused to save or delete the session.
+	KindCredentialStore ErrorKind = "credentialStore"
 )
 
 // Error is a Stremio failure. Addon is the manifest name of the addon concerned,
@@ -82,6 +84,8 @@ func (e Error) Error() string {
 		return "Aucun compte Stremio connecté."
 	case KindReauthRequired:
 		return "Session Stremio expirée. Reconnecte-toi."
+	case KindCredentialStore:
+		return "Le coffre de Windows est indisponible pour la session Stremio."
 	default:
 		return "Erreur Stremio."
 	}

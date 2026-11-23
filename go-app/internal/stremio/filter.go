@@ -24,7 +24,7 @@ func (a Addon) Serves(t ContentType, id string) bool {
 		if !slices.Contains(types, string(t)) {
 			continue
 		}
-		if prefixes == nil || slices.ContainsFunc(prefixes, func(p string) bool { return strings.HasPrefix(id, p) }) {
+		if len(prefixes) == 0 || slices.ContainsFunc(prefixes, func(p string) bool { return strings.HasPrefix(id, p) }) {
 			return true
 		}
 	}

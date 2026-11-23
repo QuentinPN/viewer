@@ -185,7 +185,7 @@ func (s *Service) SignIn(ctx context.Context, email, password string) error {
 		return err
 	}
 	if err := s.store.Save(Account, emby.NewAccessToken(key.value)); err != nil {
-		return err
+		return vaultError(err)
 	}
 	s.reset()
 	slog.Info("Stremio signed in")
@@ -200,7 +200,17 @@ func (s *Service) SignOut() error {
 	if err == nil {
 		slog.Info("Stremio signed out")
 	}
-	return err
+	return vaultError(err)
+}
+
+// vaultError is a vault failure as the UI's `{kind, message}` error; its own text
+// stays out of the message.
+func vaultError(err error) error {
+	if err == nil {
+		return nil
+	}
+	slog.Warn("Stremio credential store failed")
+	return Error{Kind: KindCredentialStore}
 }
 
 // kindOf is the kind of an Error, "" for any other error.

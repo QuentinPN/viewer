@@ -55,6 +55,11 @@ function signIn(e: SubmitEvent) {
   void run(() => stremioApi.signIn(email.trim(), secret));
 }
 
+async function signOut() {
+  await run(stremioApi.signOut);
+  if (!error) email = "";
+}
+
 onMount(() => void run(stremioApi.status));
 </script>
 
@@ -125,7 +130,7 @@ onMount(() => void run(stremioApi.status));
       type="button"
       class="ur-btn"
       disabled={busy}
-      onclick={() => void run(stremioApi.signOut)}
+      onclick={signOut}
     >
       Se déconnecter
     </button>

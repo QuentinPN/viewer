@@ -235,3 +235,27 @@ func TestServiceNeverPrintsSecrets(t *testing.T) {
 		}
 	}
 }
+
+// failingStore is a vault that refuses to write.
+type failingStore struct{ emby.MemoryCredentialStore }
+
+func (*failingStore) Save(string, emby.AccessToken) error { return errors.New("accès refusé") }
+func (*failingStore) Delete(string) error                 { return errors.New("accès refusé") }
+
+func TestServiceVaultErrorsAreStremioErrors(t *testing.T) {
+	f := newFakeServer(t)
+	svc := NewService(&failingStore{}, NewClient(f.URL, "1"))
+	for name, err := range map[string]error{
+		"sign-in":  svc.SignIn(context.Background(), "owner@example.com", "hunter2"),
+		"sign-out": svc.SignOut(),
+	} {
+		var e Error
+		if !errors.As(err, &e) || e.Kind != KindCredentialStore {
+			t.Fatalf("%s : %v", name, err)
+		}
+		raw, _ := json.Marshal(err)
+		if string(raw) != `{"kind":"credentialStore","message":"Le coffre de Windows est indisponible pour la session Stremio."}` {
+			t.Fatalf("%s : %s", name, raw)
+		}
+	}
+}
