@@ -1,5 +1,20 @@
 # Journal des versions
 
+## 1.8.0 — 2026-11-23
+
+### Nouveautés
+
+- hard hat raccoon for the debug build (desktop)
+- seasonal launcher icon and in-app logo, with an on/off setting (android)
+- seasonal logo and window icon, with an on/off setting (desktop)
+- season calendar for the seasonal logo, shared test vectors (brand)
+- hard hat raccoon for the Android debug build (brand)
+- replace the logo with the raccoon mascot (brand)
+
+### Corrections
+
+- make the native seam Wails-only and drop the UI settings handover (frontend)
+
 ## 1.7.0 — 2026-11-22
 
 ### Nouveautés
