@@ -28,26 +28,33 @@
 // --build  npm run build, then a debug `go build` (app.mjs buildDebug)
 // --out    folder of the captures and report.json
 //          (default: <tmp>/viewer-stremio-settings-<timestamp>)
-import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildDebug, debugExe as exe, launch, root } from "./app.mjs";
+import { buildDebug, debugExe as exe, launch } from "./app.mjs";
 import {
-  debugEnv,
   libraryNav,
   signIn,
   signInHeading,
   signOut,
   startScreen,
 } from "./scenario.mjs";
+import {
+  capture,
+  emailField,
+  openSettings,
+  settingsPanel as panel,
+  passwordField,
+  readAccounts,
+  readAuthKey,
+  removeWork,
+  scrubbedReport,
+  scrubber,
+  settingsButton,
+  settingsState as stateText,
+  vaultTargets,
+  waitForSettingsState as waitForState,
+} from "./stremio.mjs";
 
 const argv = process.argv.slice(2);
 const outArg = argv.indexOf("--out");
@@ -61,7 +68,6 @@ const out =
     ? argv[outArg + 1]
     : join(tmpdir(), `viewer-stremio-settings-${stamp}`);
 const PORT = 9343;
-const VAULT_TARGET = "stremio.Viewer-debug";
 const WRONG = { email: "nobody@example.com", password: "wrong" };
 const WRONG_MESSAGE = "Adresse e-mail ou mot de passe incorrect.";
 const ADDONS = [
@@ -84,204 +90,14 @@ const appEnv = {
 
 // ---- accounts and redaction -------------------------------------------------
 
-const optionalEnv = (key) => {
-  try {
-    return debugEnv(key);
-  } catch {
-    return "";
-  }
-};
-const account = {
-  url: `http://${debugEnv("EMBY_IP")}`,
-  user: debugEnv("LOGIN"),
-  password: debugEnv("PASSWORD"),
-};
-const urUrl = optionalEnv("VIEWER_UR_URL");
-const readSecret = (name) =>
-  process.env[name]
-    ? readFileSync(process.env[name], "utf8").replace(/\r?\n$/, "")
-    : null;
-const stremio =
-  process.env.ST_EMAIL_FILE && process.env.ST_PASS_FILE
-    ? {
-        email: readSecret("ST_EMAIL_FILE").trim(),
-        password: readSecret("ST_PASS_FILE"),
-      }
-    : null;
-// Read once: never passed on to the app process.
-for (const key of [
-  "EMBY_IP",
-  "LOGIN",
-  "PASSWORD",
-  "VIEWER_UR_URL",
-  "ST_EMAIL_FILE",
-  "ST_PASS_FILE",
-])
-  delete process.env[key];
-
-const host = (u) => {
-  try {
-    return [new URL(u).host, new URL(u).hostname];
-  } catch {
-    return [];
-  }
-};
-const secrets = [
-  account.password,
-  account.url,
-  ...host(account.url),
-  account.user,
-  urUrl,
-  ...host(urUrl),
-  stremio?.email,
-  stremio?.password,
-].filter((s) => s && s.length >= 3);
-/** Anything printed or written goes through this first. */
-const scrub = (value) =>
-  [...secrets]
-    .sort((a, b) => b.length - a.length)
-    .reduce((t, s) => t.split(s).join("«masqué»"), String(value));
-const firstLine = (e) =>
-  scrub(e instanceof Error ? e.message : String(e)).split("\n")[0];
-
-// ---- report -----------------------------------------------------------------
-
-const checks = [];
-const report = {
-  startedAt: new Date().toISOString(),
+const { account, stremio, secrets } = readAccounts();
+const { scrub, firstLine } = scrubber(secrets);
+const { check, skip, finish } = scrubbedReport(scrub, {
   build: "debug (coffre Viewer-debug)",
   realSignIn: Boolean(stremio),
-  checks,
-};
-function check(name, passed, detail = "") {
-  const d = scrub(detail);
-  checks.push({ name, passed: Boolean(passed), detail: d });
-  console.log(`${passed ? "PASS" : "FAIL"} ${name}${d ? ` — ${d}` : ""}`);
-}
-function skip(name, why) {
-  checks.push({ name, passed: true, skipped: true, detail: why });
-  console.log(`SKIP ${name} — ${why}`);
-}
-
-// ---- vault --------------------------------------------------------------------
-
-/** `target=` lines of `cmdkey /list` matching `re` (never printed). */
-const vaultTargets = (re) =>
-  spawnSync("cmdkey", ["/list"], { encoding: "utf8", windowsHide: true })
-    .stdout.split(/\r?\n/)
-    .filter((l) => /target=/i.test(l) && re.test(l)).length;
-
-/** The authKey stored by the app (CredReadW, UTF-16 blob), or null. Memory only. */
-function readAuthKey() {
-  const ps = `
-Add-Type -Name C -Namespace U -MemberDefinition '[DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] public static extern bool CredReadW(string target, int type, int flags, out System.IntPtr cred); [DllImport("advapi32.dll")] public static extern void CredFree(System.IntPtr p);'
-$p = [System.IntPtr]::Zero
-if (-not [U.C]::CredReadW('${VAULT_TARGET}', 1, 0, [ref]$p)) { exit 3 }
-$size = [System.Runtime.InteropServices.Marshal]::ReadInt32($p, 32)
-$blob = [System.Runtime.InteropServices.Marshal]::ReadIntPtr($p, 40)
-$bytes = New-Object byte[] $size
-[System.Runtime.InteropServices.Marshal]::Copy($blob, $bytes, 0, $size)
-[U.C]::CredFree($p)
-[Convert]::ToBase64String($bytes)`;
-  const r = spawnSync("powershell", ["-NoProfile", "-Command", ps], {
-    encoding: "utf8",
-    windowsHide: true,
-  });
-  if (r.status !== 0) return null;
-  const key = Buffer.from(r.stdout.trim(), "base64").toString("utf16le");
-  return key.length >= 8 ? key : null;
-}
-
-// ---- captures -----------------------------------------------------------------
-
-/** PrintWindow of the app's own window, account values masked in the page. */
-async function capture(app, name) {
-  const file = join(out, `${name}.png`);
-  await app.page.evaluate((hide) => {
-    const has = (t) => hide.some((h) => t?.includes(h));
-    window.__masked = [];
-    for (const input of document.querySelectorAll("input")) {
-      if (!has(input.value)) continue;
-      window.__masked.push(() =>
-        input.style.removeProperty("-webkit-text-security"),
-      );
-      input.style.setProperty("-webkit-text-security", "disc");
-    }
-    const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
-      if (!has(n.nodeValue)) continue;
-      const node = n;
-      const text = node.nodeValue;
-      window.__masked.push(() => {
-        node.nodeValue = text;
-      });
-      node.nodeValue = hide.reduce((t, h) => t.split(h).join("•••"), text);
-    }
-  }, secrets);
-  try {
-    // Two frames, so the masked page is what the window paints.
-    await app.page.evaluate(
-      () =>
-        new Promise((r) =>
-          requestAnimationFrame(() => requestAnimationFrame(r)),
-        ),
-    );
-    await app.page.waitForTimeout(300);
-    const r = spawnSync(
-      "powershell",
-      [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        join(root, "scripts", "e2e", "print-window.ps1"),
-        "-ProcessId",
-        String(app.proc.pid),
-        "-Path",
-        file,
-      ],
-      { encoding: "utf8", windowsHide: true },
-    );
-    if (r.status !== 0) throw new Error(`PrintWindow: ${r.stderr.trim()}`);
-    const { printed, width, height, distinctColors } = JSON.parse(
-      r.stdout.trim(),
-    );
-    return { file, printed, width, height, distinctColors };
-  } finally {
-    await app.page.evaluate(() => {
-      for (const undo of window.__masked ?? []) undo();
-      window.__masked = [];
-    });
-  }
-}
+});
 
 // ---- panel helpers ------------------------------------------------------------
-
-const panel = (page) =>
-  page.locator("section[aria-labelledby=settings-stremio]");
-const stateText = async (page) =>
-  (await panel(page).locator(".state").textContent())
-    ?.replace(/\s+/g, " ")
-    .trim();
-const emailField = (page) => panel(page).locator("#stremio-email");
-const passwordField = (page) => panel(page).locator("#stremio-password");
-const panelButton = (page, name) =>
-  panel(page).getByRole("button", { name, exact: true });
-
-/** Waits for the panel to settle on `label` (« Connecté », « Déconnecté »…). */
-async function waitForState(page, label, timeout = 30000) {
-  await page.waitForFunction(
-    (want) => {
-      const p = document.querySelector(
-        "section[aria-labelledby=settings-stremio]",
-      );
-      const s = p?.querySelector(".state")?.textContent?.trim();
-      return p?.getAttribute("aria-busy") === "false" && s === want;
-    },
-    label,
-    { timeout },
-  );
-}
 
 /**
  * Tab from the panel heading until the focus leaves the panel; every control
@@ -401,15 +217,9 @@ try {
   await signIn(page, account, account.password);
   state.emby = true;
   await libraryNav(page).waitFor({ timeout: 30000 });
-  await libraryNav(page)
-    .getByRole("button", { name: "Réglages", exact: true })
-    .click();
-  await page
-    .getByRole("heading", { name: "Réglages", level: 1 })
-    .waitFor({ timeout: 15000 });
+  await openSettings(page);
 
   // 1. The panel, after « Demandes », signed out, with its two fields.
-  await panel(page).waitFor({ timeout: 15000 });
   await waitForState(page, "Déconnecté", 20000);
   const order = await page.evaluate(() => {
     const st = document.querySelector(
@@ -451,7 +261,7 @@ try {
   );
 
   // 2. Wrong credentials.
-  await panelButton(page, "Se connecter").click();
+  await settingsButton(page, "Se connecter").click();
   const alert = panel(page).getByRole("alert");
   await alert.waitFor({ timeout: 30000 });
   await waitForState(page, "Déconnecté");
@@ -476,7 +286,7 @@ try {
       skip(name, "ST_EMAIL_FILE et ST_PASS_FILE absents");
     await emailField(page).fill("");
     await panel(page).scrollIntoViewIfNeeded();
-    const c = await capture(app, "stremio-deconnecte");
+    const c = await capture(app, out, "stremio-deconnecte", secrets);
     check(
       "capture_signed_out",
       c.printed && c.distinctColors > 20,
@@ -486,7 +296,7 @@ try {
     // 3. Real sign-in.
     await emailField(page).fill(stremio.email);
     await passwordField(page).fill(stremio.password);
-    await panelButton(page, "Se connecter").click();
+    await settingsButton(page, "Se connecter").click();
     state.stremio = true;
     await waitForState(page, "Connecté", 45000);
     check("real_sign_in", (await stateText(page)) === "Connecté");
@@ -527,7 +337,7 @@ try {
     check("password_empty_at_capture", pwdEmpty, `champ présent : ${pwd > 0}`);
     await panel(page).scrollIntoViewIfNeeded();
     if (pwdEmpty) {
-      const c = await capture(app, "stremio-connecte");
+      const c = await capture(app, out, "stremio-connecte", secrets);
       check(
         "capture_signed_in",
         c.printed && c.distinctColors > 20,
@@ -536,7 +346,7 @@ try {
     }
 
     // 5. Sign-out from the button.
-    await panelButton(page, "Se déconnecter").click();
+    await settingsButton(page, "Se déconnecter").click();
     await waitForState(page, "Déconnecté");
     state.stremio = false;
     check("sign_out_button", (await stateText(page)) === "Déconnecté");
@@ -553,7 +363,7 @@ try {
     );
     // 6. The signed-out panel.
     await panel(page).scrollIntoViewIfNeeded();
-    const c = await capture(app, "stremio-deconnecte");
+    const c = await capture(app, out, "stremio-deconnecte", secrets);
     check(
       "capture_signed_out",
       c.printed && c.distinctColors > 20,
@@ -610,21 +420,6 @@ try {
     );
   }
   authKey = null;
-  // WebView2 may hold its profile a moment after the app exits.
-  for (let i = 0; i < 10 && existsSync(work); i++) {
-    try {
-      rmSync(work, { recursive: true, force: true });
-    } catch {
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-  }
-  check("work_folder_removed", !existsSync(work));
-  report.finishedAt = new Date().toISOString();
-  report.passed = checks.every((c) => c.passed);
-  writeFileSync(
-    join(out, "report.json"),
-    scrub(JSON.stringify(report, null, 2)),
-  );
-  console.log(`${report.passed ? "ALL PASSED" : "FAILURES"} — ${out}`);
-  process.exitCode = report.passed ? 0 : 1;
+  check("work_folder_removed", await removeWork(work));
+  finish(out);
 }
