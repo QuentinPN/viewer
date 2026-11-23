@@ -74,6 +74,7 @@ async function ask(query: string, addonId: string) {
     if (failure.kind === "expired") {
       sources = null;
       error = failure;
+      void tick().then(() => heading?.focus());
     } else sources = addonFailed(sources, query, addonId, failure.message);
   }
 }

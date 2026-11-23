@@ -105,6 +105,9 @@ async function playbackInterrupted(itemId: string) {
     returnFocus = null;
     await tick();
     sourcesReopen.ask(itemId, SOURCE_FAILED);
+    // No visible page took it: it must not pop up on a later visit.
+    await tick();
+    sourcesReopen.clear();
     return;
   }
   interrupted = { itemId, mediaSourceId: versionOf(itemId) };
