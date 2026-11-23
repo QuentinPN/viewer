@@ -12,17 +12,9 @@
           "background": "https://tmdb.creepso.com/background.png",
           "name": "The Movie Database Addon",
           "description": "Stremio addon that provides rich metadata for movies and TV shows from TMDB, featuring customizable catalogs, multi-language support, favorites lists, watchlist, ratings, and IMDb integration. Current settings: Language: fr-FR | TMDB Account: Not Connected | Trakt Integration: Not Connected | MDBList Integration: Not Connected | IMDb Integration: Disabled | RPDB Integration: Enabled | Top Posters Integration: Disabled | Search: Enabled | Active Catalogs: 28",
-          "resources": [
-            "catalog",
-            "meta"
-          ],
-          "types": [
-            "movie",
-            "series"
-          ],
-          "idPrefixes": [
-            "tmdb:"
-          ],
+          "resources": ["catalog", "meta"],
+          "types": ["movie", "series"],
+          "idPrefixes": ["tmdb:"],
           "stremioAddonsConfig": {
             "issuer": "https://stremio-addons.net",
             "signature": "REDACTED..DTiTHmYyIbuTMPJB35cqsw.REDACTED.DJZBtIb1bOCq6Z62AMUGvw"
@@ -109,10 +101,7 @@
               "extra": [
                 {
                   "name": "genre",
-                  "options": [
-                    "Day",
-                    "Week"
-                  ],
+                  "options": ["Day", "Week"],
                   "isRequired": false
                 },
                 {
@@ -128,10 +117,7 @@
               "extra": [
                 {
                   "name": "genre",
-                  "options": [
-                    "Day",
-                    "Week"
-                  ],
+                  "options": ["Day", "Week"],
                   "isRequired": false
                 },
                 {
@@ -1050,34 +1036,21 @@
           "version": "2.2.1",
           "name": "TMDB Collections",
           "description": "Addon lets you explore TMDB Collections, which are essentially grouped movie series. Discover collections featuring newly released movies or browse catalogs of popular and top-rated collections. You can filter by genre or search collections by actor, director, writer, movie or collection name in any language.",
-          "types": [
-            "movie",
-            "collections"
-          ],
+          "types": ["movie", "collections"],
           "resources": [
             "catalog",
             {
               "name": "meta",
-              "types": [
-                "movie"
-              ],
-              "idPrefixes": [
-                "ctmdb."
-              ]
+              "types": ["movie"],
+              "idPrefixes": ["ctmdb."]
             },
             {
               "name": "stream",
-              "types": [
-                "movie"
-              ],
-              "idPrefixes": [
-                "tt"
-              ]
+              "types": ["movie"],
+              "idPrefixes": ["tt"]
             }
           ],
-          "idPrefixes": [
-            "ctmdb."
-          ],
+          "idPrefixes": ["ctmdb."],
           "behaviorHints": {
             "configurable": true
           },
@@ -1953,31 +1926,17 @@
           "description": "Local add-on to find playable files: .torrent, .mp4, .mkv and .avi",
           "logo": null,
           "background": null,
-          "types": [
-            "movie",
-            "series",
-            "other"
-          ],
+          "types": ["movie", "series", "other"],
           "resources": [
             {
               "name": "meta",
-              "types": [
-                "other"
-              ],
-              "idPrefixes": [
-                "local:",
-                "bt:"
-              ]
+              "types": ["other"],
+              "idPrefixes": ["local:", "bt:"]
             },
             {
               "name": "stream",
-              "types": [
-                "movie",
-                "series"
-              ],
-              "idPrefixes": [
-                "tt"
-              ]
+              "types": ["movie", "series"],
+              "idPrefixes": ["tt"]
             }
           ],
           "idPrefixes": null,
@@ -2003,18 +1962,9 @@
           "version": "3.0.14",
           "description": "The official addon for movie and series catalogs",
           "name": "Cinemeta",
-          "resources": [
-            "catalog",
-            "meta",
-            "addon_catalog"
-          ],
-          "types": [
-            "movie",
-            "series"
-          ],
-          "idPrefixes": [
-            "tt"
-          ],
+          "resources": ["catalog", "meta", "addon_catalog"],
+          "types": ["movie", "series"],
+          "idPrefixes": ["tt"],
           "addonCatalogs": [
             {
               "type": "all",
@@ -2129,11 +2079,7 @@
                   "name": "skip"
                 }
               ],
-              "extraSupported": [
-                "search",
-                "genre",
-                "skip"
-              ],
+              "extraSupported": ["search", "genre", "skip"],
               "name": "Popular"
             },
             {
@@ -2198,11 +2144,7 @@
                   "name": "skip"
                 }
               ],
-              "extraSupported": [
-                "search",
-                "genre",
-                "skip"
-              ],
+              "extraSupported": ["search", "genre", "skip"],
               "name": "Popular"
             },
             {
@@ -2435,13 +2377,8 @@
                   "name": "skip"
                 }
               ],
-              "extraSupported": [
-                "genre",
-                "skip"
-              ],
-              "extraRequired": [
-                "genre"
-              ],
+              "extraSupported": ["genre", "skip"],
+              "extraRequired": ["genre"],
               "name": "New"
             },
             {
@@ -2594,13 +2531,8 @@
                   "name": "skip"
                 }
               ],
-              "extraSupported": [
-                "genre",
-                "skip"
-              ],
-              "extraRequired": [
-                "genre"
-              ],
+              "extraSupported": ["genre", "skip"],
+              "extraRequired": ["genre"],
               "name": "New"
             },
             {
@@ -2656,10 +2588,7 @@
                   "name": "skip"
                 }
               ],
-              "extraSupported": [
-                "genre",
-                "skip"
-              ],
+              "extraSupported": ["genre", "skip"],
               "name": "Featured"
             },
             {
@@ -2721,10 +2650,7 @@
                   "name": "skip"
                 }
               ],
-              "extraSupported": [
-                "genre",
-                "skip"
-              ],
+              "extraSupported": ["genre", "skip"],
               "name": "Featured"
             },
             {
@@ -2737,12 +2663,8 @@
                   "optionsLimit": 100
                 }
               ],
-              "extraSupported": [
-                "lastVideosIds"
-              ],
-              "extraRequired": [
-                "lastVideosIds"
-              ],
+              "extraSupported": ["lastVideosIds"],
+              "extraRequired": ["lastVideosIds"],
               "name": "Last videos"
             },
             {
@@ -2755,12 +2677,8 @@
                   "optionsLimit": 100
                 }
               ],
-              "extraSupported": [
-                "calendarVideosIds"
-              ],
-              "extraRequired": [
-                "calendarVideosIds"
-              ],
+              "extraSupported": ["calendarVideosIds"],
+              "extraRequired": ["calendarVideosIds"],
               "name": "Calendar videos"
             }
           ],
@@ -2782,21 +2700,10 @@
           "name": "Lumio · Profil",
           "description": "Votre cinéma privé par Lumio.  ⚙️ Besoin de modifier votre profil ? Cliquez sur le bouton configuration (l'engrenage).",
           "logo": "https://mylumio.tv/static/logo.png",
-          "resources": [
-            "stream"
-          ],
-          "types": [
-            "movie",
-            "series",
-            "anime"
-          ],
+          "resources": ["stream"],
+          "types": ["movie", "series", "anime"],
           "catalogs": [],
-          "idPrefixes": [
-            "tt",
-            "tmdb",
-            "tvdb",
-            "kitsu"
-          ],
+          "idPrefixes": ["tt", "tmdb", "tvdb", "kitsu"],
           "behaviorHints": {
             "configurable": true,
             "configurationRequired": false
@@ -2818,26 +2725,12 @@
           "name": "AIOSources",
           "resources": [
             {
-              "idPrefixes": [
-                "tt",
-                "imdb:",
-                "tmdb:",
-                "tvdb:",
-                "mal:"
-              ],
+              "idPrefixes": ["tt", "imdb:", "tmdb:", "tvdb:", "mal:"],
               "name": "stream",
-              "types": [
-                "movie",
-                "series",
-                "anime"
-              ]
+              "types": ["movie", "series", "anime"]
             }
           ],
-          "types": [
-            "movie",
-            "series",
-            "anime"
-          ],
+          "types": ["movie", "series", "anime"],
           "version": "2.4.0"
         },
         "flags": {}
@@ -2853,19 +2746,11 @@
           "resources": [
             {
               "name": "stream",
-              "types": [
-                "movie",
-                "series"
-              ],
-              "idPrefixes": [
-                "tt"
-              ]
+              "types": ["movie", "series"],
+              "idPrefixes": ["tt"]
             }
           ],
-          "types": [
-            "movie",
-            "series"
-          ],
+          "types": ["movie", "series"],
           "name": "StreamFusionReborn",
           "description": "StreamFusionReborn enhances Stremio by integrating torrent indexers and debrid services, providing access to a vast array of cached torrent sources. This plugin seamlessly bridges Stremio with popular indexers and debrid platforms, offering users an expanded content library and a smooth streaming experience.",
           "behaviorHints": {
@@ -2884,19 +2769,9 @@
           "version": "3.29.0",
           "description": "Stremio addon to convert DDL to streams via debrid services",
           "catalogs": [],
-          "resources": [
-            "stream"
-          ],
-          "types": [
-            "movie",
-            "series",
-            "anime"
-          ],
-          "idPrefixes": [
-            "tt",
-            "kitsu",
-            "tmdb"
-          ],
+          "resources": ["stream"],
+          "types": ["movie", "series", "anime"],
+          "idPrefixes": ["tt", "kitsu", "tmdb"],
           "behaviorHints": {
             "configurable": true,
             "configurationRequired": false
@@ -2917,22 +2792,11 @@
           "resources": [
             {
               "name": "stream",
-              "types": [
-                "movie",
-                "series"
-              ],
-              "idPrefixes": [
-                "tt",
-                "kitsu"
-              ]
+              "types": ["movie", "series"],
+              "idPrefixes": ["tt", "kitsu"]
             }
           ],
-          "types": [
-            "movie",
-            "series",
-            "anime",
-            "other"
-          ],
+          "types": ["movie", "series", "anime", "other"],
           "logo": "https://raw.githubusercontent.com/g0ldyy/comet/refs/heads/main/comet/assets/icon.png",
           "background": "https://raw.githubusercontent.com/g0ldyy/comet/refs/heads/main/comet/assets/background.png",
           "behaviorHints": {
@@ -2955,22 +2819,11 @@
           "resources": [
             {
               "name": "stream",
-              "types": [
-                "movie",
-                "series"
-              ],
-              "idPrefixes": [
-                "tt",
-                "kitsu"
-              ]
+              "types": ["movie", "series"],
+              "idPrefixes": ["tt", "kitsu"]
             }
           ],
-          "types": [
-            "movie",
-            "series",
-            "anime",
-            "other"
-          ],
+          "types": ["movie", "series", "anime", "other"],
           "logo": "https://torrentsdb.com/icon.svg",
           "behaviorHints": {
             "configurable": true,
