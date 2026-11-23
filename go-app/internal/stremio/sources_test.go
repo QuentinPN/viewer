@@ -383,7 +383,7 @@ func TestSourcesHandlersRefuseBadArgs(t *testing.T) {
 	svc, f, _, _ := newTestService(t)
 	res := newResolver()
 	h := Handlers(svc, res.resolve)
-	play := PlayHandler(svc, func(context.Context, Selected) (any, error) {
+	play := PlayHandler(svc, func(context.Context, Selected, bool) (any, error) {
 		t.Fatal("lecture sans flux")
 		return nil, nil
 	})
@@ -405,6 +405,7 @@ func TestSourcesHandlersRefuseBadArgs(t *testing.T) {
 		{"stremio_addon_streams", `["q","a"]`, "invalid args for command `stremio_addon_streams`"},
 		{"stremio_play", `{}`, "command stremio_play missing required key streamId"},
 		{"stremio_play", `{"streamId":"https://debrid.example/x.mkv","source":"x"}`, "invalid args for command `stremio_play`"},
+		{"stremio_play", `{"streamId":"s","resume":"yes"}`, "invalid args for command `stremio_play`"},
 	}
 	for _, c := range cases {
 		_, err := call(t, h, c.cmd, c.args)
@@ -425,7 +426,7 @@ func TestPlayHandler(t *testing.T) {
 	svc, _ := signedIn(t)
 	res := newResolver()
 	var played []Selected
-	h := map[string]Handler{"stremio_play": PlayHandler(svc, func(_ context.Context, s Selected) (any, error) {
+	h := map[string]Handler{"stremio_play": PlayHandler(svc, func(_ context.Context, s Selected, _ bool) (any, error) {
 		played = append(played, s)
 		return "ok", nil
 	})}
@@ -500,7 +501,7 @@ func TestSourcesOfATitleOutsideEmby(t *testing.T) {
 	res := newResolver()
 	h := Handlers(svc, res.resolve)
 	var played []Selected
-	h["stremio_play"] = PlayHandler(svc, func(_ context.Context, s Selected) (any, error) {
+	h["stremio_play"] = PlayHandler(svc, func(_ context.Context, s Selected, _ bool) (any, error) {
 		played = append(played, s)
 		return "ok", nil
 	})

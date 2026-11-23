@@ -49,6 +49,7 @@ func registerPlayer(reg *bridge.Registry, a *app.App, win Window) {
 		if err != nil {
 			return nil, err
 		}
+		a.StremioResume.End()
 		return unit(engine.Load(&request, source))
 	}))
 	reg.Register("player_command", arg1("player_command", "command", func(_ context.Context, command player.PlayerCommand) (any, error) {

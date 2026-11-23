@@ -196,7 +196,9 @@ type App struct {
 	Emby        *emby.EmbyService
 	Request *request.Service
 	Stremio     *stremio.Service
-	Segments    *segments.Service
+	// StremioResume follows the Stremio playback going on (stremio-resume.json).
+	StremioResume *stremio.ResumeTracker
+	Segments      *segments.Service
 	// Artwork is nil when the app has no cache folder.
 	Artwork  *artworkcache.Cache
 	Reporter *emby.Reporter
@@ -263,7 +265,15 @@ func New(opts Options) (*App, error) {
 	a.Emby = svc
 	a.Request = request.NewService(opts.Store, filepath.Join(opts.Paths.Config, "request.json"), device, opts.Version).
 		WithArtworkCache(a.Artwork)
-	a.Stremio = stremio.NewService(opts.Store, stremio.NewClient(stremio.APIBase, opts.Version))
+	// Beside session.json, kept across Stremio sign-outs: a history of this PC.
+	resume := stremio.LoadResumeStore(filepath.Join(opts.Paths.Config, stremio.ResumeFile))
+	a.Stremio = stremio.NewService(opts.Store, stremio.NewClient(stremio.APIBase, opts.Version)).WithResume(resume)
+	a.StremioResume = stremio.NewResumeTracker(resume, func(c player.PlayerCommand) error {
+		if e := a.engine.Load(); e != nil {
+			return e.Command(c)
+		}
+		return player.ErrNotOpen
+	}, a.Go)
 	a.Segments = segments.NewService(opts.Version)
 	a.Reporter = emby.NewReporter(svc, opts.Emit)
 	a.Sync = devsync.NewService(ctx, devsync.ServiceConfig{
@@ -353,16 +363,24 @@ func (a *App) Engine() (*player.MpvEngine, error) {
 		cfg.TLSRoots = filepath.Join(a.opts.Paths.Cache, "tls-roots.pem")
 	}
 	cfg.Logger = a.log
-	e, err := player.NewMpvEngine(a.opts.Libmpv, cfg, func(ev player.PlayerEvent) {
-		a.Reporter.PlayerEvent(ev)
-		a.Sync.PlayerEvent(ev)
-		a.opts.Emit(PlayerEvent, ev)
-	})
+	e, err := player.NewMpvEngine(a.opts.Libmpv, cfg, a.playerEvent)
 	if err != nil {
 		return nil, err
 	}
 	a.engine.Store(e)
 	return e, nil
+}
+
+// playerEvent is the engine's sink: the Stremio tracker first, which holds back
+// the end of file of a start past the end, then the reporter, the linked playback
+// and the UI.
+func (a *App) playerEvent(ev player.PlayerEvent) {
+	if !a.StremioResume.PlayerEvent(ev) {
+		return
+	}
+	a.Reporter.PlayerEvent(ev)
+	a.Sync.PlayerEvent(ev)
+	a.opts.Emit(PlayerEvent, ev)
 }
 
 // ClosePlayer is `AppState::close_player`: detaches and destroys the engine.

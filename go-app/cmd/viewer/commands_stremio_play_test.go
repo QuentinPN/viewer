@@ -10,6 +10,7 @@ import (
 
 	"viewer/internal/emby"
 	"viewer/internal/player"
+	"viewer/internal/stremio"
 )
 
 const (
@@ -30,11 +31,11 @@ func stremioTitle() *emby.PlaybackTitle {
 func Test_go_stremio_play_never_announces_an_emby_playback(t *testing.T) {
 	rec := &recording{}
 	headers := map[string]string{"User-Agent": "UA", "Referer": debridHdr}
-	out, err := stremioPlay(context.Background(), rec, "80475", stremioTitle(), debridLink, headers)
+	out, err := stremioPlay(context.Background(), rec, stremioPick{"80475", "tt0944947:2:5", stremioTitle(), false}, debridLink, headers)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(rec.calls, ","); got != `engine,reporter {"type":"shutdown"},sync {"type":"shutdown"},resendStop,load` {
+	if got := strings.Join(rec.calls, ","); got != `engine,endStremio,reporter {"type":"shutdown"},sync {"type":"shutdown"},resendStop,track tt0944947:2:5 -,load` {
 		t.Fatal(got)
 	}
 	want := player.PlaybackRequest{Source: debridLink, HTTPHeaders: player.List[player.Header]{{"Referer", debridHdr}, {"User-Agent", "UA"}}}
@@ -67,10 +68,10 @@ func Test_go_stremio_play_failures_never_show_the_link(t *testing.T) {
 		{"protocole", &recording{}, "ftp://debrid.example/SECRETKEY/file.mkv", ""},
 		{"engine", &recording{engineErr: errors.New("libmpv " + debridLink)}, debridLink, "engine"},
 		{"load", &recording{loadErr: errors.New("mpv " + debridLink + " " + debridHdr)}, debridLink,
-			`engine,reporter {"type":"shutdown"},sync {"type":"shutdown"},resendStop,load`},
+			`engine,endStremio,reporter {"type":"shutdown"},sync {"type":"shutdown"},resendStop,track tt0111161 -,load,endStremio`},
 	}
 	for _, c := range cases {
-		_, err := stremioPlay(context.Background(), c.rec, "30207", nil, c.url, map[string]string{"X": debridHdr})
+		_, err := stremioPlay(context.Background(), c.rec, stremioPick{itemID: "30207", target: "tt0111161"}, c.url, map[string]string{"X": debridHdr})
 		if got := strings.Join(c.rec.calls, ","); got != c.want {
 			t.Errorf("%s : %s", c.name, got)
 		}
@@ -93,6 +94,9 @@ func Test_go_stremio_play_is_wired_in_release_builds(t *testing.T) {
 	if _, err := invoke(t, b, "stremio_play", `{"streamId":"stream_inconnu"}`); err != `{"kind":"expired","message":"La liste a expiré, rouvre-la."}` {
 		t.Fatal(err)
 	}
+	if _, err := invoke(t, b, "stremio_play", `{"streamId":"stream_inconnu","resume":true}`); err != `{"kind":"expired","message":"La liste a expiré, rouvre-la."}` {
+		t.Fatal(err)
+	}
 	if _, err := invoke(t, b, "stremio_play", `{"streamId":"stream_inconnu","source":"https://x.example/a.mkv"}`); !strings.Contains(err, "invalid args for command `stremio_play`") {
 		t.Fatal(err)
 	}
@@ -112,17 +116,54 @@ func Test_go_stremio_play_is_wired_in_release_builds(t *testing.T) {
 // does not: they must not reach another host.
 func Test_go_stremio_play_follows_redirects_only_without_headers(t *testing.T) {
 	bare := &recording{}
-	if _, err := stremioPlay(context.Background(), bare, "30207", nil, debridLink, nil); err != nil {
+	if _, err := stremioPlay(context.Background(), bare, stremioPick{itemID: "30207", target: "tt0111161"}, debridLink, nil); err != nil {
 		t.Fatal(err)
 	}
 	if !bare.request.FollowRedirects || len(bare.request.HTTPHeaders) != 0 {
 		t.Fatalf("%+v", bare.request)
 	}
 	withHeaders := &recording{}
-	if _, err := stremioPlay(context.Background(), withHeaders, "30207", nil, debridLink, map[string]string{"User-Agent": "UA"}); err != nil {
+	if _, err := stremioPlay(context.Background(), withHeaders, stremioPick{itemID: "30207", target: "tt0111161"}, debridLink, map[string]string{"User-Agent": "UA"}); err != nil {
 		t.Fatal(err)
 	}
 	if withHeaders.request.FollowRedirects {
 		t.Fatalf("%+v", withHeaders.request)
 	}
 }
+
+// With resume and a position saved for the content, the file loads there and the
+// result says so; without an entry, or without resume, it starts at the beginning.
+// The playback is followed from before the load.
+func Test_go_stremio_play_resumes_where_the_content_stopped(t *testing.T) {
+	saved := map[string]stremio.ResumePoint{"tt0944947:2:5": {PositionSeconds: 2530, DurationSeconds: 3000}}
+	cases := []struct {
+		name   string
+		target string
+		resume bool
+		start  *float64
+		track  string
+	}{
+		{"reprise", "tt0944947:2:5", true, ptrTo(2530.0), "track tt0944947:2:5 2530"},
+		{"sans entrée", "tt0111161", true, nil, "track tt0111161 -"},
+		{"depuis le début", "tt0944947:2:5", false, nil, "track tt0944947:2:5 -"},
+	}
+	for _, c := range cases {
+		rec := &recording{saved: saved}
+		out, err := stremioPlay(context.Background(), rec, stremioPick{"80475", c.target, nil, c.resume}, debridLink, nil)
+		if err != nil {
+			t.Fatal(c.name, err)
+		}
+		if !reflect.DeepEqual(rec.request.StartSeconds, c.start) {
+			t.Errorf("%s : %v", c.name, rec.request.StartSeconds)
+		}
+		want := `engine,endStremio,reporter {"type":"shutdown"},sync {"type":"shutdown"},resendStop,` + c.track + `,load`
+		if got := strings.Join(rec.calls, ","); got != want {
+			t.Errorf("%s : %s", c.name, got)
+		}
+		if out.(emby.PlaybackStart).Resume != (c.start != nil) {
+			t.Errorf("%s : %+v", c.name, out)
+		}
+	}
+}
+
+func ptrTo[T any](v T) *T { return &v }

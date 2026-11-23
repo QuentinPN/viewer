@@ -7,6 +7,7 @@ import (
 	"viewer/internal/app"
 	"viewer/internal/emby"
 	"viewer/internal/player"
+	"viewer/internal/stremio"
 )
 
 // playback is what emby_play and emby_change_quality drive, in the order of
@@ -21,6 +22,8 @@ type playback interface {
 	ReportEvent(ev player.PlayerEvent)
 	// Playing tells the linked playback (sync) what starts.
 	Playing(itemID, mediaSourceID string, direct bool)
+	// EndStremio saves and stops following the Stremio playback going on.
+	EndStremio()
 	Engine() (loader, error)
 }
 
@@ -43,6 +46,13 @@ func (p appPlayback) ReportEvent(ev player.PlayerEvent) { p.a.Reporter.PlayerEve
 func (p appPlayback) SyncEvent(ev player.PlayerEvent)   { p.a.Sync.PlayerEvent(ev) }
 func (p appPlayback) Playing(itemID, mediaSourceID string, direct bool) {
 	p.a.Sync.Playing(itemID, mediaSourceID, direct)
+}
+func (p appPlayback) EndStremio() { p.a.StremioResume.End() }
+func (p appPlayback) SavedStremio(target string) (stremio.ResumePoint, bool) {
+	return p.a.StremioResume.Saved(target)
+}
+func (p appPlayback) TrackStremio(target string, start *float64) {
+	p.a.StremioResume.Begin(target, start)
 }
 func (p appPlayback) Engine() (loader, error) {
 	e, err := p.a.Engine()
@@ -115,6 +125,7 @@ func embyPlay(ctx context.Context, p playback, args tauriArgs) (any, error) {
 	if err != nil {
 		return nil, fail(err)
 	}
+	p.EndStremio()
 	if err := engine.Load(&request, source); err != nil {
 		return nil, fail(err)
 	}
@@ -159,6 +170,7 @@ func embyChangeQuality(ctx context.Context, p playback, args tauriArgs) (any, er
 		return nil, emby.NewPlayer(err.Error())
 	}
 	p.Switch(emby.NewActivePlayback(itemID, &plan))
+	p.EndStremio()
 	if err := engine.Load(&request, source); err != nil {
 		return nil, emby.NewPlayer(err.Error())
 	}

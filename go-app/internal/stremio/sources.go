@@ -40,6 +40,9 @@ type Sources struct {
 	// Key is the Emby item id, or `stremio:<target>` for a title outside Emby.
 	Key    string        `json:"key"`
 	Addons []SourceAddon `json:"addons"`
+	// Resume is where this film or episode stopped last time, whatever stream
+	// played it; null when nothing is saved.
+	Resume *ResumePoint `json:"resume"`
 }
 
 // External is a title outside Emby: a film by its IMDb id and name, or an episode
@@ -65,10 +68,12 @@ type AddonStreams struct {
 }
 
 // Selected is a stream picked to play, with the key of its query (ItemID: the Emby
-// item id or `stremio:<target>`) and its player title. It prints masked and never
+// item id or `stremio:<target>`), its content (Target, `imdb[:S:E]`, what its
+// position is saved under) and its player title. It prints masked and never
 // serializes.
 type Selected struct {
 	ItemID string
+	Target string
 	Title  *emby.PlaybackTitle
 	Stream Stream
 }
@@ -246,6 +251,11 @@ func (s *Service) open(ctx context.Context, target func(ctx context.Context) (*q
 	ctype, id := q.ctype, q.id
 	q.streams = map[string]queryStream{}
 	out := Sources{Query: newID("query_"), Key: q.key, Addons: []SourceAddon{}}
+	if s.resume != nil {
+		if p, ok := s.resume.Get(id); ok {
+			out.Resume = &p
+		}
+	}
 	for _, a := range addons {
 		if a.Serves(ctype, id) {
 			qa := queryAddon{id: newID("addon_"), addon: a}
@@ -312,7 +322,7 @@ func (s *Service) Selected(streamID string) (Selected, error) {
 	defer s.mu.Unlock()
 	for _, q := range s.st.queries.byID {
 		if st, ok := q.streams[streamID]; ok {
-			return Selected{ItemID: q.key, Title: q.title, Stream: st.stream}, nil
+			return Selected{ItemID: q.key, Target: q.id, Title: q.title, Stream: st.stream}, nil
 		}
 	}
 	return Selected{}, ErrExpired

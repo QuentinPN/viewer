@@ -133,14 +133,16 @@ func Handlers(svc *Service, resolve ItemResolver) map[string]Handler {
 	}
 }
 
-// PlayHandler is stremio_play `{streamId}`: the stream is looked up here
-// (ErrExpired when unknown) and play opens it. The URL never comes from the UI, so
-// this command exists in release builds too.
-func PlayHandler(svc *Service, play func(ctx context.Context, s Selected) (any, error)) Handler {
+// PlayHandler is stremio_play `{streamId, resume?}`: the stream is looked up here
+// (ErrExpired when unknown) and play opens it, where its content stopped last time
+// with resume (default false). The URL never comes from the UI, so this command
+// exists in release builds too.
+func PlayHandler(svc *Service, play func(ctx context.Context, s Selected, resume bool) (any, error)) Handler {
 	return func(ctx context.Context, raw json.RawMessage) (any, error) {
 		const cmd = "stremio_play"
 		var a struct {
 			StreamID *string `json:"streamId"`
+			Resume   *bool   `json:"resume"`
 		}
 		if err := decodeArgs(cmd, raw, &a); err != nil {
 			return nil, err
@@ -152,6 +154,6 @@ func PlayHandler(svc *Service, play func(ctx context.Context, s Selected) (any, 
 		if err != nil {
 			return nil, err
 		}
-		return play(ctx, s)
+		return play(ctx, s, a.Resume != nil && *a.Resume)
 	}
 }

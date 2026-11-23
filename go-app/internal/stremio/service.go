@@ -51,6 +51,8 @@ const probeID = "tt0000001"
 type Service struct {
 	store  emby.CredentialStore
 	client *Client
+	// resume gives each list the position saved for its content; nil gives none.
+	resume *ResumeStore
 
 	// fetch lets one collection request run at a time; the others wait for it.
 	fetch sync.Mutex
@@ -73,6 +75,12 @@ type cacheState struct {
 	// queries are the « Autres sources » lists (sources.go): forgotten with the
 	// collection.
 	queries queryTable
+}
+
+// WithResume makes each list carry the position store saved for its content.
+func (s *Service) WithResume(store *ResumeStore) *Service {
+	s.resume = store
+	return s
 }
 
 // NewService builds the service over the vault and the client.

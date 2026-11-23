@@ -1,9 +1,12 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -153,5 +156,59 @@ func Test_go_close_slot_keeps_the_engine_when_shutdown_is_refused(t *testing.T) 
 	}
 	if err := closeSlot(&slot); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// The engine's sink: the end of file of a Stremio start past the end of a shorter
+// file never reaches the UI (it would close the player or reopen the list as an
+// interrupted stream); every other event does. Positions go to
+// stremio-resume.json beside session.json.
+func Test_go_sink_holds_back_the_end_of_a_start_past_the_end(t *testing.T) {
+	dir := t.TempDir()
+	var mu sync.Mutex
+	var emitted []string
+	a, err := New(Options{
+		Paths: Paths{Config: filepath.Join(dir, "c"), Cache: filepath.Join(dir, "l"), LocalData: filepath.Join(dir, "l")},
+		Store: &emby.MemoryCredentialStore{},
+		Emit: func(name string, payload any) {
+			b, _ := json.Marshal(payload)
+			mu.Lock()
+			emitted = append(emitted, name+" "+string(b))
+			mu.Unlock()
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close(time.Second)
+	start := 5000.0
+	a.StremioResume.Begin("tt0111161", &start)
+	for _, ev := range []player.PlayerEvent{
+		player.FileLoaded{}, player.TimePos{Seconds: 3000}, player.Duration{Seconds: 3000},
+		player.EndFile{Reason: player.EndEOF}, player.TimePos{Seconds: 0}, player.TimePos{Seconds: 120},
+	} {
+		a.playerEvent(ev)
+	}
+	a.StremioResume.End()
+	mu.Lock()
+	got := strings.Join(emitted, ",")
+	mu.Unlock()
+	want := `player://event {"type":"fileLoaded"},player://event {"type":"timePos","seconds":3000},` +
+		`player://event {"type":"duration","seconds":3000},player://event {"type":"timePos","seconds":0},` +
+		`player://event {"type":"timePos","seconds":120}`
+	if got != want {
+		t.Fatal(got)
+	}
+	if b, err := os.ReadFile(filepath.Join(dir, "c", "stremio-resume.json")); err != nil || !strings.Contains(string(b), `"positionSeconds": 120`) {
+		t.Fatal(string(b), err)
+	}
+	// Any other end of file goes through.
+	a.StremioResume.Begin("tt0111161", nil)
+	a.playerEvent(player.FileLoaded{})
+	a.playerEvent(player.EndFile{Reason: player.EndEOF})
+	mu.Lock()
+	defer mu.Unlock()
+	if last := emitted[len(emitted)-1]; last != `player://event {"type":"endFile","reason":"eof","error":null}` {
+		t.Fatal(last)
 	}
 }
