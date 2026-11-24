@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -44,63 +45,106 @@ import io.github.quentinpn.viewer.tv.stremio.StremioRepository
 import io.github.quentinpn.viewer.tv.stremio.StremioState
 import io.github.quentinpn.viewer.tv.stremio.canRetry
 import io.github.quentinpn.viewer.tv.stremio.embyTarget
+import io.github.quentinpn.viewer.tv.stremio.externalTarget
 import io.github.quentinpn.viewer.tv.stremio.stremioUsable
 import io.github.quentinpn.viewer.tv.ui.Palette
 import io.github.quentinpn.viewer.tv.ui.episodeLabel
 import io.github.quentinpn.viewer.tv.ui.requests.DialogCard
+import io.github.quentinpn.viewer.tv.ui.requests.FocusOnOpen
 
 /** An opening of the list: a new one asks the addons again; [notice] shows over it. */
-private class Opening(val notice: String?)
+internal class SourcesOpening(val notice: String?)
+
+/** What a list asks the addons for ([target], read when the list opens) and what the player shows over the stream. */
+internal class SourcesSource(val target: suspend () -> StreamTarget, val title: String, val detail: String?)
+
+/** The list of sources of one [SourcesSource], opened by [open], closed by [SourcesHost]. */
+@Stable
+internal class SourcesLauncher {
+    var source by mutableStateOf<SourcesSource?>(null)
+        private set
+    var opening by mutableStateOf<SourcesOpening?>(null)
+        private set
+
+    fun open(source: SourcesSource) {
+        this.source = source
+        opening = SourcesOpening(null)
+    }
+
+    fun reopen(notice: String) {
+        if (source != null) opening = SourcesOpening(notice)
+    }
+
+    fun close() {
+        opening = null
+    }
+}
+
+/** Whether a Stremio account is linked (or expired, which the list then says). Read without holding the page: false until known. */
+@Composable
+internal fun rememberStremioLinked(repository: StremioRepository): Boolean {
+    val state by produceState<StremioState?>(null, repository) { value = repository.status().state }
+    return stremioUsable(state)
+}
 
 /**
  * « Autres sources » on an Emby film or episode, once a Stremio account is linked (or its session expired,
- * which the list then says). The account is read without holding the page: the button shows once known.
- * A stream plays in [PlayerActivity] by its opaque id; one that fails to open or breaks off brings the list
- * back, read anew, with [SOURCE_FAILED] over it. Never the first button of its row.
+ * which the list then says). A stream plays in [PlayerActivity] by its opaque id; one that fails to open or
+ * breaks off brings the list back, read anew, with [SOURCE_FAILED] over it. Never the first button of its row.
  */
 @Composable
 internal fun SourcesButton(item: BaseItemDto, client: EmbyClient, userId: String, onSessionExpired: () -> Unit) {
-    val context = LocalContext.current
-    val repository = remember { AppServices.stremio(context) }
-    val state by produceState<StremioState?>(null, repository) { value = repository.status().state }
-    if (!stremioUsable(state)) return
-    var opening by remember { mutableStateOf<Opening?>(null) }
+    val repository = AppServices.stremio(LocalContext.current)
+    val linked = rememberStremioLinked(repository)
+    val launcher = remember { SourcesLauncher() }
     val button = remember { FocusRequester() }
     var refocus by remember { mutableIntStateOf(0) }
-    // The result reaches this page only: another page, or none, drops it
-    val player = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == PlayerActivity.RESULT_SOURCE_FAILED) opening = Opening(SOURCE_FAILED)
-    }
-    OutlinedButton(onClick = { opening = Opening(null) }, modifier = Modifier.focusRequester(button)) { Text("Autres sources") }
-    opening?.let { current ->
-        SourcesDialog(
-            current,
-            repository,
-            target = { stremioTarget(item, client, userId) },
-            onSessionExpired = onSessionExpired,
-            onPlay = { row ->
-                opening = null
-                refocus++
-                val (title, detail) = playerTitle(item)
-                player.launch(
-                    Intent(context, PlayerActivity::class.java)
-                        .putExtra(PlayerActivity.EXTRA_STREMIO_STREAM, row.id)
-                        .putExtra(PlayerActivity.EXTRA_TITLE, title)
-                        .putExtra(PlayerActivity.EXTRA_DETAIL, detail),
-                )
-            },
-            onDismiss = {
-                opening = null
-                refocus++
-            },
-        )
-    }
+    if (!linked) return
+    OutlinedButton(
+        onClick = {
+            val (title, detail) = playerTitle(item)
+            launcher.open(SourcesSource({ stremioTarget(item, client, userId) }, title, detail))
+        },
+        modifier = Modifier.focusRequester(button),
+    ) { Text("Autres sources") }
+    SourcesHost(launcher, repository, onSessionExpired) { refocus++ }
     // Back on the page, from the list or the player: the focus returns to the button, one frame later
-    LaunchedEffect(refocus) {
-        if (refocus == 0) return@LaunchedEffect
-        withFrameNanos {}
-        runCatching { button.requestFocus() }
+    if (refocus > 0) FocusOnOpen(button, refocus)
+}
+
+/**
+ * The list of [launcher] and the player a stream of it opens. [onClosed] runs when the list goes, to play or
+ * to dismiss: the page puts its focus back. The player's result reaches this page only: another page, or none, drops it.
+ */
+@Composable
+internal fun SourcesHost(launcher: SourcesLauncher, repository: StremioRepository, onSessionExpired: () -> Unit, onClosed: () -> Unit) {
+    val context = LocalContext.current
+    val player = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == PlayerActivity.RESULT_SOURCE_FAILED) launcher.reopen(SOURCE_FAILED)
     }
+    val opening = launcher.opening
+    val source = launcher.source
+    if (opening == null || source == null) return
+    SourcesDialog(
+        opening,
+        repository,
+        target = source.target,
+        onSessionExpired = onSessionExpired,
+        onPlay = { row ->
+            launcher.close()
+            onClosed()
+            player.launch(
+                Intent(context, PlayerActivity::class.java)
+                    .putExtra(PlayerActivity.EXTRA_STREMIO_STREAM, row.id)
+                    .putExtra(PlayerActivity.EXTRA_TITLE, source.title)
+                    .putExtra(PlayerActivity.EXTRA_DETAIL, source.detail),
+            )
+        },
+        onDismiss = {
+            launcher.close()
+            onClosed()
+        },
+    )
 }
 
 /** The title the player shows, as for an Emby playback: the film and its year, the series and the episode. */
@@ -110,6 +154,19 @@ private fun playerTitle(item: BaseItemDto): Pair<String, String?> =
     } else {
         item.name to item.productionYear?.toString()
     }
+
+/**
+ * The source of a title outside Emby, as the desktop's `ExternalTarget`: a film by its [name]; an episode
+ * under its series' [name], « Épisode N » with its numbers. A target the addons cannot name shows in the list.
+ */
+internal fun externalSource(imdb: String, name: String, season: Int? = null, episode: Int? = null): SourcesSource {
+    val target = suspend { externalTarget(imdb, season, episode) }
+    return if (season != null && episode != null) {
+        SourcesSource(target, name, episodeLabel(season, episode, "Épisode $episode"))
+    } else {
+        SourcesSource(target, name, null)
+    }
+}
 
 /**
  * The addons' target for [item], read at click time: an episode needs its series' IMDb id, so the series is
@@ -137,7 +194,7 @@ private sealed interface Phase {
 
 @Composable
 private fun SourcesDialog(
-    opening: Opening,
+    opening: SourcesOpening,
     repository: StremioRepository,
     target: suspend () -> StreamTarget,
     onSessionExpired: () -> Unit,

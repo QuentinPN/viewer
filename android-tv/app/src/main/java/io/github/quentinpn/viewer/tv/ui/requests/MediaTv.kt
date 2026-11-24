@@ -32,6 +32,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,9 +42,15 @@ import androidx.tv.material3.Text
 import io.github.quentinpn.viewer.tv.ui.Centered
 import io.github.quentinpn.viewer.tv.ui.GlassButton
 import io.github.quentinpn.viewer.tv.ui.Load
+import io.github.quentinpn.viewer.tv.AppServices
 import io.github.quentinpn.viewer.tv.ui.Palette
 import io.github.quentinpn.viewer.tv.ui.Retry
 import io.github.quentinpn.viewer.tv.ui.TRAILER_NO_APP
+import io.github.quentinpn.viewer.tv.ui.stremio.EpisodePickerTv
+import io.github.quentinpn.viewer.tv.ui.stremio.SourcesHost
+import io.github.quentinpn.viewer.tv.ui.stremio.SourcesLauncher
+import io.github.quentinpn.viewer.tv.ui.stremio.externalSource
+import io.github.quentinpn.viewer.tv.ui.stremio.rememberStremioLinked
 import io.github.quentinpn.viewer.tv.request.Capabilities
 import io.github.quentinpn.viewer.tv.request.EmbyTitle
 import io.github.quentinpn.viewer.tv.request.MediaDetails
@@ -72,8 +79,10 @@ private const val MESSAGE_MS = 4_000L
 /**
  * A title of Request: backdrop under a left and bottom scrim, title, meta, synopsis, then « Lire »
  * when it is in Emby and « Demander » when there is something to ask for (and the account may),
- * else « Rien à demander », then « Bande-annonce » when the title has one (its YouTube page, outside the app); the cast below. A blocked title cannot be asked for. After a request the page
- * reads the title again and says so for a moment.
+ * else « Rien à demander », then « Regarder maintenant » when the title has an IMDb id and a Stremio account is
+ * linked (a film lists its sources; a series asks for the season and the episode first), then « Bande-annonce »
+ * when the title has one (its YouTube page, outside the app); the cast below. A blocked title cannot be asked for.
+ * After a request the page reads the title again and says so for a moment.
  */
 @Composable
 internal fun MediaTv(
@@ -93,6 +102,14 @@ internal fun MediaTv(
     var message by remember(page) { mutableStateOf<String?>(null) }
     var trailerFailed by remember(page) { mutableStateOf(false) }
     val first = remember { FocusRequester() }
+    val stremio = AppServices.stremio(LocalContext.current)
+    val stremioLinked = rememberStremioLinked(stremio)
+    val sources = remember(page) { SourcesLauncher() }
+    var picking by remember(page) { mutableStateOf(false) }
+    // The season of the last episode picked: the picker opens on it again
+    var pickedSeason by remember(page) { mutableStateOf<Int?>(null) }
+    val watch = remember { FocusRequester() }
+    var refocus by remember(page) { mutableIntStateOf(0) }
 
     LaunchedEffect(page, attempt) {
         // A reload after a request keeps the page shown; a failure then leaves it as it was
@@ -117,6 +134,11 @@ internal fun MediaTv(
                 val asked = capabilities.canRequestFor(title.type)
                 val something = title.blocked == null && canAskNow(title)
                 val canAsk = asked && something
+                val read = embyTitle(title.type, title.embyItemId)
+                val imdb = title.externalIds.imdb?.takeIf { it.isNotBlank() }
+                val watchable = imdb != null && stremioLinked
+                // « Regarder maintenant » takes the first focus only when no button comes before it
+                val watchFirst = watchable && read == null && !canAsk
                 Column(
                     Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 36.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.Bottom),
@@ -131,7 +153,6 @@ internal fun MediaTv(
                         title.blocked?.let { Text("Ce titre est bloqué : il ne peut pas être demandé.", color = Palette.warning) }
                     }
                     Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        val read = embyTitle(title.type, title.embyItemId)
                         if (read != null) GlassButton(onClick = { onPlay(read) }, modifier = Modifier.focusRequester(first), height = BUTTON_HEIGHT) { Text("Lire") }
                         if (canAsk) {
                             GlassButton(onClick = { asking = true }, modifier = if (read != null) Modifier else Modifier.focusRequester(first), height = BUTTON_HEIGHT) { Text("Demander") }
@@ -141,11 +162,17 @@ internal fun MediaTv(
                                 color = Palette.textSecondary,
                             )
                         }
-                        // Never the first button, unless it is the only one
+                        if (imdb != null && watchable) {
+                            GlassButton(
+                                onClick = { if (title.type == MediaType.Movie) sources.open(externalSource(imdb, title.title)) else picking = true },
+                                modifier = Modifier.focusRequester(if (watchFirst) first else watch),
+                                height = BUTTON_HEIGHT,
+                            ) { Text("Regarder maintenant") }
+                        }
                         trailerPage(title.trailerKey)?.let { url ->
                             GlassButton(
                                 onClick = { trailerFailed = !onTrailer(url) },
-                                modifier = if (read == null && !canAsk) Modifier.focusRequester(first) else Modifier,
+                                modifier = if (read == null && !canAsk && !watchFirst) Modifier.focusRequester(first) else Modifier,
                                 height = BUTTON_HEIGHT,
                             ) { Text("Bande-annonce") }
                         }
@@ -155,7 +182,26 @@ internal fun MediaTv(
                     CastRowTv(title, art)
                 }
                 // The first button takes the focus once the page is read
-                FocusOnOpen(first)
+                FocusOnOpen(first, watchFirst)
+                // The list is not an Emby page: nothing there can expire the session
+                SourcesHost(sources, stremio, onSessionExpired = {}, onClosed = { refocus++ })
+                if (picking && imdb != null) {
+                    EpisodePickerTv(
+                        title.seasons,
+                        pickedSeason,
+                        onPick = { season, episode ->
+                            picking = false
+                            pickedSeason = season
+                            sources.open(externalSource(imdb, title.title, season, episode))
+                        },
+                        onDismiss = {
+                            picking = false
+                            refocus++
+                        },
+                    )
+                }
+                // Back from the picker, the list or the player: the focus returns to « Regarder maintenant »
+                if (refocus > 0) FocusOnOpen(if (watchFirst) first else watch, refocus)
                 if (asking) {
                     RequestDialogTv(
                         repository,
