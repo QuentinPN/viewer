@@ -46,6 +46,8 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
             val rc = MPVLib.setOptionString(name, value)
             if (rc < 0) Log.w(TAG, "option $name=$value refusée ($rc)")
         }
+        // Without a bundle, tls-verify=yes stays on and https fails closed
+        CaBundle.path(context.cacheDir)?.let { MPVLib.setOptionString("tls-ca-file", it) }
         // A comma would split the list: such a header is dropped rather than mangled
         val fields = headers.filterValues { ',' !in it }.map { (k, v) -> "$k: $v" }
         if (fields.isNotEmpty() && MPVLib.setOptionString("http-header-fields", fields.joinToString(",")) < 0) {

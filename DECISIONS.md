@@ -135,6 +135,7 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **Épisode suivant via `AdjacentTo` ; saut alphabétique par une requête d'index de `SortName` plutôt que `NameLessThan` ; tirage au hasard côté serveur (`SortBy=Random`, `Limit=1`)** — `NameLessThan` dépend d'une collation non documentée, et charger toute la liste pour tirer au hasard serait lourd.
 - **Sous-titres ASS : `sub-ass-override` à yes/force sur TV, `no` sur Windows** — avec `no`, ils ignorent `sub-pos` et restent sous les commandes (constaté sur Shield) ; différence voulue.
 - **Sous-titres externes ajoutés en coroutine sur IO, annulée au chargement du fichier suivant, suivis d'un second choix de piste qui relit les préférences** — l'ajout est lent et ne doit pas bloquer la lecture.
+- **mpv Android vérifie TLS avec un paquet PEM des AC système (`AndroidCAStore`, alias `system:`) écrit à la première lecture** — le libmpv d'mpv-android n'a aucun magasin de certificats.
 - **Journal verbeux de mpv tenu hors de logcat (lib C et `dlsym`, API 30+)** — logcat saturait et risquait d'exposer des URLs.
 - **Pas de vignettes de survol à la recherche dans la vidéo** — le propriétaire garde les vignettes vidéo Emby désactivées (CPU et disque), aucun aperçu n'est attendu.
 - **Build debug séparé (`applicationIdSuffix=.debug`, libellé, bandeau, session, réglages et DeviceId Emby propres) ; `PlaybackPocActivity` dans le source set `debug` ; la release est signée avec la clé debug pour s'installer par-dessus un debug** — debug et release ne se mélangent jamais sur l'appareil.
