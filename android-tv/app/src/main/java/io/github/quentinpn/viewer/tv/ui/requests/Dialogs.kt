@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
@@ -134,15 +135,7 @@ internal fun AddressDialog(
                 cursorBrush = SolidColor(Palette.text),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { onSave(text) }),
-                // A text field keeps the D-pad for its cursor: Down goes on to the buttons
-                modifier = Modifier.fillMaxWidth().focusRequester(field).onPreviewKeyEvent {
-                    if (it.key == Key.DirectionDown && it.type == KeyEventType.KeyDown) {
-                        focusManager.moveFocus(FocusDirection.Down)
-                        true
-                    } else {
-                        false
-                    }
-                },
+                modifier = Modifier.fillMaxWidth().focusRequester(field).downLeavesField(focusManager),
             )
         }
         error?.let { Text(it, color = Palette.danger) }
@@ -152,6 +145,16 @@ internal fun AddressDialog(
         }
     }
     FocusOnOpen(field)
+}
+
+/** A text field keeps the D-pad for its cursor: Down goes on to what is under it. */
+internal fun Modifier.downLeavesField(focusManager: FocusManager): Modifier = onPreviewKeyEvent {
+    if (it.key == Key.DirectionDown && it.type == KeyEventType.KeyDown) {
+        focusManager.moveFocus(FocusDirection.Down)
+        true
+    } else {
+        false
+    }
 }
 
 /** A list to pick one entry from, opened on [selected]; OK picks and closes through [onPick]. */
