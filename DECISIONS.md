@@ -91,6 +91,9 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **Fiches Demander : « Regarder maintenant » si la fiche a un IMDb ; une série passe par un choix saison puis épisode tiré des saisons d'Request (`episodeCount`), spéciaux en dernier, sans Cinemeta** — pas de service de plus ; le nombre d'épisodes peut inclure des épisodes pas encore diffusés.
 - **Titre hors Emby : le film par son nom, l'épisode « Épisode N » + nom de la série ; clé de lecture `stremio:<imdb>[:S:E]` construite par le Go seulement** — Request ne donne pas les titres d'épisodes ; l'UI ne refabrique jamais la clé.
 - **Erreur ou fin anticipée d'un flux Stremio : retour à la fiche, liste rouverte avec « Ce lien ne répond plus, choisis une autre source. », sans nouvelle tentative** — les liens debrid expirent ; choisir une autre source est plus sûr que réessayer.
+- **Reprise Stremio par contenu (`imdb[:S:E]`), pas par flux, dans `stremio-resume.json` du dossier de config (500 entrées au plus, gardé à la déconnexion)** — un lien debrid change à chaque liste ; c'est un historique local du PC, pas une donnée du compte.
+- **Rien n'est noté sous 60 s, l'entrée est effacée à 95 % ou en fin de fichier, écriture toutes les 15 s au plus et à l'arrêt ; une coupure avant 95 % garde la position** — pas de reprise pour un essai de quelques secondes, ni pour un film fini ; un lien coupé se reprend où il s'est arrêté.
+- **Position enregistrée au-delà de la fin du nouveau fichier : retour à 0 et une seule fin de fichier ignorée (rendue à l'UI si le retour échoue)** — un autre flux peut être plus court ; il ne doit ni finir aussitôt ni déclencher « Ce lien ne répond plus ».
 
 ## Cache et images
 
