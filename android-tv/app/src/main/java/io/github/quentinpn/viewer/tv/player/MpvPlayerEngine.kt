@@ -28,9 +28,21 @@ private const val VO = "gpu"
  * emitted before init are never delivered. Later ones can still carry it (lavf lists
  * the headers an HLS transcode left unused): [NativeLog] drops that verbose copy.
  * They apply to every request of this engine, external subtitles included.
+ *
+ * An [external] stream (Stremio) carries its debrid key in its link and maybe in [headers]: every address
+ * and header value is masked in the lines logged here, and where libplayer's own copy would reach logcat
+ * (Android < 11, [NativeLog] not quiet), mpv logs nothing at all. Its redirects are followed (5 at most, a
+ * debrid link answers 302) only without headers, which would otherwise follow it to another host.
  */
-class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap()) : PlayerEngine, MPVLib.EventObserver, MPVLib.LogObserver {
+class MpvPlayerEngine(
+    context: Context,
+    headers: Map<String, String> = emptyMap(),
+    private val external: Boolean = false,
+) : PlayerEngine, MPVLib.EventObserver, MPVLib.LogObserver {
     private val listeners = CopyOnWriteArrayList<PlayerListener>()
+
+    /** Masked in every log line of an [external] stream. */
+    private val secrets = if (external) headers.values.toList() else emptyList()
     private val released = AtomicBoolean(false)
 
     // Held by calls that may come from another thread than the UI's: mpv is destroyed only once they return
@@ -40,9 +52,10 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
 
     init {
         check(alive.compareAndSet(false, true)) { "Un seul lecteur mpv peut exister à la fois" }
-        NativeLog.ensureQuiet()
+        val quiet = NativeLog.ensureQuiet()
         MPVLib.create(context.applicationContext)
-        for ((name, value) in OPTIONS) {
+        val options = if (external) OPTIONS + externalOptions(quiet, headers.isNotEmpty()) else OPTIONS
+        for ((name, value) in options) {
             val rc = MPVLib.setOptionString(name, value)
             if (rc < 0) Log.w(TAG, "option $name=$value refusée ($rc)")
         }
@@ -274,7 +287,8 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
             level <= MPVLib.MpvLogLevel.MPV_LOG_LEVEL_INFO -> Log.INFO
             else -> return
         }
-        Log.println(priority, TAG, redactSecrets("[$prefix] ${text.trimEnd()}"))
+        val line = "[$prefix] ${text.trimEnd()}"
+        Log.println(priority, TAG, if (external) redactStreamSecrets(line, secrets) else redactSecrets(line))
     }
 
     private companion object {
@@ -323,3 +337,16 @@ class MpvPlayerEngine(context: Context, headers: Map<String, String> = emptyMap(
 
 /** A source waiting for the surface, with its loadfile options. */
 private class PendingFile(val source: MediaSource, val options: String, val paused: Boolean = false)
+
+/** FFmpeg's HTTP reconnection, as desktop's `streamLavfOptions` (`mpvprops.go`), which sets it for every load. */
+private const val RECONNECT_OPTIONS = "reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=7"
+
+/**
+ * The options an external (Stremio) stream adds. libplayer sets `msg-level=all=v` and copies every line it
+ * gets to logcat at VERBOSE, before [MpvPlayerEngine.logMessage]: when that copy cannot be dropped ([quiet]
+ * false), mpv logs nothing. Redirects as on Windows: up to 5 without [headers], none with.
+ */
+internal fun externalOptions(quiet: Boolean, headers: Boolean): List<Pair<String, String>> = listOfNotNull(
+    "stream-lavf-o" to "$RECONNECT_OPTIONS,max_redirects=${if (headers) 0 else 5}",
+    if (quiet) null else "msg-level" to "all=no",
+)

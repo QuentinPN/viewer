@@ -25,4 +25,22 @@ class MediaSourceTest {
         assertEquals("X-Emby-Token: ***", redactSecrets("X-Emby-Token: secret"))
         assertEquals("X-Emby-Authorization: ***", redactSecrets("X-Emby-Authorization: MediaBrowser Token=\"t\""))
     }
+
+    @Test
+    fun streamLinesLoseEveryAddressAndHeaderValueButKeepTheRest() {
+        val key = "Bearer d3br1d"
+        val lines = listOf(
+            "[cplayer] Playing: https://debrid.example/dl/KEY123/film.mkv",
+            "[ffmpeg] http: Status 302: Redirecting to http://cdn.example/x?token=abc",
+            "[stream] Failed to open HTTPS://debrid.example/dl/KEY123.",
+            "[ffmpeg] header Authorization: $key unused",
+        )
+        val redacted = lines.map { redactStreamSecrets(it, listOf(key, "")) }
+        for (line in redacted) {
+            for (secret in listOf("KEY123", "cdn.example", "token=abc", "d3br1d")) assertEquals(line, false, secret in line)
+        }
+        // What is not a secret stays readable for diagnostics
+        assertEquals("[ffmpeg] http: Status 302: Redirecting to ***", redacted[1])
+        assertEquals("[ffmpeg] error 403 Forbidden", redactStreamSecrets("[ffmpeg] error 403 Forbidden", listOf(key)))
+    }
 }

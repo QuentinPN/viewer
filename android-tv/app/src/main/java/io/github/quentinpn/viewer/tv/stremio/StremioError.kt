@@ -16,6 +16,9 @@ enum class StremioErrorKind {
 
     /** Not an IMDb id, or a season without an episode. */
     InvalidId,
+
+    /** The Emby film, or the series of the episode, has no IMDb id: the only id the addons are asked by. */
+    NoImdb,
     SignedOut,
 
     /** The stored session was refused: sign in again. */
@@ -61,6 +64,7 @@ data class StremioError(
                     "Saisis ton adresse e-mail et ton mot de passe."
                 }
             StremioErrorKind.InvalidId -> "Identifiant de contenu invalide."
+            StremioErrorKind.NoImdb -> "Ce titre n'a pas d'identifiant IMDb : les addons ne peuvent pas le chercher."
             StremioErrorKind.SignedOut ->
                 if (page) "Connecte ton compte Stremio dans les Réglages." else "Aucun compte Stremio connecté."
             StremioErrorKind.ReauthRequired ->

@@ -37,6 +37,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.UserItemData
+import io.github.quentinpn.viewer.tv.ui.stremio.SourcesButton
 
 /**
  * A film: backdrop, year, length, overview, "Reprendre" / "Lire depuis le début", « Bande-annonce », its version
@@ -136,6 +137,7 @@ fun MovieScreen(
                             },
                         ) { onMessage ->
                             trailers?.let { TrailerButton(m.value, client, userId, it, onSessionExpired, onMessage) }
+                            SourcesButton(m.value, client, userId, onSessionExpired)
                         }
                         val cast = remember(m.value.people) { castMembers(m.value) }
                         CastRow(cast, client, images, focusPerson, onOpenPerson)
@@ -163,7 +165,7 @@ private fun Details(
     modifier: Modifier,
     /** The watched mark and favourite buttons, on their own row under the play row. */
     actions: @Composable (onMessage: (String?) -> Unit) -> Unit,
-    /** The trailer button, last of the play row; its message shows under the row. */
+    /** The trailer and « Autres sources » buttons, last of the play row; the trailer's message shows under the row. */
     trailer: @Composable (onMessage: (String?) -> Unit) -> Unit,
 ) {
     val played = movie.userData?.played == true
