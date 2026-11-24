@@ -1,9 +1,8 @@
 package io.github.quentinpn.viewer.tv.player
 
 import android.util.Log
+import io.github.quentinpn.viewer.tv.writeAtomically
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.security.KeyStore
 import java.util.Base64
 
@@ -30,9 +29,7 @@ object CaBundle {
                 .mapNotNull { keyStore.getCertificate(it)?.encoded }
             check(certs.isNotEmpty()) { "aucune AC système" }
             val target = File(cacheDir, FILE_NAME)
-            val temp = File(cacheDir, "$FILE_NAME.tmp")
-            temp.writeText(pem(certs), Charsets.US_ASCII)
-            Files.move(temp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
+            writeAtomically(target, pem(certs))
             target.absolutePath.also { path = it }
         } catch (e: Exception) {
             Log.w(TAG, "paquet d'AC non écrit (${e.javaClass.simpleName}): https sera refusé")

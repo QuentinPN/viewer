@@ -1,14 +1,28 @@
 package io.github.quentinpn.viewer.tv.ui.stremio
 
 import io.github.quentinpn.viewer.tv.stremio.AddonStreams
+import io.github.quentinpn.viewer.tv.stremio.RESUME_DONE_RATIO
+import io.github.quentinpn.viewer.tv.stremio.ResumePoint
 import io.github.quentinpn.viewer.tv.stremio.SourceList
 import io.github.quentinpn.viewer.tv.stremio.StreamChoice
 import io.github.quentinpn.viewer.tv.stremio.StremioError
 import io.github.quentinpn.viewer.tv.stremio.StremioErrorKind
 import io.github.quentinpn.viewer.tv.ui.formatSize
+import io.github.quentinpn.viewer.tv.ui.seconds
 
 /** Shown over the list when a Stremio stream failed to open or broke off (the desktop's `SOURCE_FAILED`). */
 internal const val SOURCE_FAILED = "Ce lien ne répond plus, choisis une autre source."
+
+/** The second choice over the list, when there is something to resume. */
+internal const val RESTART_LABEL = "Depuis le début"
+
+/** « Reprendre à 42:10 » over the list, or null when there is nothing to resume: none saved, or past [RESUME_DONE_RATIO]. */
+internal fun resumeLabel(point: ResumePoint?): String? {
+    if (point == null) return null
+    val (position, duration) = point
+    if (!position.isFinite() || !duration.isFinite() || position <= 0 || position >= duration * RESUME_DONE_RATIO) return null
+    return "Reprendre à ${seconds(position)}"
+}
 
 /** One stream as a row: the name on one line, the description lines under it, the size aside. Never its link. */
 internal data class StreamRow(val id: String, val title: String, val details: List<String>, val size: String?)

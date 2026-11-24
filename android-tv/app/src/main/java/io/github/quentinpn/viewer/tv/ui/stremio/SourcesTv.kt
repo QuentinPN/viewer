@@ -25,7 +25,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
@@ -38,6 +41,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.stremio.AddonStreams
+import io.github.quentinpn.viewer.tv.stremio.ResumeStore
 import io.github.quentinpn.viewer.tv.stremio.SourceList
 import io.github.quentinpn.viewer.tv.stremio.StreamTarget
 import io.github.quentinpn.viewer.tv.stremio.StremioException
@@ -47,10 +51,13 @@ import io.github.quentinpn.viewer.tv.stremio.canRetry
 import io.github.quentinpn.viewer.tv.stremio.embyTarget
 import io.github.quentinpn.viewer.tv.stremio.externalTarget
 import io.github.quentinpn.viewer.tv.stremio.stremioUsable
+import io.github.quentinpn.viewer.tv.ui.GlassButton
 import io.github.quentinpn.viewer.tv.ui.Palette
 import io.github.quentinpn.viewer.tv.ui.episodeLabel
 import io.github.quentinpn.viewer.tv.ui.requests.DialogCard
 import io.github.quentinpn.viewer.tv.ui.requests.FocusOnOpen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** An opening of the list: a new one asks the addons again; [notice] shows over it. */
 internal class SourcesOpening(val notice: String?)
@@ -128,14 +135,16 @@ internal fun SourcesHost(launcher: SourcesLauncher, repository: StremioRepositor
     SourcesDialog(
         opening,
         repository,
+        AppServices.stremioResume(context),
         target = source.target,
         onSessionExpired = onSessionExpired,
-        onPlay = { row ->
+        onPlay = { row, resume ->
             launcher.close()
             onClosed()
             player.launch(
                 Intent(context, PlayerActivity::class.java)
                     .putExtra(PlayerActivity.EXTRA_STREMIO_STREAM, row.id)
+                    .putExtra(PlayerActivity.EXTRA_STREMIO_RESUME, resume)
                     .putExtra(PlayerActivity.EXTRA_TITLE, source.title)
                     .putExtra(PlayerActivity.EXTRA_DETAIL, source.detail),
             )
@@ -196,22 +205,28 @@ private sealed interface Phase {
 private fun SourcesDialog(
     opening: SourcesOpening,
     repository: StremioRepository,
+    resumes: ResumeStore,
     target: suspend () -> StreamTarget,
     onSessionExpired: () -> Unit,
-    onPlay: (StreamRow) -> Unit,
+    onPlay: (row: StreamRow, resume: Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var phase by remember(opening) { mutableStateOf<Phase>(Phase.Searching) }
     // Bumped by « Réessayer »: a new list, read anew
     var attempt by remember(opening) { mutableIntStateOf(0) }
+    // Where the title was left off, read with each list (a stream cut short just saved it); null: no choice
+    var resumeText by remember(opening, attempt) { mutableStateOf<String?>(null) }
+    var fromStart by remember(opening, attempt) { mutableStateOf(false) }
     val close = remember { FocusRequester() }
     val first = remember { FocusRequester() }
     var firstFocused by remember(opening, attempt) { mutableStateOf(false) }
     LaunchedEffect(opening, attempt) {
         phase = Phase.Searching
         try {
+            val content = target()
+            resumeText = resumeLabel(withContext(Dispatchers.IO) { resumes.get(content.id) })
             // Each collection opens one list: collected once per opening
-            repository.sources(target()).collect { list ->
+            repository.sources(content).collect { list ->
                 val expired = expiredList(list)
                 phase = if (expired != null) Phase.Failed(expired.message, retry = true) else Phase.Listed(list)
             }
@@ -236,7 +251,10 @@ private fun SourcesDialog(
                     Text("Aucun addon Stremio ne propose ce type de titre.", color = Palette.textSecondary)
                 } else {
                     val firstRow = sections.firstNotNullOfOrNull { it.rows.firstOrNull() }?.id
-                    SectionList(sections, firstRow, first, onPlay)
+                    resumeText?.let { label -> ResumeChoice(label, fromStart) { fromStart = it } }
+                    // The choice takes its row from the list: the dialog stays the same height
+                    val listHeight = if (resumeText != null) LIST_HEIGHT - CHOICE_ROW else LIST_HEIGHT
+                    SectionList(sections, firstRow, first, listHeight) { row -> onPlay(row, resumeText != null && !fromStart) }
                     // Once, on the first stream to arrive; later answers never move the focus
                     if (firstRow != null && !firstFocused) {
                         LaunchedEffect(firstRow) {
@@ -262,10 +280,24 @@ private fun SourcesDialog(
     }
 }
 
+private val LIST_HEIGHT = 420.dp
+
+/** GlassButton's height and the column's spacing. */
+private val CHOICE_ROW = 48.dp
+
+/** « Reprendre à … » (the default) or « Depuis le début », over the list: the one chosen stays lit. */
 @Composable
-private fun SectionList(sections: List<SourceSection>, firstRow: String?, first: FocusRequester, onPlay: (StreamRow) -> Unit) {
+private fun ResumeChoice(label: String, fromStart: Boolean, onChoice: (fromStart: Boolean) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        GlassButton(onClick = { onChoice(false) }, modifier = Modifier.semantics { selected = !fromStart }, selected = !fromStart) { Text(label) }
+        GlassButton(onClick = { onChoice(true) }, modifier = Modifier.semantics { selected = fromStart }, selected = fromStart) { Text(RESTART_LABEL) }
+    }
+}
+
+@Composable
+private fun SectionList(sections: List<SourceSection>, firstRow: String?, first: FocusRequester, maxHeight: Dp, onPlay: (StreamRow) -> Unit) {
     LazyColumn(
-        Modifier.heightIn(max = 420.dp),
+        Modifier.heightIn(max = maxHeight),
         contentPadding = PaddingValues(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {

@@ -122,7 +122,7 @@ class StremioRepositoryTest {
         assertEquals(StremioError(StremioErrorKind.SignedOut, page = true), stremioFailure { list() })
     }
 
-    @Test fun `a list gives each addon's streams and resolves them to their URL`() {
+    @Test fun `a list gives each addon's streams and resolves them to their URL and content`() {
         signIn()
 
         val lists = list()
@@ -139,6 +139,7 @@ class StremioRepositoryTest {
         val resolved = repo.resolve(lumio.streams.first().id)!!
         assertEquals("https://debrid.example/REDACTED/file.mkv", resolved.url)
         assertEquals(emptyMap<String, String>(), resolved.headers)
+        assertEquals("resumed under the content of its list", SHAWSHANK.id, resolved.target)
         assertNull(repo.resolve("stream_unknown"))
     }
 

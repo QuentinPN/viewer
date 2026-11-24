@@ -1,6 +1,7 @@
 package io.github.quentinpn.viewer.tv.ui.stremio
 
 import io.github.quentinpn.viewer.tv.stremio.AddonStreams
+import io.github.quentinpn.viewer.tv.stremio.ResumePoint
 import io.github.quentinpn.viewer.tv.stremio.SourceAddon
 import io.github.quentinpn.viewer.tv.stremio.SourceList
 import io.github.quentinpn.viewer.tv.stremio.StreamChoice
@@ -56,5 +57,15 @@ class SourceSectionsTest {
         assertEquals(listOf("Film.2160p.mkv", "👤 12"), row.details)
         assertTrue(row.title.contains("Torrentio") && row.title.contains("4K") && '\n' !in row.title)
         assertTrue(row.size != null)
+    }
+
+    @Test
+    fun resumeIsOfferedFromTheFirstSecondUpTo95PercentAtTheSavedTime() {
+        assertNull(resumeLabel(null))
+        assertNull(resumeLabel(ResumePoint(0.0, 3000.0)))
+        assertNull(resumeLabel(ResumePoint(2850.0, 3000.0)))
+        assertNull(resumeLabel(ResumePoint(Double.NaN, 3000.0)))
+        assertTrue(resumeLabel(ResumePoint(2849.0, 3000.0))!!.contains("47:29"))
+        assertTrue(resumeLabel(ResumePoint(4930.0, 8520.0))!!.contains("1:22:10"))
     }
 }

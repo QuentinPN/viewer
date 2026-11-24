@@ -62,8 +62,8 @@ data class SourceAddon(val index: Int, val name: String, val streams: AddonStrea
 /** A stream list: its opaque id and its addons, in collection order. */
 data class SourceList(val query: String, val addons: List<SourceAddon>)
 
-/** What the player opens: never shown, never logged. */
-class ResolvedStream(val url: String, val headers: Map<String, String>) {
+/** What the player opens: never shown, never logged. [target] is the content it plays (`imdb[:S:E]`), its resume key. */
+class ResolvedStream(val url: String, val headers: Map<String, String>, val target: String) {
     override fun toString() = "ResolvedStream(***)"
 }
 
@@ -181,10 +181,10 @@ class StremioRepository(
         }
     }
 
-    /** The URL and headers behind [streamId]; null once its list is gone. */
+    /** The URL and headers behind [streamId], and the content of its list; null once that list is gone. */
     fun resolve(streamId: String): ResolvedStream? = synchronized(lock) {
-        lists.values.firstNotNullOfOrNull { it.streams[streamId] }
-    }?.let { ResolvedStream(it.url, it.headers) }
+        lists.values.firstNotNullOfOrNull { q -> q.streams[streamId]?.let { ResolvedStream(it.url, it.headers, q.target.id) } }
+    }
 
     override fun toString() = "StremioRepository"
 

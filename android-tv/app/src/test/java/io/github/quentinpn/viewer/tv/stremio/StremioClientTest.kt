@@ -267,7 +267,7 @@ class StremioClientTest {
         }
         val addon = named("Lumio · Profil")
         val result = runBlocking { client.streams(addon, ContentType.Movie, "tt0111161") }
-        val printed = listOf(AuthKey(FIXTURE_KEY), addon, result, result.streams.single(), ResolvedStream("https://debrid.example/x.mkv", mapOf("X-Key" to "SECRET-HEADER")))
+        val printed = listOf(AuthKey(FIXTURE_KEY), addon, result, result.streams.single(), ResolvedStream("https://debrid.example/x.mkv", mapOf("X-Key" to "SECRET-HEADER"), "tt0111161"))
         // An addon that drops the connection, and an answer cut in the middle of the key
         fake.streams = { MockResponse.Builder().onResponseStart(SocketEffect.CloseSocket()).build() }
         val unreachable = runCatching { runBlocking { client.streams(addon, ContentType.Movie, "tt0111161") } }.exceptionOrNull()!!
