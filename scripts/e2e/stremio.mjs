@@ -9,12 +9,13 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { root } from "./app.mjs";
 import {
   debugEnv,
@@ -497,6 +498,58 @@ export const addonsSummary = (settled) =>
     ...(settled.searching ? [settled.searching] : []),
   ].join(" ; ");
 
+/** The « Lecture » choice of the panel (local resume), copied from the app. */
+export const RESUME_LEGEND = "Lecture";
+export const RESUME_PREFIX = "Reprendre à ";
+export const RESTART_LABEL = "Depuis le début";
+
+/**
+ * The radio group of the open panel: its legend and each choice's label and
+ * state, or null without a fieldset.
+ */
+export const resumeChoice = (page) =>
+  sourcesDialog(page).evaluate((d) => {
+    const f = d.querySelector("fieldset");
+    if (!f) return null;
+    return {
+      legend: f.querySelector("legend")?.textContent?.trim() ?? "",
+      choices: [...f.querySelectorAll("label")].map((l) => ({
+        text: l.textContent?.replace(/\s+/g, " ").trim() ?? "",
+        checked: l.querySelector("input[type=radio]")?.checked === true,
+      })),
+    };
+  });
+
+/** Seconds of the `m:ss` or `h:mm:ss` time ending `text`, or null. */
+export function clockSeconds(text) {
+  const m = /(\d+(?::\d{2}){1,2})\s*$/.exec(text);
+  return m ? m[1].split(":").reduce((t, p) => t * 60 + Number(p), 0) : null;
+}
+
+/**
+ * Tab (at most `max` times) until a radio of the panel's fieldset has the
+ * focus; its label and state, or `reached: false`.
+ */
+export async function tabToRadio(page, max = 8) {
+  for (let i = 0; i < max; i++) {
+    await page.keyboard.press("Tab");
+    const at = await page.evaluate(() => {
+      const a = document.activeElement;
+      const radio = a instanceof HTMLInputElement && a.type === "radio";
+      return {
+        reached:
+          radio &&
+          !!a.closest("dialog[aria-labelledby=sources-title] fieldset"),
+        text:
+          a?.closest("label")?.textContent?.replace(/\s+/g, " ").trim() ?? "",
+        checked: radio && a.checked,
+      };
+    });
+    if (at.reached) return at;
+  }
+  return { reached: false, text: "", checked: false };
+}
+
 export async function closePanel(page) {
   await page.keyboard.press("Escape");
   await sourcesDialog(page).waitFor({ state: "detached", timeout: 10000 });
@@ -671,6 +724,51 @@ export async function holdPastProgressInterval(page) {
   );
   const stopAt = (await events(page)).times.at(-1)?.[1] ?? 0;
   return { duration, holdFrom, stopAt };
+}
+
+/**
+ * Seeks to `target` (absolute) and holds `holdSeconds` of playback past the
+ * first position reported after the seek (one before it is the old one). Returns
+ * that position and the last one, or null when the seek does not land in 30 s.
+ */
+export async function seekAndHold(page, target, holdSeconds = 3) {
+  const sent = Date.now();
+  await playerCommand(page, { type: "seekAbsolute", seconds: target });
+  const landed = (s) =>
+    s.times.find(([at, v]) => at > sent && v >= target && v < target + 60);
+  const seen = await poll(
+    () => events(page),
+    (s) => landed(s),
+    30000,
+  );
+  const reached = landed(seen)?.[1];
+  if (reached === undefined) return null;
+  const held = await poll(
+    () => events(page),
+    (s) => (s.times.at(-1)?.[1] ?? 0) >= reached + holdSeconds,
+    20000,
+  );
+  return { reached, last: held.times.at(-1)?.[1] ?? reached };
+}
+
+/**
+ * The entries of the Stremio resume file found under `dir` (the app's APPDATA
+ * of the run), as position and duration only; null without a readable file.
+ */
+export function readResumeFile(dir) {
+  try {
+    const file = readdirSync(dir, { recursive: true }).find(
+      (f) => basename(f) === "stremio-resume.json",
+    );
+    if (!file) return null;
+    const data = JSON.parse(readFileSync(join(dir, file), "utf8"));
+    return Object.values(data).map((e) => ({
+      positionSeconds: e.positionSeconds,
+      durationSeconds: e.durationSeconds,
+    }));
+  } catch {
+    return null;
+  }
 }
 
 // ---- Emby's trace ---------------------------------------------------------------------

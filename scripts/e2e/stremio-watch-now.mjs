@@ -13,7 +13,12 @@
 // « Stremio », held past Emby's 10 s progress interval after a seek to 40 % →
 // closed: back on the Demander page with the focus on « Regarder maintenant »,
 // the Emby « Reprendre » list unchanged (the title has no Emby item to carry a
-// resume point) → a series outside Emby with an IMDb id: the picker « Choisir
+// resume point) → the local resume (stremio-resume.json): no « Lecture » choice
+// before the first play; a seek to ~150 s held 3 s before leaving saves that
+// position (one entry, ±20 s); the panel reopened shows « Reprendre à … »
+// checked by default (same time, ±20 s) and « Depuis le début », the radios
+// reachable with Tab; the same addon's first stream with « Reprendre » starts
+// near the saved position, with « Depuis le début » under 30 s → a series outside Emby with an IMDb id: the picker « Choisir
 // un épisode » opens on its season list (Échap gives the focus back), season 1
 // episode 1 opens the panel with at least one addon with streams, Échap
 // closes it, focus back on the button → always at the end: Stremio sign-out
@@ -36,7 +41,7 @@
 // --out    folder of the captures and report.json
 //          (default: <tmp>/viewer-stremio-watch-now-<timestamp>)
 import { existsSync } from "node:fs";
-import { basename } from "node:path";
+import { basename, join } from "node:path";
 import { buildDebug, debugExe as exe, launch } from "./app.mjs";
 import {
   invoke,
@@ -50,6 +55,7 @@ import {
   attemptsText,
   capture,
   checkLogAndVault,
+  clockSeconds,
   closePanel,
   decision,
   dialogLeaks,
@@ -59,16 +65,24 @@ import {
   leavePlayer,
   playFirstWorking,
   poll,
+  RESTART_LABEL,
+  RESUME_LEGEND,
+  RESUME_PREFIX,
   readAccounts,
+  readResumeFile,
   readyApp,
   removeWork,
+  resumeChoice,
   runFolders,
   scrubbedReport,
   scrubber,
+  seekAndHold,
   signInEmbyAndStremio,
   signOutStremio,
   sourcesDialog,
+  tabToRadio,
   toNav,
+  tryAddon,
   vaultTargets,
   waitSettled,
 } from "./stremio.mjs";
@@ -99,6 +113,16 @@ const SERIES = [
 ];
 /** First addon with streams, then up to this many others. */
 const OTHER_ATTEMPTS = 3;
+/** Resume positions are compared within this many seconds. */
+const RESUME_TOLERANCE = 20;
+/** What the resume steps check, failed together when they cannot run. */
+const RESUME_CHECKS = [
+  "resume_saved",
+  "resume_choice_shown",
+  "resume_radios_focusable",
+  "resume_applied",
+  "restart_from_zero",
+];
 
 const { out, work, logFile, appEnv } = runFolders("stremio-watch-now", argv);
 
@@ -243,6 +267,142 @@ const pickerFocus = (page) =>
     };
   });
 
+/**
+ * Where the first playback is seeked for the resume: past the 60 s under which
+ * nothing is saved, far from the end (at most 40 % of the stream); null when the
+ * stream is too short for that.
+ */
+function resumeTargetFor(duration) {
+  if (!(duration > 0)) return null;
+  const target = Math.min(150, Math.floor(duration * 0.4));
+  return target >= 75 ? target : null;
+}
+
+/** A stream of `addon` played; a failure comes back as a reason, never thrown. */
+async function playAgain(page, addon) {
+  try {
+    return await tryAddon(page, addon);
+  } catch (e) {
+    if (await decision(page).count()) await leavePlayer(page).catch(() => {});
+    return { ok: false, reason: firstLine(e) };
+  }
+}
+
+/** Leaves the player of a played stream, or the panel a failed one left open. */
+async function leaveAfter(page, result) {
+  if (result.ok) await leavePlayer(page);
+  else if (await sourcesDialog(page).isVisible()) await closePanel(page);
+}
+
+/**
+ * The local resume, once the first stream was left at `seeked` (null: the seek
+ * did not land; `why` says what stopped it): file saved, choice shown with
+ * « Reprendre » by default, resumed start, restart from the beginning.
+ */
+async function resumeSteps(app, { addon, target, seeked, why }) {
+  const { page } = app;
+  const failAll = (names, reason) => {
+    for (const name of names) check(name, false, reason);
+  };
+  if (!seeked) return failAll(RESUME_CHECKS, why);
+
+  step = "film : reprise enregistrée";
+  const entries = await poll(
+    async () => readResumeFile(join(work, "Roaming")),
+    // The 15 s cadence may already hold the earlier 40 % position: wait for the write at leave.
+    (e) =>
+      e?.length === 1 &&
+      Math.abs(e[0].positionSeconds - target) <= RESUME_TOLERANCE,
+    10000,
+    500,
+  );
+  const saved = entries?.length === 1 ? entries[0] : null;
+  check(
+    "resume_saved",
+    saved !== null &&
+      Math.abs(saved.positionSeconds - target) <= RESUME_TOLERANCE,
+    saved
+      ? `position ${saved.positionSeconds.toFixed(0)} s sur ${saved.durationSeconds.toFixed(0)} s, visée ${target} s`
+      : `${entries?.length ?? 0} entrée(s) dans stremio-resume.json`,
+  );
+  if (!saved)
+    return failAll(
+      RESUME_CHECKS.slice(1),
+      "aucune position enregistrée à reprendre",
+    );
+
+  step = "film : choix de reprise";
+  await openWatchPanel(page);
+  await waitSettled(page);
+  const choice = await resumeChoice(page);
+  const [resume, restart] = choice?.choices ?? [];
+  const shown = clockSeconds(resume?.text ?? "");
+  const shot = await capture(app, out, "reprise-locale-choix", secrets);
+  check(
+    "resume_choice_shown",
+    choice?.legend === RESUME_LEGEND &&
+      choice.choices.length === 2 &&
+      resume.text.startsWith(RESUME_PREFIX) &&
+      resume.checked &&
+      shown !== null &&
+      Math.abs(shown - saved.positionSeconds) <= RESUME_TOLERANCE &&
+      restart.text === RESTART_LABEL &&
+      !restart.checked,
+    choice
+      ? `légende « ${choice.legend} », ${choice.choices.map((c) => `« ${c.text} » (coché ${c.checked})`).join(", ")}, enregistré ${saved.positionSeconds.toFixed(0)} s`
+      : "aucun choix « Lecture » dans le panneau",
+  );
+  check(
+    "capture_resume_choice",
+    shot.printed && shot.distinctColors > 20,
+    `${basename(shot.file)}, ${shot.distinctColors} couleurs`,
+  );
+  const tab = await tabToRadio(page);
+  check(
+    "resume_radios_focusable",
+    tab.reached && tab.checked && tab.text.startsWith(RESUME_PREFIX),
+    tab.reached
+      ? `focus sur « ${tab.text} » (coché ${tab.checked})`
+      : "aucune radio atteinte avec Tab",
+  );
+
+  step = "film : reprise appliquée";
+  const resumed = await playAgain(page, addon);
+  check(
+    "resume_applied",
+    resumed.ok &&
+      Math.abs(resumed.from - saved.positionSeconds) <= RESUME_TOLERANCE,
+    resumed.ok
+      ? `première position ${resumed.from.toFixed(1)} s, enregistré ${saved.positionSeconds.toFixed(0)} s`
+      : `lecture : ${resumed.reason}`,
+  );
+  await leaveAfter(page, resumed);
+
+  step = "film : depuis le début";
+  let restarted = {
+    ok: false,
+    reason: "panneau sans choix « Depuis le début »",
+  };
+  if (!(await sourcesDialog(page).isVisible())) await openWatchPanel(page);
+  await waitSettled(page);
+  const fromStart = sourcesDialog(page).getByRole("radio", {
+    name: RESTART_LABEL,
+    exact: true,
+  });
+  if (await fromStart.count()) {
+    await fromStart.check({ timeout: 5000 });
+    restarted = await playAgain(page, addon);
+  }
+  check(
+    "restart_from_zero",
+    restarted.ok && restarted.from < 30,
+    restarted.ok
+      ? `première position ${restarted.from.toFixed(1)} s`
+      : `lecture : ${restarted.reason}`,
+  );
+  await leaveAfter(page, restarted);
+}
+
 // ---- steps ------------------------------------------------------------------------
 
 async function filmSteps(app) {
@@ -288,6 +448,14 @@ async function filmSteps(app) {
       !settled.addons.some((a) => a.state === "loading"),
     addonsSummary(settled),
   );
+  const firstChoice = await resumeChoice(page);
+  check(
+    "resume_choice_absent_first",
+    firstChoice?.legend !== RESUME_LEGEND,
+    firstChoice
+      ? `fieldset « ${firstChoice.legend} »`
+      : "aucun choix de lecture",
+  );
   const leaks = await dialogLeaks(page);
   check(
     "dialog_without_addresses",
@@ -312,6 +480,8 @@ async function filmSteps(app) {
   check("stremio_playback", played !== null, attemptsText(attempts));
   if (!played) {
     if (await sourcesDialog(page).isVisible()) await closePanel(page);
+    for (const name of RESUME_CHECKS)
+      check(name, false, "aucun flux n'a démarré");
     await closeMedia(page);
     return;
   }
@@ -342,6 +512,15 @@ async function filmSteps(app) {
     stopAt: Math.round(stopAt),
   });
 
+  step = "film : position de reprise";
+  const target = resumeTargetFor(duration);
+  const seeked = target === null ? null : await seekAndHold(page, target, 3);
+  const why =
+    target === null
+      ? `durée ${duration ?? "inconnue"} s trop courte pour une reprise`
+      : `position ${target} s non atteinte en 30 s`;
+  fact("resumeSeek", { duration, target, seeked });
+
   step = "film : fermeture du lecteur";
   await leavePlayer(page);
   const onPage = await mediaTitle(page).isVisible();
@@ -363,6 +542,7 @@ async function filmSteps(app) {
     now === before,
     `Reprendre ${now === before ? "inchangé" : "changé"} après l'arrêt à ${stopAt.toFixed(0)} s`,
   );
+  await resumeSteps(app, { addon: played.addon, target, seeked, why });
   await closeMedia(page);
 }
 
