@@ -22,9 +22,21 @@ Viewer est un client multimédia personnel pour [Emby](https://emby.media). Il r
 - **Lecture fluide.** La vidéo est lue en direct dès que le serveur le permet, avec un repli en transcodage sinon. La lecture passe par le moteur natif libmpv, pas par une page web.
 - **Retrouve vite ce que tu cherches.** Recherche, tri et filtres, favoris, pages d'épisode complètes et épisode suivant automatique. La navigation ne bloque jamais sur le réseau : écrans squelettes, cache d'images jetable et pagination la gardent réactive.
 - **Regarde aussi sur grand écran.** Envoie un épisode du PC vers la télé et les deux restent synchronisés (l'écart mesuré s'affiche, par exemple « Lié à la TV, ±40 ms »). Pause, lecture et « Passer l'intro » fonctionnent depuis l'un ou l'autre.
+- **Demande un titre sans quitter l'app.** Un onglet « Demander » intégré permet de parcourir, chercher et demander des films et séries qui ne sont pas encore sur ton serveur, sur Windows comme sur Android TV.
 - **Connexion robuste.** La session survit aux redémarrages. Quand le serveur devient injoignable, l'app garde ta session, réessaie toute seule et te ramène là où tu étais.
 - **À ton image.** Réorganise ou masque les rangées de l'accueil, choisis les langues audio et sous-titres, passe les génériques d'un bouton. Le logo change même de tenue aux fêtes, avec un réglage pour le couper.
 - **Sûr par conception.** Ton jeton de connexion reste dans le stockage sécurisé du système, jamais dans un journal ni un fichier en clair. Les certificats du serveur sont vérifiés, et les mises à jour de l'app sont contrôlées par une signature cryptographique avant installation.
+
+## Demander un titre sans quitter l'app
+
+Les deux applications intègrent un onglet « Demander » qui relie Viewer à un serveur [Request](https://github.com/QuentinPN/request), le portail de demandes de ton serveur multimédia.
+
+- **Le même compte, sans mot de passe en plus.** Viewer réutilise ton compte Emby pour se connecter à Request. Chaque appareil apparaît comme sa propre session, que tu peux révoquer.
+- **Découvrir et chercher.** Parcours par type et par genre, ou cherche, puis ouvre un titre pour ses détails et ses bandes-annonces.
+- **Demander en quelques clics.** Demande un film ou une série, avec ton quota restant affiché avant l'envoi.
+- **Suivre tes demandes.** Retrouve « Mes demandes » avec leur statut, et annule-en une tant qu'elle est en attente.
+
+L'onglet demande l'adresse d'un serveur Request ; le reste de Viewer fonctionne sans.
 
 ## Plateformes
 
@@ -43,6 +55,9 @@ Viewer n'est qu'un client. Emby reste la source de vérité pour les utilisateur
 flowchart LR
     W["Viewer pour Windows"] --> E["Serveur Emby"]
     T["Viewer pour Android TV"] --> E
+    W --> R["Serveur Request"]
+    T --> R
+    R --> E
     E --> M[("Tes fichiers médias")]
     W <-. "lecture liée" .-> T
 ```
