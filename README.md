@@ -22,9 +22,21 @@ Viewer is a personal media client for [Emby](https://emby.media). It pairs a nat
 - **Smooth playback.** Videos play directly whenever the server allows it and fall back to transcoding when it does not. Playback runs on the native libmpv engine, not in a web page.
 - **Find things fast.** Search, sort and filters, favorites, full episode pages and automatic next episode. Browsing never blocks on the network: skeleton screens, a disposable image cache and paging keep it responsive.
 - **Watch on the big screen too.** Send an episode from the PC to the TV and the two stay in sync (the measured offset is shown, for example "Linked to TV, +/-40 ms"). Pause, play and skip intro work from either device.
+- **Request titles without leaving the app.** A built-in "Request" tab ("Demander") lets you browse, search and ask for films and series that are not on your server yet, on Windows and on Android TV.
 - **Resilient connection.** Sessions persist across restarts. When the server becomes unreachable, the app keeps your session, retries on its own and brings you back to where you were.
 - **Yours to arrange.** Reorder or hide the rows of the home screen, choose audio and subtitle languages, and skip intros with one button. The logo even changes outfit for holidays, with a setting to turn that off.
 - **Safe by design.** Your sign-in token lives in the operating system's secure storage, never in a log or a plain file. Server certificates are validated, and in-app updates are checked against a cryptographic signature before they are installed.
+
+## Request titles without leaving the app
+
+Both apps include a "Request" tab (shown as "Demander" in the interface) that connects Viewer to a [Request](https://github.com/QuentinPN/request) server, the request portal for your home media server.
+
+- **Same account, no extra password.** Viewer reuses your Emby account to sign in to Request. Each device appears as its own session, which you can revoke.
+- **Discover and search.** Browse by type and genre, or search, then open a title for its details and trailers.
+- **Ask in a couple of clicks.** Request a film or a series, with your remaining quota shown before you send.
+- **Follow your requests.** See "my requests" with their status, and cancel one while it is still waiting.
+
+The tab needs the address of a Request server; the rest of Viewer works without one.
 
 ## Platforms
 
@@ -43,6 +55,9 @@ Viewer is only a client. Emby stays the source of truth for users, libraries, pr
 flowchart LR
     W["Viewer for Windows"] --> E["Emby server"]
     T["Viewer for Android TV"] --> E
+    W --> R["Request server"]
+    T --> R
+    R --> E
     E --> M[("Your media files")]
     W <-. "linked playback" .-> T
 ```
