@@ -54,7 +54,7 @@ class MpvPlayerEngine(
         check(alive.compareAndSet(false, true)) { "Un seul lecteur mpv peut exister à la fois" }
         val quiet = NativeLog.ensureQuiet()
         MPVLib.create(context.applicationContext)
-        val options = if (external) OPTIONS + externalOptions(quiet, headers.isNotEmpty()) else OPTIONS
+        val options = OPTIONS + loadOptions(external, quiet, headers.isNotEmpty())
         for ((name, value) in options) {
             val rc = MPVLib.setOptionString(name, value)
             if (rc < 0) Log.w(TAG, "option $name=$value refusée ($rc)")
@@ -342,11 +342,12 @@ private class PendingFile(val source: MediaSource, val options: String, val paus
 private const val RECONNECT_OPTIONS = "reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=7"
 
 /**
- * The options an external (Stremio) stream adds. libplayer sets `msg-level=all=v` and copies every line it
- * gets to logcat at VERBOSE, before [MpvPlayerEngine.logMessage]: when that copy cannot be dropped ([quiet]
- * false), mpv logs nothing. Redirects as on Windows: up to 5 without [headers], none with.
+ * The options every engine adds. Redirects as on Windows: none, except a Stremio ([external]) stream without
+ * [headers], which may follow 5 (a bare debrid link answers 302); Emby's token never follows one. libplayer
+ * sets `msg-level=all=v` and copies every line it gets to logcat at VERBOSE, before [MpvPlayerEngine.logMessage]:
+ * when that copy cannot be dropped ([quiet] false), an external stream's mpv logs nothing.
  */
-internal fun externalOptions(quiet: Boolean, headers: Boolean): List<Pair<String, String>> = listOfNotNull(
-    "stream-lavf-o" to "$RECONNECT_OPTIONS,max_redirects=${if (headers) 0 else 5}",
-    if (quiet) null else "msg-level" to "all=no",
+internal fun loadOptions(external: Boolean, quiet: Boolean, headers: Boolean): List<Pair<String, String>> = listOfNotNull(
+    "stream-lavf-o" to "$RECONNECT_OPTIONS,max_redirects=${if (external && !headers) 5 else 0}",
+    if (external && !quiet) "msg-level" to "all=no" else null,
 )
