@@ -14,14 +14,15 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"viewer/internal/artworkcache"
+	"viewer/internal/atomicfile"
 	"viewer/internal/emby"
+	"viewer/internal/redact"
 )
 
 // Identity is the Emby account a Request session belongs to, with the token to
@@ -121,13 +122,13 @@ type Revocation struct {
 
 // String, GoString and Format keep the token out of every fmt verb (fmt does not
 // call SessionToken's on an unexported field).
-func (r Revocation) String() string { return redactedText("Revocation") }
+func (r Revocation) String() string { return redact.Masked("Revocation") }
 
 func (r Revocation) GoString() string { return r.String() }
 
-func (r Revocation) Format(f fmt.State, _ rune) { writeRedacted(f, "Revocation") }
+func (r Revocation) Format(f fmt.State, _ rune) { redact.WriteMasked(f, "Revocation") }
 
-func (r Revocation) MarshalJSON() ([]byte, error) { return refuseMarshal("Revocation") }
+func (r Revocation) MarshalJSON() ([]byte, error) { return redact.RefuseMarshal("Revocation") }
 
 // Send runs the revocation; a failure is only logged, by kind.
 func (r *Revocation) Send(ctx context.Context) {
@@ -146,22 +147,22 @@ type rejection struct {
 
 func hashToken(t emby.AccessToken) [sha256.Size]byte { return sha256.Sum256([]byte(t.Expose())) }
 
-func (r rejection) String() string { return redactedText("rejection") }
+func (r rejection) String() string { return redact.Masked("rejection") }
 
 func (r rejection) GoString() string { return r.String() }
 
-func (r rejection) Format(f fmt.State, _ rune) { writeRedacted(f, "rejection") }
+func (r rejection) Format(f fmt.State, _ rune) { redact.WriteMasked(f, "rejection") }
 
-func (r rejection) MarshalJSON() ([]byte, error) { return refuseMarshal("rejection") }
+func (r rejection) MarshalJSON() ([]byte, error) { return redact.RefuseMarshal("rejection") }
 
 // String, GoString and Format of Identity: the Emby token is trusted to nobody.
-func (id Identity) String() string { return redactedText("Identity") }
+func (id Identity) String() string { return redact.Masked("Identity") }
 
 func (id Identity) GoString() string { return id.String() }
 
-func (id Identity) Format(f fmt.State, _ rune) { writeRedacted(f, "Identity") }
+func (id Identity) Format(f fmt.State, _ rune) { redact.WriteMasked(f, "Identity") }
 
-func (id Identity) MarshalJSON() ([]byte, error) { return refuseMarshal("Identity") }
+func (id Identity) MarshalJSON() ([]byte, error) { return redact.RefuseMarshal("Identity") }
 
 // Service is `RequestService`. Safe for concurrent use.
 type Service struct {
@@ -196,11 +197,11 @@ type Service struct {
 }
 
 // String, GoString and Format keep the refused Emby tokens out of every fmt verb.
-func (s *Service) String() string { return redactedText("RequestService") }
+func (s *Service) String() string { return redact.Masked("RequestService") }
 
 func (s *Service) GoString() string { return s.String() }
 
-func (s *Service) Format(f fmt.State, _ rune) { writeRedacted(f, "RequestService") }
+func (s *Service) Format(f fmt.State, _ rune) { redact.WriteMasked(f, "RequestService") }
 
 // NewService is `RequestService::new`: settings read from path (an unreadable
 // file is the default), the address checked again.
@@ -251,10 +252,6 @@ func (s *Service) updateSettings(f func(*settings)) error {
 	defer s.settingsMu.Unlock()
 	next := s.settings.clone()
 	f(&next)
-	ioErr := func(err error) error { return NewSettings("request.json : " + err.Error()) }
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return ioErr(err)
-	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
@@ -262,13 +259,8 @@ func (s *Service) updateSettings(f func(*settings)) error {
 	if err := enc.Encode(next); err != nil {
 		return NewSettings(err.Error())
 	}
-	// `with_extension("json.tmp")`.
-	temp := strings.TrimSuffix(s.path, filepath.Ext(s.path)) + ".json.tmp"
-	if err := os.WriteFile(temp, bytes.TrimSuffix(buf.Bytes(), []byte("\n")), 0o644); err != nil {
-		return ioErr(err)
-	}
-	if err := os.Rename(temp, s.path); err != nil {
-		return ioErr(err)
+	if err := atomicfile.Write(s.path, bytes.TrimSuffix(buf.Bytes(), []byte("\n"))); err != nil {
+		return NewSettings("request.json : " + err.Error())
 	}
 	s.settings = next
 	return nil

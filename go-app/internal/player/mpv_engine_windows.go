@@ -325,6 +325,11 @@ func (e *MpvEngine) Load(request *PlaybackRequest, source MediaSource) error {
 	if err := e.setProperty("start", start); err != nil {
 		return err
 	}
+	// Each load sets it: a Stremio load that follows redirects never leaves them on
+	// for the next Emby one.
+	if err := e.setProperty("stream-lavf-o", streamLavfFor(request.FollowRedirects && len(request.HTTPHeaders) == 0)); err != nil {
+		return err
+	}
 	subtitles := make([]pendingSubtitle, 0, len(request.Subtitles))
 	for _, s := range request.Subtitles {
 		src, err := ParseSource(s.Source)
@@ -610,7 +615,7 @@ func (e *MpvEngine) eventLoop(openLimit time.Duration) {
 			e.emit(stall, EndFile{Reason: reason, Error: message})
 		case mpv.EventLogMessage:
 			text := strings.TrimRightFunc(ev.LogText, unicode.IsSpace)
-			e.log.Warn(fmt.Sprintf("[%s] %s", ev.LogPrefix, redact.Redact(text)), "target", "mpv")
+			e.log.Warn(fmt.Sprintf("[%s] %s", ev.LogPrefix, mpvLogText(text)), "target", "mpv")
 		case mpv.EventPropertyChange:
 			if pe := mapProperty(ev); pe != nil {
 				e.emit(stall, pe)

@@ -4,7 +4,8 @@
 // diagnostic panels. The video is the native surface under this transparent page.
 // At the end of an episode, a card offers the next one. During an
 // intro or the credits, a button skips them. Chapters are marked on
-// the seek bar and listed in their own panel.
+// the seek bar and listed in their own panel. A Stremio stream has none of
+// these Emby features: no quality, chapters, segments, next episode or TV.
 import { onDestroy, onMount, tick, untrack } from "svelte";
 import { embyApi } from "../emby/api";
 import type {
@@ -14,6 +15,7 @@ import type {
   Segment,
 } from "../emby/types";
 import { capInEffect } from "../settings/quality";
+import { isStremio } from "../stremio/sources";
 import TitleBar from "../window/TitleBar.svelte";
 import { playerApi } from "./api";
 import {
@@ -116,7 +118,8 @@ interface Props {
   onExit: () => void;
   /**
    * The playback ended on an error or well before the end (the stream broke):
-   * the player closes and the app offers to resume.
+   * the player closes and the app offers to resume. For a Stremio stream, also
+   * when it failed to open: the app goes back to its list of sources.
    */
   onInterrupted: (itemId: string) => void;
   /**
@@ -155,8 +158,12 @@ let qualityPhase = $state<QualityPhase>(QUALITY_IDLE);
 /** A quality change is loading: the delays set are kept. */
 let switchingQuality = false;
 
+/** Emby provides the stream: its quality, chapters, segments and next episode apply. */
+const emby = $derived(!isStremio(playback));
+
 onMount(() => {
   pendingCap = untrack(() => playback.bitrateCap);
+  if (untrack(() => !emby)) return;
   embyApi
     .playbackQuality()
     .then((q) => {
@@ -292,7 +299,7 @@ const skipKey = $derived.by(() => {
   const playing = active ? activeSegment(segments, position, duration) : null;
   return playing ? `${playback.itemId}:${segmentKey(playing)}` : null;
 });
-const decision = $derived(playMethodLabel(playback));
+const decision = $derived(emby ? playMethodLabel(playback) : "Stremio");
 const chapterNow = $derived(chapterIndex(chapters, position));
 const chapterName = $derived(chapters[chapterNow]?.name ?? null);
 const marks = $derived(chapterMarks(chapters, duration));
@@ -330,7 +337,7 @@ $effect(() => {
   launching = null;
   nextEpisode = null;
   previousEpisode = null;
-  if (!isEpisode(title)) return;
+  if (!isEpisode(title) || isStremio(playback)) return;
   embyApi
     .itemDetail(itemId)
     .then((detail) => {
@@ -350,6 +357,7 @@ $effect(() => {
   segments = [];
   autoSkipped = new Set();
   skipSetting = readSkip(storage());
+  if (isStremio(playback)) return;
   embyApi
     .segments(itemId, skipSetting.external)
     .then((found) => {
@@ -365,6 +373,7 @@ $effect(() => {
 $effect(() => {
   const { itemId } = playback;
   chapters = [];
+  if (isStremio(playback)) return;
   embyApi
     .chapters(itemId)
     .then((found) => {
@@ -460,7 +469,8 @@ function onEvent(ev: PlayerEvent) {
       tracks = ev.tracks;
       break;
     case "endFile":
-      if (interruptedBy(ev.reason)) {
+      // A Stremio link that fails to open has no Emby transcode to fall back on.
+      if (interruptedBy(ev.reason) || (!emby && ev.reason === "error")) {
         void close(() => onInterrupted(playback.itemId));
       } else if (ev.reason === "error") {
         if (canFallBack(everPlayed, playback.method) && !fallingBack)
@@ -983,11 +993,11 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
         {#if heading.kicker}<p class="kicker">{heading.kicker}</p>{/if}
         <h1>{heading.name}</h1>
       </div>
-      <span class="decision" title="Décision du serveur Emby">{decision}</span>
+      <span class="decision" title={emby ? "Décision du serveur Emby" : "Flux d'un addon Stremio"}>{decision}</span>
       {#if sync.phase === "linked"}
         <span class="sync-pill" role="status">{pillText(sync.device, sync.driftMs)}</span>
         <button type="button" class="sync-unlink" onclick={() => void syncApi.unlink()}>Délier</button>
-      {:else if sync.phase === "idle"}
+      {:else if sync.phase === "idle" && emby}
         <button
           type="button"
           class="round"
@@ -1194,7 +1204,7 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
                 </label>
               {/each}
             </fieldset>
-            {#if qualityCaps.length > 0}
+            {#if qualityCaps.length > 0 && emby}
               <fieldset>
                 <legend>Qualité</legend>
                 {#each qualityCaps as cap (cap ?? "max")}
@@ -1254,10 +1264,12 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
           {:else}
             <h2 tabindex="-1">Informations de lecture</h2>
             <dl>
-              <dt>Serveur</dt>
+              <dt>{emby ? "Serveur" : "Source"}</dt>
               <dd>{decision}</dd>
-              <dt>Débit maximal</dt>
-              <dd>{capInEffect(playback.bitrateCap, playback.localAddress)}</dd>
+              {#if emby}
+                <dt>Débit maximal</dt>
+                <dd>{capInEffect(playback.bitrateCap, playback.localAddress)}</dd>
+              {/if}
               {#if diag}
                 <dt>Décodage</dt>
                 <dd>{decoding(diag)}</dd>
@@ -1814,14 +1826,10 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
     outline: none;
   }
   .choice {
-    display: flex;
-    align-items: center;
     gap: var(--space-3);
     min-height: 40px;
     padding: 0 10px;
-    border-radius: var(--radius-sm);
     font-size: 15px;
-    cursor: pointer;
   }
   .choice:hover {
     background: rgb(255 255 255 / 8%);
@@ -1883,10 +1891,6 @@ const joined = (...parts: (string | number | null | undefined)[]) =>
   }
   fieldset + fieldset {
     margin-top: var(--space-3);
-  }
-  .choice input {
-    accent-color: var(--color-accent);
-    margin: 0;
   }
   dl {
     display: grid;

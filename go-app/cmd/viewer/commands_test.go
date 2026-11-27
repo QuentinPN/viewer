@@ -86,7 +86,7 @@ func invoke(t *testing.T, b *bridge.Bridge, cmd, args string) (string, string) {
 
 // commands is every command the frontend may invoke: the 82 of the former Rust
 // invoke_handler minus the two ui_settings_* of the finished Tauri handover, plus
-// the two of the logo.
+// the two of the logo and the six of Stremio.
 var commands = []string{
 	"app_info", "app_update_check", "app_update_install", "app_update_pending",
 	"artwork_cache_clear", "artwork_cache_stats",
@@ -110,6 +110,9 @@ var commands = []string{
 	"window_set_fullscreen",
 	// The logo (commands_brand.go): no Rust counterpart.
 	"app_is_debug", "window_set_icon",
+	// Réglages › Stremio (internal/stremio): no Rust counterpart.
+	"stremio_addon_streams", "stremio_play", "stremio_sign_in", "stremio_sign_out", "stremio_sources",
+	"stremio_status",
 }
 
 // Exactly these commands are registered.
@@ -359,5 +362,20 @@ func Test_go_window_set_icon_validates(t *testing.T) {
 	}
 	if _, err := invoke(t, b, "window_set_icon", `{}`); err == "" {
 		t.Error("sans id")
+	}
+}
+
+// The stremio_* commands reach the app's service: signed out on an empty vault,
+// without any network call; a malformed sign-in is refused before one.
+func TestStremioCommandsAreWired(t *testing.T) {
+	_, b, _, _ := testApp(t, true)
+	if out, err := invoke(t, b, "stremio_status", ``); err != "" || out != `{"state":"signed_out","addons":[]}` {
+		t.Fatal(out, err)
+	}
+	if out, err := invoke(t, b, "stremio_sign_out", `{}`); err != "" || out != `{"state":"signed_out","addons":[]}` {
+		t.Fatal(out, err)
+	}
+	if _, err := invoke(t, b, "stremio_sign_in", `{"email":"a@b.c"}`); err != `"command stremio_sign_in missing required key password"` {
+		t.Fatal(err)
 	}
 }

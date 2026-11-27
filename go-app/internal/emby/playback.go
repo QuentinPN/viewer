@@ -428,6 +428,7 @@ func NewPlaybackStart(itemID string, resume bool, plan *PlaybackPlan) PlaybackSt
 		TranscodeReasons: plan.TranscodeReasons,
 		Title:            plan.Title,
 		LocalAddress:     true,
+		Origin:           OriginEmby,
 	}
 	if limit := plan.BitrateLimit; limit != nil {
 		start.BitrateCap = limit.Cap

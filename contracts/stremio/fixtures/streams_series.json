@@ -1,0 +1,520 @@
+{
+  "addon-1": {
+    "name": "TMDB Collections",
+    "status": 404,
+    "error": null,
+    "total": 0,
+    "response": {
+      "error": "Type not supported",
+      "streams": []
+    }
+  },
+  "addon-2": {
+    "name": "Local Files (without catalog support)",
+    "status": 0,
+    "error": "TypeError",
+    "total": 0,
+    "response": null
+  },
+  "addon-4": {
+    "name": "Lumio · Profil",
+    "status": 200,
+    "error": null,
+    "total": 24,
+    "response": {
+      "streams": [
+        {
+          "name": "[AD⚡️] Lumio",
+          "description": "1080p • BluRay REMUX • 📶 33 Mb/s\n🇫🇷 🇬🇧 🇪🇸 ✓ • 💾 14,0 Go • 🔎 YGG | Tr4ker\n🎧 H264 • DTS 5.1 • FGT\n🗂️ Game.of.Thrones.S01E02.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-FGT.mkv",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "notWebReady": true,
+            "bingeGroup": "lumio|t|86acda6aacd678044abcab21447c47261ac331e7",
+            "filename": "Game.of.Thrones.S01E02.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-FGT.mkv",
+            "videoSize": 13986999900
+          }
+        },
+        {
+          "name": "[AD⚡️] Lumio",
+          "description": "1080p • BluRay REMUX • 📶 33 Mb/s\n🌍 🇫🇷 🇬🇧 • 💾 14,0 Go • 🔎 Darki • 🔗 1fichier\n🎧 H264 • DTS-HD MA 5.1 • FGT\n🗂️ Game.of.Thrones.S01E02.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-FGT.mkv",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "notWebReady": true,
+            "bingeGroup": "lumio|r|fgt|3|25|4|fr|",
+            "filename": "Game.of.Thrones.S01E02.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-FGT.mkv",
+            "videoSize": 13986999900
+          }
+        },
+        {
+          "name": "[AD⚡️] Lumio",
+          "description": "1080p • BluRay REMUX • 📶 30 Mb/s\n🇫🇷 🇬🇧 ✓ • 💾 12,7 Go • 🔎 C411\n🎧 H264 • DTS-HD MA DTS 5.1 • MANOFSTYLE\n🗂️ Game Of Thrones S01E02 Bluray Remux 1080p Multi DTS HDMA-MAN OF STYLE.mkv",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "notWebReady": true,
+            "bingeGroup": "lumio|t|6ebab7dc6e8cbc6cc0a0967a98240e09e80c9ec2",
+            "filename": "Game Of Thrones S01E02 Bluray Remux 1080p Multi DTS HDMA-MAN OF STYLE.mkv",
+            "videoSize": 12673175712
+          }
+        },
+        {
+          "name": "[AD⚡️] Lumio",
+          "description": "1080p • BluRay REMUX • 📶 30 Mb/s\n🇫🇷 🇬🇧 ✓ • 💾 12,7 Go • 🔎 YGG | DMM | Tr4ker | Torr9\n🎧 DTS-HD MA DTS 5.1\n🗂️ Game Of Thrones S01E02 Bluray Remux 1080p Multi DTS HDMA-MAN OF STYLE.mkv",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "notWebReady": true,
+            "bingeGroup": "lumio|t|b75f78f19b22575d14623b477c33c2be01d6b829",
+            "filename": "Game Of Thrones S01E02 Bluray Remux 1080p Multi DTS HDMA-MAN OF STYLE.mkv",
+            "videoSize": 12673175712
+          }
+        },
+        {
+          "name": "[AD⚡️] Lumio",
+          "description": "1080p • BluRay • 📶 11 Mb/s\n🇫🇷 🇬🇧 ✓ • 💾 4,7 Go • 🔎 YGG | DMM | Tr4ker | Sharewood | V3X | TheOldSchool\n🎧 H264 • DTS 5.1 • JMT\n🗂️ Game.Of.Thrones.S01E02.MULTi.1080p.BluRay.x264-JMT.mkv",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "notWebReady": true,
+            "bingeGroup": "lumio|t|17678d0783c1266b30c4a215ac9dc27b6e8afb02",
+            "filename": "Game.Of.Thrones.S01E02.MULTi.1080p.BluRay.x264-JMT.mkv",
+            "videoSize": 4691401706
+          }
+        },
+        {
+          "name": "[AD⚡️] Lumio",
+          "description": "1080p • BluRay • 📶 10 Mb/s\n🌍 🇫🇷 🇬🇧 • 💾 4,4 Go • 🔎 YGG | DMM | Tr4ker | C411\n🎧 H264 • DTS 5.1 • YAB\n🗂️ Game of Thrones S01E02 (2011) MULTI VFF 1080p Bluray x264-YAB.mkv",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "notWebReady": true,
+            "bingeGroup": "lumio|t|24bd02d7e70f216fb39d02c38f9e0ceeccd38dce",
+            "filename": "Game of Thrones S01E02 (2011) MULTI VFF 1080p Bluray x264-YAB.mkv",
+            "videoSize": 4359209667
+          }
+        }
+      ]
+    }
+  },
+  "addon-5": {
+    "name": "AIOSources",
+    "status": 200,
+    "error": null,
+    "total": 11,
+    "response": {
+      "streams": [
+        {
+          "name": "[AD+] ⚡ Cached\n🌍 MULTI / French 🇫🇷",
+          "description": "🖼️ 2160P\n🎞️ X265\n🎨 DV\n🔊 AC3 • 5.1\n📦 10.5 GB\n📅 2026-09-13\n🔍 AIOSources 🧭 TR4KER 🌐 AllDebrid",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "aiosource|REDACTED|alldebrid",
+            "videoSize": 11277994945,
+            "filename": "Game.of.Thrones.Integral.Multi.VFF.2160p.UHD.DV.HDR10P.x265/Saison 1/Game.of.Thrones.S01E02.Multi.VFF.2160p.UHD.DV.HDR10P.x265-Notag.mkv",
+            "notWebReady": true,
+            "folderName": "Game.of.Thrones.Intégrale.MULTi.VFF.2160p.10bits.DV.AC3.5.1.x265-Notag",
+            "folderSize": 842419688956,
+            "indexer": "TR4KER",
+            "service": "alldebrid",
+            "cached": true,
+            "publishDate": "2026-09-13T00:19:51Z"
+          }
+        },
+        {
+          "name": "[AD+] ⚡ Cached\n🌍 MULTI / English / French 🇬🇧 🇫🇷",
+          "description": "🖼️ 2160P\n🎞️ WEB • X265\n🎨 HDR • DV\n📦 8.80 GB\n📅 2026-03-14\n🔍 AIOSources 🧭 TR4KER 🌐 AllDebrid",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "aiosource|REDACTED|alldebrid",
+            "videoSize": 9444456447,
+            "filename": "Game.of.Thrones.iNTEGRALE.MULTi.HDR.DV.2160p.WEB.x265-FW/Game.of.Thrones.S01.MULTi.HDR.DV.2160p.WEB.x265-FW/Game.of.Thrones.S01E02.MULTi.HDR.DV.2160p.WEB.x265-FW.mkv",
+            "notWebReady": true,
+            "folderName": "Game.of.Thrones.iNTEGRALE.MULTi.HDR.DV.2160p.WEB.x265-FW",
+            "folderSize": 692481428003,
+            "indexer": "TR4KER",
+            "service": "alldebrid",
+            "cached": true,
+            "publishDate": "2026-03-14T07:38:57Z"
+          }
+        },
+        {
+          "name": "[AD+] ⚡ Cached\n🌍 MULTI / English / French 🇬🇧 🇫🇷",
+          "description": "🖼️ 2160P\n🎞️ WEB • X265\n🎨 HDR • DV\n📦 8.80 GB\n📅 2026-03-06\n🔍 AIOSources 🧭 TR4KER 🌐 AllDebrid",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "aiosource|REDACTED|alldebrid",
+            "videoSize": 9444456447,
+            "filename": "Game.of.Thrones.iNTEGRALE.MULTi.HDR.DV.2160p.WEB.x265-FW/Game.of.Thrones.S01.MULTi.HDR.DV.2160p.WEB.x265-FW/Game.of.Thrones.S01E02.MULTi.HDR.DV.2160p.WEB.x265-FW.mkv",
+            "notWebReady": true,
+            "folderName": "Game.of.Thrones.iNTEGRALE.MULTi.HDR.DV.2160p.WEB.x265-FW",
+            "folderSize": 692481428003,
+            "indexer": "TR4KER",
+            "service": "alldebrid",
+            "cached": true,
+            "publishDate": "2026-03-06T11:03:35Z"
+          }
+        },
+        {
+          "name": "[AD+] ⚡ Cached\n🌍 French 🇫🇷",
+          "description": "🖼️ 2160P\n🎞️ BLURAY • X265 • H.265\n🎨 DV • HDR10+\n🔊 DTS • 5.1\n📦 8.66 GB\n📅 2026-01-15\n🔍 AIOSources 🧭 C411-2 🌐 AllDebrid",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "aiosource|REDACTED|alldebrid",
+            "videoSize": 9300526808,
+            "filename": "Game.of.Thrones.Integral.FRENCH.2160p.UHD.DV.HDR10P.x265-FLOP/Game.of.Thrones.S01E02.FRENCH.2160p.UHD.DV.HDR10P.x265-FLOP.mkv",
+            "notWebReady": true,
+            "folderName": "Game.Of.Thrones.2011.INTEGRALE.VFF.2160p.BluRay.DV.HDR10Plus.DTS.5.1.x265-FLOP",
+            "folderSize": 707443259587,
+            "indexer": "C411-2",
+            "service": "alldebrid",
+            "cached": true,
+            "publishDate": "2026-01-15T19:45:44Z"
+          }
+        },
+        {
+          "name": "[AD+] ⚡ Cached\n🌍 French 🇫🇷",
+          "description": "🖼️ 2160P\n🎞️ BLURAY • X265\n🎨 DV\n🔊 DTS • 5.1\n📦 8.66 GB\n📅 2026-01-15\n🔍 AIOSources 🧭 C411 🌐 AllDebrid",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "aiosource|REDACTED|alldebrid",
+            "videoSize": 9300526808,
+            "filename": "Game.of.Thrones.Integral.FRENCH.2160p.UHD.DV.HDR10P.x265-FLOP/Game.of.Thrones.S01E02.FRENCH.2160p.UHD.DV.HDR10P.x265-FLOP.mkv",
+            "notWebReady": true,
+            "folderName": "Game.Of.Thrones.2011.INTEGRALE.VFF.2160p.BluRay.DV.HDR10Plus.DTS.5.1.x265-FLOP",
+            "folderSize": 707443259587,
+            "indexer": "C411",
+            "service": "alldebrid",
+            "cached": true,
+            "publishDate": "2026-01-15T19:45:44Z"
+          }
+        },
+        {
+          "name": "[AD+] ⚡ Cached\n🌍 MULTI / French / English 🇫🇷 🇬🇧",
+          "description": "🖼️ 2160P\n🎞️ BLURAY • X265\n🎨 10BIT • HDR\n🔊 AC3 • 5.1\n📦 2.60 GB\n📅 2026-05-15\n🔍 AIOSources 🧭 TR4KER 🌐 AllDebrid",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "aiosource|REDACTED|alldebrid",
+            "videoSize": 2794064472,
+            "filename": "Game of Thrones S01 (2011) MULTi VFI 2160p 10bit 4KLight HDR BluRay AC3 5.1 x265-QTZ/Game of Thrones S01E02 MULTi VFI 2160p 10bit 4KLight HDR BluRay AC3 5.1 x265-QTZ.mkv",
+            "notWebReady": true,
+            "folderName": "Game of Thrones S01 (2011) MULTi VFI 2160p 10bit 4KLight HDR BluRay AC3 5.1 x265-QTZ",
+            "folderSize": 26393144880,
+            "indexer": "TR4KER",
+            "service": "alldebrid",
+            "cached": true,
+            "publishDate": "2026-05-15T00:02:29Z"
+          }
+        }
+      ]
+    }
+  },
+  "addon-6": {
+    "name": "StreamFusionReborn",
+    "status": 200,
+    "error": null,
+    "total": 13,
+    "response": {
+      "streams": [
+        {
+          "name": "⚡instant\nAllDebrid\n(1080p)",
+          "description": "Game of Thrones 1x02 - La Route royale.mkv\n🔊 🇫🇷 • 🇺🇸  ☠️ REDWOLF77\n🔍 C411 - Cache 💾 0.65GB 👥 46 \n🎥 av1 📺 BluRay 🌈 HDR",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "infoHash": "f1e1a04fa800c7ef0c38d0c8b099062245448da6",
+          "fileIdx": null,
+          "behaviorHints": {
+            "bingeGroup": "stream-fusion-tt0944947-1080p-REDWOLF77",
+            "filename": "Game of Thrones 1x02 - La Route royale.mkv"
+          }
+        },
+        {
+          "name": "⚡instant\nAllDebrid\n(1080p)",
+          "description": "Game of Thrones 1x02 - La Route royale.mkv\n🔊 🇫🇷 • 🇺🇸  ☠️ REDWOLF77\n🔍 C411 - Cache 💾 0.65GB 👥 1 \n🎥 av1 📺 BluRay 🌈 HDR",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "infoHash": "0d36684f253513d1d2d69a08cdb2c1e1da8fb546",
+          "fileIdx": null,
+          "behaviorHints": {
+            "bingeGroup": "stream-fusion-tt0944947-1080p-REDWOLF77",
+            "filename": "Game of Thrones 1x02 - La Route royale.mkv"
+          }
+        },
+        {
+          "name": "⚡instant\nAllDebrid\n(1080p)",
+          "description": "Game Of Thrones S01E02 MULTi [1080p] BluRay x264-PopHD.mkv\n🔊 🇫🇷 • 🇺🇸   ✓  ☠️ PopHD\n🔍 C411 - Cache 💾 1.35GB 👥 196 \n🎥 avc 📺 BluRay 🎧 Dolby Digital",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "infoHash": "196e5751b11243351435ab91b962f4f7ce22dd5c",
+          "fileIdx": null,
+          "behaviorHints": {
+            "bingeGroup": "stream-fusion-tt0944947-1080p-PopHD",
+            "filename": "Game Of Thrones S01E02 MULTi [1080p] BluRay x264-PopHD.mkv"
+          }
+        },
+        {
+          "name": "⚡instant\nAllDebrid\n(1080p)",
+          "description": "REDACTED\n🔊 🇫🇷 • 🇺🇸   ✓  ☠️ FW\n🔍 C411 - Cache 💾 2.87GB 👥 88 \n🎥 avc 📺 WEB 🎧 Dolby Digital Plus",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "infoHash": "d550a513f02ed0af2160da2e1ab5bf7a15dede6e",
+          "fileIdx": null,
+          "behaviorHints": {
+            "bingeGroup": "stream-fusion-tt0944947-1080p-FW",
+            "filename": "REDACTED"
+          }
+        },
+        {
+          "name": "⚡instant\nAllDebrid\n(1080p)",
+          "description": "Game.of.Thrones.S01E02.MULTI.VFF.1080p.WEBRip.AV1.10bit.EAC3.5.1-MW.mkv\n🔊 🇫🇷 • 🇺🇸   ✓  ☠️ MW\n🔍 C411 - Cache 💾 0.88GB 👥 75 \n🎥 av1 📺 WEBRip 🎧 Dolby Digital Plus",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "infoHash": "41c41ec9f39324516027e01c43ad0f2659f6405e",
+          "fileIdx": null,
+          "behaviorHints": {
+            "bingeGroup": "stream-fusion-tt0944947-1080p-MW",
+            "filename": "Game.of.Thrones.S01E02.MULTI.VFF.1080p.WEBRip.AV1.10bit.EAC3.5.1-MW.mkv"
+          }
+        },
+        {
+          "name": "⚡instant\nAllDebrid\n(1080p)",
+          "description": "Game Of Thrones S01E02 MULTi [1080p] BluRay x264-PopHD.mkv\n🔊 🇫🇷 • 🇺🇸   ✓  ☠️ PopHD\n🔍 C411 - Cache 💾 1.35GB 👥 74 \n🎥 avc 📺 BluRay 🎧 Dolby Digital",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "infoHash": "f930ab78e44c2cdb03cef00fb5d00442aec85ebe",
+          "fileIdx": null,
+          "behaviorHints": {
+            "bingeGroup": "stream-fusion-tt0944947-1080p-PopHD",
+            "filename": "Game Of Thrones S01E02 MULTi [1080p] BluRay x264-PopHD.mkv"
+          }
+        }
+      ]
+    }
+  },
+  "addon-7": {
+    "name": "Wastream | AD",
+    "status": 200,
+    "error": null,
+    "total": 11,
+    "response": {
+      "streams": [
+        {
+          "name": "[AD ⚡]\nWastream\n1080p",
+          "description": "📁 REDACTED\n🌍 Multi · 🎞️ WEB-DL 1080p · 📦 27.9 GB\n🌐 Loadix · 1fichier",
+          "behaviorHints": {
+            "filename": "REDACTED",
+            "videoSize": 29957396889,
+            "service": "alldebrid",
+            "cached": true,
+            "indexer": "Loadix",
+            "bingeGroup": "wastream|alldebrid|1080p"
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "size": 29957396889,
+          "sizeBytes": 29957396889
+        },
+        {
+          "name": "[AD ⚡]\nWastream\n1080p",
+          "description": "📁 REDACTED\n🌍 Multi (English, French) · 🎞️ WEB 1080p · 📦 27.41 GB\n🌐 Movix · 1Fichier",
+          "behaviorHints": {
+            "filename": "REDACTED",
+            "videoSize": 29431263395,
+            "service": "alldebrid",
+            "cached": true,
+            "indexer": "Movix",
+            "bingeGroup": "wastream|alldebrid|1080p"
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "size": 29431263395,
+          "sizeBytes": 29431263395
+        },
+        {
+          "name": "[AD ⚡]\nWastream\n1080p",
+          "description": "📁 REDACTED\n🌍 Multi · 🎞️ BluRay 1080p · 📦 14.7 GB\n🌐 Loadix · 1fichier",
+          "behaviorHints": {
+            "filename": "REDACTED",
+            "videoSize": 15784004812,
+            "service": "alldebrid",
+            "cached": true,
+            "indexer": "Loadix",
+            "bingeGroup": "wastream|alldebrid|1080p"
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "size": 15784004812,
+          "sizeBytes": 15784004812
+        },
+        {
+          "name": "[AD ⚡]\nWastream\n1080p",
+          "description": "📁 REDACTED\n🌍 Multi · 🎞️ REMUX 1080p · 📦 14.0 GB\n🌐 Loadix · 1fichier",
+          "behaviorHints": {
+            "filename": "REDACTED",
+            "videoSize": 15032385536,
+            "service": "alldebrid",
+            "cached": true,
+            "indexer": "Loadix",
+            "bingeGroup": "wastream|alldebrid|1080p"
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "size": 15032385536,
+          "sizeBytes": 15032385536
+        },
+        {
+          "name": "[AD ⚡]\nWastream\n1080p",
+          "description": "📁 REDACTED\n🎞️ 1080p · 📦 13.03 GB\n🌐 Movix · 1Fichier",
+          "behaviorHints": {
+            "filename": "REDACTED",
+            "videoSize": 13990855966,
+            "service": "alldebrid",
+            "cached": true,
+            "indexer": "Movix",
+            "bingeGroup": "wastream|alldebrid|1080p"
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "size": 13990855966,
+          "sizeBytes": 13990855966
+        },
+        {
+          "name": "[AD ⚡]\nWastream\n1080p",
+          "description": "📁 REDACTED\n🌍 Multi · 🎞️ HDLight 1080p · 📦 12.2 GB\n🌐 Loadix · 1fichier",
+          "behaviorHints": {
+            "filename": "REDACTED",
+            "videoSize": 13099650252,
+            "service": "alldebrid",
+            "cached": true,
+            "indexer": "Loadix",
+            "bingeGroup": "wastream|alldebrid|1080p"
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "size": 13099650252,
+          "sizeBytes": 13099650252
+        }
+      ]
+    }
+  },
+  "addon-8": {
+    "name": "Comet | AD",
+    "status": 200,
+    "error": null,
+    "total": 18,
+    "response": {
+      "streams": [
+        {
+          "name": "[AD⚡] Comet 1080p",
+          "description": "📄 Game of Thrones S01E02 The Kingsroad REPACK 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR.mkv\n📹 avc | 🔊 DTS Lossless • 5.1\n⭐ REMUX • REPACK | 🏷️ FraMeSToR\n👤 5 💾 11.9 GB 🔎 Knaben",
+          "behaviorHints": {
+            "bingeGroup": "comet|alldebrid|REDACTED",
+            "filename": "Game of Thrones S01E02 The Kingsroad REPACK 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR.mkv",
+            "videoSize": 12820765228
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv"
+        },
+        {
+          "name": "[AD⚡] Comet 1080p",
+          "description": "📄 Game.of.Thrones.S01E02.The.Kingsroad.REPACK.1080p.DTS-HD.MA.5.1.AVC.REMUX-FraMeSToR.mkv\n📹 avc | 🔊 DTS Lossless • 5.1\n⭐ REMUX • REPACK | 🏷️ FraMeSToR\n💾 11.9 GB 🔎 StremThru",
+          "behaviorHints": {
+            "bingeGroup": "comet|alldebrid|REDACTED",
+            "filename": "Game.of.Thrones.S01E02.The.Kingsroad.REPACK.1080p.DTS-HD.MA.5.1.AVC.REMUX-FraMeSToR.mkv",
+            "videoSize": 12820765228
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv"
+        },
+        {
+          "name": "[AD⚡] Comet 1080p",
+          "description": "📄 Game.of.Thrones.S01E02.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-FGT.mkv\n📹 avc | 🔊 DTS Lossless • 5.1\n⭐ BluRay REMUX | 🏷️ FGT\n💾 13.0 GB 🔎 StremThru",
+          "behaviorHints": {
+            "bingeGroup": "comet|alldebrid|REDACTED",
+            "filename": "Game.of.Thrones.S01E02.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-FGT.mkv",
+            "videoSize": 13986999900
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv"
+        },
+        {
+          "name": "[AD⚡] Comet 1080p",
+          "description": "📄 Game.of.Thrones.S01E02.1080p.MAX.WEB-DL.DDP5.1.Atmos.H.264-TURG.mkv\n📹 avc | 🔊 Atmos • Dolby Digital Plus • 5.1\n⭐ WEB-DL | 🏷️ TURG\n💾 2.1 GB 🔎 DMM",
+          "behaviorHints": {
+            "bingeGroup": "comet|alldebrid|REDACTED",
+            "filename": "Game.of.Thrones.S01E02.1080p.MAX.WEB-DL.DDP5.1.Atmos.H.264-TURG.mkv",
+            "videoSize": 2286421965
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv"
+        },
+        {
+          "name": "[AD⚡] Comet 1080p",
+          "description": "📄 Game.of.Thrones.S01E02.The.Kingsroad.1080p.MAX.WEB-DL.DDP5.1.Atmos.H.264-FLUX.mkv\n📹 avc | 🔊 Atmos • Dolby Digital Plus • 5.1\n⭐ WEB-DL | 🏷️ FLUX\n💾 2.5 GB 🔎 StremThru",
+          "behaviorHints": {
+            "bingeGroup": "comet|alldebrid|REDACTED",
+            "filename": "Game.of.Thrones.S01E02.The.Kingsroad.1080p.MAX.WEB-DL.DDP5.1.Atmos.H.264-FLUX.mkv",
+            "videoSize": 2717042122
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv"
+        },
+        {
+          "name": "[AD⚡] Comet 1080p",
+          "description": "📄 REDACTED\n📹 hevc | 🔊 Atmos • 7.1\n⭐ BluRay | 🏷️ Absinth\n💾 3.5 GB 🔎 StremThru|Torrents.csv",
+          "behaviorHints": {
+            "bingeGroup": "comet|alldebrid|REDACTED",
+            "filename": "REDACTED",
+            "videoSize": 3741286981
+          },
+          "url": "https://debrid.example/REDACTED/file.mkv"
+        }
+      ]
+    }
+  },
+  "addon-9": {
+    "name": "TorrentsDB AD",
+    "status": 200,
+    "error": null,
+    "total": 37,
+    "response": {
+      "streams": [
+        {
+          "name": "[AD download] TorrentsDB\n1080p",
+          "title": "Игра престолов / Game of Thrones [S01-08]\nGame of Thrones/Game.of.Thrones.S01.BDRip-HEVC.1080p/REDACTED\n📅 S01E02 👤 26 💾 3.87 GB ⚙️ rutor",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "torrentsdb|REDACTED",
+            "filename": "REDACTED"
+          }
+        },
+        {
+          "name": "[AD download] TorrentsDB\n1080p",
+          "title": "Il trono di spade EXTRA (2011-2019) 1080p H265 ITA.ENG sub NUita.eng Sp33dy94 MIRCrew\nGame of Thrones 1x02 La Strada del Re ITA.ENG 1080p H265 sub NUita.eng Sp33dy94-MIRCrew.mkv\n📅 S01E02 👤 18 💾 1.21 GB ⚙️ ilcorsaronero",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "torrentsdb|REDACTED",
+            "filename": "Game of Thrones 1x02 La Strada del Re ITA.ENG 1080p H265 sub NUita.eng Sp33dy94-MIRCrew.mkv"
+          }
+        },
+        {
+          "name": "[AD download] TorrentsDB\n1080p",
+          "title": "Hra o trůny / Game of Thrones (2011–2019)[WebRip][1080p](HEVC)(CZ) = CSFD 91%\nHra o trůny (seriál)/Hra o trůny_ Setkání u Conana O'Briena/S01/Hra o trůny_ Setkání u Conana O'Briena_S01E02_Díl 2.mkv\n📅 S01E02 👤 16 💾 810.25 MB ⚙️ sktorrent",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "torrentsdb|REDACTED",
+            "filename": "Hra o trůny_ Setkání u Conana O'Briena_S01E02_Díl 2.mkv"
+          }
+        },
+        {
+          "name": "[AD download] TorrentsDB\n1080p",
+          "title": "Hra o trůny / Game of Thrones (2011–2019)[WebRip][1080p](HEVC)(CZ) = CSFD 91%\nHra o trůny (seriál)/Rod, který vybudovali draci/S01/Rod, který vybudovali draci_S01E02_Drsný princ.mkv\n📅 S01E02 👤 16 💾 959.95 MB ⚙️ sktorrent",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "torrentsdb|REDACTED",
+            "filename": "Rod, který vybudovali draci_S01E02_Drsný princ.mkv"
+          }
+        },
+        {
+          "name": "[AD download] TorrentsDB\n1080p",
+          "title": "Hra o trůny / Game of Thrones (2011–2019)[WebRip][1080p](HEVC)(CZ) = CSFD 91%\nHra o trůny (seriál)/S01/Hra o trůny_S01E02_Královská cesta.mkv\n📅 S01E02 👤 16 💾 2.64 GB ⚙️ sktorrent",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "torrentsdb|REDACTED",
+            "filename": "Hra o trůny_S01E02_Královská cesta.mkv"
+          }
+        },
+        {
+          "name": "[AD download] TorrentsDB\n1080p",
+          "title": "Game of Thrones (2011) Season 1-7 S01-S07 Steelbook (1080p BluRa\nGame.of.Thrones.S01.1080p.BluRay.HEVC.TrueHD.Atmos.7.1/REDACTED\n📅 S01E02 👤 15 💾 3.48 GB ⚙️ ThePirateBay",
+          "url": "https://debrid.example/REDACTED/file.mkv",
+          "behaviorHints": {
+            "bingeGroup": "torrentsdb|REDACTED",
+            "filename": "REDACTED"
+          }
+        }
+      ],
+      "cacheMaxAge": 3600,
+      "staleRevalidate": 14400,
+      "staleError": 604800
+    }
+  }
+}

@@ -351,6 +351,15 @@ export type PlayMethod = "directPlay" | "directStream" | "transcode";
 
 /** A started playback: the method only, never the stream URL or the token. */
 export interface PlaybackStart {
+  /**
+   * Who provides the stream; missing means Emby. A Stremio stream has no
+   * Emby report, quality, chapters, segments or next episode.
+   */
+  origin?: "emby" | "stremio";
+  /**
+   * For Stremio, the `key` of the title it was picked for: the Emby item of
+   * its « Autres sources », or « stremio:… » for a title outside Emby.
+   */
   itemId: string;
   /** The version played: a fallback or a resume plays the same one. */
   mediaSourceId: string;

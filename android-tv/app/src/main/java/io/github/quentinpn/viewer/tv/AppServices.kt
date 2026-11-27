@@ -18,12 +18,18 @@ import io.github.quentinpn.viewer.tv.session.Session
 import io.github.quentinpn.viewer.tv.session.SessionStore
 import io.github.quentinpn.viewer.tv.settings.IMAGE_CACHE_DIRECTORY
 import io.github.quentinpn.viewer.tv.settings.IMAGE_CACHE_MAX_BYTES
+import io.github.quentinpn.viewer.tv.stremio.RESUME_FILE
+import io.github.quentinpn.viewer.tv.stremio.ResumeStore
+import io.github.quentinpn.viewer.tv.stremio.StremioClient
+import io.github.quentinpn.viewer.tv.stremio.StremioRepository
+import io.github.quentinpn.viewer.tv.stremio.StremioStore
 import io.github.quentinpn.viewer.tv.sync.SyncHub
 import io.github.quentinpn.viewer.tv.request.EmbyAccount
 import io.github.quentinpn.viewer.tv.request.ImageAuth
 import io.github.quentinpn.viewer.tv.request.RequestRepository
 import io.github.quentinpn.viewer.tv.request.RequestStore
 import io.github.quentinpn.viewer.tv.request.deviceLabel
+import java.io.File
 import okhttp3.OkHttpClient
 import okio.Path.Companion.toOkioPath
 
@@ -87,6 +93,27 @@ object AppServices {
     }
 
     @Volatile private var viewerRequests: RequestRepository? = null
+
+    /**
+     * Stremio: one repository per process, so its addon collection and stream lists live in memory for the
+     * whole app session, and the player can resolve a stream id there.
+     */
+    fun stremio(context: Context): StremioRepository = stremioRepository ?: synchronized(this) {
+        val app = context.applicationContext
+        stremioRepository ?: StremioRepository(
+            StremioStore(app),
+            StremioClient(http, userAgent = "Viewer-TV/${device(app).version}"),
+        ).also { stremioRepository = it }
+    }
+
+    @Volatile private var stremioRepository: StremioRepository? = null
+
+    /** Where Stremio playbacks stopped: one store per process, shared by the source list and the player. Kept on sign-out. */
+    fun stremioResume(context: Context): ResumeStore = stremioResumeStore ?: synchronized(this) {
+        stremioResumeStore ?: ResumeStore(File(context.applicationContext.filesDir, RESUME_FILE)).also { stremioResumeStore = it }
+    }
+
+    @Volatile private var stremioResumeStore: ResumeStore? = null
 
     /** The open Emby account, read without opening its token; the server id falls back to its address. */
     private fun embyAccount(context: Context): EmbyAccount? {

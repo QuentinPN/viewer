@@ -893,3 +893,67 @@ func Test_mpv_quitting_by_itself_emits_shutdown_twice(t *testing.T) {
 		t.Fatal("Shutdown is last", events)
 	}
 }
+
+// Redirects are a per-load choice: a load that asks for them (a Stremio stream
+// without headers) follows a debrid 302; the next load without the flag (any
+// Emby load) is strict again, and the other way round.
+func Test_go_redirects_are_followed_per_load(t *testing.T) {
+	lib := libmpvPath(t)
+	other, otherSeen := serve(t, func(string) string { return httpResponse("404 Not Found", "", "") })
+	port, seen := serve(t, func(string) string {
+		return httpResponse("302 Found", fmt.Sprintf("Location: http://127.0.0.1:%d/cdn\r\n", other), "")
+	})
+	e, rec := newHeadless(t, lib, headlessConfig())
+	url := fmt.Sprintf("http://127.0.0.1:%d/stream", port)
+	src, err := ParseSource(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	play := func(request PlaybackRequest) {
+		t.Helper()
+		if err := e.Load(&request, src); err != nil {
+			t.Fatal("load", err)
+		}
+		deadline := time.Now().Add(30 * time.Second)
+		for {
+			ev, ok := rec.recv(time.Until(deadline))
+			if !ok {
+				t.Fatal("no end of file")
+			}
+			if isEnd(EndError)(ev) || isEnd(EndEOF)(ev) {
+				return
+			}
+		}
+	}
+	stremio := PlaybackRequest{Source: url, FollowRedirects: true}
+	emby := PlaybackRequest{Source: url, HTTPHeaders: List[Header]{{"X-Emby-Token", "TEST-TOKEN"}}}
+
+	play(stremio)
+	if got := property(e, "stream-lavf-o"); got != streamLavfFor(true) {
+		t.Fatal(got)
+	}
+	if got := otherSeen(); len(got) != 1 || got[0] != "/cdn -" {
+		t.Fatal("redirection non suivie", got)
+	}
+	play(emby)
+	if got := property(e, "stream-lavf-o"); got != streamLavfOptions {
+		t.Fatal(got)
+	}
+	if got := otherSeen(); len(got) != 1 {
+		t.Fatal("le jeton a suivi la redirection", got)
+	}
+	play(stremio)
+	if got := otherSeen(); len(got) != 2 || got[1] != "/cdn -" {
+		t.Fatal(got)
+	}
+	if got := seen(); len(got) != 3 || got[1] != "/stream TEST-TOKEN" {
+		t.Fatal(got)
+	}
+	// Asked with headers anyway: the engine stays strict.
+	withHeaders := emby
+	withHeaders.FollowRedirects = true
+	play(withHeaders)
+	if got := otherSeen(); len(got) != 2 {
+		t.Fatal("le jeton a suivi la redirection", got)
+	}
+}

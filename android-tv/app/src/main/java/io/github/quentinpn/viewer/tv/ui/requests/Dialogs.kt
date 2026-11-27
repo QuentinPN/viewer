@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
@@ -67,6 +68,23 @@ internal fun DialogCard(title: String, onDismiss: () -> Unit, width: Dp = 460.dp
 
 /** Height of the action buttons of the Demander pages and dialogs (the filter pills keep GlassButton's 36 dp). */
 internal val BUTTON_HEIGHT = 44.dp
+
+/**
+ * Asks [target] for the focus each frame until [taken] says it holds it, ten frames at most: a row of a
+ * lazy list, or one that replaces the focused row, may be laid out a frame after the first request.
+ */
+@Composable
+internal fun FocusUntilTaken(target: FocusRequester, key: Any?, taken: () -> Boolean) {
+    LaunchedEffect(key) {
+        repeat(FOCUS_TRIES) {
+            withFrameNanos {}
+            if (taken()) return@LaunchedEffect
+            runCatching { target.requestFocus() }
+        }
+    }
+}
+
+private const val FOCUS_TRIES = 10
 
 /** Takes the focus once laid out, one frame later. */
 @Composable
@@ -134,15 +152,7 @@ internal fun AddressDialog(
                 cursorBrush = SolidColor(Palette.text),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { onSave(text) }),
-                // A text field keeps the D-pad for its cursor: Down goes on to the buttons
-                modifier = Modifier.fillMaxWidth().focusRequester(field).onPreviewKeyEvent {
-                    if (it.key == Key.DirectionDown && it.type == KeyEventType.KeyDown) {
-                        focusManager.moveFocus(FocusDirection.Down)
-                        true
-                    } else {
-                        false
-                    }
-                },
+                modifier = Modifier.fillMaxWidth().focusRequester(field).downLeavesField(focusManager),
             )
         }
         error?.let { Text(it, color = Palette.danger) }
@@ -152,6 +162,16 @@ internal fun AddressDialog(
         }
     }
     FocusOnOpen(field)
+}
+
+/** A text field keeps the D-pad for its cursor: Down goes on to what is under it. */
+internal fun Modifier.downLeavesField(focusManager: FocusManager): Modifier = onPreviewKeyEvent {
+    if (it.key == Key.DirectionDown && it.type == KeyEventType.KeyDown) {
+        focusManager.moveFocus(FocusDirection.Down)
+        true
+    } else {
+        false
+    }
 }
 
 /** A list to pick one entry from, opened on [selected]; OK picks and closes through [onPick]. */

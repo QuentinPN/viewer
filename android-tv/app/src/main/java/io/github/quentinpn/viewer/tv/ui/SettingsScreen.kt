@@ -78,6 +78,9 @@ import io.github.quentinpn.viewer.tv.update.readyOf
 import io.github.quentinpn.viewer.tv.ui.requests.RequestsSettingsDialogs
 import io.github.quentinpn.viewer.tv.ui.requests.rememberRequestsSettings
 import io.github.quentinpn.viewer.tv.ui.requests.requestsSettingsSection
+import io.github.quentinpn.viewer.tv.ui.stremio.StremioSettingsDialogs
+import io.github.quentinpn.viewer.tv.ui.stremio.rememberStremioSettings
+import io.github.quentinpn.viewer.tv.ui.stremio.stremioSettingsSection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -142,6 +145,7 @@ fun SettingsScreen(
     LaunchedEffect(images) { cache = withContext(Dispatchers.IO) { measure(images) } }
     val first = remember { FocusRequester() }
     val requestsSettings = rememberRequestsSettings(AppServices.requests(context))
+    val stremioSettings = rememberStremioSettings(AppServices.stremio(context))
     fun change(next: PlaybackSettings) {
         settings = next
         store.save(next)
@@ -349,6 +353,8 @@ fun SettingsScreen(
 
         requestsSettingsSection(requestsSettings)
 
+        stremioSettingsSection(stremioSettings)
+
         item { Section("Mises à jour") }
         item {
             Note(
@@ -424,6 +430,7 @@ fun SettingsScreen(
     // only closes it, the home still offers the update
     if (updateCard) UpdatePrompt { updateCard = false }
     RequestsSettingsDialogs(requestsSettings)
+    StremioSettingsDialogs(stremioSettings)
 }
 
 private fun onOff(on: Boolean) = if (on) "Activé" else "Désactivé"

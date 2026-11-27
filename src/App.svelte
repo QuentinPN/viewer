@@ -12,6 +12,8 @@ import LibraryBrowser from "./lib/library/LibraryBrowser.svelte";
 import { playerApi } from "./lib/player/api";
 import PlayerSpike from "./lib/player/PlayerSpike.svelte";
 import PlayerView from "./lib/player/PlayerView.svelte";
+import { sourcesReopen } from "./lib/stremio/reopen.svelte";
+import { isStremio, SOURCE_FAILED } from "./lib/stremio/sources";
 import UpdatePrompt from "./lib/updater/UpdatePrompt.svelte";
 import Logo from "./lib/window/Logo.svelte";
 import TitleBar from "./lib/window/TitleBar.svelte";
@@ -76,6 +78,7 @@ function startPlaying(start: PlaybackStart) {
       : null;
   interrupted = null;
   resumeError = null;
+  sourcesReopen.clear();
   playing = start;
 }
 
@@ -91,8 +94,22 @@ function versionOf(itemId: string): string | null {
   return playing?.itemId === itemId ? playing.mediaSourceId : null;
 }
 
-/** The stream broke: back to the app, which checks the server, then offers to resume. */
+/**
+ * The stream broke: back to the app, which checks the server, then offers to
+ * resume. A Stremio link has nothing to resume on Emby: its page lists the
+ * sources again instead.
+ */
 async function playbackInterrupted(itemId: string) {
+  if (playing && isStremio(playing)) {
+    playing = null;
+    returnFocus = null;
+    await tick();
+    sourcesReopen.ask(itemId, SOURCE_FAILED);
+    // No visible page took it: it must not pop up on a later visit.
+    await tick();
+    sourcesReopen.clear();
+    return;
+  }
   interrupted = { itemId, mediaSourceId: versionOf(itemId) };
   playing = null;
   await tick();

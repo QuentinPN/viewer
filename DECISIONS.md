@@ -14,7 +14,8 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **Build libmpv épinglé, vérifié par SHA-256, `vendor/` ignoré par git** — binaire reproductible et jamais commité.
 - **libmpv sous GPL conservée** — usage strictement personnel, aucune redistribution.
 - **Options mpv durcies (config=no, load-scripts=no, ytdl=no, osc=no, bindings coupés, hwdec=auto-safe)** — l'app ne doit exécuter aucun script ni config venus du disque ou du réseau.
-- **Seuls les chemins locaux absolus et http(s) sont acceptés ; redirections à 0 ; protocoles limités à http, https, tcp, tls ; `tls-verify=yes` explicite** — le moteur ne doit pas être détourné vers un autre schéma ou hôte.
+- **Seuls les chemins locaux absolus et http(s) sont acceptés ; redirections à 0, fixées à chaque chargement, sauf un flux Stremio sans en-têtes (5 au plus, les liens debrid répondent 302, et une redirection peut passer de https à http (CDN debrid), acceptée car aucun en-tête ne suit) ; protocoles limités à http, https, tcp, tls ; `tls-verify=yes` explicite** — le moteur ne doit pas être détourné vers un autre schéma ou hôte, et un en-tête ne suit jamais une redirection.
+- **Journal de mpv : chaque URL réduite à son schéma et son hôte** — mpv cite l'URL qu'il n'arrive pas à ouvrir, et un lien debrid porte sa clé dans le chemin.
 - **Risque accepté : un segment HLS sur un autre hôte reçoit le jeton** — le bloquer casserait des flux légitimes, et l'usage est un LAN personnel.
 - **Certificats racine Windows exportés en PEM à chaque chargement HTTPS** — mpv n'utilise pas le magasin système, donc un Emby en HTTPS à certificat d'entreprise échouerait.
 - **Vidéo en HWND enfant sous une WebView transparente, chaque vue opaque hors lecture** — seule composition qui garde l'interface au-dessus de la vidéo sans fenêtre flottante.
@@ -74,6 +75,26 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **`http://` accepté seulement sur boucle locale et réseaux privés, avec avertissement** — hors LAN, le jeton circulerait en clair.
 - **Protocole d'image `requestimg` avec liste blanche de tailles et de noms de fichiers, jamais de SVG** — pas de contenu actif servi dans la webview.
 
+## Stremio
+
+- **Le cœur travaille sur une liste d'addons ; en v1, le compte Stremio est sa seule source** — une saisie d'adresse manuelle ou une synchro du compte pourront s'ajouter sans le refaire.
+- **Clé de compte dans le coffre de l'OS (compte `stremio`, un seul par installation), adresses d'addons en mémoire seulement, recharge à chaque session** — les adresses portent la clé debrid.
+- **Un refus d'authentification passe à « reconnexion requise », le mot de passe n'est jamais gardé** — pas de reconnexion silencieuse.
+- **L'API Stremio répond HTTP 200 avec `{"error":…}` (code 3 mauvais mot de passe, 1 session inconnue) : tout objet `error` vaut refus** — constaté sur les vraies réponses.
+- **« Se déconnecter » efface la clé locale sans fermer la session côté Stremio** — l'app Stremio du propriétaire reste connectée.
+- **Adresse d'addon en `https`, `http` seulement en LAN, sans identifiants ni paramètres dans l'URL** — même règle que Request.
+- **Erreurs, journaux et UI ne nomment un addon que par le nom de son manifeste ; les erreurs `net/http` (qui contiennent l'URL) sont remplacées par un type à nous** — jamais de clé debrid hors du Go.
+- **L'UI ne reçoit que des identifiants opaques (requête, addon, flux) ; le Go garde les flux des 4 dernières listes, vidées à la connexion/déconnexion** — l'URL et les en-têtes d'un flux ne quittent jamais le Go.
+- **Une liste interroge chaque addon par un appel séparé, en parallèle, 10 s chacun** — les résultats s'affichent au fil de l'eau sans canal d'événements.
+- **« Autres sources » visible dès que Stremio est connecté, même sans IMDb (la liste l'explique)** — savoir si un épisode a un IMDb coûterait une requête Emby de plus à chaque fiche. La 1re fiche d'une session lit l'état Stremio (liste d'addons mise en cache), sans bloquer la fiche.
+- **Lecture Stremio : `origin: "stremio"`, sans PlaybackInfo, rapport, synchro TV, segments, chapitres, qualité ni épisode suivant ; une lecture Emby en cours est d'abord arrêtée normalement** — Emby ne doit jamais attribuer la position d'un flux externe à un de ses éléments.
+- **Fiches Demander : « Regarder maintenant » si la fiche a un IMDb ; une série passe par un choix saison puis épisode tiré des saisons d'Request (`episodeCount`), spéciaux en dernier, sans Cinemeta** — pas de service de plus ; le nombre d'épisodes peut inclure des épisodes pas encore diffusés.
+- **Titre hors Emby : le film par son nom, l'épisode « Épisode N » + nom de la série ; clé de lecture `stremio:<imdb>[:S:E]` construite par le Go seulement** — Request ne donne pas les titres d'épisodes ; l'UI ne refabrique jamais la clé.
+- **Erreur ou fin anticipée d'un flux Stremio : retour à la fiche, liste rouverte avec « Ce lien ne répond plus, choisis une autre source. », sans nouvelle tentative** — les liens debrid expirent ; choisir une autre source est plus sûr que réessayer.
+- **Reprise Stremio par contenu (`imdb[:S:E]`), pas par flux, dans `stremio-resume.json` du dossier de config (500 entrées au plus, gardé à la déconnexion)** — un lien debrid change à chaque liste ; c'est un historique local du PC, pas une donnée du compte.
+- **Rien n'est noté sous 60 s, l'entrée est effacée à 95 % ou en fin de fichier, écriture toutes les 15 s au plus et à l'arrêt ; une coupure avant 95 % garde la position** — pas de reprise pour un essai de quelques secondes, ni pour un film fini ; un lien coupé se reprend où il s'est arrêté.
+- **Position enregistrée au-delà de la fin du nouveau fichier : retour à 0 et une seule fin de fichier ignorée (rendue à l'UI si le retour échoue)** — un autre flux peut être plus court ; il ne doit ni finir aussitôt ni déclencher « Ce lien ne répond plus ».
+
 ## Cache et images
 
 - **Protocole `emby-img` : tailles bornées, 6 téléchargements simultanés, 10 Mo max, 401 sans session** — le jeton ne quitte pas le natif et la webview ne peut pas saturer le serveur.
@@ -114,7 +135,13 @@ Ajouter une ligne quand un choix n'est pas évident à la lecture du code ; supp
 - **Épisode suivant via `AdjacentTo` ; saut alphabétique par une requête d'index de `SortName` plutôt que `NameLessThan` ; tirage au hasard côté serveur (`SortBy=Random`, `Limit=1`)** — `NameLessThan` dépend d'une collation non documentée, et charger toute la liste pour tirer au hasard serait lourd.
 - **Sous-titres ASS : `sub-ass-override` à yes/force sur TV, `no` sur Windows** — avec `no`, ils ignorent `sub-pos` et restent sous les commandes (constaté sur Shield) ; différence voulue.
 - **Sous-titres externes ajoutés en coroutine sur IO, annulée au chargement du fichier suivant, suivis d'un second choix de piste qui relit les préférences** — l'ajout est lent et ne doit pas bloquer la lecture.
+- **mpv Android vérifie TLS avec un paquet PEM des AC système (`AndroidCAStore`, alias `system:`) écrit à la première lecture** — le libmpv d'mpv-android n'a aucun magasin de certificats.
 - **Journal verbeux de mpv tenu hors de logcat (lib C et `dlsym`, API 30+)** — logcat saturait et risquait d'exposer des URLs.
+- **Flux Stremio sur TV : adresses et valeurs d'en-têtes masquées dans chaque ligne de mpv ; avant Android 11, `msg-level=all=no`** — libplayer recopie chaque ligne dans logcat en VERBOSE, quel que soit son niveau (`[%s:%s] %s` dans son `event_thread`), et seul le filtre API 30+ l'écarte.
+- **TV : « Autres sources » montre une section par addon (recherche, indisponible, vide, flux non pris en charge) au lieu des notes globales du bureau** — le D-pad parcourt la liste section par section ; textes du bureau repris.
+- **TV : « Regarder maintenant » d'une série à une seule saison ouvre directement la liste des épisodes** — un choix de saison unique coûte un clic de télécommande pour rien ; le bureau garde son menu de saisons.
+- **Lecteur TV : la fin anticipée d'un flux Stremio se lit sur `eof-reached` (règle des 30 s), un `END_FILE` vaut échec** — le pont JNI ne donne pas la raison, et `keep-open` n'envoie `END_FILE` qu'en cas d'échec.
+- **Reprise Stremio sur TV : `stremio-resume.json` dans `filesDir`, mêmes règles que le bureau, écrite à chaque fin, en `onPause`/`onStop` et à `onDestroy` avant la libération du moteur ; le retour à 0 d'un départ au-delà de la fin ne se sait raté que sans moteur** — Android n'a pas d'événement d'arrêt, et `MPVLib.command` ne renvoie aucune erreur.
 - **Pas de vignettes de survol à la recherche dans la vidéo** — le propriétaire garde les vignettes vidéo Emby désactivées (CPU et disque), aucun aperçu n'est attendu.
 - **Build debug séparé (`applicationIdSuffix=.debug`, libellé, bandeau, session, réglages et DeviceId Emby propres) ; `PlaybackPocActivity` dans le source set `debug` ; la release est signée avec la clé debug pour s'installer par-dessus un debug** — debug et release ne se mélangent jamais sur l'appareil.
 - **Desktop : même séparation en debug (identifiant `io.github.quentinpn.viewer.debug`, service de coffre `Viewer-debug`, config, cache et données WebView2 distincts)** — un debug ne doit pas toucher la session de la release.

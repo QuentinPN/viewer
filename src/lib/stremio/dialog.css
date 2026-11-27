@@ -1,0 +1,69 @@
+/* Shared frame of the Stremio windows (« Autres sources », « Choisir un
+   épisode »): frosted, a head, a scrolling middle and a foot. Prefixed `st-`
+   so nothing else is touched. */
+
+.st-dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  padding: 0;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-lg);
+  background: var(--material-thick);
+  backdrop-filter: var(--material-blur);
+  color: var(--color-text);
+  font: inherit;
+}
+.st-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.st-dialog::backdrop {
+  background: rgb(0 0 0 / 0.55);
+  backdrop-filter: blur(6px);
+}
+.st-dialog p {
+  margin: 0;
+}
+.st-head {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-6) var(--space-4);
+}
+.st-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+}
+.st-title:focus {
+  outline: none;
+}
+.st-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6) var(--space-6);
+}
+.st-btn {
+  height: 38px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--fill-glass);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--motion-fast);
+}
+.st-btn:hover {
+  background: var(--fill-glass-hover);
+}
+.st-dialog button:focus-visible,
+.st-dialog select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.st-dialog .muted {
+  color: var(--color-text-muted);
+}

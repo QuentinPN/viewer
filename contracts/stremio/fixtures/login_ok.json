@@ -1,0 +1,8 @@
+{
+  "result": {
+    "authKey": "REDACTED_AUTHKEY",
+    "user": {
+      "email": "owner@example.com"
+    }
+  }
+}
