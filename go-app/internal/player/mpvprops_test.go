@@ -4,6 +4,7 @@ package player
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"viewer/internal/redact"
@@ -202,5 +203,34 @@ func Test_go_floats_are_written_like_rust(t *testing.T) {
 	}
 	if !math.IsNaN(clamp(math.NaN(), 0, 1)) || clamp(math.Inf(1), 0, 130) != 130 || clamp(-1, 0.25, 4) != 0.25 {
 		t.Fatal("clamp")
+	}
+}
+
+// mpv names the file it fails to open: a debrid link carries its key in the path,
+// so only the scheme and the host of a URL reach the log.
+func Test_go_mpv_log_lines_keep_only_the_host_of_urls(t *testing.T) {
+	for in, want := range map[string]string{
+		"Failed to open https://debrid.example/d/SECRETKEY/a.mkv.":      "Failed to open https://debrid.example/<redacted>",
+		"Opening HTTP://192.168.1.14:8096/emby/Videos/1/stream?x=1 now": "Opening HTTP://192.168.1.14:8096/<redacted> now",
+		"[ffmpeg] https: HTTP error 403 Forbidden":                      "[ffmpeg] https: HTTP error 403 Forbidden",
+		"'https://a.example/k?token=abc' and http://b.example":          "'https://a.example/<redacted>' and http://b.example",
+		"https://user:pw@c.example/p":                                   "https://c.example/<redacted>",
+		"no url":                                                        "no url",
+	} {
+		if got := mpvLogText(in); got != want {
+			t.Errorf("%q: %q", in, got)
+		}
+	}
+}
+
+// FFmpeg's HTTP options of one load: redirects only when asked (a header-less
+// Stremio stream), the rest the same.
+func Test_go_stream_options_allow_redirects_only_when_asked(t *testing.T) {
+	strict, follow := streamLavfFor(false), streamLavfFor(true)
+	if strict != streamLavfOptions || !strings.HasSuffix(strict, ",max_redirects=0") {
+		t.Fatal(strict)
+	}
+	if follow != strings.TrimSuffix(strict, "max_redirects=0")+"max_redirects=5" {
+		t.Fatal(follow)
 	}
 }

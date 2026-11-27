@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 
 	"viewer/internal/emby"
 	"viewer/internal/player"
+	"viewer/internal/stremio"
 )
 
 // recording is a playback that writes down each call, in order.
@@ -17,6 +19,10 @@ type recording struct {
 	url       string
 	engineErr error
 	loadErr   error
+	// request is the last one loaded.
+	request player.PlaybackRequest
+	// saved are the Stremio positions, by target.
+	saved map[string]stremio.ResumePoint
 }
 
 func (r *recording) add(c string) { r.calls = append(r.calls, c) }
@@ -39,12 +45,28 @@ func (r *recording) ReportEvent(ev player.PlayerEvent) {
 	b, _ := json.Marshal(ev)
 	r.add("reporter " + string(b))
 }
+func (r *recording) SyncEvent(ev player.PlayerEvent) {
+	b, _ := json.Marshal(ev)
+	r.add("sync " + string(b))
+}
 func (r *recording) Playing(_, src string, direct bool) {
 	if direct {
 		r.add("playing " + src + " direct")
 	} else {
 		r.add("playing " + src)
 	}
+}
+func (r *recording) EndStremio() { r.add("endStremio") }
+func (r *recording) SavedStremio(target string) (stremio.ResumePoint, bool) {
+	p, ok := r.saved[target]
+	return p, ok
+}
+func (r *recording) TrackStremio(target string, start *float64) {
+	from := "-"
+	if start != nil {
+		from = strconv.FormatFloat(*start, 'f', -1, 64)
+	}
+	r.add("track " + target + " " + from)
 }
 func (r *recording) Engine() (loader, error) {
 	r.add("engine")
@@ -53,8 +75,9 @@ func (r *recording) Engine() (loader, error) {
 	}
 	return r, nil
 }
-func (r *recording) Load(*player.PlaybackRequest, player.MediaSource) error {
+func (r *recording) Load(request *player.PlaybackRequest, _ player.MediaSource) error {
 	r.add("load")
+	r.request = *request
 	return r.loadErr
 }
 
@@ -78,10 +101,10 @@ func Test_go_emby_play_keeps_the_order_of_commands_rs(t *testing.T) {
 		rec  *recording
 		want string
 	}{
-		{"ok", &recording{url: stream}, "resendStop,prepare,begin,playing src1 direct,engine,load"},
+		{"ok", &recording{url: stream}, "resendStop,prepare,begin,playing src1 direct,engine,endStremio,load"},
 		{"source", &recording{url: "ftp://x"}, `resendStop,prepare,begin,playing src1 direct,reporter {"type":"shutdown"}`},
 		{"engine", &recording{url: stream, engineErr: errors.New("libmpv")}, `resendStop,prepare,begin,playing src1 direct,engine,reporter {"type":"shutdown"}`},
-		{"load", &recording{url: stream, loadErr: errors.New("mpv")}, `resendStop,prepare,begin,playing src1 direct,engine,load,reporter {"type":"shutdown"}`},
+		{"load", &recording{url: stream, loadErr: errors.New("mpv")}, `resendStop,prepare,begin,playing src1 direct,engine,endStremio,load,reporter {"type":"shutdown"}`},
 	}
 	for _, c := range cases {
 		out, err := embyPlay(context.Background(), c.rec, playArgs(t, "emby_play", args))
@@ -107,10 +130,10 @@ func Test_go_change_quality_switches_before_load(t *testing.T) {
 		rec  *recording
 		want string
 	}{
-		{"ok", &recording{url: stream}, "prepareAtCap,engine,switch,load"},
+		{"ok", &recording{url: stream}, "prepareAtCap,engine,switch,endStremio,load"},
 		{"source", &recording{url: "ftp://x"}, "prepareAtCap"},
 		{"engine", &recording{url: stream, engineErr: errors.New("libmpv")}, "prepareAtCap,engine"},
-		{"load", &recording{url: stream, loadErr: errors.New("mpv")}, "prepareAtCap,engine,switch,load"},
+		{"load", &recording{url: stream, loadErr: errors.New("mpv")}, "prepareAtCap,engine,switch,endStremio,load"},
 	}
 	for _, c := range cases {
 		out, err := embyChangeQuality(context.Background(), c.rec, playArgs(t, "emby_change_quality", args))

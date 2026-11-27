@@ -330,3 +330,30 @@ func Test_go_link_ids_are_simple_uuids(t *testing.T) {
 		t.Fatal("deux fois le même lien")
 	}
 }
+
+// What a Stremio playback (stremio_play) leaves to the linked playback: a Shutdown
+// forgets the Emby item, so the next file, which no Playing announced, is never
+// offered to a TV under that item.
+func Test_go_a_file_after_a_shutdown_is_not_the_emby_item(t *testing.T) {
+	r, client := standIn(t)
+	svc, _, _ := newTestService(t, client, &fakeEngine{})
+	ctx := context.Background()
+	peer := Peer{SessionID: "tv1", Name: "Shield salon"}
+	own := "own1"
+	svc.OwnSession(&own)
+	svc.Playing("item1", "src1", true)
+	svc.PlayerEvent(player.FileLoaded{})
+	svc.PlayerEvent(player.Shutdown{})
+	svc.PlayerEvent(player.EndFile{Reason: player.EndStopped})
+	svc.PlayerEvent(player.FileLoaded{})
+	svc.PlayerEvent(player.Paused{Paused: true})
+	if got := errText(svc.Invite(ctx, peer)); !strings.Contains(got, "aucune lecture en cours") {
+		t.Fatal(got)
+	}
+	if !svc.Stop(2 * time.Second) {
+		t.Fatal("stop")
+	}
+	if got := r.kinds(); len(got) != 0 {
+		t.Fatal(got)
+	}
+}

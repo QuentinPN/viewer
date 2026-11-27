@@ -1,9 +1,12 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -153,5 +156,66 @@ func Test_go_close_slot_keeps_the_engine_when_shutdown_is_refused(t *testing.T) 
 	}
 	if err := closeSlot(&slot); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// The engine's sink: the Stremio tracker sees each event before the reporter, the
+// linked playback and the UI. A start past the end of a shorter file is put back
+// to 0; without an engine that fails, so its end of file reaches the UI once, from
+// the sink or released by the tracker. Positions go to stremio-resume.json beside
+// session.json.
+func Test_go_sink_goes_through_the_stremio_tracker(t *testing.T) {
+	dir := t.TempDir()
+	var mu sync.Mutex
+	var emitted []string
+	a, err := New(Options{
+		Paths: Paths{Config: filepath.Join(dir, "c"), Cache: filepath.Join(dir, "l"), LocalData: filepath.Join(dir, "l")},
+		Store: &emby.MemoryCredentialStore{},
+		Emit: func(name string, payload any) {
+			b, _ := json.Marshal(payload)
+			mu.Lock()
+			emitted = append(emitted, name+" "+string(b))
+			mu.Unlock()
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close(time.Second)
+	const end = `player://event {"type":"endFile","reason":"eof","error":null}`
+	count := func() (n int) {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, e := range emitted {
+			if e == end {
+				n++
+			}
+		}
+		return n
+	}
+
+	a.StremioResume.Begin("tt0111161", nil)
+	for _, ev := range []player.PlayerEvent{player.FileLoaded{}, player.Duration{Seconds: 3000}, player.TimePos{Seconds: 120}} {
+		a.playerEvent(ev)
+	}
+	a.StremioResume.End()
+	if b, err := os.ReadFile(filepath.Join(dir, "c", "stremio-resume.json")); err != nil || !strings.Contains(string(b), `"positionSeconds": 120`) {
+		t.Fatal(string(b), err)
+	}
+
+	start := 5000.0
+	a.StremioResume.Begin("tt0111161", &start)
+	for _, ev := range []player.PlayerEvent{player.FileLoaded{}, player.Duration{Seconds: 3000}, player.EndFile{Reason: player.EndEOF}} {
+		a.playerEvent(ev)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for count() == 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if n := count(); n != 1 {
+		mu.Lock()
+		defer mu.Unlock()
+		t.Fatal(n, emitted)
 	}
 }

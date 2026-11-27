@@ -5,6 +5,7 @@ import type { ArtworkCacheStats, EmbyError, Library } from "../emby/types";
 import { playerApi } from "../player/api";
 import { readSkip, type SkipSetting, saveSkip } from "../player/segments";
 import RequestsSettings from "../requests/RequestsSettings.svelte";
+import StremioSettings from "../stremio/StremioSettings.svelte";
 import About from "./About.svelte";
 import AppearanceSettings from "./AppearanceSettings.svelte";
 import Diagnostics from "./Diagnostics.svelte";
@@ -144,6 +145,8 @@ onMount(() => {
   <HomeRowsSettings {libraries} storageKey={rowPrefsKey} />
 
   <RequestsSettings />
+
+  <StremioSettings />
 </div>
 
 <header class="group">

@@ -50,6 +50,10 @@ type PlaybackRequest struct {
 	Tracks TrackSelection `json:"tracks"`
 	// SubtitleStyle: how text subtitles look.
 	SubtitleStyle SubtitleStyle `json:"subtitleStyle"`
+	// FollowRedirects lets FFmpeg follow up to 5 redirects for this load only: a
+	// Stremio stream without headers (debrid links answer 302). Never with
+	// HTTPHeaders, which would follow to another host; never from JSON.
+	FollowRedirects bool `json:"-"`
 }
 
 // UnmarshalJSON follows serde: `source` required, the other keys default.

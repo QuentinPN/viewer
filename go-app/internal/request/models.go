@@ -22,6 +22,7 @@ import (
 	"log/slog"
 
 	"viewer/internal/emby"
+	"viewer/internal/redact"
 	"viewer/internal/strictjson"
 )
 
@@ -143,17 +144,17 @@ func NewSessionToken(value string) SessionToken { return SessionToken{value: val
 
 func (t SessionToken) Expose() string { return t.value }
 
-func (t SessionToken) String() string { return redactedText("SessionToken") }
+func (t SessionToken) String() string { return redact.Masked("SessionToken") }
 
 func (t SessionToken) GoString() string { return t.String() }
 
-func (t SessionToken) Format(f fmt.State, _ rune) { writeRedacted(f, "SessionToken") }
+func (t SessionToken) Format(f fmt.State, _ rune) { redact.WriteMasked(f, "SessionToken") }
 
 func (t SessionToken) LogValue() slog.Value { return slog.StringValue(t.String()) }
 
 // MarshalJSON keeps the token out of any JSON (the Rust type has no Serialize).
 func (t SessionToken) MarshalJSON() ([]byte, error) {
-	return refuseMarshal("SessionToken")
+	return redact.RefuseMarshal("SessionToken")
 }
 
 // UnmarshalJSON is `#[serde(transparent)]` over a String.

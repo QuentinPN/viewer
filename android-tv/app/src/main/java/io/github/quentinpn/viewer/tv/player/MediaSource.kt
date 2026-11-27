@@ -37,3 +37,15 @@ private val SECRET_PATTERNS = listOf(
 /** Masks tokens before a libmpv log line reaches logcat. */
 fun redactSecrets(line: String): String =
     SECRET_PATTERNS.fold(line) { acc, pattern -> pattern.replace(acc) { "${it.groupValues[1]}***" } }
+
+/** Any address with a scheme, up to the next blank: a link, a redirect target. */
+private val ADDRESS = Regex("[A-Za-z][A-Za-z0-9+.-]*://\\S+")
+
+/**
+ * [redactSecrets], then every address and each of [values] masked: a Stremio stream's link, where it
+ * redirects and the headers it asks for carry a debrid key.
+ */
+fun redactStreamSecrets(line: String, values: Collection<String>): String {
+    val masked = values.filter { it.isNotEmpty() }.fold(redactSecrets(line)) { acc, value -> acc.replace(value, "***") }
+    return ADDRESS.replace(masked, "***")
+}

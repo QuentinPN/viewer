@@ -26,6 +26,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"viewer/internal/atomicfile"
 )
 
 // SessionFile is the contents of `session.json`. Contains no secret. Same keys,
@@ -145,11 +147,6 @@ func (f *SessionFile) usesURL(url string) bool {
 // file. Pretty JSON as serde's `to_vec_pretty` (two spaces, `<>&` not escaped, no
 // final newline), so the Rust app reads it back.
 func (f *SessionFile) Save(path string) error {
-	ioErr := func(err error) error { return NewCredentialStore("session.json : " + osErrorText(err)) }
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return ioErr(err)
-	}
-	tmp := strings.TrimSuffix(path, filepath.Ext(path)) + ".json.tmp"
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
@@ -157,11 +154,8 @@ func (f *SessionFile) Save(path string) error {
 	if err := enc.Encode(f); err != nil {
 		return NewCredentialStore(err.Error())
 	}
-	if err := os.WriteFile(tmp, bytes.TrimSuffix(buf.Bytes(), []byte("\n")), 0o644); err != nil {
-		return ioErr(err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		return ioErr(err)
+	if err := atomicfile.Write(path, bytes.TrimSuffix(buf.Bytes(), []byte("\n"))); err != nil {
+		return NewCredentialStore("session.json : " + osErrorText(err))
 	}
 	return nil
 }

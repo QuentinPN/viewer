@@ -193,6 +193,10 @@ data class WatchProviders(
     val buy: List<WatchProvider> = emptyList(),
 )
 
+/** The title's ids outside TMDB; only the IMDb one is read (« Regarder maintenant » asks the Stremio addons by it). */
+@Serializable
+data class ExternalIds(val imdb: String? = null)
+
 @Serializable
 data class MediaDetails(
     val tmdbId: Int,
@@ -206,6 +210,7 @@ data class MediaDetails(
     val status: MediaStatus? = null,
     val progress: Double? = null,
     val embyItemId: String? = null,
+    val externalIds: ExternalIds = ExternalIds(),
     val genres: List<Genre> = emptyList(),
     val runtime: Int? = null,
     val seasons: List<Season> = emptyList(),

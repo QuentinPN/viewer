@@ -10,10 +10,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
+
+	"viewer/internal/atomicfile"
 	"viewer/internal/iokind"
 )
 
@@ -201,24 +201,12 @@ func (s *QualityStore) Set(serverID string, caps QualityCaps) error {
 
 // saveQualityFile writes atomically (temp file + rename), like `session.json`.
 func saveQualityFile(file qualityFile, path string) error {
-	ioErr := func(err error) error {
-		return NewSettings("playback-quality.json : " + osErrorText(err))
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return ioErr(err)
-	}
-	// Rust `with_extension("json.tmp")`: the extension is replaced, so
-	// playback-quality.json becomes playback-quality.json.tmp.
-	tmp := strings.TrimSuffix(path, filepath.Ext(path)) + ".json.tmp"
 	text, err := json.MarshalIndent(file, "", "  ")
 	if err != nil {
 		return NewSettings(err.Error())
 	}
-	if err := os.WriteFile(tmp, text, 0o644); err != nil {
-		return ioErr(err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		return ioErr(err)
+	if err := atomicfile.Write(path, text); err != nil {
+		return NewSettings("playback-quality.json : " + osErrorText(err))
 	}
 	return nil
 }

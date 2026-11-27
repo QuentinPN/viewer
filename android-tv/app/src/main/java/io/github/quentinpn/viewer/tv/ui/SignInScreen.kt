@@ -166,8 +166,9 @@ private fun ReadOnlyField(label: String, value: String) {
     }
 }
 
+/** A labelled text field; [secret] hides what is typed. */
 @Composable
-private fun Field(
+internal fun Field(
     label: String,
     value: String,
     onChange: (String) -> Unit,

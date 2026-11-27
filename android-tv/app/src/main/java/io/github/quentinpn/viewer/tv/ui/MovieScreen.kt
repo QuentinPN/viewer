@@ -37,6 +37,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.UserItemData
+import io.github.quentinpn.viewer.tv.ui.stremio.SourcesButton
 
 /**
  * A film: backdrop, year, length, overview, "Reprendre" / "Lire depuis le début", « Bande-annonce », its version
@@ -136,6 +137,7 @@ fun MovieScreen(
                             },
                         ) { onMessage ->
                             trailers?.let { TrailerButton(m.value, client, userId, it, onSessionExpired, onMessage) }
+                            SourcesButton(m.value, client, userId, onSessionExpired)
                         }
                         val cast = remember(m.value.people) { castMembers(m.value) }
                         CastRow(cast, client, images, focusPerson, onOpenPerson)
@@ -163,7 +165,7 @@ private fun Details(
     modifier: Modifier,
     /** The watched mark and favourite buttons, on their own row under the play row. */
     actions: @Composable (onMessage: (String?) -> Unit) -> Unit,
-    /** The trailer button, last of the play row; its message shows under the row. */
+    /** The trailer and « Autres sources » buttons, last of the play row; the trailer's message shows under the row. */
     trailer: @Composable (onMessage: (String?) -> Unit) -> Unit,
 ) {
     val played = movie.userData?.played == true
@@ -204,7 +206,7 @@ private fun Details(
         Facts(movie, studios = chips.studios.isEmpty())
         GenreChips(chips.genres, chips.focusGenre, chips.onOpenGenre)
         StudioChips(movie, chips.studios, chips.focusStudio, chips.onOpenStudio)
-        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(Modifier.padding(top = 8.dp).playRow(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // One first button whatever the resume state, so a reload does not drop its focus
             Button(onClick = { onPlay(movie.id, if (resume) position else 0, version) }, modifier = Modifier.focusRequester(first)) {
                 Text(if (resume) "Reprendre à ${clock(position)}" else "Lire")

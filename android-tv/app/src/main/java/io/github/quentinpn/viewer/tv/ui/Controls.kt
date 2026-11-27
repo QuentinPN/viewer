@@ -2,12 +2,16 @@ package io.github.quentinpn.viewer.tv.ui
 
 import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -15,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -93,3 +98,19 @@ internal fun SectionHeader(title: String, count: Int?, modifier: Modifier = Modi
         count?.let { Text(it.toString(), style = MaterialTheme.typography.titleMedium, color = Palette.textSecondary) }
     }
 }
+
+/**
+ * The play row of a film or episode page: wider than its text column, over the backdrop, so a label never wraps
+ * nor squeezes the rows under it; held within the screen's side margins, it scrolls sideways to a focused button
+ * that would not fit.
+ */
+@Composable
+internal fun Modifier.playRow(): Modifier {
+    val screen = LocalConfiguration.current.screenWidthDp.dp
+    return wrapContentWidth(Alignment.Start, unbounded = true)
+        .widthIn(max = screen - PLAY_ROW_MARGINS)
+        .horizontalScroll(rememberScrollState())
+}
+
+/** The pages' 48 dp side padding, on both sides. */
+private val PLAY_ROW_MARGINS = 96.dp

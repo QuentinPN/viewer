@@ -97,6 +97,7 @@ import io.github.quentinpn.viewer.tv.player.downloadThumbnails
 import io.github.quentinpn.viewer.tv.player.failed
 import io.github.quentinpn.viewer.tv.player.hasStartParameter
 import io.github.quentinpn.viewer.tv.player.keepsAudioRequest
+import io.github.quentinpn.viewer.tv.player.naturalEnd
 import io.github.quentinpn.viewer.tv.player.playbackInfo
 import io.github.quentinpn.viewer.tv.player.playingAudioIndex
 import io.github.quentinpn.viewer.tv.player.playingAudioLanguage
@@ -106,11 +107,13 @@ import io.github.quentinpn.viewer.tv.player.seeksOnRepeat
 import io.github.quentinpn.viewer.tv.player.sleepDue
 import io.github.quentinpn.viewer.tv.player.sleepTimer
 import io.github.quentinpn.viewer.tv.player.step
+import io.github.quentinpn.viewer.tv.player.streamBroke
 import io.github.quentinpn.viewer.tv.player.subtitlePosition
 import io.github.quentinpn.viewer.tv.player.thumbnailsLog
 import io.github.quentinpn.viewer.tv.player.transcodeReasons
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettings
 import io.github.quentinpn.viewer.tv.settings.PlaybackSettingsStore
+import io.github.quentinpn.viewer.tv.stremio.ResumeTracker
 import io.github.quentinpn.viewer.tv.ui.PlayerOverlay
 import io.github.quentinpn.viewer.tv.ui.PlayerUi
 import io.github.quentinpn.viewer.tv.ui.SeekFrame
@@ -136,9 +139,6 @@ private const val READY_CACHE_SECONDS = 3.0
 /** A link message over the picture goes after this long. */
 private const val LINK_NOTICE_MS = 6_000L
 
-/** As the tracker: an end further than this from the duration is a cut stream. */
-private const val NATURAL_END_MARGIN_SECONDS = 30.0
-
 /** "Informations de lecture" is read again this often while it is open. */
 private const val INFO_REFRESH_MS = 1_000L
 
@@ -163,6 +163,10 @@ private const val INFO_REFRESH_MS = 1_000L
  * Its « Format » crops or stretches the picture to the screen, for the current file only.
  * Its « Qualité » asks the server again at another cap and reloads at the same place, for this playback only.
  * A local trailer ([EXTRA_TRAILER]) plays without any report, segment lookup or next episode.
+ * A Stremio stream ([EXTRA_STREMIO_STREAM]) is read from the in-memory list by its opaque id, never from
+ * the Intent, and plays without PlaybackInfo, report, link, segments, chapters, quality or next episode;
+ * one that fails to open or breaks off ends with [RESULT_SOURCE_FAILED]. Where it stops is saved per content
+ * ([ResumeTracker]); with [EXTRA_STREMIO_RESUME] it starts there.
  */
 class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListener, LinkedPlayer {
     private var engine: PlayerEngine? = null
@@ -224,6 +228,15 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     /** A trailer: nothing reported to the server, no segments, no next episode. */
     private var trailer = false
 
+    /** A Stremio stream: nothing asked of the server for it, nor reported. */
+    private var stremio = false
+
+    /** Where the Stremio stream stops, saved per content; null for any other playback. */
+    private var stremioResume: ResumeTracker? = null
+
+    /** An Emby item, not a trailer: reported to the server and linked with a desktop. */
+    private val emby get() = !trailer && !stremio
+
     private val hub by lazy { AppServices.sync(this) }
 
     /** The linked `load` being played: its tracks, and `ready` still to send until [readyJob] ends. */
@@ -248,9 +261,9 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     /** A held ◀ ▶ moved playback: its final position is sent when the key is released. */
     private var heldMoved = false
 
-    /** A player event for the tracker, unless a trailer plays: it never reaches the server. */
+    /** A player event for the tracker, unless a trailer or a Stremio stream plays: it never reaches the server. */
     private fun report(apply: PlaybackTracker.(now: Long) -> List<Report>) {
-        if (!trailer) reporter.event(apply)
+        if (emby) reporter.event(apply)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -282,18 +295,21 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
         val session = AppServices.store(this).load()
         val itemId = intent.getStringExtra(EXTRA_ITEM_ID)
-        if (session == null || itemId == null) {
+        val streamId = intent.getStringExtra(EXTRA_STREMIO_STREAM)
+        if (session == null || (itemId == null && streamId == null)) {
             finish()
             return
         }
         val startTicks = intent.getLongExtra(EXTRA_START_TICKS, 0).coerceAtLeast(0)
-        trailer = intent.getBooleanExtra(EXTRA_TRAILER, false)
+        stremio = streamId != null
+        trailer = !stremio && intent.getBooleanExtra(EXTRA_TRAILER, false)
+        ui.emby = !stremio
         client = AppServices.client(this, session)
         userId = session.userId
         preferences = TrackPreferenceStore(this, session.userId)
         settingsStore = PlaybackSettingsStore(this, session.userId)
         surface.holder.addCallback(this)
-        if (!trailer) {
+        if (emby) {
             hub.attach(this)
             // The session's socket stays open while the player shows
             lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { hub.hold(client, userId) } }
@@ -316,7 +332,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         }
 
         // Read once per session, before the file loads in practice; languages and mode only in the log
-        lifecycleScope.launch {
+        if (!stremio) lifecycleScope.launch {
             val read = AppServices.accountTracks(client, userId)
             account = read
             Log.i(TAG, "account audio=${read?.audioLanguages} default=${read?.playDefaultAudio} sub=${read?.subtitleLanguages} mode=${read?.subtitleMode}")
@@ -339,9 +355,61 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             }
         }
 
+        if (streamId != null) {
+            playStremio(streamId)
+            return
+        }
         // Opened by a desktop's `load` from another screen: the hub kept it
         val linked = if (intent.getBooleanExtra(EXTRA_LINKED, false)) hub.takePendingLoad() else null
-        if (linked != null) linkedLoad(linked) else play(itemId, startTicks, intent.getStringExtra(EXTRA_MEDIA_SOURCE_ID))
+        if (linked != null) linkedLoad(linked) else play(itemId ?: return finish(), startTicks, intent.getStringExtra(EXTRA_MEDIA_SOURCE_ID))
+    }
+
+    /**
+     * The link and headers behind [streamId], from the list it was picked in. Gone with that list (newer
+     * lists, the process restarted), it ends at once as a link that no longer answers.
+     */
+    private fun playStremio(streamId: String) {
+        val resolved = AppServices.stremio(this).resolve(streamId)
+        val source = resolved?.let { MediaSource.parse(it.url) as? MediaSource.Http }
+        if (resolved == null || source == null) {
+            Log.i(TAG, "stremio stream no longer kept")
+            leaveStremio(broken = true)
+            return
+        }
+        current = streamId
+        val resumes = AppServices.stremioResume(this)
+        // A position saved for the content, whatever stream it was read from
+        val start = if (intent.getBooleanExtra(EXTRA_STREMIO_RESUME, false)) resumes.get(resolved.target)?.positionSeconds else null
+        // Before the load: its first events may come before load returns
+        stremioResume = ResumeTracker(resumes, resolved.target, start, ::restartStremio, { runOnUiThread(it) }, { runOnUiThread(::stremioEnded) })
+        settings = settingsStore?.load() ?: PlaybackSettings()
+        ui.reset()
+        ui.night = Night(settings.nightMode)
+        ui.title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+        ui.detail = intent.getStringExtra(EXTRA_DETAIL)
+        // The addon's headers only, never the Emby token; never their values in the log
+        Log.i(TAG, "stremio play headers=${resolved.headers.size} resume=${start != null}")
+        startEngine(MpvPlayerEngine(this, resolved.headers, external = true), source, start ?: 0.0)
+    }
+
+    /** A start past the end of a shorter file, back to 0 and playing (keep-open paused it at the end); false when not sent. */
+    private fun restartStremio(): Boolean {
+        val player = engine
+        val sent = player != null && runCatching {
+            player.seekTo(0.0)
+            player.setPaused(false)
+        }.isSuccess
+        if (!sent) Log.w(TAG, "stremio start past the end not put back to 0")
+        return sent
+    }
+
+    /** The Stremio stream reached its end of file: back to the page, the list again if it was cut short. */
+    private fun stremioEnded() = leaveStremio(streamBroke(endFile = false, ui.position, ui.duration))
+
+    /** Back to the page; [broken]: it lists the sources again, with « Ce lien ne répond plus ». */
+    private fun leaveStremio(broken: Boolean) {
+        if (broken) setResult(RESULT_SOURCE_FAILED)
+        finish()
     }
 
     /** A `load` from the leader: the usual negotiation, its tracks, its position, paused. */
@@ -442,7 +510,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
     /** A user action on the TV, already applied here, sent to the leader in a link. */
     private fun relay(action: CmdAction, seconds: Double? = null) {
-        if (!trailer) hub.command(action, seconds?.let { (it * 1000).roundToLong() })
+        if (emby) hub.command(action, seconds?.let { (it * 1000).roundToLong() })
     }
 
     /** [mediaSourceId]: the version chosen on the film page; null lets the server pick. */
@@ -560,19 +628,23 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
                 return
             }
             // Created once the headers are known: they can only be set before mpv init
-            val player = MpvPlayerEngine(this, chosen.headers + client.streamHeaders())
-            player.addListener(this)
-            engine = player
-            surfaceHolder?.let { holder ->
-                player.attachSurface(holder.surface)
-                holder.surfaceFrame.let { player.resizeSurface(it.width(), it.height()) }
-            }
-            styleSubtitles(player)
-            applyNightMode(player)
-            play(player, source, startTicks / TICKS_PER_SECOND, paused = linked != null)
+            startEngine(MpvPlayerEngine(this, chosen.headers + client.streamHeaders()), source, startTicks / TICKS_PER_SECOND, paused = linked != null)
         } catch (e: EmbyException) {
             ui.status = e.error.message
         }
+    }
+
+    /** The first file of this player: the engine on the surface, the subtitle look and night mode of Réglages. */
+    private fun startEngine(player: MpvPlayerEngine, source: MediaSource, at: Double, paused: Boolean = false) {
+        player.addListener(this)
+        engine = player
+        surfaceHolder?.let { holder ->
+            player.attachSurface(holder.surface)
+            holder.surfaceFrame.let { player.resizeSurface(it.width(), it.height()) }
+        }
+        styleSubtitles(player)
+        applyNightMode(player)
+        play(player, source, at, paused)
     }
 
     /**
@@ -731,6 +803,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     }
 
     override fun onFileLoaded() {
+        stremioResume?.fileLoaded()
         report { fileLoaded(it) }
         runOnUiThread {
             ui.status = null
@@ -807,6 +880,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     }
 
     override fun onPosition(seconds: Double) {
+        stremioResume?.position(seconds)
         report { position(seconds, it) }
         runOnUiThread {
             ui.position = seconds
@@ -817,6 +891,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     }
 
     override fun onDuration(seconds: Double) {
+        stremioResume?.duration(seconds)
         report { duration(seconds); emptyList() }
         runOnUiThread { ui.duration = seconds }
     }
@@ -848,10 +923,17 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     }
 
     override fun onBuffering(buffering: Boolean) {
-        runOnUiThread { if (readyJob == null && !trailer) hub.buffering(buffering) }
+        runOnUiThread { if (readyJob == null && emby) hub.buffering(buffering) }
     }
 
     override fun onEndReached() {
+        if (stremio) {
+            // Saved first, on this thread: the list reopened on the page reads it. The end of a start past the
+            // end of the file is held back: playback goes on from 0
+            if (stremioResume?.endReached() == false) return
+            runOnUiThread(::stremioEnded)
+            return
+        }
         report { ended(it) }
         runOnUiThread {
             // « Fin de l'épisode » not caught by a position: the player stays, without the next one
@@ -861,7 +943,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
             }
             val following = next
             // A cut stream also reaches its end: no next episode then
-            val natural = ui.duration <= 0 || ui.duration - ui.position <= NATURAL_END_MARGIN_SECONDS
+            val natural = naturalEnd(ui.position, ui.duration)
             // Linked, the leader decides what comes next: the last frame stays
             if (ui.linkBusy) return@runOnUiThread
             if (following != null && natural && ui.upNext == null) {
@@ -877,6 +959,12 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         if (replacedEnds > 0) {
             replacedEnds--
             Log.i(TAG, "end of the replaced file")
+            return
+        }
+        // keep-open: mpv ends a Stremio file this way only when it fails to open or breaks off
+        if (stremio) {
+            stremioResume?.endFile()
+            runOnUiThread { leaveStremio(streamBroke(endFile = true, ui.position, ui.duration)) }
             return
         }
         report { ended(it) }
@@ -1119,7 +1207,7 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
     private fun selectTrack(type: TrackType, id: Int?) {
         val player = engine ?: return
         val track = ui.tracks?.find { it.type == type && it.id == id }
-        preferences?.save(type, track?.let(TrackPreference::of) ?: TrackPreference.OFF)
+        if (emby) preferences?.save(type, track?.let(TrackPreference::of) ?: TrackPreference.OFF)
         player.selectTrack(type, id)
         Log.i(TAG, "${type.property}=${player.property(type.property)}")
         ui.tracks = player.tracks()
@@ -1169,24 +1257,39 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
         ui.night = Night(on, state)
     }
 
+    override fun onPause() {
+        super.onPause()
+        // Saved before the engine goes and before the page shows again: its list may read it at once
+        stremioResume?.save()
+        // Before the page shows again: a stream picked there at once creates its engine in onCreate, and
+        // only one mpv may exist at a time
+        if (stremio && isFinishing) releaseEngine()
+    }
+
     override fun onStop() {
         super.onStop()
+        stremioResume?.save()
         // Home button or another app: playback ends, it does not go on unseen
         if (!isFinishing) finish()
     }
 
     override fun onDestroy() {
         // Back, Home or the end: the desktop stops too (`bye stopped`)
-        if (!trailer) {
+        if (emby) {
             if (ui.linkBusy) hub.stopped()
             hub.detach(this)
         }
         // Before release: the tracker keeps the last position mpv reported
         report { closed(it) }
+        stremioResume?.end()
         dropThumbnails()
+        releaseEngine()
+        super.onDestroy()
+    }
+
+    private fun releaseEngine() {
         engine?.release()
         engine = null
-        super.onDestroy()
     }
 
     /** Per-file settings of this playback that a reload would lose. */
@@ -1202,5 +1305,18 @@ class PlayerActivity : ComponentActivity(), SurfaceHolder.Callback, PlayerListen
 
         /** Opened by a desktop's `load`: the hub holds it. */
         const val EXTRA_LINKED = "linked"
+
+        /** The opaque id of a Stremio stream of a kept list; never its link. */
+        const val EXTRA_STREMIO_STREAM = "stremioStream"
+
+        /** With [EXTRA_STREMIO_STREAM]: start where the content was left off, if a position is saved. */
+        const val EXTRA_STREMIO_RESUME = "stremioResume"
+
+        /** What the player shows over a Stremio stream, which it cannot read from Emby. */
+        const val EXTRA_TITLE = "title"
+        const val EXTRA_DETAIL = "detail"
+
+        /** A Stremio stream failed to open or broke off: the page lists the sources again. */
+        const val RESULT_SOURCE_FAILED = RESULT_FIRST_USER
     }
 }

@@ -44,6 +44,7 @@ import io.github.quentinpn.viewer.tv.emby.EmbyClient
 import io.github.quentinpn.viewer.tv.emby.EmbyError
 import io.github.quentinpn.viewer.tv.emby.EmbyException
 import io.github.quentinpn.viewer.tv.emby.UserItemData
+import io.github.quentinpn.viewer.tv.ui.stremio.SourcesButton
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -237,6 +238,7 @@ fun EpisodeScreen(
                             },
                             // Back on the buttons, the episode's title shows again
                             Modifier.height(screen).topOnFocus(scroll),
+                            sources = { SourcesButton(episode, client, userId, onSessionExpired) },
                         ) { onMessage ->
                             // The answer is the episode's new user data: the page shows it at once
                             val update = { userData: UserItemData ->
@@ -301,6 +303,8 @@ private fun Details(
     onPlay: (itemId: String, startTicks: Long, mediaSourceId: String?) -> Unit,
     onNavigate: (BaseItemDto, Focus) -> Unit,
     modifier: Modifier,
+    /** « Autres sources », last of the play row. */
+    sources: @Composable () -> Unit,
     /** The watched mark and favourite buttons, on their own row under the play row. */
     actions: @Composable (onMessage: (String?) -> Unit) -> Unit,
 ) {
@@ -346,7 +350,7 @@ private fun Details(
             Text(it, color = Palette.textSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
         }
         Facts(episode, limit = 3)
-        Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(Modifier.padding(top = 4.dp).playRow(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // One first button whatever the resume state, so a reload does not drop its focus
             Button(onClick = { onPlay(episode.id, if (resume) position else 0, version) }, modifier = Modifier.focusRequester(play)) {
                 Text(if (resume) "Reprendre à ${clock(position)}" else "Lire")
@@ -354,6 +358,7 @@ private fun Details(
             if (resume) OutlinedButton(onClick = { onPlay(episode.id, 0, version) }) { Text("Lire depuis le début") }
             // The desktop leads, the TV follows
             WatchWithDesktopButton()
+            sources()
         }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             actions { actionMessage = it }

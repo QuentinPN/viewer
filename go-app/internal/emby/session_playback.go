@@ -53,26 +53,12 @@ func (s *EmbyService) SegmentQuery(ctx context.Context, itemID string) ([]segs.S
 		ms := uint64(*t / 10_000)
 		durationMs = &ms
 	}
-	var ids segs.MediaIDs
-	var episode *segs.EpisodeNumber
-	asked := false
-	switch dto.ItemType {
-	case "Movie":
-		ids, asked = segs.MediaIDsFromProviderIDs(dto.ProviderIDs), true
-	case "Episode":
-		if sid := dto.SeriesID; sid != nil && isID(*sid) && dto.ParentIndexNumber != nil && dto.IndexNumber != nil {
-			series, err := client.Item(ctx, userID, *sid)
-			switch {
-			case err == nil && series.ID == *sid:
-				ids, asked = segs.MediaIDsFromProviderIDs(series.ProviderIDs), true
-				episode = &segs.EpisodeNumber{Season: *dto.ParentIndexNumber, Episode: *dto.IndexNumber}
-			case errors.Is(err, ErrSessionExpired):
-				return nil, nil, s.expireOn401(client, ErrSessionExpired)
-			}
-			// Otherwise the series is only needed for its ids: no query, no error.
-		}
+	ids, episode, asked, err := externalIDs(ctx, client, userID, &dto)
+	if errors.Is(err, ErrSessionExpired) {
+		return nil, nil, s.expireOn401(client, ErrSessionExpired)
 	}
-	if !asked || ids.IsEmpty() {
+	// Any other failure: the series is only needed for its ids: no query, no error.
+	if err != nil || !asked || ids.IsEmpty() {
 		return markers, nil, nil
 	}
 	return markers, &segs.Query{IDs: ids, Episode: episode, DurationMs: durationMs}, nil

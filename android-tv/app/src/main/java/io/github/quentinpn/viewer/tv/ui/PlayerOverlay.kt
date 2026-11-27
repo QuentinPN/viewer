@@ -195,6 +195,9 @@ class PlayerUi {
     /** The desktop list, open over the player. */
     var linkPicker by mutableStateOf<SyncHub?>(null)
 
+    /** An Emby item: the menu offers its quality, the link with a desktop and its playback information. */
+    var emby by mutableStateOf(true)
+
     /** Target of the last ◀ ▶ seek while its thumbnail may show; null once the seek settles. */
     var seekTarget by mutableStateOf<Double?>(null)
         private set
@@ -340,7 +343,7 @@ fun PlayerOverlay(
             SkipButton(skip, !ui.menuOpen && ui.skipArmed, !ui.menuOpen, onSkip,Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = maxHeight * ui.covered + 24.dp))
         }
         ui.tracks?.let {
-            TrackMenu(it, MenuState(ui.delays, ui.speed, ui.fit, ui.night, ui.sleep.choice, ui.item, ui.quality, ui.linkBusy), MenuActions(onSelect, onDelay, onSpeed, onFit, onNight, onSleep, onInfo, onQualityStep, onQualityApply, onLink), Modifier.align(Alignment.CenterEnd))
+            TrackMenu(it, MenuState(ui.delays, ui.speed, ui.fit, ui.night, ui.sleep.choice, ui.item, ui.quality, ui.linkBusy, ui.emby), MenuActions(onSelect, onDelay, onSpeed, onFit, onNight, onSleep, onInfo, onQualityStep, onQualityApply, onLink), Modifier.align(Alignment.CenterEnd))
         }
         ui.info?.let { InfoMenu(it, Modifier.align(Alignment.CenterEnd)) }
         if (ui.chapterMenu) ChapterMenu(ui.chapters, chapterIndex(ui.chapters, ui.position), onChapter, Modifier.align(Alignment.CenterEnd))
@@ -533,7 +536,7 @@ private sealed interface MenuRow {
 }
 
 /** What the rows of the track menu show beyond the tracks. */
-private class MenuState(val delays: Delays, val speed: Double, val fit: VideoFit, val night: Night, val sleep: SleepChoice, val item: SleepItem?, val quality: Quality, val linkBusy: Boolean)
+private class MenuState(val delays: Delays, val speed: Double, val fit: VideoFit, val night: Night, val sleep: SleepChoice, val item: SleepItem?, val quality: Quality, val linkBusy: Boolean, val emby: Boolean)
 
 private class MenuActions(
     val select: (TrackType, Int?) -> Unit,
@@ -576,13 +579,16 @@ private fun menuRows(tracks: List<Track>, state: MenuState): List<MenuRow> = bui
     if (subs.any { it.selected }) add(MenuRow.Delay(DelayKind.Subtitle, delays.subtitle))
     add(MenuRow.Delay(DelayKind.Audio, delays.audio))
     add(MenuRow.Header("Lecture"))
-    add(MenuRow.QualityRow(state.quality))
+    // Asked of the Emby server: nothing to offer for a Stremio stream
+    if (state.emby) add(MenuRow.QualityRow(state.quality))
     add(MenuRow.Speed(state.speed))
     add(MenuRow.Fit(state.fit))
     add(MenuRow.NightMode(state.night))
     add(MenuRow.Sleep(state.sleep, state.item))
-    add(MenuRow.Link(state.linkBusy))
-    add(MenuRow.Info)
+    if (state.emby) {
+        add(MenuRow.Link(state.linkBusy))
+        add(MenuRow.Info)
+    }
 }
 
 @Composable

@@ -180,6 +180,18 @@ h2 {
 .glass-select:hover {
   background-color: var(--fill-glass-hover);
 }
+/* Radio/checkbox row of the option panels; each panel sets its own gap,
+   padding, font size, hover and focus ring. */
+.choice {
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.choice input {
+  accent-color: var(--color-accent);
+  margin: 0;
+}
 .glass-select option {
   background: var(--color-elevated);
   color: var(--color-text);

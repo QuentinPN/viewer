@@ -396,3 +396,78 @@ func Test_go_reporter_resends_a_lost_stop_report(t *testing.T) {
 		t.Fatal(paths)
 	}
 }
+
+// What a Stremio playback (stremio_play) leaves to the tracker: a Shutdown ends the
+// Emby playback, playing or only announced, and the events of the next file,
+// which no Begin announced, report nothing.
+func Test_go_events_after_a_shutdown_report_nothing(t *testing.T) {
+	t0 := time.Now()
+	later := []player.PlayerEvent{
+		player.EndFile{Reason: player.EndStopped}, player.FileLoaded{}, player.Duration{Seconds: 7200},
+		player.TimePos{Seconds: 30}, player.Paused{Paused: true}, player.Paused{Paused: false},
+		player.Seeked{}, player.TimePos{Seconds: 90}, player.EndFile{Reason: player.EndError},
+		player.EndFile{Reason: player.EndEOF}, player.Shutdown{},
+	}
+	feed := func(tr *Tracker) {
+		t.Helper()
+		for i, ev := range later {
+			rptWant(t, tr.OnEvent(ev, t0.Add(time.Duration(i)*time.Second)))
+		}
+		rptWant(t, tr.Tick(t0.Add(time.Hour)))
+	}
+
+	// Playing: one stop at the last position, then silence.
+	playing := rptLoaded(t, t0)
+	playing.OnEvent(player.TimePos{Seconds: 61}, t0)
+	stop := playing.OnEvent(player.Shutdown{}, t0)
+	rptWant(t, stop, rptKind{Kind: ReportStopped})
+	if body := rptBody(t, stop[0]); body["Failed"] != false || body["PositionTicks"] != 610_000_000.0 {
+		t.Fatal(body)
+	}
+	feed(playing)
+
+	// Announced, its file not loaded yet: nothing was reported, nothing will be.
+	var pending Tracker
+	pending.Begin(rptPlayback(), t0)
+	rptWant(t, pending.OnEvent(player.Shutdown{}, t0))
+	feed(&pending)
+
+	// Nothing announced at all.
+	var idle Tracker
+	feed(&idle)
+}
+
+// The Reporter itself: without an announced playback, player events send no
+// report; after the Shutdown that ends one, the next file's events send none.
+func Test_go_reporter_ignores_events_without_a_playback(t *testing.T) {
+	server, fx, _ := signedInBrowser(t)
+	r := NewReporter(fx.service, nil)
+	stremio := func() {
+		r.PlayerEvent(player.FileLoaded{})
+		r.PlayerEvent(player.TimePos{Seconds: 61})
+		r.PlayerEvent(player.Paused{Paused: true})
+		r.PlayerEvent(player.Seeked{})
+		r.PlayerEvent(player.TimePos{Seconds: 62})
+		r.PlayerEvent(player.EndFile{Reason: player.EndError})
+	}
+	stremio()
+	if !r.Flush(5 * time.Second) {
+		t.Fatal("flush")
+	}
+	r.Begin(rptPlayback())
+	r.PlayerEvent(player.FileLoaded{})
+	r.PlayerEvent(player.Shutdown{})
+	stremio()
+	if !r.Close(5 * time.Second) {
+		t.Fatal("close")
+	}
+	var paths []string
+	for _, req := range server.requests() {
+		if strings.HasPrefix(req.Path, "/emby/Sessions/Playing") {
+			paths = append(paths, req.Path)
+		}
+	}
+	if !reflect.DeepEqual(paths, []string{"/emby/Sessions/Playing", "/emby/Sessions/Playing/Stopped"}) {
+		t.Fatal(paths)
+	}
+}
