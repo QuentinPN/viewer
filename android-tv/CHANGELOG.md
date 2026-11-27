@@ -2,6 +2,19 @@
 
 Chaque section est écrite par Gitea Actions au merge dans `main`, avec `versionName` et `versionCode` (ADR 0126).
 
+## 1.6.0 — 2026-11-23
+
+### Nouveautés
+
+- seasonal launcher icon and in-app logo, with an on/off setting (android)
+- season calendar for the seasonal logo, shared test vectors (brand)
+- hard hat raccoon for the Android debug build (brand)
+- replace the logo with the raccoon mascot (brand)
+
+### Corrections
+
+- in-app logo follows the date and the setting while the app is open (android)
+
 ## 1.5.0 — 2026-11-22
 
 ### Nouveautés
