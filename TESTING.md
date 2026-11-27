@@ -119,6 +119,7 @@ Les points ci-dessous ne s'automatisent pas : image et son réels, matériel, hu
 ### Stremio
 
 - Réglages › Stremio : connexion au vrai compte, liste des addons de flux, mauvais mot de passe, déconnexion (plus d'entrée `stremio` dans le Gestionnaire d'identification).
+- Android TV, sur la Shield avec le build debug piloté par `adb shell input` : Réglages › Stremio (connexion, addons, déconnexion) ; « Autres sources » sur un film et un épisode Emby (focus sur le premier flux, « Fermer » visible, Retour rend le focus au bouton, rangée de boutons sur une ligne même avec « Reprendre à ») ; lecture https d'un flux debrid (décodage mediacodec) ; reprise locale (« Reprendre à 1:34 » proposé, lecture repartie à 1:34, position gardée après réinstallation) ; « Regarder maintenant » d'une série Demander (saison 2, épisode 2, bon épisode lu) ; logcat sans adresse, clé ni `authKey`. Dernier passage le 2026-11-27. Non vérifiés : la liste rouverte sur « Ce lien ne répond plus », le départ au-delà de la fin d'un fichier plus court. Limite : après « Se déconnecter » (Stremio comme Demandes), le focus tombe plus bas dans les Réglages.
 
 ### Parcours
 

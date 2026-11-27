@@ -69,6 +69,23 @@ internal fun DialogCard(title: String, onDismiss: () -> Unit, width: Dp = 460.dp
 /** Height of the action buttons of the Demander pages and dialogs (the filter pills keep GlassButton's 36 dp). */
 internal val BUTTON_HEIGHT = 44.dp
 
+/**
+ * Asks [target] for the focus each frame until [taken] says it holds it, ten frames at most: a row of a
+ * lazy list, or one that replaces the focused row, may be laid out a frame after the first request.
+ */
+@Composable
+internal fun FocusUntilTaken(target: FocusRequester, key: Any?, taken: () -> Boolean) {
+    LaunchedEffect(key) {
+        repeat(FOCUS_TRIES) {
+            withFrameNanos {}
+            if (taken()) return@LaunchedEffect
+            runCatching { target.requestFocus() }
+        }
+    }
+}
+
+private const val FOCUS_TRIES = 10
+
 /** Takes the focus once laid out, one frame later. */
 @Composable
 internal fun FocusOnOpen(target: FocusRequester, key: Any? = Unit) {

@@ -350,7 +350,7 @@ private fun Details(
             Text(it, color = Palette.textSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
         }
         Facts(episode, limit = 3)
-        Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(Modifier.padding(top = 4.dp).playRow(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // One first button whatever the resume state, so a reload does not drop its focus
             Button(onClick = { onPlay(episode.id, if (resume) position else 0, version) }, modifier = Modifier.focusRequester(play)) {
                 Text(if (resume) "Reprendre à ${clock(position)}" else "Lire")

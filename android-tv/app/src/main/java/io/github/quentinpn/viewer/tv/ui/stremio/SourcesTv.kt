@@ -24,6 +24,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -56,6 +57,7 @@ import io.github.quentinpn.viewer.tv.ui.Palette
 import io.github.quentinpn.viewer.tv.ui.episodeLabel
 import io.github.quentinpn.viewer.tv.ui.requests.DialogCard
 import io.github.quentinpn.viewer.tv.ui.requests.FocusOnOpen
+import io.github.quentinpn.viewer.tv.ui.requests.FocusUntilTaken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -113,7 +115,7 @@ internal fun SourcesButton(item: BaseItemDto, client: EmbyClient, userId: String
             launcher.open(SourcesSource({ stremioTarget(item, client, userId) }, title, detail))
         },
         modifier = Modifier.focusRequester(button),
-    ) { Text("Autres sources") }
+    ) { Text("Autres sources", maxLines = 1, softWrap = false) }
     SourcesHost(launcher, repository, onSessionExpired) { refocus++ }
     // Back on the page, from the list or the player: the focus returns to the button, one frame later
     if (refocus > 0) FocusOnOpen(button, refocus)
@@ -254,15 +256,12 @@ private fun SourcesDialog(
                     resumeText?.let { label -> ResumeChoice(label, fromStart) { fromStart = it } }
                     // The choice takes its row from the list: the dialog stays the same height
                     val listHeight = if (resumeText != null) LIST_HEIGHT - CHOICE_ROW else LIST_HEIGHT
-                    SectionList(sections, firstRow, first, listHeight) { row -> onPlay(row, resumeText != null && !fromStart) }
-                    // Once, on the first stream to arrive; later answers never move the focus
-                    if (firstRow != null && !firstFocused) {
-                        LaunchedEffect(firstRow) {
-                            withFrameNanos {}
-                            runCatching { first.requestFocus() }
-                            firstFocused = true
-                        }
+                    // Shrinks on a short screen: « Fermer » under it always keeps its height
+                    SectionList(sections, firstRow, first, listHeight, Modifier.weight(1f, fill = false), { firstFocused = true }) { row ->
+                        onPlay(row, resumeText != null && !fromStart)
                     }
+                    // Once, on the first stream to arrive; later answers never move the focus
+                    if (firstRow != null && !firstFocused) FocusUntilTaken(first, firstRow) { firstFocused }
                 }
             }
         }
@@ -295,9 +294,17 @@ private fun ResumeChoice(label: String, fromStart: Boolean, onChoice: (fromStart
 }
 
 @Composable
-private fun SectionList(sections: List<SourceSection>, firstRow: String?, first: FocusRequester, maxHeight: Dp, onPlay: (StreamRow) -> Unit) {
+private fun SectionList(
+    sections: List<SourceSection>,
+    firstRow: String?,
+    first: FocusRequester,
+    maxHeight: Dp,
+    modifier: Modifier,
+    onFirstFocused: () -> Unit,
+    onPlay: (StreamRow) -> Unit,
+) {
     LazyColumn(
-        Modifier.heightIn(max = maxHeight),
+        modifier.heightIn(max = maxHeight),
         contentPadding = PaddingValues(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -322,7 +329,11 @@ private fun SectionList(sections: List<SourceSection>, firstRow: String?, first:
                         { Column { row.details.forEach { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } } }
                     },
                     trailingContent = row.size?.let { size -> { Text(size) } },
-                    modifier = if (row.id == firstRow) Modifier.focusRequester(first) else Modifier,
+                    modifier = if (row.id == firstRow) {
+                        Modifier.focusRequester(first).onFocusChanged { if (it.isFocused) onFirstFocused() }
+                    } else {
+                        Modifier
+                    },
                 )
             }
             items(section.notes.size, key = { "note-${section.index}-$it" }) { i ->

@@ -206,7 +206,7 @@ private fun Details(
         Facts(movie, studios = chips.studios.isEmpty())
         GenreChips(chips.genres, chips.focusGenre, chips.onOpenGenre)
         StudioChips(movie, chips.studios, chips.focusStudio, chips.onOpenStudio)
-        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(Modifier.padding(top = 8.dp).playRow(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // One first button whatever the resume state, so a reload does not drop its focus
             Button(onClick = { onPlay(movie.id, if (resume) position else 0, version) }, modifier = Modifier.focusRequester(first)) {
                 Text(if (resume) "Reprendre à ${clock(position)}" else "Lire")
